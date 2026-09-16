@@ -16,6 +16,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **Two chained mBoosters get their own settings and calibration.** Which pedal sits on
+  the USB unit is now read from the pedal's own heartbeat instead of assumed to be the
+  throttle.
+
 - **AB9 engine vibration now has a 20hz floor** 
 
 - **A CM2 dash shows data on every dashboard, not just the one it started on.** Switching

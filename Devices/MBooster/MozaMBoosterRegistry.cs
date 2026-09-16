@@ -50,6 +50,8 @@ namespace MozaPlugin.Devices.MBooster
         private readonly Action<string, string>? _onSerialResolved;
         private readonly Func<string, bool[]?>? _connectivitySeedLookup;
         private readonly Action<string, bool[]>? _onConnectivityResolved;
+        private readonly Func<string, byte[]?>? _chainRolesSeedLookup;
+        private readonly Action<string, byte[]>? _onChainRolesResolved;
 
         // Highest merged position (0..100) each role has reached this session —
         // diagnostics-only, so a support bundle can prove whether pedal input
@@ -143,7 +145,9 @@ namespace MozaPlugin.Devices.MBooster
             Func<string, double>? customEffectFormulaEvaluator = null,
             Action<string, string>? onSerialResolved = null,
             Func<string, bool[]?>? connectivitySeedLookup = null,
-            Action<string, bool[]>? onConnectivityResolved = null)
+            Action<string, bool[]>? onConnectivityResolved = null,
+            Func<string, byte[]?>? chainRolesSeedLookup = null,
+            Action<string, byte[]>? onChainRolesResolved = null)
         {
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
@@ -153,6 +157,8 @@ namespace MozaPlugin.Devices.MBooster
             _onSerialResolved = onSerialResolved;
             _connectivitySeedLookup = connectivitySeedLookup;
             _onConnectivityResolved = onConnectivityResolved;
+            _chainRolesSeedLookup = chainRolesSeedLookup;
+            _onChainRolesResolved = onChainRolesResolved;
         }
 
         /// <summary>
@@ -216,11 +222,20 @@ namespace MozaPlugin.Devices.MBooster
                         try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
                         catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
                     };
+                    // Same for the host/remote locality of each role — the seed
+                    // for the NEXT controller's role→unit map.
+                    c.ChainRolesResolved += loc =>
+                    {
+                        try { _onChainRolesResolved?.Invoke(c.Identity, loc); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnChainRolesResolved: {ex.Message}"); }
+                    };
                     c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                     // Arm phantom-axis protection immediately from the persisted
                     // last-known connectivity (live diagnostic overrides later).
                     try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(kvp.Key)); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
+                    try { c.SeedChainRoles(_chainRolesSeedLookup?.Invoke(kvp.Key)); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Chain-roles seed: {ex.Message}"); }
                     _byIdentity[kvp.Key] = c;
                     _order.Add(c);
                     (added ??= new List<MBoosterDeviceController>()).Add(c);
@@ -347,9 +362,16 @@ namespace MozaPlugin.Devices.MBooster
                     try { _onConnectivityResolved?.Invoke(c.Identity, conn); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnConnectivityResolved: {ex.Message}"); }
                 };
+                c.ChainRolesResolved += loc =>
+                {
+                    try { _onChainRolesResolved?.Invoke(c.Identity, loc); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnChainRolesResolved: {ex.Message}"); }
+                };
                 c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                 try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(c.Identity)); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
+                try { c.SeedChainRoles(_chainRolesSeedLookup?.Invoke(c.Identity)); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Chain-roles seed: {ex.Message}"); }
                 _byIdentity[c.Identity] = c;
                 _order.Add(c);
                 _orderSnapshot = _order.ToArray();

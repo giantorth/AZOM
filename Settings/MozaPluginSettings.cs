@@ -168,6 +168,15 @@ namespace MozaPlugin.Settings
         public Dictionary<string, bool[]> MBoosterKnownPedals { get; set; }
             = new Dictionary<string, bool[]>(StringComparer.OrdinalIgnoreCase);
 
+        // Last-known host/remote locality of each pedal role per mBooster lane,
+        // indexed [throttle, brake, clutch] (0 unknown, 1 on the host unit, 2 on
+        // a chained unit), keyed like MBoosterKnownPedals. Locality rather than
+        // device ids: the same unit is 0x12 on USB and 0x19 routed. Seeds the
+        // role→unit map before the host's first heartbeat, the only live source
+        // (MBoosterDeviceController.RoleLocality).
+        public Dictionary<string, int[]> MBoosterKnownChainRoles { get; set; }
+            = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —

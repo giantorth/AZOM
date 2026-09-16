@@ -46,8 +46,8 @@ namespace MozaPlugin.Devices.MBooster
     /// disposes and removes a controller whose port disappears. State on the
     /// controller would die mid-flow. The registry keys controllers by USB
     /// device-instance identity, which survives the re-enumeration, so a run
-    /// holds the identity and re-resolves the controller (and its role→device
-    /// mapping, which may have changed) on every step.
+    /// holds the identity and re-resolves the controller on every step. The
+    /// target unit itself is resolved once at start and pinned (_dev).
     ///
     /// Driven by one <see cref="System.Timers.Timer"/> rather than a
     /// DispatcherTimer in the settings panel: SettingsControl's
@@ -119,6 +119,12 @@ namespace MozaPlugin.Devices.MBooster
         // Run state, all under _lock.
         private string? _identity;
         private int _axisIndex;
+        // The unit this run addresses, resolved once at start and pinned: it
+        // must not drift mid-routine (the reboot re-enumerates the port), and a
+        // chained pedal whose unit hasn't answered yet has no right address at
+        // all (KG143GNC: the throttle routine went to the brake unit, which
+        // acked, logged T-PD-C-S and did nothing).
+        private byte _dev;
         private string? _rolePrefix;
         private MBoosterCalKind _kind;
         private MBoosterCalStep _step;
@@ -195,12 +201,14 @@ namespace MozaPlugin.Devices.MBooster
             if (!controller.IsAxisMotorized(axisIndex)) { error = "pedal has no motor"; return false; }
             string? prefix = controller.RolePrefixForAxis(axisIndex);
             if (string.IsNullOrEmpty(prefix)) { error = "pedal role unresolved"; return false; }
+            if (!controller.TryCalibDeviceForAxis(axisIndex, out byte dev)) { error = "pedal unit not resolved yet"; return false; }
 
             lock (_lock)
             {
                 if (Snapshot().IsRunning) { error = "a calibration is already running"; return false; }
                 _identity = controller.Identity;
                 _axisIndex = axisIndex;
+                _dev = dev;
                 _rolePrefix = prefix;
                 _kind = kind;
                 _sawDisconnect = false;
@@ -213,7 +221,6 @@ namespace MozaPlugin.Devices.MBooster
             }
 
             controller.SetEffectsSuspended(true);
-            byte dev = controller.CalibDeviceForAxis(axisIndex);
 
             if (kind == MBoosterCalKind.Travel)
             {
@@ -257,8 +264,7 @@ namespace MozaPlugin.Devices.MBooster
 
             var controller = ResolveController();
             if (controller != null && controller.IsConnected)
-                controller.SendIntWrite("mbooster-soft-reboot", 0,
-                                        controller.CalibDeviceForAxis(_axisIndex));
+                controller.SendIntWrite("mbooster-soft-reboot", 0, _dev);
             MozaLog.Info("[AZOM/mBooster] calibration cancelled — rebooting the pedal, nothing committed");
             Finish(MBoosterCalStep.Failed, "cancelled");
         }
@@ -360,8 +366,7 @@ namespace MozaPlugin.Devices.MBooster
                 case MBoosterCalStep.TravelSweeping:
                     if (!expired) break;
                     if (!connected) { Fail(controller, "the pedal disconnected mid-calibration"); break; }
-                    controller!.SendIntWrite($"mbooster-{_rolePrefix}-cal-stop", TravelParam,
-                                             controller.CalibDeviceForAxis(_axisIndex));
+                    controller!.SendIntWrite($"mbooster-{_rolePrefix}-cal-stop", TravelParam, _dev);
                     // The firmware narrates a real sweep on group 0x0E
                     // ("Pedal Calib Start/Backward/Forward/pressure
                     // Calculating"). Silence across the whole window means it
@@ -438,16 +443,14 @@ namespace MozaPlugin.Devices.MBooster
                             Fail(controller, "the pedal did not come back after the reboot");
                         break;
                     }
-                    controller!.SendIntWrite("mbooster-motor-cal-enter", MotorEnterParam,
-                                             controller.CalibDeviceForAxis(_axisIndex));
+                    controller!.SendIntWrite("mbooster-motor-cal-enter", MotorEnterParam, _dev);
                     Advance(MBoosterCalStep.MotorEnteringDebug, MotorEnterSeconds, "calibrating");
                     break;
 
                 case MBoosterCalStep.MotorEnteringDebug:
                     if (!expired) break;
                     if (!connected) { Fail(controller, "the pedal disconnected mid-calibration"); break; }
-                    controller!.SendIntWrite("mbooster-motor-cal-locate", MotorLocateParam,
-                                             controller.CalibDeviceForAxis(_axisIndex));
+                    controller!.SendIntWrite("mbooster-motor-cal-locate", MotorLocateParam, _dev);
                     lock (_lock) _locateStartedUtc = DateTime.UtcNow;
                     Advance(MBoosterCalStep.MotorLocateWait, MotorFirstPollSeconds, "calibrating");
                     break;
@@ -499,20 +502,18 @@ namespace MozaPlugin.Devices.MBooster
                 if ((DateTime.UtcNow - _lastStateReadUtc).TotalSeconds < 1.0) return;
                 _lastStateReadUtc = DateTime.UtcNow;
             }
-            controller.SendRead("mbooster-calibration-state",
-                                controller.CalibDeviceForAxis(_axisIndex));
+            controller.SendRead("mbooster-calibration-state", _dev);
         }
 
         /// <summary>Last motor-locate status this run's target device reported:
         /// <see cref="MotorStateRunning"/>, <see cref="MotorStateComplete"/>,
         /// or -1 if it has not answered.</summary>
         private int MotorStateOf(MBoosterDeviceController? controller)
-            => controller == null ? -1 : controller.MotorCalStateFor(controller.CalibDeviceForAxis(_axisIndex));
+            => controller == null ? -1 : controller.MotorCalStateFor(_dev);
 
         private void PollMotor(MBoosterDeviceController controller)
         {
-            controller.SendIntWrite("mbooster-motor-cal-locate", MotorQueryParam,
-                                    controller.CalibDeviceForAxis(_axisIndex));
+            controller.SendIntWrite("mbooster-motor-cal-locate", MotorQueryParam, _dev);
             Advance(MBoosterCalStep.MotorPolling, MotorPollIntervalSeconds, "calibrating");
         }
 
@@ -520,8 +521,7 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (controller != null && controller.IsConnected)
             {
-                controller.SendIntWrite("mbooster-soft-reboot", 0,
-                                        controller.CalibDeviceForAxis(_axisIndex));
+                controller.SendIntWrite("mbooster-soft-reboot", 0, _dev);
                 controller.SetEffectsSuspended(false);
             }
             if (next == MBoosterCalStep.Rebooting)

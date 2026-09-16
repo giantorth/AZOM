@@ -140,6 +140,33 @@ namespace MozaPlugin.Devices.MBooster
         // acted on) from a half-read block — see LogRoutingDecision.
         private readonly bool[] _axisTypeSeen = new bool[3];
 
+        // ===== Which physical unit each role lives on, from the host heartbeat =====
+        // The host's group-0x0E heartbeat names the pedals it reaches over the
+        // chain link — "<Role> Mean Loss Rate / Max Loss Rate / Max Recv Gap" —
+        // and prints "<T|B|C>-PD:[min …]" with min 65535 for any role that is
+        // not physically on it (absent or chained). A passive pedal wired to
+        // the host produces neither (bundles ARE6993X, J5PSSQG8, NWS6EY7X,
+        // A6N521CS); every genuine chain shows both (KG143GNC, 34JAASN5,
+        // C3SFMXWB). Accumulated per block — header "Active pedal heartbeat
+        // log", committed on "Log the end" or the next header — so a
+        // re-plugged chain is re-learned within one heartbeat.
+        public const byte LocalityUnknown = 0, LocalityHost = 1, LocalityRemote = 2;
+        private readonly bool[] _blockRemote = new bool[3];
+        private readonly double[] _blockLocalMin = { double.NaN, double.NaN, double.NaN };
+        private bool _blockOpen;
+        // "min 65535.00000" is the firmware's unset marker; real pedals read within ±30°.
+        private const double LocalMinSentinel = 60000.0;
+        // Committed role-indexed [T,B,C] locality. Volatile whole-array swap: read
+        // by the routing resolvers and the diagnostics dump. Topology, not
+        // connection state — kept across a port bounce like _axisTypes.
+        private volatile byte[]? _roleLocality;
+        private volatile bool _roleLocalityIsSeed;
+        private string _lastLocalityLogged = "";
+        public byte[]? RoleLocality => _roleLocality;
+        public bool RoleLocalityIsSeed => _roleLocalityIsSeed;
+        public static string LocalityLabel(byte v) =>
+            v == LocalityHost ? "host" : v == LocalityRemote ? "remote" : "?";
+
         /// <summary>
         /// Whether the device has reported a type for every pedal slot the
         /// diagnostic covers, i.e. a WHOLE block has been read. The three lines
@@ -309,6 +336,15 @@ namespace MozaPlugin.Devices.MBooster
         public event Action<bool[]>? ConnectivityResolved;
 
         /// <summary>
+        /// Fired when the host heartbeat has settled which roles live on the
+        /// host and which on a chained unit — role-indexed [T,B,C] of
+        /// <see cref="LocalityHost"/> / <see cref="LocalityRemote"/>. LIVE data
+        /// only, on change. The plugin persists it so the next controller is
+        /// seeded ahead of the first heartbeat (~1 min).
+        /// </summary>
+        public event Action<byte[]>? ChainRolesResolved;
+
+        /// <summary>
         /// Fired when the active/passive pedal-type diagnostic settles (or
         /// changes) the motor/config device-id routing for this lane — see
         /// <see cref="MotorDeviceForCurrentAxis"/>. Arg: true on the FIRST
@@ -355,6 +391,38 @@ namespace MozaPlugin.Devices.MBooster
                 $"T={connected.Length > 0 && connected[0]} B={connected.Length > 1 && connected[1]} C={connected.Length > 2 && connected[2]} " +
                 "(live diagnostic will confirm/override)");
             RecomputeChainRoleMap();
+        }
+
+        /// <summary>
+        /// Seed <see cref="RoleLocality"/> from the persisted last-known value.
+        /// A seed may replace an earlier seed (the serial-keyed entry lands after
+        /// the transport-keyed one) but never live evidence. Lets the connect-
+        /// time apply and the effect workers address the right unit before the
+        /// host's first heartbeat.
+        /// </summary>
+        public void SeedChainRoles(byte[]? locality)
+        {
+            if (locality == null || locality.Length == 0) return;
+            if (_roleLocality != null && !_roleLocalityIsSeed) return;
+            bool any = false;
+            foreach (var v in locality) if (v != LocalityUnknown) any = true;
+            if (!any) return;
+            _roleLocality = (byte[])locality.Clone();
+            _roleLocalityIsSeed = true;
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} seeded pedal locality from cache: {LocalitySignature(locality)} (live heartbeat will confirm/override)");
+            RecomputeChainRoleMap();
+        }
+
+        private static string LocalitySignature(byte[] loc)
+        {
+            var sb = new StringBuilder();
+            for (int r = 0; r < 3 && r < loc.Length; r++)
+            {
+                if (loc[r] == LocalityUnknown) continue;
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(RoleName(r)).Append('=').Append(LocalityLabel(loc[r]));
+            }
+            return sb.Length == 0 ? "(none)" : sb.ToString();
         }
 
         public MBoosterDeviceController(
@@ -569,6 +637,8 @@ namespace MozaPlugin.Devices.MBooster
         /// Input) — the resolved role map when it exists, else the host
         /// <see cref="MozaProtocol.DeviceMain"/>. Never the count-based chain
         /// guess that <see cref="MotorDeviceForCurrentAxis"/> falls back to.
+        /// False when the heartbeat says the role lives on a chained unit that
+        /// has not been placed yet — the caller must skip the write.
         ///
         /// <para>Config writes are flash-committed on the unit that receives
         /// them, so a guessed id does durable damage: on a single unit hosting a
@@ -598,12 +668,24 @@ namespace MozaPlugin.Devices.MBooster
         /// own <see cref="IsAxisMotorized"/> gate is fail-open in that same
         /// window).</para>
         /// </summary>
-        public byte ConfigDeviceForRole(int roleIndex, int axisFallback)
+        public bool TryConfigDeviceForRole(int roleIndex, int axisFallback, out byte dev)
         {
             var map = _roleToDevice;
             if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
-                && map.TryGetValue(roleIndex, out var dev))
-                return dev;
+                && map.TryGetValue(roleIndex, out dev))
+                return true;
+            // Heartbeat locality (see RoleLocality). Host-local: the host, even
+            // while the map is being rebuilt after a port bounce. Chained but not
+            // yet answered: NO id is right — not the host (34JAASN5 flashed a
+            // foreign pedal's registers into it) and not a guess (KG143GNC sent
+            // the throttle's config and calibration to the brake unit). The
+            // RoutingResolved re-apply covers it once the unit is placed.
+            var loc = _roleLocality;
+            if (roleIndex >= 0 && loc != null && roleIndex < loc.Length)
+            {
+                if (loc[roleIndex] == LocalityHost) { dev = HostDeviceId; return true; }
+                if (loc[roleIndex] == LocalityRemote) { dev = 0; return false; }
+            }
             // ROUTED lane: neither fallback below applies. The reasoning above
             // ("0x12 is the one id always present on the pipe") holds for a
             // dedicated USB pipe only — on a shared base/hub pipe 0x12 is the
@@ -612,11 +694,12 @@ namespace MozaPlugin.Devices.MBooster
             // device entirely. Same guard MotorDeviceForCurrentAxis carries.
             // A routed chain's second unit is reached only through the map
             // above, once it has answered — see DiscoverRoutedChainDevice.
-            if (!_ownsConnection) return HostDeviceId;
-            // Types known and a genuine multi-motor chain — the axis mapping is
-            // real, not a guess.
-            if (ActiveAxisCount > 1) return MotorDeviceForAxis(axisFallback);
-            return MozaProtocol.DeviceMain;
+            if (!_ownsConnection) { dev = HostDeviceId; return true; }
+            // Types known, a genuine multi-motor chain and no locality evidence
+            // at all — the axis order is the only guess left.
+            if (ActiveAxisCount > 1) { dev = MotorDeviceForAxis(axisFallback); return true; }
+            dev = MozaProtocol.DeviceMain;
+            return true;
         }
 
         /// <summary>
@@ -634,6 +717,18 @@ namespace MozaPlugin.Devices.MBooster
             if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
                 && map.TryGetValue(roleIndex, out var dev))
                 return dev;
+            // Heartbeat locality before the map has placed the unit: a host
+            // pedal's motor is the host's; a chained pedal's is on a chain port,
+            // and any chain port beats driving the host's motor with another
+            // pedal's effect (routed lanes have no proven chain id here and
+            // fall through).
+            var loc = _roleLocality;
+            if (roleIndex >= 0 && loc != null && roleIndex < loc.Length)
+            {
+                if (loc[roleIndex] == LocalityHost) return HostDeviceId;
+                if (loc[roleIndex] == LocalityRemote)
+                    foreach (var id in MotorIds) if (id != HostDeviceId) return id;
+            }
             return MotorDeviceForCurrentAxis(axisFallback);
         }
 
@@ -659,19 +754,20 @@ namespace MozaPlugin.Devices.MBooster
         /// Device id an axis's own PHYSICAL (per-unit) calibration writes go to
         /// — travel, endstop, damping, threshold, sensor ratio, and the two
         /// calibration ROUTINES. Routed by role through the chain map, not by
-        /// raw HID axis; see <see cref="ConfigDeviceForRole"/>. Single shared
+        /// raw HID axis; see <see cref="TryConfigDeviceForRole"/>. Single shared
         /// implementation so the UI sliders, the connect-time apply and
         /// <see cref="MBoosterCalibrationRunner"/> can never disagree about
         /// which physical pedal they are addressing.
         ///
-        /// <para>Resolves through <see cref="ConfigDeviceForRole"/>, so an
+        /// <para>Resolves through <see cref="TryConfigDeviceForRole"/>, so an
         /// unresolved chain falls back to the host rather than to a guessed
         /// 0x1d/0x1e — these writes are flash-committed by whichever unit
-        /// receives them. The matching calibration READS already had this
-        /// behaviour via <see cref="MotorDeviceForRole(int)"/>.</para>
+        /// receives them — and a chained pedal whose unit hasn't answered yet
+        /// resolves to nothing (false). The matching calibration READS already
+        /// had this behaviour via <see cref="MotorDeviceForRole(int)"/>.</para>
         /// </summary>
-        public byte CalibDeviceForAxis(int axisIndex)
-            => ConfigDeviceForRole(RoleIndexForAxis(axisIndex), axisIndex);
+        public bool TryCalibDeviceForAxis(int axisIndex, out byte dev)
+            => TryConfigDeviceForRole(RoleIndexForAxis(axisIndex), axisIndex, out dev);
 
         /// <summary>
         /// Whether this axis may push the brake-named SINGLETON registers —
@@ -697,14 +793,14 @@ namespace MozaPlugin.Devices.MBooster
         public bool OwnsSingletonRegisters(int axisIndex)
         {
             if (!IsAxisMotorized(axisIndex)) return false;
-            byte mine = CalibDeviceForAxis(axisIndex);
+            if (!TryCalibDeviceForAxis(axisIndex, out byte mine)) return false;
 
             int bestAxis = axisIndex;
             int bestRank = SingletonOwnerRank(axisIndex);
             for (int a = 0; a < MaxAxes; a++)
             {
                 if (a == axisIndex || !IsAxisMotorized(a)) continue;
-                if (CalibDeviceForAxis(a) != mine) continue;
+                if (!TryCalibDeviceForAxis(a, out byte other) || other != mine) continue;
                 int rank = SingletonOwnerRank(a);
                 if (rank < bestRank || (rank == bestRank && a < bestAxis))
                 {
@@ -826,6 +922,9 @@ namespace MozaPlugin.Devices.MBooster
             if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
                 && map.TryGetValue(roleIndex, out var dev))
                 return dev;
+            var loc = _roleLocality;
+            if (roleIndex >= 0 && loc != null && roleIndex < loc.Length && loc[roleIndex] == LocalityRemote)
+                foreach (var id in MotorIds) if (id != HostDeviceId) return id;
             return HostDeviceId;
         }
 
@@ -917,29 +1016,13 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
-        /// Automatic role→motor mapping for a chain, from the per-device
-        /// calibration reads. Confirmed on hardware: every mBooster in the
-        /// chain stores only ITS OWN pedal's calibration, under the register
-        /// for that pedal's role, and reads back the unconfigured full-range
-        /// default (min 0 / max 100) for the roles it doesn't have. So each
-        /// device's role is simply the single register that is NOT the default
-        /// — e.g. host 0x12 reads brake 16/99 (the rest 0/100) → Brake; chained
-        /// 0x1d reads throttle 3/99 (the rest 0/100) → Throttle. Roles
-        /// <see cref="ConnectedAxes"/> reports as having no pedal are excluded
-        /// from the fingerprint: the host retains stale calibration for
-        /// detached pedals (a confirmed standalone brake also read back a
-        /// non-default throttle register), which would otherwise make it count
-        /// as ambiguous. A device with zero or more than one configured
-        /// register is left unmapped (routes by axis index), so this never
-        /// routes worse than before.
-        ///
-        /// The fingerprint only exists to disambiguate a genuine multi-unit
-        /// chain. With ONE active pedal there is nothing to disambiguate — the
-        /// single motor IS the host 0x12 — so that case maps directly and never
-        /// has to satisfy the "exactly one non-default register" test, which a
-        /// host aggregating several pedals' calibration cannot pass anyway
-        /// (bundle KY3HK4QP: throttle 0/95 AND brake 3/99 both non-default, so
-        /// the map stayed null and routing fell through to the phantom 0x1d).
+        /// Role→motor/config device map for a chain. Sources, in priority order:
+        /// the sole-active shortcut (one motor = the host), the host heartbeat's
+        /// locality evidence (<see cref="RoleLocality"/>, applied by
+        /// <see cref="ApplyLocalityEvidence"/>), then the per-device min/max
+        /// fingerprint (<see cref="FingerprintRoleMap"/>) for whatever the
+        /// heartbeat left open. A role none of them decides stays unmapped and
+        /// the resolvers fall back as before.
         /// </summary>
         private void RecomputeChainRoleMap()
         {
@@ -961,6 +1044,135 @@ namespace MozaPlugin.Devices.MBooster
                 }
             }
 
+            var roleToDev = new Dictionary<int, byte>();
+            var decided = new HashSet<int>();
+            ApplyLocalityEvidence(roleToDev, decided);
+            // The fingerprint fills only what the heartbeat left open and never
+            // re-uses a unit the heartbeat already placed.
+            foreach (var kv in FingerprintRoleMap())
+            {
+                if (decided.Contains(kv.Key) || roleToDev.ContainsValue(kv.Value)) continue;
+                roleToDev[kv.Key] = kv.Value;
+            }
+            PublishRoleMap(roleToDev);
+        }
+
+        /// <summary>Chained ids that have answered a min/max read on this lane,
+        /// ascending — the only ids a remote role may be placed on.</summary>
+        private List<byte> AnsweredChainIds()
+        {
+            var ids = new List<byte>();
+            lock (_calibLock)
+                foreach (var dev in _deviceCalib.Keys)
+                    if (dev != HostDeviceId) ids.Add(dev);
+            ids.Sort();
+            return ids;
+        }
+
+        /// <summary>
+        /// Place roles from the host heartbeat's locality evidence (see
+        /// <see cref="RoleLocality"/>): the one host-local active role goes to
+        /// <see cref="HostDeviceId"/>; remote active roles go to the chained ids
+        /// that answered, when the counts agree. Two chained units are told
+        /// apart by the fingerprint if it names both on distinct answering ids,
+        /// else by role order (logged as unverified). Each active pedal is one
+        /// unit, so once every unit but one is placed the last active role takes
+        /// it by elimination. Passive pedals have no unit of their own and are
+        /// skipped once the types are known.
+        /// </summary>
+        private void ApplyLocalityEvidence(Dictionary<int, byte> roleToDev, HashSet<int> decided)
+        {
+            var loc = _roleLocality;
+            if (loc == null) return;
+            var types = _axisTypes;
+            bool typesKnown = types != null && AxisTypesComplete;
+
+            var active = new List<int>();
+            int hostRole = -1, hostCount = 0;
+            var remotes = new List<int>();
+            for (int r = 0; r < 3 && r < loc.Length; r++)
+            {
+                if (typesKnown)
+                {
+                    if (r >= types!.Length || types[r] != 1) continue;
+                    active.Add(r);
+                }
+                else if (_connectedAxes != null && !IsAxisConnected(r)) continue;
+                if (loc[r] == LocalityHost) { hostRole = r; hostCount++; }
+                else if (loc[r] == LocalityRemote) remotes.Add(r);
+            }
+            if (hostCount > 1)
+            {
+                LogChainEvidenceOnce("heartbeat marks more than one pedal as local to the host — locality ignored");
+                return;
+            }
+            if (hostCount == 1) { roleToDev[hostRole] = HostDeviceId; decided.Add(hostRole); }
+
+            var chained = AnsweredChainIds();
+            if (remotes.Count > 0 && chained.Count > 0)
+            {
+                if (remotes.Count == 1 && chained.Count == 1)
+                {
+                    roleToDev[remotes[0]] = chained[0];
+                    decided.Add(remotes[0]);
+                }
+                else if (remotes.Count == chained.Count)
+                {
+                    var fp = FingerprintRoleMap();
+                    var used = new HashSet<byte>();
+                    bool fpNamesAll = true;
+                    foreach (var r in remotes)
+                        if (!fp.TryGetValue(r, out var d) || !chained.Contains(d) || !used.Add(d)) { fpNamesAll = false; break; }
+                    for (int i = 0; i < remotes.Count; i++)
+                    {
+                        roleToDev[remotes[i]] = fpNamesAll ? fp[remotes[i]] : chained[i];
+                        decided.Add(remotes[i]);
+                    }
+                    if (!fpNamesAll)
+                        LogChainEvidenceOnce($"{remotes.Count} chained units answer and nothing tells them apart — assigned by role order, unverified");
+                }
+                else
+                    LogChainEvidenceOnce($"heartbeat names {remotes.Count} chained pedal(s) but {chained.Count} chained id(s) answered — those roles stay unplaced");
+            }
+
+            if (!typesKnown) return;
+            var units = new List<byte> { HostDeviceId };
+            units.AddRange(chained);
+            if (active.Count != units.Count) return;
+            var openRoles = new List<int>();
+            foreach (var r in active) if (!decided.Contains(r)) openRoles.Add(r);
+            var openUnits = new List<byte>();
+            foreach (var u in units) if (!roleToDev.ContainsValue(u)) openUnits.Add(u);
+            if (openRoles.Count == 1 && openUnits.Count == 1)
+            {
+                roleToDev[openRoles[0]] = openUnits[0];
+                decided.Add(openRoles[0]);
+            }
+        }
+
+        private readonly HashSet<string> _chainEvidenceLogged = new HashSet<string>(StringComparer.Ordinal);
+        private void LogChainEvidenceOnce(string msg)
+        {
+            lock (_chainEvidenceLogged)
+                if (_chainEvidenceLogged.Count >= LoggedSetCap || !_chainEvidenceLogged.Add(msg)) return;
+            MozaLog.Warn($"[AZOM/mBooster] {ShortIdentity(Identity)}: {msg}");
+        }
+
+        /// <summary>
+        /// Per-device min/max fingerprint. Premise, from the 2026-09-08 Pit House
+        /// chain: a unit stores only ITS OWN pedal's calibration and reads the
+        /// 0/100 default for the others, so its one non-default pair names its
+        /// role (host brake 16/99, chained throttle 3/99). KG143GNC falsified
+        /// the "others read 0/100" half on both units (host T 0/95 B 13/100;
+        /// chained T 3/97 B 1/97 C 0/97), which is why this is a tie-breaker
+        /// behind the heartbeat rather than the primary source. Roles
+        /// <see cref="ConnectedAxes"/> reports as absent are excluded (the host
+        /// keeps stale registers for detached pedals); a device with zero or
+        /// several non-default pairs is left out; two devices claiming one role
+        /// cancel each other.
+        /// </summary>
+        private Dictionary<int, byte> FingerprintRoleMap()
+        {
             List<KeyValuePair<byte, int[]>> devices;
             lock (_calibLock)
             {
@@ -996,8 +1208,7 @@ namespace MozaPlugin.Devices.MBooster
                     roleToDev[role] = kv.Key;
             }
             foreach (var r in conflict) roleToDev.Remove(r);
-
-            PublishRoleMap(roleToDev);
+            return roleToDev;
         }
 
         /// <summary>Swap in a resolved role→motor map and log it once per
@@ -1020,6 +1231,11 @@ namespace MozaPlugin.Devices.MBooster
             {
                 _lastRoleMapLogged = sig;
                 MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} mapped pedal roles → motors: {sig}");
+                // A map change IS a routing change: announce it and let the
+                // RoutingResolved re-apply reach the units it now names — a
+                // chained unit answering its probe after the connect-time apply
+                // is the normal order of events.
+                LogRoutingDecision();
             }
         }
 
@@ -1027,6 +1243,9 @@ namespace MozaPlugin.Devices.MBooster
         {
             _detected = false;
             _chainProbed = false;
+            // _roleLocality (host/remote per role) is topology, kept like
+            // _axisTypes; the map re-derives from it as soon as the chain probe
+            // answers again.
             _roleToDevice = null;
             _lastRoleMapLogged = "";
             _lastRoutingLogged = "";
@@ -1070,17 +1289,19 @@ namespace MozaPlugin.Devices.MBooster
                 return;
             }
 
-            // EXPERIMENTAL chain-mapping diagnostic: a response from a chained
-            // motor id carries the nibble-swapped device byte at data[1]
-            // (0x1d→0xd1, 0x1e→0xe1); the host 0x12→0x21 falls through to the
-            // normal identity handling below. Log each distinct chain-device
-            // read response (raw + best-effort decode) and feeds the
-            // calibration store that drives the role→motor map. Skip the
-            // 2-byte keepalive acks (group 0x80) and the ~50Hz motor-write
-            // echoes (group 0xa4, cmd 0xb1) — only read-backs carry mapping
-            // info. Never let a chain response run the host identity switch.
-            if (data.Length >= 3 && data[0] != 0x80 && data[0] != 0xa4 && (data[1] == 0xd1 || data[1] == 0xe1))
+            // A response from a chained unit carries the nibble-swapped device
+            // byte at data[1] (0x1d→0xd1, 0x1e→0xe1); the host 0x12→0x21 falls
+            // through to the identity handling below. Everything a chained unit
+            // says is booked under ITS id — read-backs feed the role map and
+            // the status block, write-echoes (0xa4) included: routed through
+            // the host arm they were stored, logged and even latched detection
+            // as the host's own values (KG143GNC: both units' Travel / feel-
+            // curve read-backs interleaved 74 ms apart under one name). Never
+            // let a chain response run the host identity switch.
+            if (data[1] == 0xd1 || data[1] == 0xe1)
             {
+                if (data[0] == 0x80 || data.Length < 3) return; // keepalive ack
+                if (data[0] == 0xa4 && data[2] == MozaMBoosterProtocol.CmdMotorWrite) return; // ~50 Hz motor-write echo
                 int unswapped = ((data[1] & 0x0f) << 4) | ((data[1] & 0xf0) >> 4);
                 var probe = MozaResponseParser.Parse(data, busHint: "mbooster");
                 if (probe.HasValue && probe.Value.Name != null)
@@ -1090,7 +1311,11 @@ namespace MozaPlugin.Devices.MBooster
                     // 0xB4 / motor-locate status back through this branch, not
                     // the host arm below.
                     StoreStatusRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
+                    StoreUnitIdentity((byte)unswapped, probe.Value.Name, probe.Value.ArrayValue);
                 }
+                // Log each distinct READ response once; write-echoes change with
+                // every slider tick and would exhaust the cap.
+                if (data[0] == 0xa4) return;
                 string hex = ToHex(data);
                 bool isNew;
                 // Wire-derived key: cap so a response carrying a changing value can't
@@ -1235,6 +1460,50 @@ namespace MozaPlugin.Devices.MBooster
             // else — this is the only way to learn it exists without writing
             // blind to an id that may belong to another peripheral.
             DiscoverRoutedChainDevice(data, ascii);
+            // Only the HOST describes the lane: its heartbeat lists every pedal
+            // slot, each slot's type, link statistics for the units it reaches
+            // over the chain and its own pedal's angles. A chained unit's own
+            // block ("PD Linked: 1", "Theta:[…]") is one pedal with no role, and
+            // on a shared base/hub pipe other peripherals log here too.
+            if (data.Length < 2 || data[1] != _swappedHostId) return;
+            ParseHostHeartbeatLine(ascii);
+        }
+
+        private void ParseHostHeartbeatLine(string ascii)
+        {
+            if (ascii.IndexOf("Active pedal heartbeat log", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // A dropped "Log the end" must not lose the previous block.
+                CommitHeartbeatBlock();
+                Array.Clear(_blockRemote, 0, _blockRemote.Length);
+                for (int i = 0; i < _blockLocalMin.Length; i++) _blockLocalMin[i] = double.NaN;
+                _blockOpen = true;
+                return;
+            }
+            if (ascii.IndexOf("Log the end", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                CommitHeartbeatBlock();
+                return;
+            }
+            // "<Role> Mean Loss Rate / Max Loss Rate / Max Recv Gap" — link
+            // statistics exist only for a pedal reached over the chain link.
+            bool linkStats =
+                (ascii.IndexOf("Loss", StringComparison.OrdinalIgnoreCase) >= 0 && ascii.IndexOf("Rate", StringComparison.OrdinalIgnoreCase) >= 0)
+                || (ascii.IndexOf("Recv", StringComparison.OrdinalIgnoreCase) >= 0 && ascii.IndexOf("Gap", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (linkStats)
+            {
+                int slot = RoleSlotIn(ascii);
+                if (slot >= 0) { _blockRemote[slot] = true; _blockOpen = true; }
+                return;
+            }
+            // "B-PD:[min 0.00000 max 24.30 angle 8.10]" (long form: "Brake
+            // calibrate theta:[min …") — min 65535 = no local pedal in that role.
+            if (TryParsePedalMin(ascii, out int pdSlot, out double pdMin))
+            {
+                _blockLocalMin[pdSlot] = pdMin;
+                _blockOpen = true;
+                return;
+            }
             if (ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
@@ -1273,9 +1542,7 @@ namespace MozaPlugin.Devices.MBooster
             // per-slot type. 1 = active (has a motor), 2 = passive (no motor).
             if (ascii.IndexOf("pedal is", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                int slot = ascii.IndexOf("Throttle", StringComparison.OrdinalIgnoreCase) >= 0 ? 0
-                         : ascii.IndexOf("Brake", StringComparison.OrdinalIgnoreCase) >= 0 ? 1
-                         : ascii.IndexOf("Clutch", StringComparison.OrdinalIgnoreCase) >= 0 ? 2 : -1;
+                int slot = RoleSlotIn(ascii);
                 if (slot >= 0)
                 {
                     byte type = ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)0
@@ -1287,39 +1554,118 @@ namespace MozaPlugin.Devices.MBooster
                     if (slot < _axisTypeSeen.Length) _axisTypeSeen[slot] = true;
                     // Active/passive is what actually decides chain-ness (see
                     // ActiveAxisCount / MotorDeviceForCurrentAxis), so re-derive
-                    // the role→motor map and report the settled routing.
+                    // the role→motor map. The routing verdict itself waits for
+                    // the block end (CommitHeartbeatBlock): a role's link
+                    // statistics follow its type line.
+                    _blockOpen = true;
                     RecomputeChainRoleMap();
-                    LogRoutingDecision();
                 }
             }
         }
 
+        private static int RoleSlotIn(string s) =>
+            s.IndexOf("Throttle", StringComparison.OrdinalIgnoreCase) >= 0 ? 0
+            : s.IndexOf("Brake", StringComparison.OrdinalIgnoreCase) >= 0 ? 1
+            : s.IndexOf("Clutch", StringComparison.OrdinalIgnoreCase) >= 0 ? 2 : -1;
+
+        /// <summary>"T-PD:[min -0.02 max 24.3 angle 8.1]" / "Throttle calibrate
+        /// theta:[min …]" → slot and the min value. Anchored on the bracket so
+        /// "T-PD OP mode" and "Cut T-PD" don't match.</summary>
+        private static bool TryParsePedalMin(string s, out int slot, out double min)
+        {
+            slot = -1;
+            min = double.NaN;
+            int br = s.IndexOf("-PD:[", StringComparison.OrdinalIgnoreCase);
+            if (br > 0)
+            {
+                char c = char.ToUpperInvariant(s[br - 1]);
+                slot = c == 'T' ? 0 : c == 'B' ? 1 : c == 'C' ? 2 : -1;
+            }
+            else
+            {
+                br = s.IndexOf("calibrate theta:[", StringComparison.OrdinalIgnoreCase);
+                if (br < 0) return false;
+                slot = RoleSlotIn(s.Substring(0, br));
+            }
+            if (slot < 0) return false;
+            int m = s.IndexOf("min", br, StringComparison.OrdinalIgnoreCase);
+            if (m < 0) return false;
+            int i = m + 3;
+            while (i < s.Length && s[i] == ' ') i++;
+            int j = i;
+            while (j < s.Length && (char.IsDigit(s[j]) || s[j] == '-' || s[j] == '.')) j++;
+            return j > i && double.TryParse(s.Substring(i, j - i),
+                System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out min);
+        }
+
         /// <summary>
-        /// Report the settled motor/config routing once the active/passive types
-        /// are known, superseding the provisional per-axis line the ambiguous
-        /// presence read logs, and re-apply hardware against it. Announced once
-        /// per distinct outcome — the device re-streams the type diagnostic about
-        /// once a minute.
-        ///
-        /// Waits for the WHOLE diagnostic block (via
-        /// <see cref="AxisTypesComplete"/>, which <see cref="ActiveAxisCount"/>
-        /// already enforces): the three type lines arrive ~10ms apart, so acting
-        /// on the first one would announce — and re-apply against — "0 active
-        /// pedals" before the active pedal's own line lands.
+        /// End of a host heartbeat block: fold the link-statistics and angle
+        /// lines into <see cref="RoleLocality"/> (absent slots contribute
+        /// nothing — their sentinel min means only "no pedal"), re-derive the
+        /// role map, then announce the routing verdict. Types, link statistics
+        /// and angles are all in by now, which the type lines alone can't
+        /// guarantee.
+        /// </summary>
+        private void CommitHeartbeatBlock()
+        {
+            if (!_blockOpen) return;
+            _blockOpen = false;
+            var connected = _connectedAxes;
+            var loc = new byte[3];
+            bool any = false;
+            for (int r = 0; r < 3; r++)
+            {
+                if (connected != null && (r >= connected.Length || !connected[r])) continue;
+                if (_blockRemote[r]) loc[r] = LocalityRemote;
+                else if (!double.IsNaN(_blockLocalMin[r]))
+                    loc[r] = _blockLocalMin[r] >= LocalMinSentinel ? LocalityRemote : LocalityHost;
+                if (loc[r] != LocalityUnknown) any = true;
+            }
+            if (any)
+            {
+                _roleLocality = loc;
+                _roleLocalityIsSeed = false;
+                string sig = LocalitySignature(loc);
+                if (sig != _lastLocalityLogged)
+                {
+                    _lastLocalityLogged = sig;
+                    MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} pedal locality from heartbeat: {sig}");
+                    try { ChainRolesResolved?.Invoke((byte[])loc.Clone()); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] ChainRolesResolved handler: {ex.Message}"); }
+                }
+                RecomputeChainRoleMap();
+            }
+            LogRoutingDecision();
+        }
+
+        /// <summary>
+        /// Report the settled motor/config routing — active/passive type, host/
+        /// remote locality and device id per pedal — superseding the provisional
+        /// per-axis line the ambiguous presence read logs, and re-apply hardware
+        /// against it. Announced once per distinct outcome, from the end of a
+        /// heartbeat block (<see cref="CommitHeartbeatBlock"/>: the last role's
+        /// link statistics follow its type line, so a verdict on the type lines
+        /// alone could still mis-place it) and whenever the role map changes
+        /// (<see cref="PublishRoleMap"/>).
         /// </summary>
         private void LogRoutingDecision()
         {
             int activeCount = ActiveAxisCount;
             if (activeCount < 0) return;
             var sb = new StringBuilder();
+            var loc = _roleLocality;
             for (int a = 0; a < MaxAxes; a++)
             {
                 var types = _axisTypes;
                 if (types == null || a >= types.Length || types[a] == 0) continue;
                 if (sb.Length > 0) sb.Append(' ');
+                // By ROLE — the way the effect workers and the config writes
+                // actually address the pedal.
+                int roleIdx = RoleIndexForAxis(a);
+                string where = loc != null && roleIdx >= 0 && roleIdx < loc.Length ? LocalityLabel(loc[roleIdx]) : "?";
                 sb.Append("ax").Append(a)
-                  .Append(types[a] == 1 ? "(active)" : "(passive)")
-                  .Append("=0x").Append(MotorDeviceForCurrentAxis(a).ToString("x2"));
+                  .Append(types[a] == 1 ? "(active," : "(passive,").Append(where).Append(')')
+                  .Append("=0x").Append(MotorDeviceForRole(roleIdx, a).ToString("x2"));
             }
             string sig = $"{activeCount}|{sb}";
             if (sig == _lastRoutingLogged) return;
@@ -1739,6 +2085,10 @@ namespace MozaPlugin.Devices.MBooster
                 "mbooster-brake-threshold", "mbooster-brake-angle-ratio",
             })
                 SendRead(name, dev);
+            // Status block too, so a bundle shows the chained unit's 0x21-0x24
+            // next to the host's (the doc's open pedal↔slot-map question).
+            foreach (var name in StatusReadNames)
+                SendRead(name, dev);
         }
 
         // ===== Routed multi-unit chains =====
@@ -1774,6 +2124,43 @@ namespace MozaPlugin.Devices.MBooster
         public bool DeviceHasAnswered(byte device)
         {
             lock (_calibLock) return _deviceCalib.ContainsKey(device);
+        }
+
+        // Identity each chained unit reported to the chain probe — serial halves
+        // and model, by device id. Diagnostics only: the lane's Serial/ModelName
+        // stay the host's.
+        private readonly Dictionary<byte, string[]> _unitIdentity = new Dictionary<byte, string[]>();
+
+        private void StoreUnitIdentity(byte dev, string name, byte[]? bytes)
+        {
+            int idx = name == "mbooster-serial-a" ? 0 : name == "mbooster-serial-b" ? 1 : name == "mbooster-model-name" ? 2 : -1;
+            if (idx < 0) return;
+            string text = MozaData.ParseNullTerminatedString(bytes ?? Array.Empty<byte>());
+            lock (_unitIdentity)
+            {
+                if (!_unitIdentity.TryGetValue(dev, out var parts)) _unitIdentity[dev] = parts = new string[3];
+                parts[idx] = text;
+            }
+        }
+
+        /// <summary>Every unit on this lane for the diagnostics dump: the host
+        /// first, then each chained id that answered or identified itself.
+        /// Serial is null until both halves are in.</summary>
+        public List<(byte dev, string? serial, string? model, bool answered)> ChainUnits()
+        {
+            var list = new List<(byte, string?, string?, bool)> { (HostDeviceId, Serial, ModelName, Detected) };
+            var ids = new SortedSet<byte>(AnsweredChainIds());
+            lock (_unitIdentity) foreach (var d in _unitIdentity.Keys) ids.Add(d);
+            foreach (var dev in ids)
+            {
+                if (dev == HostDeviceId) continue;
+                string? a = null, b = null, model = null;
+                lock (_unitIdentity)
+                    if (_unitIdentity.TryGetValue(dev, out var p)) { a = p[0]; b = p[1]; model = p[2]; }
+                string? serial = !string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(b) ? a + b : null;
+                list.Add((dev, serial, model, DeviceHasAnswered(dev)));
+            }
+            return list;
         }
 
         /// <summary>Chained mBooster ids this ROUTED lane has proven and may

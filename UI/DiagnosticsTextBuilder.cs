@@ -362,6 +362,14 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"        active pedals={(d.ActiveAxisCount < 0 ? "? (type diagnostic not streamed yet)" : d.ActiveAxisCount.ToString())}" +
                 $"  deviceReportedMaxThreshold={FmtKg(d.DeviceReportedMaxThresholdKg)}");
+            // Every unit on the lane with the identity it reported — host and
+            // each chained id — so a genuine chain shows two distinct serials
+            // and which chained ids ever answered.
+            var units = new System.Collections.Generic.List<string>();
+            foreach (var u in d.ChainUnits())
+                units.Add($"0x{u.dev:x2} {(u.dev == d.HostDeviceId ? "host" : u.answered ? "chained(answers)" : "chained(silent)")}" +
+                          $" serial={(string.IsNullOrEmpty(u.serial) ? "—" : Redact(u.serial!))} model={(string.IsNullOrEmpty(u.model) ? "—" : u.model)}");
+            sb.AppendLine($"        units=[{string.Join(", ", units)}]");
             foreach (int a in d.ConnectedAxisIndices())
             {
                 string type = types == null || a >= types.Length ? "?"
@@ -374,7 +382,13 @@ namespace MozaPlugin.UI
                 // no frame is sent to.
                 int roleIdx = MBoosterDeviceController.RoleIndexOf(role);
                 byte dev = d.MotorDeviceForRole(roleIdx, a);
-                sb.AppendLine($"        ax{a} {role}/{type} → dev 0x{dev:x2}");
+                // host/remote from the host heartbeat (RoleLocality); "(seed)"
+                // while it still comes from the persisted cache.
+                var loc = d.RoleLocality;
+                string where = loc != null && roleIdx >= 0 && roleIdx < loc.Length
+                    ? MBoosterDeviceController.LocalityLabel(loc[roleIdx]) + (d.RoleLocalityIsSeed ? "(seed)" : "")
+                    : "?";
+                sb.AppendLine($"        ax{a} {role}/{type}/{where} → dev 0x{dev:x2}");
                 var cfg = MozaMBoosterRegistry.PeekPedalConfig(s, a, d.SoleConnectedAxis());
                 if (cfg == null) { sb.AppendLine("             (no config row)"); continue; }
                 sb.AppendLine(

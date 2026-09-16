@@ -359,6 +359,7 @@ namespace MozaPlugin
                     // device's own once-a-minute broadcast. No-op if live
                     // connectivity already arrived.
                     controller.SeedConnectedAxes(LookupMBoosterKnownPedals(identity));
+                    controller.SeedChainRoles(LookupMBoosterKnownChainRoles(identity));
                     _hardwareApplier.ApplyMBoosterToHardware(controller, settings);
                 }
             }
@@ -379,6 +380,57 @@ namespace MozaPlugin
                 if (cache.TryGetValue(key, out var v) && v != null) return v;
                 return cache.TryGetValue(identity, out v) ? v : null;
             }
+        }
+
+        /// <summary>Persisted last-known host/remote locality per pedal role for
+        /// a lane — same two-key lookup as <see cref="LookupMBoosterKnownPedals"/>.
+        /// Null when never seen.</summary>
+        private byte[]? LookupMBoosterKnownChainRoles(string identity)
+        {
+            var cache = _settings?.MBoosterKnownChainRoles;
+            if (cache == null || string.IsNullOrEmpty(identity)) return null;
+            string key = _mboosterSerialByIdentity.TryGetValue(identity, out var serialKey) ? serialKey : identity;
+            int[]? v;
+            lock (_mboosterSettingsLock)
+            {
+                if ((!cache.TryGetValue(key, out v) || v == null)
+                    && (!cache.TryGetValue(identity, out v) || v == null))
+                    return null;
+            }
+            var b = new byte[v.Length];
+            for (int i = 0; i < v.Length; i++) b[i] = (byte)v[i];
+            return b;
+        }
+
+        /// <summary>Live host/remote locality from the host heartbeat — persisted
+        /// under both keys so the next controller is seeded before the serial
+        /// is re-interrogated. Runs on the connection read thread, on change.</summary>
+        private void OnMBoosterChainRolesResolved(string identity, byte[] locality)
+        {
+            if (IsShuttingDown || string.IsNullOrEmpty(identity) || locality == null || locality.Length == 0) return;
+            try
+            {
+                var v = new int[locality.Length];
+                for (int i = 0; i < v.Length; i++) v[i] = locality[i];
+                bool changed = false;
+                string? serialKey = _mboosterSerialByIdentity.TryGetValue(identity, out var sk) ? sk : null;
+                lock (_mboosterSettingsLock)
+                {
+                    var cache = _settings?.MBoosterKnownChainRoles;
+                    if (cache == null) return;
+                    changed |= StoreKnownChainRoles(cache, identity, v);
+                    if (serialKey != null) changed |= StoreKnownChainRoles(cache, serialKey, v);
+                }
+                if (changed) SaveSettings();
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] chain-roles persist for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        private static bool StoreKnownChainRoles(Dictionary<string, int[]> cache, string key, int[] locality)
+        {
+            if (cache.TryGetValue(key, out var old) && old != null && old.SequenceEqual(locality)) return false;
+            cache[key] = (int[])locality.Clone();
+            return true;
         }
 
         /// <summary>

@@ -83,7 +83,7 @@ namespace MozaPlugin.Hardware
                 // doesn't match the HID axis order, so an axis-index device
                 // sends these writes to the wrong physical pedal.
                 //
-                // ConfigDeviceForRole, not MotorDeviceForRole (which the effect
+                // TryConfigDeviceForRole, not MotorDeviceForRole (which the effect
                 // workers use): until the active/passive verdict lands there is
                 // no sound way to guess a chain id, and these writes are
                 // flash-committed on whichever unit receives them. See that
@@ -91,7 +91,13 @@ namespace MozaPlugin.Hardware
                 int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
                             : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
                             : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
-                byte dev = controller.ConfigDeviceForRole(roleIdx, axis);
+                if (!controller.TryConfigDeviceForRole(roleIdx, axis, out byte dev))
+                {
+                    // Chained unit not placed yet — RoutingResolved re-runs this
+                    // apply once it is.
+                    MozaLog.Debug($"[AZOM/mBooster] {MBoosterDeviceController.ShortIdentity(controller.Identity)} {prefix}: unit unplaced, apply deferred");
+                    continue;
+                }
 
                 if (cfg.Direction >= 0) controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev);
                 if (cfg.Min >= 0) controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev);

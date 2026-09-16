@@ -44,9 +44,10 @@ two ways:
 
 ## Chain topology & connectivity diagnostics
 
-A lane's motor/config device ids are role-based: `0x12` (host) throttle,
-`0x1d` brake, `0x1e` clutch — but only when more than one **active**
-(motorized) mBooster unit is genuinely present. A **single unit's pedal
+A lane's motor/config device ids are per UNIT: `0x12` is the host, `0x1d`/`0x1e`
+the chained units — and which ROLE sits on which unit is the chain's plug
+order, learned from the host heartbeat (see "Which unit holds which role"
+below), never assumed from the axis order. A **single unit's pedal
 always lives at `0x12`** regardless of which HID axis it reports on
 (confirmed on three units, support bundles 2026-07-30 and KY3HK4QP: every
 response frame came from `0x12`; `0x1d`/`0x1e` never acked anything).
@@ -113,7 +114,7 @@ KY3HK4QP/A6N521CS failure mode. The diagnostics dump reports both halves as
 
 Two fallout fixes from the same reports:
 
-- **`ConfigDeviceForRole` had no routed guard.** Its fallbacks are
+- **`ConfigDeviceForRole` (now `TryConfigDeviceForRole`) had no routed guard.** Its fallbacks are
   `MotorDeviceForAxis(axis)` and `0x12`, on the reasoning that "`0x12` is the
   one id always present on the pipe" — true of a dedicated USB pipe, but on a
   shared pipe `0x12` is the **wheelbase main**, so an unresolved routed chain
@@ -127,6 +128,86 @@ Two fallout fixes from the same reports:
   progress signal, and their **absence** across the whole 20 s window is how
   "the device acked the start frame and did nothing" is detected (which is what
   `0x19` does for the throttle pair).
+
+### Which unit holds which role — the host heartbeat says (bug report KG143GNC, 2026-09-15)
+
+Same rig as GVT5H8B8 / 34JAASN5, now on USB: host `0x12` + chained `0x1d`, both
+active. The plugin placed throttle on `0x12` and brake on `0x1d` by axis order;
+the reporter: "all pedal adjustments go to the opposite pedal", both calibration
+routines "go to the opposite pedal and often just fail". The host is the brake.
+
+**The calibration fingerprint (`RecomputeChainRoleMap`'s "exactly one non-default
+min/max pair") cannot decide this chain.** Its premise — a unit reads `0/100` for
+the roles it doesn't own — held on the 2026-09-08 units and fails on these: host
+T `0/95` B `13/100`, chained `0x1d` T `3/97` B `1/97` C `0/97`. Both skipped, map
+empty, every config write and both routines fell through to `MotorDeviceForAxis`.
+It is a tie-breaker behind the heartbeat now (`FingerprintRoleMap`).
+
+**The host's own heartbeat block carries the answer, twice over.** Host `0x12`
+(`src=21`), one block:
+
+```text
+Active pedal heartbeat log
+Throttle pedal is connected, type: active pedal
+Throttle Mean Loss Rate : 0.00008 (%)               ← link statistics: reached OVER THE CHAIN
+Brake pedal is connected, type: active pedal        ← no Loss Rate lines: on this unit
+Clutch pedal is not connected !
+PD Linked:[T 1 B 1 C 0]
+B-PD:[min 0.00000 max 24.30175 angle 8.09692]       ← real angles: the host's own pedal
+T-PD:[min 65535.00000 max 15.00000 angle -0.01098]  ← 65535 = no local pedal in that role
+C-PD:[min 65535.00000 max 25.19165 angle -171.06811]
+Sensor Dir:[T 1 B -1 C -1]
+…
+Log the end
+```
+
+The chained unit (`src=d1`) prints its own scalar block (`Theta:[min -0.01098 max
+24.44458 angle 8.21777]`, `P-Sens raw …`) with no role in it.
+
+Checked across every local mBooster bundle:
+
+| bundle | topology | host block: `Loss Rate` for | host `X-PD` with real min | verdict |
+|---|---|---|---|---|
+| KG143GNC | USB, 2 active | Throttle | B | brake = host `0x12`, throttle = `0x1d` |
+| 34JAASN5, GVT5H8B8 | routed `0x19`, 2 active | Throttle | B | brake = host `0x19`, throttle = `0x1d` |
+| C3SFMXWB | routed `0x19`, 2 active | Throttle | B | same |
+| ARE6993X, J5PSSQG8, NWS6EY7X | routed, 1 active + passive T/C | none | T, B, C | single unit |
+| A6N521CS | USB, 1 active + passive C | none | B, C | single unit |
+| F2S8CJPE | USB, 1 active | none | B | single unit |
+
+A passive pedal wired to the host gets **no** link statistics and a **real**
+`X-PD` min. So: `Loss Rate` lines = that role is a chained unit; sentinel min =
+absent or chained; real min = on this unit — for active and passive pedals alike.
+
+`MBoosterDeviceController.ParseHostHeartbeatLine` accumulates both per block
+(host source only — `data[1]` is the swapped host id; a chained unit's block and,
+on a shared pipe, other peripherals' lines never count) and
+`CommitHeartbeatBlock` folds them into `RoleLocality` at `Log the end` (or the
+next header). `ApplyLocalityEvidence` places the one host-local active role on the
+host, the remote active roles on the chained ids that answered the probe (two
+remotes: the fingerprint if it names both on distinct ids, else role order,
+logged as unverified), and the last open role by elimination — every active pedal
+is one unit. The routing verdict (`LogRoutingDecision` → `RoutingResolved`
+re-apply) fires at the block end and whenever the map changes, not on the type
+lines: a role's `Loss Rate` lines FOLLOW its type line, so a verdict on the types
+alone can still mis-place the last one.
+
+Locality is persisted per lane (`MozaPluginSettings.MBoosterKnownChainRoles`,
+host/remote per role — not device ids, the same unit is `0x12` on USB and `0x19`
+routed) and seeded into the next controller like `MBoosterKnownPedals`, so the
+connect-time apply and the effect workers address the right unit before the first
+heartbeat. A role known to be on a chained unit that has not answered yet
+resolves to **nothing** (`TryConfigDeviceForRole` returns false): the apply skips
+it and the re-apply picks it up, the UI push waits, the calibration runner refuses
+to start — never the host (34JAASN5), never a guess (this report).
+
+Fixed from the same capture: a chained unit's write-echoes (`a4 d1 …`) were kept
+out of the chain branch and fell into the host arm, so both units' Travel /
+feel-curve read-backs appeared 74 ms apart under the host's name (and would have
+fed the host's fingerprint); and the chained unit's `model-name` / `serial-a` /
+`serial-b` answers were logged as hex and discarded. Both are booked per unit
+now; the diagnostics dump prints `units=[0x12 host serial=…, 0x1d
+chained(answers) serial=…]` and each pedal's `host`/`remote` locality.
 
 ### A third diagnostic dialect — the chained unit's own scalar form
 
@@ -204,12 +285,14 @@ worker for it (`MBoosterEffectWorker.IsPedalAxisConnected`).
 ### Config writes and effect frames route differently on purpose
 
 Until `ActiveAxisCount` is known there is no sound chain signal, so
-`MBoosterDeviceController.ConfigDeviceForRole` — used by the connect-time
-apply (`HardwareApplier.MBooster`), `CalibDeviceForAxis`, the UI sliders and
-`MBoosterCalibrationRunner` — resolves the role map when it exists and
-otherwise falls back to the **host** `0x12`, never to `MotorDeviceForAxis`.
-Effects keep using `MotorDeviceForRole`/`MotorDeviceForCurrentAxis` with its
-count-based guess.
+`MBoosterDeviceController.TryConfigDeviceForRole` — used by the connect-time
+apply (`HardwareApplier.MBooster`), `TryCalibDeviceForAxis`, the UI sliders and
+`MBoosterCalibrationRunner` — resolves the role map when it exists, then the
+heartbeat locality (host-local role → host; chained role whose unit hasn't
+answered yet → **false**, and the write is skipped), and otherwise falls back
+to the **host** `0x12`, never to `MotorDeviceForAxis`. Effects keep using
+`MotorDeviceForRole`/`MotorDeviceForCurrentAxis` with its count-based guess,
+locality permitting.
 
 The asymmetry is about durability. A motor frame is transient; a config write
 is flash-committed by whichever unit receives it, and `RoutingResolved`'s
@@ -490,6 +573,14 @@ Only the BRAKE pair is capture-confirmed, and the firmware's `B-PD-C-S`
 ("brake pedal, calibration, start") is brake-specific wording. Throttle
 (`12`/`16`) and clutch (`14`/`18`) are registered by symmetry with the
 pedals bus and selected by the axis's resolved role.
+
+KG143GNC shows the throttle pair on the WRONG unit: cmd `12` to the brake
+unit (`0x12`) was acked and logged `pedal_cmd.c:768 T-PD-C-S`, no `Pedal
+Calib` line followed in 20 s, and the stop (`16`) drew `pedal_cmd.c:818
+T-PD-C Err:3` plus a `Table Id 6, ParamAddr 28: Failed to Write`. The routine
+is dispatched by role inside each unit — the cmd id names the pedal, the
+device id must be the unit that owns it (see "Which unit holds which role").
+That is the runner's "acked the start frame but never reported a sweep".
 
 ### Motor rotor-locate calibration — group `0x2A` (42) cmd `0x14` / `0x15`
 
@@ -1273,7 +1364,10 @@ Two things this exposed in `RequestCalibrationReads`:
 throttle/brake swapped on the chained unit) but one capture cannot prove that,
 so nothing is built on them. All six are read, stored per device and printed
 in the diagnostics dump (`status=[…]`) so the next bundle from a different
-topology settles them.
+topology settles them. KG143GNC's host — also the brake — reads the same
+`1/2/3`; its chained unit was not read at the time. The chain probe now reads
+the whole block from every chained id too (`ProbeChainDevice`), so the next
+chain bundle carries both units' values.
 
 ## Calibration surface (experimental)
 

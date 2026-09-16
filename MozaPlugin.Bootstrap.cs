@@ -548,7 +548,9 @@ namespace MozaPlugin
                     customEffectFormulaEvaluator: CreateHapticsFormulaResolver(),
                     onSerialResolved: OnMBoosterSerialResolved,
                     connectivitySeedLookup: LookupMBoosterKnownPedals,
-                    onConnectivityResolved: OnMBoosterConnectivityResolved);
+                    onConnectivityResolved: OnMBoosterConnectivityResolved,
+                    chainRolesSeedLookup: LookupMBoosterKnownChainRoles,
+                    onChainRolesResolved: OnMBoosterChainRolesResolved);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.
