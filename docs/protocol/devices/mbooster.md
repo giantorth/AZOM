@@ -209,6 +209,30 @@ fed the host's fingerprint); and the chained unit's `model-name` / `serial-a` /
 now; the diagnostics dump prints `units=[0x12 host serial=…, 0x1d
 chained(answers) serial=…]` and each pedal's `host`/`remote` locality.
 
+**Follow-up, same rig on that build (01MCT5T0, 2026-09-16).** Routing held
+(`ax0 Throttle/active/remote → 0x1d`, `ax1 Brake/active/host → 0x12`; the
+chained unit's status block reads `0x21=2 0x22=1 0x23=3`, the host's `1/2/3`
+— the second data point for the pedal↔slot-map reading) and both routines
+ran on the brake unit: rotor locate to `compen_theta_e`, travel sweep
+`Pedal Calib Start → Backward → Forward → pressure Calculating → B-PD Angle
+Excess → End`. What broke was the aftermath. The soft reboot re-enumerates
+the USB device; the registry recreates the controller, but `MozaHidReader`'s
+loop had already re-enumerated once (~1 s after the drop, when only the base
+was back) and then parked on the base's live thread — nothing ever reopened
+the mBooster's HID. So the new controller had `AxisCount 0`: no positions,
+`ConnectedAxisIndices` listed axis 0 only ("the brake disappeared"), the
+connect-time apply skipped axis 1, and `AxisTypesComplete` — sized by the
+HID count — was satisfied by the first type line of the next heartbeat,
+which declared "1 active → single unit" and flashed the throttle's Pedal Feel
+into the brake unit (`maxforce = 8192` = 25kg) 40 ms before the block
+corrected it. Fixes: the HID reader now polls for Moza HID paths it has not
+seen every 2 s while its wait runs and opens them alongside the live devices
+(`HasUnknownMozaHid`); `AxisTypesComplete` always requires the three T/B/C
+lines; `AxisSlotCount` (max of HID axes and connectivity slots) replaces the
+raw HID count as the loop bound in the row list, the apply, the merge and
+the role resolvers. The host also logged `diag_svr_event.c:86 error_code 50
+occurs` 15 s after that reboot — meaning unknown, both pedals worked after.
+
 ### A third diagnostic dialect — the chained unit's own scalar form
 
 The chained unit at `0x1d` reports only its own single pedal, in a form that
@@ -1896,8 +1920,8 @@ defaults for a still-untouched profile).
 ### Deadzone / Max Force — REVISED: real hardware calibration, not host-side (bug bundle 5VR5AQ8Y)
 
 The same card also has two force-based sliders, **Deadzone** (`DeadzoneKg`,
-0–37kg) and **Max Force** (`MaxForceKg`, 24–200kg — Brake role; Throttle/
-Clutch get their own narrower ranges, see `MBoosterUiConstants`). These were originally
+0–37kg) and **Max Force** (`MaxForceKg`, 0–200kg on an active pedal, 4–20kg on
+a passive one — bounds follow the hardware, see `MBoosterUiConstants`). These were originally
 implemented as a purely host-side kg-space remap
 (`MozaMBoosterRegistry.ApplyDeadzoneAndMaxForce`, applied to the raw HID
 axis position before `EvaluateInputCurve`, and clamped to whatever
@@ -1952,12 +1976,14 @@ Deadzone/Max Force to work and not written by AZOM's own push.
 confirmed selector `0x07`). This directly contradicts the original
 design's ceiling logic (`ApplyMBoosterMaxForceCeiling`,
 `ResolveFullScaleKg` — both removed): Max Force is an independent
-parameter, not a rescale of Threshold's own span. The slider's range is
-24–200kg for a Brake — Pit House's own bounds, reported by the user from
-its UI (the earlier 0–200kg was just what AZOM's XAML happened to declare).
-Deadzone's is 0–37kg on the same authority. `MBoosterUiConstants
-.BrakeMaxForceMinKg`/`BrakeDeadzoneMaxKg`; the 24kg floor also matches the
-low end of `max-force-24-75-128-166-200.pcapng`'s own sweep.
+parameter, not a rescale of Threshold's own span. Pit House's own UI bounds
+(user-reported) are 24–200kg for Max Force and 0–37kg for Deadzone; the 24kg
+floor also matches the low end of `max-force-24-75-128-166-200.pcapng`'s
+sweep. The plugin mirrored that floor and it did real damage — every setting
+below 24 was clamped back up on load (ARE6993X / QQS3MVDS "keeps reverting
+to 24", 883ZQBFH "throttle should go 0 to 200") — so `MBoosterUiConstants
+.ActiveMaxForceMinKg` is **0** since 2026-09-16: the wire scale is 0–200kg and
+a UI limit is not a hardware one. Deadzone keeps 0–37kg.
 
 Like every other real calibration field, both use the shared `-1` "not
 yet set / no override" sentinel (previously 0/200 = "off"), so a fresh

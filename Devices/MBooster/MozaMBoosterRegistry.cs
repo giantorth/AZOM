@@ -927,8 +927,7 @@ namespace MozaPlugin.Devices.MBooster
                     // echo (or, before the mirror ticks, zero) the real values.
                     if (c.IsRouted) continue;
                     var s = _settingsLookup(c.Identity);
-                    int rawAxisCount = c.AxisCount > 0 ? c.AxisCount : 1;
-                    if (rawAxisCount > MBoosterDeviceController.MaxAxes) rawAxisCount = MBoosterDeviceController.MaxAxes;
+                    int rawAxisCount = c.AxisSlotCount;
 
                     // Resolve roles against how many axes are ACTUALLY wired,
                     // not the raw HID axis count — a chain-capable hub's report

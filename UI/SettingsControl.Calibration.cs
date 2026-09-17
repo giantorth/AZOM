@@ -438,9 +438,8 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
-        // Max Force (24..200kg Brake) — the force at which the pedal's raw HID
-        // axis
-        // reaches 100% travel. Also the Pedal Feel curve's own top-right
+        // Max Force (0..200kg on an active pedal) — the force at which the
+        // pedal's raw HID axis reaches 100% travel. Also the Pedal Feel curve's own top-right
         // point, which is bound two-way to this slider — dragging that point
         // vertically lands here (see MozaCurveEditor.AnchorEndDraggableInY).
         // CONFIRMED real hardware calibration

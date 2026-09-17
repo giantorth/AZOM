@@ -30,11 +30,13 @@ namespace MozaPlugin.Devices.MBooster
         // Resolve through <see cref="ForceRanges"/> so the slider bounds and
         // the stored-value clamp can never disagree.
         //
-        // Active values are Pit House's own (user-reported from its UI): Max
-        // Force starts at 24kg, not 0 — matching the low end of the original
-        // max-force-24-75-128-166-200.pcapng sweep — and Deadzone tops out at
-        // 37kg.
-        public const float ActiveMaxForceMinKg = 24f;
+        // Active Max Force spans the wire's whole 0-200kg scale. Pit House's UI
+        // floors it at 24kg (the low end of the max-force-24-75-128-166-200
+        // .pcapng sweep) and the plugin mirrored that, which clamped every
+        // lighter setting back up to 24 on load (bugs ARE6993X / QQS3MVDS /
+        // 883ZQBFH) — a UI limit, not a hardware one. Deadzone tops out at
+        // Pit House's 37kg.
+        public const float ActiveMaxForceMinKg = 0f;
         public const float ActiveMaxForceMaxKg = 200f;
         public const float ActiveDeadzoneMinKg = 0f;
         public const float ActiveDeadzoneMaxKg = 37f;
@@ -866,7 +868,7 @@ namespace MozaPlugin.Devices.MBooster
         // default); see docs/protocol/devices/mbooster.md "Pedal Feel".
         public float DeadzoneKg { get; set; } = -1;
 
-        // Force (kg, 24..200) at which the pedal's raw HID axis reaches
+        // Force (kg, 0..200 on an active pedal) at which the pedal's raw HID axis reaches
         // 100% travel — REAL hardware calibration (wire command
         // mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
         // engineered from max-force-24-75-128-166-200.pcapng (bug bundle

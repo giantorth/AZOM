@@ -125,7 +125,7 @@ namespace MozaPlugin.UI
             var sigBuilder = new System.Text.StringBuilder();
             foreach (var c in devices)
             {
-                int sigAxisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                int sigAxisCount = c.AxisSlotCount;
                 sigBuilder.Append(c.Identity).Append('|').Append(sigAxisCount).Append('|');
                 var sigConnected = c.ConnectedAxes;
                 if (sigConnected != null)
@@ -147,7 +147,7 @@ namespace MozaPlugin.UI
                 {
                     if (!string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) continue;
                     selectedDeviceStillPresent = true;
-                    int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
+                    int axisCount = c.AxisSlotCount;
                     var connected = c.ConnectedAxes;
                     bool selAxisKnownConnected = connected != null && _mboosterEffectPedalIndex < connected.Length
                         ? connected[_mboosterEffectPedalIndex]
@@ -219,7 +219,6 @@ namespace MozaPlugin.UI
                     foreach (var c in devices)
                     {
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
-                        int axisCount = c.AxisCount > 0 ? c.AxisCount : 1;
                         string deviceLabel = BuildMBoosterComboLabel(c);
                         var connectedAxes = c.ConnectedAxisIndices();
 
@@ -254,8 +253,7 @@ namespace MozaPlugin.UI
                     {
                         var rowController = registry.FindByIdentity(row.Identity);
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(row.Identity);
-                        int axisCount = rowController != null && rowController.AxisCount > 0 ? rowController.AxisCount : 1;
-                        if (axisCount > MBoosterDeviceController.MaxAxes) axisCount = MBoosterDeviceController.MaxAxes;
+                        int axisCount = rowController?.AxisSlotCount ?? 1;
                         int connectedAxisCount = 0;
                         if (rowController != null)
                             for (int axis = 0; axis < axisCount; axis++)
@@ -459,19 +457,17 @@ namespace MozaPlugin.UI
             if (_plugin == null) return;
             var s = _plugin.GetOrCreateMBoosterSettings(identity);
             var controller = _plugin.MBoosterRegistry?.FindByIdentity(identity);
-            int axisCount = controller != null && controller.AxisCount > 0 ? controller.AxisCount : 1;
+            int axisCount = controller?.AxisSlotCount ?? 1;
             int connectedAxisCount = controller?.ConnectedAxisCount ?? 1;
             SetMBoosterPedalRole(s, connectedAxisCount, axisCount, axisIndex, role);
             _plugin.SaveSettings();
             if (role != MBoosterRole.Disabled)
                 ClearDuplicateMBoosterRoleAssignments(identity, axisIndex, role);
-            // Every role's Max Force/Deadzone range differs (Brake 24-200kg /
-            // 0-37kg, Throttle-Clutch 4-20kg with their own deadzones) — a
-            // pedal freshly reassigned to any of them may still be carrying
-            // an out-of-range stored value from whatever role it had before
-            // (140kg from Brake on a Throttle, or 20kg from a Throttle on a
-            // Brake, which is now under Brake's 24kg floor). Clamp it into
-            // range and re-push immediately, targeting THIS specific axis
+            // Max Force/Deadzone bounds follow the pedal's hardware (active
+            // 0-200kg / 0-37kg, passive 4-20kg / 0-8kg) — a pedal whose type
+            // verdict changed may still carry a stored value outside its
+            // range. Clamp it into range and re-push immediately, targeting
+            // THIS specific axis
             // (not necessarily the one selected in the UI — see
             // PushMBoosterFeelCurve's axis-explicit overload). Left alone,
             // the stored value and the slider disagree until the user happens

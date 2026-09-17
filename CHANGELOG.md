@@ -20,6 +20,12 @@ All notable changes to the AZOM plugin are documented here.
   the USB unit is now read from the pedal's own heartbeat instead of assumed to be the
   throttle.
 
+- **An mBooster comes back after its calibration reboot.** Its pedal positions and its
+  pedal row no longer stay gone until SimHub restarts.
+
+- **mBooster Max Force goes down to 0 kg.** The 24 kg floor was a Pit House UI limit, not
+  a hardware one, and it kept pulling lighter settings back up to 24.
+
 - **AB9 engine vibration now has a 20hz floor** 
 
 - **A CM2 dash shows data on every dashboard, not just the one it started on.** Switching

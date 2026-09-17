@@ -173,18 +173,41 @@ namespace MozaPlugin.Devices.MBooster
         /// arrive ~10ms apart, so a half-read block would momentarily under-count
         /// the active pedals — on a genuine chain that flips routing to the host
         /// for the couple of 50 Hz effect ticks in between. Everything that acts
-        /// on <see cref="ActiveAxisCount"/> waits for this. Capped at 3 slots:
-        /// the long-form 4-axis devices still only describe T/B/C.
+        /// on <see cref="ActiveAxisCount"/> waits for this. Always the three
+        /// T/B/C slots: every captured block names all three (absent pedals as
+        /// "not connected !"), the long-form 4-axis devices included. Never the
+        /// HID axis count — that is 0 until the HID pairs, and judging the block
+        /// complete after its first line declared a chain a single unit and
+        /// flashed the throttle's config into the brake unit (bug 01MCT5T0).
         /// </summary>
         public bool AxisTypesComplete
         {
             get
             {
                 if (_axisTypes == null) return false;
-                int slots = Math.Min(_axisTypeSeen.Length, Math.Max(1, AxisCount));
-                for (int i = 0; i < slots; i++)
+                for (int i = 0; i < _axisTypeSeen.Length; i++)
                     if (!_axisTypeSeen[i]) return false;
                 return true;
+            }
+        }
+
+        /// <summary>
+        /// Axis slots worth considering: the HID axis count once the HID has
+        /// paired, else however many slots the connectivity diagnostic (or its
+        /// seed) describes; never below 1. The HID count alone is 0 until the
+        /// first axis event — after a calibration soft-reboot the recreated
+        /// controller may wait on that — and a lane's pedals exist whether or
+        /// not their positions are streaming (bug 01MCT5T0: the brake row and
+        /// its config apply vanished with the HID pairing).
+        /// </summary>
+        public int AxisSlotCount
+        {
+            get
+            {
+                var connected = _connectedAxes;
+                int n = Math.Max(AxisCount, connected?.Length ?? 0);
+                if (n < 1) n = 1;
+                return n > MaxAxes ? MaxAxes : n;
             }
         }
 
@@ -856,8 +879,7 @@ namespace MozaPlugin.Devices.MBooster
             if (roleIndex < 0) return false;
             var s = CurrentSettings;
             int axisCount = ConnectedAxisCount;
-            int raw = AxisCount > 0 ? AxisCount : 1;
-            if (raw > MaxAxes) raw = MaxAxes;
+            int raw = AxisSlotCount;
             int count = 0;
             for (int a = 0; a < raw; a++)
             {
@@ -904,8 +926,7 @@ namespace MozaPlugin.Devices.MBooster
         {
             get
             {
-                int raw = AxisCount > 0 ? AxisCount : 1;
-                if (raw > MaxAxes) raw = MaxAxes;
+                int raw = AxisSlotCount;
                 int n = 0;
                 for (int a = 0; a < raw; a++)
                     if (IsAxisConnected(a)) n++;
@@ -1748,7 +1769,7 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         public List<int> ConnectedAxisIndices()
         {
-            int axisCount = AxisCount > 0 ? AxisCount : 1;
+            int axisCount = AxisSlotCount;
             var connected = _connectedAxes;
             var axes = new List<int>();
             for (int axis = 0; axis < axisCount && axis < MaxAxes; axis++)

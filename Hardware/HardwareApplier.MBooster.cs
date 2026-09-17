@@ -35,7 +35,7 @@ namespace MozaPlugin.Hardware
             // otherwise. Per-pedal calibration for the OTHER chained pedals is a
             // follow-up (needs a per-pedal settings UI); this fixes the routing
             // for the pedal the current single calibration set configures.
-            int axisCount = controller.AxisCount > 0 ? controller.AxisCount : 1;
+            int axisCount = controller.AxisSlotCount;
             // Roles resolve against the CONNECTED pedal count, never raw
             // axisCount above (which is the loop bound, and is 3 on any
             // chain-capable hub regardless of how many pedals are plugged in

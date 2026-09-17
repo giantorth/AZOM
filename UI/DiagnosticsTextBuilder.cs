@@ -271,13 +271,14 @@ namespace MozaPlugin.UI
                 // Per-axis role resolution for a chained lane — the actual
                 // routing (which HID axis drives throttle/brake/clutch), so a
                 // mis-mapping is visible straight from the bundle.
-                if (d.AxisCount > 1)
+                if (d.AxisSlotCount > 1)
                 {
                     // ax<i>[+/-/?] = role — + connected, - not connected, ? unknown
                     // (device hasn't streamed a "PD Linked" diagnostic this session).
+                    // axes= is the raw HID count: 0 means the HID never paired.
                     var connected = d.ConnectedAxes;
                     var roleParts = new System.Collections.Generic.List<string>();
-                    for (int a = 0; a < d.AxisCount && a < MBoosterDeviceController.MaxAxes; a++)
+                    for (int a = 0; a < d.AxisSlotCount; a++)
                     {
                         string flag = connected == null ? "?" : (a < connected.Length && connected[a] ? "+" : "-");
                         roleParts.Add($"ax{a}[{flag}]={MozaMBoosterRegistry.ResolveAxisRole(s, a, d.ConnectedAxisCount)}");
