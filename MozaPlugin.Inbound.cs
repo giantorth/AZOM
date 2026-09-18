@@ -33,6 +33,8 @@ namespace MozaPlugin
         // handler is the only thing that composes them.
         private volatile string? _baseModelChunk1;
         private volatile string? _baseModelChunk2;
+        // Raw 0x8E frames from the dash logged per session (first few only).
+        private int _dash8eLogged;
 
         private void OnMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: false);
 
@@ -44,6 +46,11 @@ namespace MozaPlugin
         {
             // Shutdown guard: serial reader may deliver frames after End() begins.
             if (IsShuttingDown) return;
+
+            // Any reply from the dash address (0x14 → raw 0x41) on the primary pipe is
+            // dash liveness for the bridged-dash poll-miss watchdog (PollStatusCore).
+            if (!fromDashboard && data.Length >= 2 && data[1] == MozaProtocol.DashDeviceIdSwapped)
+                _deviceManager.MarkDashAlive();
 
             // Firmware debug frames (raw wire group 0x0E, subtype 0x05) carry
             // unsolicited ASCII status / log lines from the wheel-bus firmware
@@ -133,13 +140,25 @@ namespace MozaPlugin
             if (data.Length >= 4 && data[0] == MozaProtocol.SerialStreamRespGroup &&
                 (data[2] == MozaProtocol.SerialStreamOpcodeData ||
                  data[2] == MozaProtocol.SerialStreamOpcodeCtrl) && data[3] == 0x00)
+            {
+                // Session ack from the dash (fc:00) — diagnostics-only CM2 evidence; the
+                // 2-byte C3 41 ping a CM1 also answers never reaches here.
+                if (data[1] == MozaProtocol.DashDeviceIdSwapped
+                    && data[2] == MozaProtocol.SerialStreamOpcodeCtrl && data.Length >= 5)
+                    _dualDisplay?.NoteCm2Evidence(Cm2Evidence.SessionAck);
                 return;
+            }
 
             // Filter wheel's 7c:23 dashboard-activate advertisements — informational,
             // absorbed by TelemetrySender.
             if (data.Length >= 4 && data[0] == MozaProtocol.SerialStreamRespGroup
                 && data[2] == MozaProtocol.SerialStreamOpcodeData && data[3] == 0x23)
+            {
+                // A tier-def catalog advertisement from the dash — a CM1 never sends one.
+                if (data[1] == MozaProtocol.DashDeviceIdSwapped)
+                    _dualDisplay?.NoteCm2Evidence(Cm2Evidence.CatalogAdvert);
                 return;
+            }
 
             // Filter group 0x40 channel-config burst echoes (1E XX, 28 XX).
             // Wheel returns stored EEPROM values; mark wheel-alive and swallow.
@@ -185,14 +204,16 @@ namespace MozaPlugin
                 return;
             }
 
-            // CM1 param-read reply: the discriminator probe (SendCm1ParamProbe,
-            // group 0x0E → dev 0x14) was answered with a group-0x8E frame from the
-            // dash (dev 0x41). A tier-def CM2 doesn't answer it, so this is a
-            // positive CM1 signal for TickCm1Discriminator's fast path. Not a
-            // command-DB entry — flag and short-circuit.
-            if (data.Length >= 2 && data[0] == 0x8E && data[1] == 0x41)
+            // Group-0x8E frame from the dash (dev 0x41): candidate reply to the CM1
+            // discriminator probe (SendCm1ParamProbe, group 0x0E → dev 0x14). The
+            // coordinator counts it only against a probe it just sent and only in the
+            // documented reply shape. First few logged raw so a bundle shows what
+            // produced them. Not a command-DB entry — short-circuit.
+            if (data.Length >= 2 && data[0] == 0x8E && data[1] == MozaProtocol.DashDeviceIdSwapped)
             {
-                _dualDisplay?.NoteDashParamReadAnswered();
+                if (Interlocked.Increment(ref _dash8eLogged) <= 5)
+                    MozaLog.Debug($"[AZOM] dash 0x8E frame: {BitConverter.ToString(data)}");
+                _dualDisplay?.NoteDashParamReadAnswered(data);
                 return;
             }
 

@@ -383,6 +383,26 @@ namespace MozaPlugin.Devices.Extensions
             }
         }
 
+        /// <summary>Remove the CM1 dash definition once the discriminator reverses a
+        /// CM1 latch (the dash proved to be a CM2). No PID guard: a CM1 is bus-only.</summary>
+        public static bool RemoveCm1Dashboard()
+        {
+            try
+            {
+                var deviceDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    "DevicesDefinitions", "User", DashCm1DeviceName);
+                if (!Directory.Exists(deviceDir)) return false;
+                Directory.Delete(deviceDir, recursive: true);
+                MozaLog.Info("[AZOM] Removed CM1 dash definition (this dash is a CM2; restart SimHub to drop the stale entry)");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not remove CM1 dash definition: {ex.Message}");
+                return false;
+            }
+        }
+
         /// <summary>
         /// Deploy the SimHub device definition for the connected wheelbase.
         /// <paramref name="baseModelName"/> is the firmware model string (group

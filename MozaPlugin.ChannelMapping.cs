@@ -112,6 +112,7 @@ namespace MozaPlugin
         }
 
         private const int WheelMissThreshold = 3;
+        private const int DashMissThreshold = 3;
 
         // wheel-model-name recheck cadence once identity is resolved; per-tick
         // liveness then comes from the 0x00 presence ACK. Kept strictly below

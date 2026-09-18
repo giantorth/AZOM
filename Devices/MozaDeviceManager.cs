@@ -114,6 +114,12 @@ namespace MozaPlugin.Devices
             _wheelRespondedSinceLastPoll = false;
         }
 
+        // Bridged dash (0x14) liveness for the dash poll-miss watchdog.
+        private volatile bool _dashRespondedSinceLastPoll;
+        public bool DashRespondedSinceLastPoll => _dashRespondedSinceLastPoll;
+        public void MarkDashAlive() => _dashRespondedSinceLastPoll = true;
+        public void ResetDashResponseFlag() => _dashRespondedSinceLastPoll = false;
+
         public MozaDeviceManager(MozaSerialConnection connection,
                                  PendingResponseTracker pendingResponses,
                                  byte? deviceIdOverride = null)

@@ -278,6 +278,20 @@ namespace MozaPlugin.Devices
             return null;
         }
 
+        /// <summary>Display identities a bridged CM2 answers the group-0x43 model probe
+        /// with (docs/protocol/devices/dash-0x14.md). Positive CM2 evidence for the
+        /// CM1 discriminator.</summary>
+        private static readonly string[] Cm2DisplayModels = { "S09 Display" };
+
+        public static bool IsCm2DisplayModel(string? displayModelName)
+        {
+            if (string.IsNullOrEmpty(displayModelName)) return false;
+            string name = displayModelName!.Trim();
+            foreach (var m in Cm2DisplayModels)
+                if (string.Equals(name, m, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
         /// <summary>Returns true if the DeviceTypeID is a known dashboard device (standalone CM2 or base-bridged CM1).</summary>
         public static bool IsDashDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId)

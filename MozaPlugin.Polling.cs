@@ -323,6 +323,7 @@ namespace MozaPlugin
             // for a non-bus CM2). For a bus CM2 the wheelbase IS connected so the guard
             // below passes anyway — running them here only adds the USB-only case.
             _dualDisplay?.EnsureCm2Pipeline();
+            _dualDisplay?.TickCm2LaneHygiene();
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             _dualDisplay?.TickCm2DashboardReassert();
             _dualDisplay?.TickCm1Discriminator();
@@ -444,6 +445,29 @@ namespace MozaPlugin
                     _deviceManager.ProbeOtherWheelIds();
             }
 
+            // Bridged-dash liveness: any 0x14 reply since the last poll resets the miss
+            // counter; DashMissThreshold silent polls drop DashDetected so a dash
+            // power-cycle re-runs the MarkDashDetected cascade on re-attach. The 0x14
+            // presence poll below keeps a quiet-but-healthy dash (parked lane) answering.
+            if (DetectionState.DashDetected && !DashboardUsbConnected)
+            {
+                if (_deviceManager.DashRespondedSinceLastPoll)
+                {
+                    DetectionState.ResetDashPollMisses();
+                }
+                else
+                {
+                    int misses = DetectionState.IncrementDashPollMisses();
+                    if (misses >= DashMissThreshold)
+                    {
+                        MozaLog.Debug($"[AZOM] Bridged dash at 0x14 not responding ({misses} misses) — clearing dash detection");
+                        DetectionState.DashDetected = false;
+                        DetectionState.ResetDashPollMisses();
+                    }
+                }
+            }
+            _deviceManager.ResetDashResponseFlag();
+
             // Base temps/state are dev-0x13 reads the base main controller answers.
             // A hub-bound primary (post base→hub migration) can't reach the base
             // over the hub — the dedicated base-aux pipe polls them instead (see
@@ -470,8 +494,9 @@ namespace MozaPlugin
             // probe to 0x12 always ACKs from the base and can't distinguish.
             if (!DetectionState.NewWheelDetected && !DetectionState.OldWheelDetected)
                 _deviceManager.ProbeWheelDetection();
-            if (!DetectionState.DashDetected)
-                _deviceManager.SendPresenceProbe(MozaProtocol.DeviceDash);
+            // Bridged dash: probed every tick, detected or not — the ACK is its liveness
+            // heartbeat for the miss counter above (a standalone-USB CM2 has no 0x14).
+            _deviceManager.SendPresenceProbe(MozaProtocol.DeviceDash);
             // Also re-probe when the flag rode a persistent-wire reload but End()
             // cleared the owner: the ACK is the only thing that re-points it (and,
             // for pedals, re-arms the routed-mBooster probe — see MarkPedalsDetected).

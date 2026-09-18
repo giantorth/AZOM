@@ -710,10 +710,11 @@ namespace MozaPlugin.UI
 
             // CM1-vs-CM2 classification of a BRIDGED dash (a USB 0x0025 dash is always a
             // real CM2, so the line is omitted there). Reports the evidence, not a guess:
-            // only the CM1-exclusive 0x8E param-read answer latches CM1, and only a
-            // tier-def catalog proves CM2 — a dash showing neither stays undecided and is
-            // re-probed. "undecided" with probes climbing and ans=no is the normal
-            // steady state for a real CM2 whose catalog hasn't arrived yet.
+            // only a correlated 0x8E param-read answer latches CM1; CM2 evidence
+            // (display identity / catalog) vetoes it and reverses a latch. A dash
+            // showing neither stays undecided and is re-probed — "undecided" with
+            // probes climbing and 0x8E=no is the steady state for a CM2 whose catalog
+            // hasn't arrived yet.
             if (plugin != null && plugin.IsCm2Present && !dashUsb)
             {
                 var dd = plugin.DualDisplay;
@@ -726,13 +727,8 @@ namespace MozaPlugin.UI
                 else if (dd == null)
                     cls = "undecided (coordinator not wired yet)";
                 else
-                {
-                    var forSpan = dd.DiscriminatingFor;
-                    cls = $"undecided (0x8E ans={(dd.DashParamReadAnswered ? "yes" : "no")}, " +
-                          $"probes={dd.Cm1ProbeCount}, " +
-                          $"deciding {(forSpan.HasValue ? $"{forSpan.Value.TotalSeconds:F0}s" : "not started")}, " +
-                          $"catalog=0)";
-                }
+                    cls = "undecided (catalog=0)";
+                if (dd != null) cls += $" {dd.DescribeDiscriminator()}";
                 sb.AppendLine();
                 sb.Append($"Dash class:        {cls}");
             }

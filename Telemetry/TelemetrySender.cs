@@ -244,8 +244,9 @@ namespace MozaPlugin.Telemetry
         internal Func<Devices.WheelModelInfo?>? WheelModelInfoProvider { get; set; }
 
         // Wheel-reported current dashboard slot — ground truth, parsed from
-        // type-04 records on sess=0x02 b2h. See WheelSlotTracker for parsing
-        // and docs/protocol/dashboard-upload/wheel-pushed-slot.md.
+        // type-04 records on sess=0x02 b2h (or the device's kind=4 echo). See
+        // WheelSlotTracker and docs/protocol/tier-definition/handshake.md
+        // § In-game dashboard switch.
         public int WheelReportedSlot => _slotTracker.WheelReportedSlot;
 
         // Last slot host emitted FF kind=4 to. STATIC: survives plugin recycle
@@ -379,6 +380,10 @@ namespace MozaPlugin.Telemetry
         // the static defences would never notice on their own.
         private readonly Lifecycle.PostSwitchCatalogConvergence _postSwitchConvergence
             = new Lifecycle.PostSwitchCatalogConvergence();
+        // Set by WheelSlotTracker when the device echoes the kind=4 the watcher is
+        // armed for; cleared on every arm and on Stop(). Serial thread writes, tick
+        // thread reads.
+        private volatile bool _postSwitchKind4Confirmed;
 
         /// <summary>Drain window for queued kind=4 / one-shot frames before
         /// Stop's FlushPendingWrites discards the queue.</summary>
