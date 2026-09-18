@@ -116,6 +116,7 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             sb.AppendLine("AZOM bug report");
             sb.AppendLine($"Plugin version: {version}");
+            sb.AppendLine($"SimHub version: {DiagnosticsTextBuilder.GetSimHubVersion()}");
             sb.AppendLine($"OS:             {os}");
             sb.AppendLine($"CLR:            {Environment.Version}");
             sb.AppendLine($"Wheel model:    {(string.IsNullOrEmpty(_data?.WheelModelName) ? "—" : _data!.WheelModelName)}");

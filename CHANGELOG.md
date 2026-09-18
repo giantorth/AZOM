@@ -61,6 +61,8 @@ All notable changes to the AZOM plugin are documented here.
   in progress.
 - **The BUTTON/KNOB selector applies correctly.** 
 - **Dropped unecessary idle polls.** .
+- **Control Mapper fixes.** The plugin no longer stamps a wheel name SimHub will never match, 
+  and puts its wheel recognizer back when SimHub rebuilds its list.
 
 ## [1.6.0]
 

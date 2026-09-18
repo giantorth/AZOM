@@ -367,11 +367,12 @@ namespace MozaPlugin
         // (or whenever the FFB Lag Fix override is on). See ProcessResponsivenessManager.
         private ProcessResponsivenessManager? _responsiveness;
 
-        // Control Mapper IVariantProvider bridge — see ControlMapper/. Registration
+        // Control Mapper IVariantProvider bridge — see Integration/. Registration
         // is reflection-based against an internal SimHub API, so the bridge is wrapped
         // in defensive guards and gated on MozaPluginSettings.EnableControlMapperVariants.
         // Constructed in Init when the toggle is on; null otherwise.
         private Integration.ControlMapperBridge? _controlMapperBridge;
+        internal Integration.ControlMapperBridge? ControlMapperBridge => _controlMapperBridge;
         // Tick budget for retrying registration in DataUpdate when ControlMapperPlugin
         // wasn't loaded yet at Init time. ~50 ticks (~0.8 s at 60 Hz). 0 = stop trying.
         private int _controlMapperRetryTicks;

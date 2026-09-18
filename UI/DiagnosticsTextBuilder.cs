@@ -50,9 +50,45 @@ namespace MozaPlugin.UI
             catch { return "unknown"; }
         }
 
+        /// <summary>Host SimHub version (SimHubWPF.exe file version); "—" when unavailable.</summary>
+        public static string GetSimHubVersion() => s_simHubVersion ??= ComputeSimHubVersion();
+
+        private static string? s_simHubVersion;
+
+        private static string ComputeSimHubVersion()
+        {
+            try
+            {
+                string? path = Assembly.GetEntryAssembly()?.Location;
+                if (string.IsNullOrEmpty(path))
+                    path = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (string.IsNullOrEmpty(path)) return "—";
+                var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(path!);
+                string? v = fvi.ProductVersion;
+                if (string.IsNullOrWhiteSpace(v)) v = fvi.FileVersion;
+                return string.IsNullOrWhiteSpace(v) ? "—" : v!.Trim();
+            }
+            catch { return "—"; }
+        }
+
         // ── Per-panel builders ──────────────────────────────────────────
 
-        public static string BuildPluginInfo() => $"Version:        {GetPluginVersion()}";
+        public static string BuildPluginInfo()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Version:        {GetPluginVersion()}");
+            sb.Append($"SimHub:         {GetSimHubVersion()}");
+            return sb.ToString();
+        }
+
+        /// <summary>Control Mapper variant-bridge state; see ControlMapperBridge.BuildDiagnostics.</summary>
+        public static string BuildControlMapper(MozaPlugin plugin)
+        {
+            var bridge = plugin?.ControlMapperBridge;
+            if (bridge == null) return "(bridge disabled — EnableControlMapperVariants is false)";
+            try { return bridge.BuildDiagnostics(); }
+            catch (Exception ex) { return $"(failed: {ex.Message})"; }
+        }
 
         public static string BuildUsbDetection(MozaPlugin plugin)
         {

@@ -76,6 +76,9 @@ namespace MozaPlugin.UI
             sb.AppendLine("=== Plugin ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildPluginInfo());
             sb.AppendLine();
+            sb.AppendLine("=== Control Mapper ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildControlMapper(_plugin));
+            sb.AppendLine();
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
             sb.AppendLine();

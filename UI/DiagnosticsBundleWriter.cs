@@ -98,6 +98,7 @@ namespace MozaPlugin.UI
             manifest.AppendLine("AZOM diagnostics bundle");
             manifest.AppendLine($"Created (local):     {DateTime.Now:yyyy-MM-dd HH:mm:ss zzz}");
             manifest.AppendLine($"Plugin version:      {DiagnosticsTextBuilder.GetPluginVersion()}");
+            manifest.AppendLine($"SimHub version:      {DiagnosticsTextBuilder.GetSimHubVersion()}");
             manifest.AppendLine($"OS:                  {Environment.OSVersion}");
             manifest.AppendLine($"CLR:                 {Environment.Version}");
             manifest.AppendLine();

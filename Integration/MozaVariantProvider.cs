@@ -18,21 +18,19 @@ namespace MozaPlugin.Integration
     /// same problem Fanatec and Simucube solve via their own bundled
     /// providers in <c>SimHub.Plugins.dll</c>.
     ///
-    /// Mirrors the Fanatec / Simucube provider convention: implements
-    /// <see cref="IVariantProvider.GetVariant"/> and exposes a public
-    /// <c>VariantChanged</c> event of type <see cref="EventHandler"/> that
-    /// <c>VariantHelper</c> subscribes to (via reflection by name) inside
-    /// <c>RemapperWorker.UpdateVariantProviders</c>. Firing the event on
-    /// wheel hot-swap is what makes Control Mapper re-enumerate controllers
-    /// without the user having to manually rescan.
+    /// Implements <see cref="IVariantProvider"/> (GetVariant + the
+    /// <c>VariantChanged</c> event). SimHub's <c>VariantHelper</c> subscribes only
+    /// to the providers it creates itself, so <see cref="ControlMapperBridge"/>
+    /// listens to <see cref="VariantChanged"/> and requests the controller
+    /// re-enumeration on wheel hot-swap.
     /// </summary>
     public class MozaVariantProvider : IVariantProvider
     {
         /// <summary>
         /// Fired by <see cref="Poll"/> when the resolved variant string
-        /// changes (wheel attached, detached, or hot-swapped). SimHub's
-        /// <c>VariantHelper</c> subscribes to this event by reflecting on
-        /// the field name.
+        /// changes (wheel attached, detached, or hot-swapped). Consumed by
+        /// <see cref="ControlMapperBridge"/>; SimHub never subscribes to a
+        /// provider it didn't create.
         /// </summary>
         public event EventHandler? VariantChanged;
 
