@@ -336,8 +336,12 @@ namespace MozaPlugin
             }
 
             // Shifter replies share command names across HGP/SGP, so route a relayed
-            // shifter's values into whichever model was detected on this pipe.
-            if (!_data.TryUpdateShifter(DetectionState.ShifterModelForOwner(_deviceManager), r.Name, r.IntValue, r.ArrayValue))
+            // shifter's values into whichever model was detected on this pipe, and
+            // prime that model's write cache from them.
+            var shifterModel = DetectionState.ShifterModelForOwner(_deviceManager);
+            if (_data.TryUpdateShifter(shifterModel, r.Name, r.IntValue, r.ArrayValue))
+                _hardwareApplier.PrimeShifterCfgFromDevice(shifterModel, r.Name, r.IntValue, r.ArrayValue);
+            else
             {
                 _data.UpdateFromCommand(r.Name, r.IntValue);
                 if (r.ArrayValue != null)

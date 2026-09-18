@@ -559,18 +559,18 @@ namespace MozaPlugin
             // display detection (cleared in DeviceProber's display-model-name
             // case) or a manual Connection-enable toggle, so a permanently
             // wedged display can't loop the connection.
-            // Gated to NewWheelDetected only: old-protocol (ES) wheels never
-            // resolve WheelModelInfo (the wheel-model-name resolve is gated on
-            // NewWheelDetected because dev 0x13's model name is the base's, not
-            // the rim's), so WheelModelInfo stays null and `?.HasDisplay != false`
-            // reads null!=false == true — which would otherwise force a one-shot
-            // disconnect on a screenless ES wheel that has no display sub-device
-            // to wait for. Old wheels have no display; exclude them outright.
+            // Same resolved-model gate as the probe above. With WheelModelInfo
+            // null — identity reads unanswered (a bare "CS" mid Table-8 storm), or
+            // an ES rim, which never resolves it — `?.HasDisplay != false` reads
+            // true and the watchdog would bounce the base port over a rim that has
+            // no display to wait for.
             const long DisplayWedgeTimeoutMs = 60_000;
             long wheelDetectedTicks = WheelDetectedUtcTicks;
+            var wedgeModel = WheelModelInfo;
             if (!DisplayWedgeRecoveryFired
                 && DetectionState.NewWheelDetected
-                && WheelModelInfo?.HasDisplay != false
+                && wedgeModel != null
+                && wedgeModel.HasDisplay != false
                 && !IsDisplayDetected
                 && wheelDetectedTicks != 0)
             {
@@ -579,7 +579,7 @@ namespace MozaPlugin
                 if (elapsedMs >= DisplayWedgeTimeoutMs)
                 {
                     DisplayWedgeRecoveryFired = true;
-                    var hasDisplayStr = WheelModelInfo?.HasDisplay?.ToString() ?? "unknown";
+                    var hasDisplayStr = wedgeModel.HasDisplay?.ToString() ?? "unknown";
                     MozaLog.Warn(
                         $"[AZOM] Display sub-device wedge: wheel detected " +
                         $"{elapsedMs}ms ago (HasDisplay={hasDisplayStr}) but " +

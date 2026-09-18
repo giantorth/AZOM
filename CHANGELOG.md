@@ -16,6 +16,15 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **A shifter on its own USB port stays connected.** Its keepalive stopped after the first
+  answer, so the port was closed as dead and reopened every 35 seconds.
+
+- **A shifter's settings are no longer re-written on every connect.** They are read back
+  first and only what the profile changes is written, sparing the shifter's EEPROM.
+
+- **A rim that hasn't identified yet no longer gets its base port bounced.** The
+  display-wedge watchdog waits for the wheel model to resolve before it can fire.
+
 - **Two chained mBoosters get their own settings and calibration.** Which pedal sits on
   the USB unit is now read from the pedal's own heartbeat instead of assumed to be the
   throttle.

@@ -486,7 +486,9 @@ namespace MozaPlugin.Devices
             }
             _detectionState.HgpOwner = _deviceManager;
             _detectionState.HgpDetected = true;
-            _plugin.HardwareApplier.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            // Profile values reach the device as each settings readback lands, and only
+            // where they differ — every 0x52 write is an EEPROM commit on the shifter.
+            _plugin.HardwareApplier.ArmShifterConnectApply(ShifterModelKind.Hgp);
             if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
             MozaLog.Info("[AZOM] HGP shifter detected");
         }
@@ -500,7 +502,7 @@ namespace MozaPlugin.Devices
             }
             _detectionState.SgpOwner = _deviceManager;
             _detectionState.SgpDetected = true;
-            _plugin.HardwareApplier.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ArmShifterConnectApply(ShifterModelKind.Sgp);
             if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
             MozaLog.Info("[AZOM] SGP shifter detected");
         }

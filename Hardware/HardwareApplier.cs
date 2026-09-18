@@ -508,6 +508,131 @@ namespace MozaPlugin.Hardware
             }
         }
 
+        // ── Shifter settings: write-on-change against the shifter's own readback ──
+        // Every group-0x52 write is an EEPROM commit on the shifter (Table 9 "Param N
+        // Written"), so the profile is not pushed blind at detect. Detect ARMS a
+        // reconcile: the per-model settings reads go out as before, and each readback
+        // adopts the device value, then writes the profile's value for that one setting
+        // only if it differs. Later profile applies and tab writes share the cache.
+        // Static like the base cache: a plugin reload reconstructs the applier and
+        // re-applies the profile, and must not re-write what the shifter already holds.
+        private static readonly System.Collections.Generic.Dictionary<string, long> s_shifterCfgCache
+            = new System.Collections.Generic.Dictionary<string, long>(System.StringComparer.Ordinal);
+        // Settings still awaiting their connect-time readback, plus when each model was armed.
+        private static readonly System.Collections.Generic.HashSet<string> s_shifterConnectPending
+            = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+        private static readonly System.Collections.Generic.Dictionary<ShifterModelKind, long> s_shifterArmedTicks
+            = new System.Collections.Generic.Dictionary<ShifterModelKind, long>();
+        // Leaf lock: readbacks land on the serial read/dispatch threads, applies on the
+        // UI/profile thread and the reconnect tick. No I/O under it.
+        private static readonly object s_shifterCfgLock = new object();
+        // A readback still missing this long after detect is treated as never coming;
+        // the next profile apply then writes that setting unconditionally.
+        private const double ShifterReadbackGraceMs = 15_000.0;
+
+        private static readonly string[] s_hgpProfileCommands =
+            { "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode" };
+        private static readonly string[] s_sgpProfileCommands =
+            { "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode", "shifter-brightness", "shifter-colors" };
+
+        private static string[] ShifterProfileCommands(ShifterModelKind model) =>
+            model == ShifterModelKind.Hgp ? s_hgpProfileCommands
+            : model == ShifterModelKind.Sgp ? s_sgpProfileCommands
+            : System.Array.Empty<string>();
+
+        // The profile-applied set plus shifter-type, which the HGP tab writes and reads
+        // back on user action.
+        private static bool IsShifterCfgCommand(string command) =>
+            command == "shifter-apply-mode" || System.Array.IndexOf(s_sgpProfileCommands, command) >= 0;
+
+        private static string ShifterCfgKey(ShifterModelKind model, string command) => model + ":" + command;
+        private static long PackShifterColors(int s1, int s2) => ((long)s1 << 8) | (long)s2;
+
+        /// <summary>True (and records the value) iff it differs from the shifter's last
+        /// known value for this setting, or nothing is known yet.</summary>
+        private static bool ShifterCfgChanged(ShifterModelKind model, string command, long value)
+        {
+            string key = ShifterCfgKey(model, command);
+            lock (s_shifterCfgLock)
+            {
+                if (s_shifterCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
+                s_shifterCfgCache[key] = value;
+                return true;
+            }
+        }
+
+        /// <summary>User-initiated write: it always goes out. Record it and retire any
+        /// pending connect reconcile for the setting so the readback can't re-write it.</summary>
+        private static void ShifterCfgNoteUserWrite(ShifterModelKind model, string command, long value)
+        {
+            string key = ShifterCfgKey(model, command);
+            lock (s_shifterCfgLock)
+            {
+                s_shifterCfgCache[key] = value;
+                s_shifterConnectPending.Remove(key);
+            }
+        }
+
+        /// <summary>Called at detect in place of a profile apply: each profile-backed
+        /// setting is written when, and only if, its readback shows a different value.</summary>
+        internal void ArmShifterConnectApply(ShifterModelKind model)
+        {
+            lock (s_shifterCfgLock)
+            {
+                s_shifterArmedTicks[model] = System.DateTime.UtcNow.Ticks;
+                foreach (var cmd in ShifterProfileCommands(model))
+                    s_shifterConnectPending.Add(ShifterCfgKey(model, cmd));
+            }
+        }
+
+        /// <summary>True while this setting's connect-time readback is still due, so the
+        /// apply path leaves the write to the reconcile. Expires after
+        /// <see cref="ShifterReadbackGraceMs"/> so an unanswered read can't starve the setting.</summary>
+        private static bool ShifterConnectPending(ShifterModelKind model, string command)
+        {
+            string key = ShifterCfgKey(model, command);
+            lock (s_shifterCfgLock)
+            {
+                if (!s_shifterConnectPending.Contains(key)) return false;
+                if (s_shifterArmedTicks.TryGetValue(model, out var armed)
+                    && (System.DateTime.UtcNow.Ticks - armed)
+                       < (long)(ShifterReadbackGraceMs * System.TimeSpan.TicksPerMillisecond))
+                    return true;
+                s_shifterConnectPending.Remove(key);
+                return false;
+            }
+        }
+
+        /// <summary>Shifter settings readback (serial read/dispatch thread). The device
+        /// value is ground truth: adopt it, and if this setting's connect-time reconcile
+        /// is outstanding, push the current profile's value for it iff it differs.</summary>
+        internal void PrimeShifterCfgFromDevice(ShifterModelKind model, string? command, int intValue, byte[]? arrayValue)
+        {
+            if (command == null || model == ShifterModelKind.Unknown || !IsShifterCfgCommand(command)) return;
+            long deviceValue;
+            if (command == "shifter-colors")
+            {
+                if (arrayValue == null || arrayValue.Length < 2) return;
+                deviceValue = PackShifterColors(arrayValue[0], arrayValue[1]);
+            }
+            else
+            {
+                if (intValue < 0) return;
+                deviceValue = intValue;
+            }
+
+            string key = ShifterCfgKey(model, command);
+            bool reconcile;
+            lock (s_shifterCfgLock)
+            {
+                s_shifterCfgCache[key] = deviceValue;
+                reconcile = s_shifterConnectPending.Remove(key);
+            }
+            if (!reconcile) return;
+            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+            if (profile != null) ApplyShifterCommand(model, profile, command);
+        }
+
         // Resolve the pipe that owns pedals / handbrake. Pedals or a handbrake
         // can be attached to the base OR to a dedicated Universal Hub pipe, so
         // settings reads and calibration writes must target whichever connection
@@ -1248,48 +1373,55 @@ namespace MozaPlugin.Hardware
 
         // HGP and SGP are independent devices — each applies from its own profile
         // fields, mirrors into its own _data slot, and writes to its own pipe. _data is
-        // mirrored regardless of detection; writes gate on that model being present.
+        // mirrored regardless of detection; a write goes out only when that model is
+        // present, its connect-time readback isn't still due, and the value differs from
+        // what the shifter reported (see the shifter cfg cache above).
         // shifter-type (apply-mode) is device identity, never profile-applied — the
         // v1.5.1 shared-profile apply of it is what flipped HGPs into sequential mode.
-        public void ApplyHgpToHardware(MozaProfile? profile)
+        public void ApplyHgpToHardware(MozaProfile? profile) => ApplyShifterToHardware(ShifterModelKind.Hgp, profile);
+        public void ApplySgpToHardware(MozaProfile? profile) => ApplyShifterToHardware(ShifterModelKind.Sgp, profile);
+
+        private void ApplyShifterToHardware(ShifterModelKind model, MozaProfile? profile)
         {
             if (profile == null) return;
-            var d = _data.ShifterHgp;
-            if (profile.HgpDirection  >= 0) d.Direction  = profile.HgpDirection;
-            if (profile.HgpPaddleSync >= 0) d.PaddleSync = profile.HgpPaddleSync;
-            if (profile.HgpHidMode    >= 0) d.HidMode    = profile.HgpHidMode;
-
-            if (!_detectionState.HgpDetected) return;
-            var dm = HgpManager;
-            if (profile.HgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.HgpDirection);
-            if (profile.HgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.HgpPaddleSync);
-            if (profile.HgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.HgpHidMode);
+            foreach (var cmd in ShifterProfileCommands(model))
+                ApplyShifterCommand(model, profile, cmd);
         }
 
-        public void ApplySgpToHardware(MozaProfile? profile)
+        private void ApplyShifterCommand(ShifterModelKind model, MozaProfile profile, string command)
         {
-            if (profile == null) return;
-            var d = _data.ShifterSgp;
-            if (profile.SgpDirection  >= 0) d.Direction  = profile.SgpDirection;
-            if (profile.SgpPaddleSync >= 0) d.PaddleSync = profile.SgpPaddleSync;
-            if (profile.SgpHidMode    >= 0) d.HidMode    = profile.SgpHidMode;
-            if (profile.SgpBrightness >= 0) d.Brightness = profile.SgpBrightness;
-            if (profile.SgpLed1Index  >= 0) d.Led1Index  = profile.SgpLed1Index;
-            if (profile.SgpLed2Index  >= 0) d.Led2Index  = profile.SgpLed2Index;
+            bool hgp = model == ShifterModelKind.Hgp;
+            var d = hgp ? _data.ShifterHgp : _data.ShifterSgp;
+            bool detected = hgp ? _detectionState.HgpDetected : _detectionState.SgpDetected;
+            var dm = hgp ? HgpManager : SgpManager;
 
-            if (!_detectionState.SgpDetected) return;
-            var dm = SgpManager;
-            if (profile.SgpDirection  >= 0) dm.WriteSetting("shifter-direction", profile.SgpDirection);
-            if (profile.SgpPaddleSync >= 0) dm.WriteSetting("shifter-paddle-sync", profile.SgpPaddleSync);
-            if (profile.SgpHidMode    >= 0) dm.WriteSetting("shifter-hid-mode", profile.SgpHidMode);
-            if (profile.SgpBrightness >= 0) dm.WriteSetting("shifter-brightness", profile.SgpBrightness);
-            // Both LEDs ride one 2-byte command, so only push when BOTH indices are
-            // known — otherwise we'd coerce the unknown LED to index 0 (red) and clobber
-            // it. In the normal flow the pair always travels together.
-            int s1 = d.Led1Index, s2 = d.Led2Index;
-            if (s1 >= 0 && s2 >= 0)
-                dm.WriteArray("shifter-colors",
-                    new byte[] { (byte)Math.Min(7, s1), (byte)Math.Min(7, s2) });
+            if (command == "shifter-colors")
+            {
+                if (hgp) return;
+                if (profile.SgpLed1Index >= 0) d.Led1Index = profile.SgpLed1Index;
+                if (profile.SgpLed2Index >= 0) d.Led2Index = profile.SgpLed2Index;
+                // Both LEDs ride one 2-byte command, so only push when BOTH indices are
+                // known — otherwise we'd coerce the unknown LED to index 0 (red) and clobber
+                // it. In the normal flow the pair always travels together.
+                int l1 = d.Led1Index, l2 = d.Led2Index;
+                if (l1 < 0 || l2 < 0 || !detected || ShifterConnectPending(model, command)) return;
+                int s1 = Math.Min(7, l1), s2 = Math.Min(7, l2);
+                if (ShifterCfgChanged(model, command, PackShifterColors(s1, s2)))
+                    dm.WriteArray(command, new byte[] { (byte)s1, (byte)s2 });
+                return;
+            }
+
+            int v;
+            switch (command)
+            {
+                case "shifter-direction":   v = hgp ? profile.HgpDirection  : profile.SgpDirection;  if (v < 0) return; d.Direction  = v; break;
+                case "shifter-paddle-sync": v = hgp ? profile.HgpPaddleSync : profile.SgpPaddleSync; if (v < 0) return; d.PaddleSync = v; break;
+                case "shifter-hid-mode":    v = hgp ? profile.HgpHidMode    : profile.SgpHidMode;    if (v < 0) return; d.HidMode    = v; break;
+                case "shifter-brightness":  if (hgp) return; v = profile.SgpBrightness;            if (v < 0) return; d.Brightness = v; break;
+                default: return;
+            }
+            if (!detected || ShifterConnectPending(model, command)) return;
+            if (ShifterCfgChanged(model, command, v)) dm.WriteSetting(command, v);
         }
 
         /// <summary>
@@ -1777,13 +1909,15 @@ namespace MozaPlugin.Hardware
         }
         public void WriteIfHgpDetected(string command, int value)
         {
-            if (value < 0) return;
-            if (_detectionState.HgpDetected) HgpManager.WriteSetting(command, value);
+            if (value < 0 || !_detectionState.HgpDetected) return;
+            if (IsShifterCfgCommand(command)) ShifterCfgNoteUserWrite(ShifterModelKind.Hgp, command, value);
+            HgpManager.WriteSetting(command, value);
         }
         public void WriteIfSgpDetected(string command, int value)
         {
-            if (value < 0) return;
-            if (_detectionState.SgpDetected) SgpManager.WriteSetting(command, value);
+            if (value < 0 || !_detectionState.SgpDetected) return;
+            if (IsShifterCfgCommand(command)) ShifterCfgNoteUserWrite(ShifterModelKind.Sgp, command, value);
+            SgpManager.WriteSetting(command, value);
         }
         // Readback path for the HGP shifter-type repair control: the reply lands in
         // the per-model mirror, so the tab shows what the device actually stored.
@@ -1795,7 +1929,10 @@ namespace MozaPlugin.Hardware
         // UI re-sends both whenever either changes. SGP-only (the HGP has no LEDs).
         public void WriteArrayIfSgpDetected(string command, byte[] payload)
         {
-            if (_detectionState.SgpDetected) SgpManager.WriteArray(command, payload);
+            if (!_detectionState.SgpDetected) return;
+            if (command == "shifter-colors" && payload.Length >= 2)
+                ShifterCfgNoteUserWrite(ShifterModelKind.Sgp, command, PackShifterColors(payload[0], payload[1]));
+            SgpManager.WriteArray(command, payload);
         }
         public void WriteIfBaseAmbientSupported(string command, int value)
         {

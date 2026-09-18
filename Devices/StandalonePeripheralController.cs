@@ -347,8 +347,11 @@ namespace MozaPlugin.Devices
 
             _pending.NoteResponse(r.Name);
             // Shifter replies route into this lane's per-model mirror (this descriptor
-            // knows whether it's the HGP or SGP); everything else uses the shared model.
-            if (!_data.TryUpdateShifter(_desc.ShifterModel, r.Name, r.IntValue, r.ArrayValue))
+            // knows whether it's the HGP or SGP) and prime the shifter write cache;
+            // everything else uses the shared model.
+            if (_data.TryUpdateShifter(_desc.ShifterModel, r.Name, r.IntValue, r.ArrayValue))
+                _plugin.HardwareApplier.PrimeShifterCfgFromDevice(_desc.ShifterModel, r.Name, r.IntValue, r.ArrayValue);
+            else
             {
                 _data.UpdateFromCommand(r.Name, r.IntValue);
                 if (r.ArrayValue != null)
