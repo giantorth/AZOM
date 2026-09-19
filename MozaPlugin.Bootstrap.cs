@@ -666,6 +666,21 @@ namespace MozaPlugin
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
 
+                // LED keepalive re-feed. The firmware renders host-driven LEDs only
+                // while they keep being fed, and SimHub's Display() callback is not a
+                // cadence we control — when it goes quiet the wheel used to revert
+                // within ~1 s regardless of the user's keepalive timeout (2X7HPMMS).
+                _ledKeepaliveTimer = new Timer(LedKeepaliveIntervalMs);
+                _ledKeepaliveTimer.Elapsed += (s, e) =>
+                {
+                    if (IsShuttingDown) return;
+                    if (Interlocked.CompareExchange(ref _ledKeepaliveTickInProgress, 1, 0) != 0) return;
+                    try { TickLedKeepalive(); }
+                    finally { Interlocked.Exchange(ref _ledKeepaliveTickInProgress, 0); }
+                };
+                _ledKeepaliveTimer.AutoReset = true;
+                _ledKeepaliveTimer.Start();
+
                 _reconnectTimer = new Timer(5000);
                 _reconnectTimer.Elapsed += (s, e) =>
                 {
@@ -904,6 +919,7 @@ namespace MozaPlugin
             try { _tempHistoryTimer?.Stop(); } catch { }
             try { _torqueHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
+            try { _ledKeepaliveTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
 
@@ -1024,6 +1040,7 @@ namespace MozaPlugin
             try { _tempHistoryTimer?.Dispose(); } catch { }
             try { _torqueHistoryTimer?.Dispose(); } catch { }
             try { _retryTimer?.Dispose(); } catch { }
+            try { _ledKeepaliveTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }
 

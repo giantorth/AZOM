@@ -587,7 +587,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>시프터</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>비행 시뮬레이션</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>킵얼라이브 시간 제한</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>텔레메트리가 멈춘 후 휠이 절전 모드로 들어가기 전까지 LED를 새로 고치는 시간입니다.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>효과가 멈춘 뒤 휠이 자체 조명으로 돌아가기 전까지 LED가 마지막 상태를 유지하는 시간입니다.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>디스플레이 회전</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>부드럽게</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>즉시</value></data>

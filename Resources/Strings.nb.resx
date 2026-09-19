@@ -593,7 +593,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Girspak</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flysimulering</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-tidsavbrudd</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene oppdateres etter at telemetrien stopper før rattet kan gå i hvilemodus.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene beholder sin siste tilstand etter at effektene stopper, før rattet går tilbake til sin egen belysning.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Skjermrotasjon</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>

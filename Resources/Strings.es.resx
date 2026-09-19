@@ -593,7 +593,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Cambio de marchas</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Simulación de vuelo</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Tiempo de keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Cuánto tiempo seguir actualizando los LED tras detenerse la telemetría antes de que el volante pueda dormir.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Cuánto tiempo mantienen los LED su último estado tras detenerse los efectos, antes de que el volante vuelva a su propia iluminación.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotación de pantalla</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Suave</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Inmediata</value></data>

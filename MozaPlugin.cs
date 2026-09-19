@@ -152,6 +152,13 @@ namespace MozaPlugin
         private Timer _pollTimer = null!;
         private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
+        // LED keepalive re-feed. Its own timer rather than a rider on the 250 ms
+        // _retryTimer: that tick shares one re-entry flag with four pipes of
+        // retransmits, and a slow pass there would drop the LED feed with it.
+        // Period is set by the tightest obligation on the wire — the CM2 flag lane's
+        // ~12.5 Hz refresh — not by the wheel's 0.75 s sections.
+        private Timer _ledKeepaliveTimer = null!;
+        private const int LedKeepaliveIntervalMs = 40;
         // Base-tab temperature-graph history. Sampled every 500 ms by a
         // plugin-lifetime timer (independent of the settings panel) so the graph
         // shows the full 5-minute window the moment the panel opens rather than

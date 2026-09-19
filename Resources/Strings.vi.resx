@@ -588,7 +588,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Cần số</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Mô phỏng bay</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Thời gian chờ keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Thời gian tiếp tục làm mới đèn LED sau khi telemetry dừng trước khi vô-lăng có thể ngủ.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Đèn LED giữ trạng thái cuối trong bao lâu sau khi hiệu ứng dừng, trước khi vô-lăng trở về ánh sáng riêng của nó.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Xoay màn hình</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Mượt</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Tức thì</value></data>

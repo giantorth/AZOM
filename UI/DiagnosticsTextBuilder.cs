@@ -649,6 +649,20 @@ namespace MozaPlugin.UI
                 Bri(plugin.WheelLedAppliedBrightnessKnob), Cfg("wheel-knob-brightness")));
             sb.Append($"Flags (meter):  wheel={Bri(d.WheelFlagsBrightness)} "
                       + $"cache/want={Cfg("dash-flags-brightness")}  (dev 0x14, not a wheel LED group)");
+
+            // LED keepalive. srcQuiet is how long since SimHub's LED pipeline last
+            // handed us a frame; the fed ages are how long since we last re-fed each
+            // section. srcQuiet climbing while the fed ages stay under a second is the
+            // keepalive doing its job through a stalled source.
+            var ka = Devices.Led.MozaLedDeviceManager.LiveKeepaliveSnapshot();
+            if (ka != null)
+            {
+                string Secs(double s) => s < 0 ? "never" : $"{s:F1}s";
+                sb.AppendLine();
+                sb.Append($"LED keepalive:  hold={ka.Value.HoldSec}s srcQuiet={Secs(ka.Value.SrcQuietSec)} "
+                          + $"fed rpm={Secs(ka.Value.RpmFedSec)} btn={Secs(ka.Value.BtnFedSec)} "
+                          + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips}");
+            }
             return sb.ToString();
         }
 
@@ -830,6 +844,7 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 LED driver:    fw={fw} engaged={(snap.Engaged ? "yes" : "no")} everLit={(snap.EverLit ? "yes" : "no")} " +
                     $"lastNonBlack={Age(snap.LastNonBlackTicks)} lastBitmask={mask} sentAgo={Age(snap.LastBitmaskSendTicks)} " +
+                    $"srcQuiet={Age(snap.LastDisplayTicks)} " +
                     $"sends: bitmask={snap.BitmaskSends} rpmColor={snap.RpmColorSends} flag={snap.FlagSends}");
             }
             return sb.ToString();

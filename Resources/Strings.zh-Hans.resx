@@ -588,7 +588,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>换挡器</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>飞行模拟</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>保活超时</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>遥测停止后继续刷新 LED 多久，方向盘才能进入休眠。</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>效果停止后 LED 保持最后状态多久，方向盘才恢复自身灯效。</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>屏幕旋转</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>平滑</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>立即</value></data>

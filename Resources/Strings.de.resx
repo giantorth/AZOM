@@ -588,7 +588,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Schaltung</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flugsimulation</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-Timeout</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Wie lange die LEDs nach dem Ende der Telemetrie aktualisiert werden, bevor das Lenkrad in den Ruhezustand wechseln kann.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Wie lange die LEDs ihren letzten Zustand halten, nachdem die Effekte enden, bevor das Lenkrad zu seiner eigenen Beleuchtung zurückkehrt.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Displayrotation</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Sanft</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Sofort</value></data>

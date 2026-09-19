@@ -40,6 +40,7 @@ namespace MozaPlugin
             _tempHistoryTimer?.Stop();
             _torqueHistoryTimer?.Stop();
             _retryTimer?.Stop();
+            _ledKeepaliveTimer?.Stop();
             _reconnectTimer?.Stop();
 
             // Stop the AB9 engine-vib worker before the AB9 manager / connection
@@ -269,6 +270,7 @@ namespace MozaPlugin
             _tempHistoryTimer?.Dispose();
             _torqueHistoryTimer?.Dispose();
             _retryTimer?.Dispose();
+            _ledKeepaliveTimer?.Dispose();
             _reconnectTimer?.Dispose();
 
             // 8. Null Instance last so any straggler callback can still no-op via IsShuttingDown.

@@ -601,7 +601,7 @@
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Yap!</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Snarf!</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Grrowl!</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Barff Ruff Grr Arf Yap Yowff!</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Grr Barff Ruff Arf Yap Yowff Woof Bark!</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Yowff!</value></data>

@@ -588,7 +588,7 @@ Id : {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Levier de vitesses</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Simulation de vol</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Délai de keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Durée de rafraîchissement des LED après l'arrêt de la télémétrie avant la mise en veille du volant.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Durée pendant laquelle les LED conservent leur dernier état après l'arrêt des effets, avant que le volant ne revienne à son propre éclairage.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotation de l'écran</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluide</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immédiate</value></data>

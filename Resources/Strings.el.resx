@@ -587,7 +587,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9Shifter" xml:space="preserve"><value>Λεβιές ταχυτήτων</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Προσομοίωση πτήσης</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Χρονικό όριο Keepalive</value></data>
-  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Πόση ώρα θα ανανεώνονται τα LED μετά τη διακοπή τηλεμετρίας πριν το τιμόνι μπει σε αδράνεια.</value></data>
+  <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Για πόση ώρα τα LED διατηρούν την τελευταία τους κατάσταση μετά τη διακοπή των εφέ, πριν το τιμόνι επιστρέψει στον δικό του φωτισμό.</value></data>
   <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Περιστροφή οθόνης</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Ομαλή</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Άμεση</value></data>

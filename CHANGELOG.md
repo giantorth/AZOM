@@ -39,6 +39,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Fixed
 
+- **The LEDs stay lit when SimHub's effect pipeline stalls.** The keepalive now runs on
+  its own timer instead of riding SimHub's LED callback, so a pause in that callback no
+  longer drops the wheel and dash back to their own lighting mid-session.
+
 - **A shifter on its own USB port stays connected.** Its keepalive stopped after the first
   answer, so the port was closed as dead and reopened every 35 seconds.
 
