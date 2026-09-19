@@ -26,6 +26,14 @@ All notable changes to the AZOM plugin are documented here.
   when the upload finishes — or earlier, if it stops making progress, so a stuck transfer
   never keeps the LEDs to itself.
 
+### Changed
+
+- **The LED colour palette is two rows of standard colours.** Red, orange, yellow, green, cyan,
+  blue, purple and magenta over their pastel tints, plus off and white, with the last custom
+  colour as the final swatch of every palette, kept across restarts.
+
+- **Clicking a selected LED again closes its colour editor.**
+
 ### Fixed
 
 - **A shifter on its own USB port stays connected.** Its keepalive stopped after the first

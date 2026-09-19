@@ -291,7 +291,6 @@
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ещё не тестировалось.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Выбор цвета LED</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>ПАЛИТРА</value></data>
-  <data name="Label_Last" xml:space="preserve"><value>ПОСЛЕДНИЙ</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>ТОЧНАЯ НАСТРОЙКА · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ОТМЕНА</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>ОК</value></data>
@@ -793,4 +792,5 @@ Id: {2}</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Не удалось преобразовать: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Отброшено {0}% виджетов</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Лимит узлов</value></data>
+  <data name="Tooltip_SavedColor" xml:space="preserve"><value>Сохранённый цвет</value></data>
 </root>

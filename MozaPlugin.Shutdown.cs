@@ -59,6 +59,8 @@ namespace MozaPlugin
             // list. The bridge is null when the toggle was off or construction
             // failed in Init.
             try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
+            // Static persistence hook captures this instance; drop it on teardown.
+            MozaControls.MozaPalette.SavedColorPersist = null;
 
             // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
             // effect immediately on shutdown. Without this the firmware keeps

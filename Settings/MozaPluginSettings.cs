@@ -153,6 +153,10 @@ namespace MozaPlugin.Settings
         public int[]? WheelRpmBlinkColors { get; set; }
         public int[]? DashRpmBlinkColors { get; set; }
 
+        // Last colour confirmed in the LED picker's CUSTOM dialog — the SAVED chip
+        // on every PaletteStrip. Packed R<<16|G<<8|B, -1 = none yet.
+        public int LastCustomLedColor { get; set; } = -1;
+
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
 

@@ -296,7 +296,6 @@
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ikke testet ennå.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Velg LED-farge</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>PALETT</value></data>
-  <data name="Label_Last" xml:space="preserve"><value>SIST</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>FINJUSTER · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>AVBRYT</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>OK</value></data>
@@ -798,4 +797,5 @@ Id: {2}</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Konverteringen mislyktes: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % av modulene forkastet</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Nodegrense</value></data>
+  <data name="Tooltip_SavedColor" xml:space="preserve"><value>Lagret farge</value></data>
 </root>

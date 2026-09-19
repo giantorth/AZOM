@@ -400,7 +400,7 @@ namespace MozaPlugin.Resources
         // ----- ColorPickerDialog
         public static string Title_PickLedColor => Get("Title_PickLedColor");
         public static string Label_Palette => Get("Label_Palette");
-        public static string Label_Last => Get("Label_Last");
+        public static string Tooltip_SavedColor => Get("Tooltip_SavedColor");
         public static string Label_FineTuneRgb => Get("Label_FineTuneRgb");
         public static string Button_Cancel => Get("Button_Cancel");
         public static string Button_Ok => Get("Button_Ok");

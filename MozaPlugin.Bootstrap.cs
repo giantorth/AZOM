@@ -89,6 +89,19 @@ namespace MozaPlugin
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
 
+                // SAVED chip on every PaletteStrip: restore the last CUSTOM pick and
+                // route new picks back into settings. Static hook re-set per Init
+                // like PaletteStrip.CustomPickerFactory; cleared in End.
+                var savedRgb = _settings.LastCustomLedColor >= 0
+                    ? MozaProfile.UnpackColor(_settings.LastCustomLedColor) : null;
+                MozaControls.MozaPalette.SeedSavedColor(savedRgb != null
+                    ? Color.FromRgb(savedRgb[0], savedRgb[1], savedRgb[2]) : (Color?)null);
+                MozaControls.MozaPalette.SavedColorPersist = c =>
+                {
+                    _settings.LastCustomLedColor = MozaProfile.PackColor(new[] { c.R, c.G, c.B });
+                    SaveSettings();
+                };
+
                 // Sweep leftover install artifacts before doing anything
                 // heavyweight. After a successful in-app update + SimHub
                 // restart, we land here with the NEW DLL loaded and the

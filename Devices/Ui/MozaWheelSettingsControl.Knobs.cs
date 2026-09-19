@@ -314,13 +314,10 @@ namespace MozaPlugin.Devices.Ui
                     var fresh = new System.Collections.ObjectModel.ObservableCollection<Color>();
                     for (int i = 0; i < ledCount; i++) fresh.Add(Colors.Black);
                     viz.RingColors = fresh;
-                    // If the prior selection points past the new bounds, clear it
-                    // so the editor label/palette don't paint into a missing slot.
+                    // If the prior selection points past the new bounds, close the
+                    // editor so the label/palette don't paint into a missing slot.
                     if (_wiSelectedKnob == k && _wiSelectedSlot >= ledCount)
-                    {
-                        _wiSelectedSlot = -1;
-                        viz.SelectedSlot = -1;
-                    }
+                        CloseKnobEditor();
                 }
                 for (int i = 0; i < ledCount; i++)
                 {
@@ -339,6 +336,18 @@ namespace MozaPlugin.Devices.Ui
 
         private void OnKnobSlotSelected(int knob, int slot)
         {
+            // Same dot again while the editor is open: toggle it closed.
+            if (knob == _wiSelectedKnob && slot == _wiSelectedSlot
+                && WiKnobEditorPanel?.Visibility == Visibility.Visible)
+            {
+                CloseKnobEditor();
+                return;
+            }
+            // One ringed dot across all knobs — the viz sets its own SelectedSlot
+            // before raising, so the previous knob's is cleared here.
+            if (_wiKnobViz != null && _wiSelectedKnob >= 0 && _wiSelectedKnob != knob
+                && _wiSelectedKnob < _wiKnobViz.Length)
+                _wiKnobViz[_wiSelectedKnob].SelectedSlot = -1;
             _wiSelectedKnob = knob;
             _wiSelectedSlot = slot;
             HighlightSelectedKnob();
@@ -351,6 +360,16 @@ namespace MozaPlugin.Devices.Ui
                 if (slot == -2) WiKnobPalette.SelectedColor = viz.ActiveColor;
                 else if (slot >= 0 && slot < viz.RingColors!.Count) WiKnobPalette.SelectedColor = viz.RingColors[slot];
             }
+        }
+
+        private void CloseKnobEditor()
+        {
+            if (_wiKnobViz != null && _wiSelectedKnob >= 0 && _wiSelectedKnob < _wiKnobViz.Length)
+                _wiKnobViz[_wiSelectedKnob].SelectedSlot = -1;
+            _wiSelectedKnob = -1;
+            _wiSelectedSlot = -1;
+            HighlightSelectedKnob();
+            if (WiKnobEditorPanel != null) WiKnobEditorPanel.Visibility = Visibility.Collapsed;
         }
 
         private void HighlightSelectedKnob()

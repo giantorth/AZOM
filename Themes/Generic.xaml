@@ -534,11 +534,12 @@
     <!-- ============================================================ -->
 
     <Style TargetType="{x:Type controls:PaletteStrip}">
-        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="MinHeight" Value="56"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type controls:PaletteStrip}">
-                    <StackPanel x:Name="PART_Swatches" Orientation="Horizontal"/>
+                    <!-- Vertical host for the two swatch rows the control builds -->
+                    <StackPanel x:Name="PART_Swatches" Orientation="Vertical"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

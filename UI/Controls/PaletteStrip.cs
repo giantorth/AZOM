@@ -1,16 +1,21 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using MozaPlugin.Resources;
 
 namespace MozaControls
 {
     /// <summary>
-    /// Horizontal row of 16 curated swatches + a CUSTOM hue-picker chip that
-    /// opens the legacy <c>ColorPickerDialog</c>. Sets <see cref="SelectedColor"/>
-    /// and raises <see cref="ColorChanged"/> when the user picks.
+    /// Two column-aligned rows of swatches: the eight pure colours over their
+    /// pastel tints, then a gapped utility column with Off/White over a CUSTOM
+    /// hue-picker chip (opens the legacy <c>ColorPickerDialog</c>) and a SAVED
+    /// chip mirroring <see cref="MozaPalette.SavedColor"/> (hidden until a
+    /// CUSTOM pick has been confirmed). Sets <see cref="SelectedColor"/> and
+    /// raises <see cref="ColorChanged"/> when the user picks.
     ///
     /// Designed as a drop-in replacement for the per-LED <c>Border</c> +
     /// <c>MouseLeftButtonUp</c> → <c>ColorPickerDialog</c> flow used throughout
@@ -44,6 +49,19 @@ namespace MozaControls
         public static Func<Color, Color?>? CustomPickerFactory { get; set; }
 
         private StackPanel? _root;
+        private Border? _savedSwatch;
+
+        public PaletteStrip()
+        {
+            // Static event: subscribed only while in the tree so SimHub's per-game
+            // control rebuilds don't root stale strips.
+            Loaded += (_, __) =>
+            {
+                MozaPalette.SavedColorChanged += OnSavedColorChanged;
+                SyncSavedSwatch();
+            };
+            Unloaded += (_, __) => MozaPalette.SavedColorChanged -= OnSavedColorChanged;
+        }
 
         public override void OnApplyTemplate()
         {
@@ -57,16 +75,38 @@ namespace MozaControls
         {
             if (_root == null) return;
             _root.Children.Clear();
-            foreach (var sw in MozaPalette.Swatches)
-            {
-                _root.Children.Add(BuildSwatchBorder(sw));
-            }
-            // CUSTOM chip
+            var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+            var bottom = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var sw in MozaPalette.PureSwatches) top.Children.Add(BuildSwatchBorder(sw));
+            top.Children.Add(BuildSwatchBorder(MozaPalette.Off, gapBefore: true));
+            top.Children.Add(BuildSwatchBorder(MozaPalette.White));
+            foreach (var sw in MozaPalette.PastelSwatches) bottom.Children.Add(BuildSwatchBorder(sw));
+            bottom.Children.Add(BuildCustomChip());
+            _savedSwatch = BuildSavedSwatch();
+            bottom.Children.Add(_savedSwatch);
+            _root.Children.Add(top);
+            _root.Children.Add(bottom);
+            SyncSavedSwatch();
+        }
+
+        private IEnumerable<Border> Chips()
+        {
+            if (_root == null) yield break;
+            foreach (var row in _root.Children)
+                if (row is Panel p)
+                    foreach (var child in p.Children)
+                        if (child is Border b) yield return b;
+        }
+
+        private static Thickness ChipMargin(bool gapBefore) => new Thickness(gapBefore ? 8 : 2, 0, 0, 0);
+
+        private Border BuildCustomChip()
+        {
             var customBorder = new Border
             {
                 Width = 26, Height = 26, CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(2, 0, 0, 0),
+                Margin = ChipMargin(gapBefore: true),
                 Cursor = Cursors.Hand,
                 ToolTip = "Custom hue picker",
             };
@@ -92,18 +132,18 @@ namespace MozaControls
                     ColorChanged?.Invoke(this, SelectedColor);
                 }
             };
-            _root.Children.Add(customBorder);
+            return customBorder;
         }
 
-        private Border BuildSwatchBorder(MozaPalette.Swatch sw)
+        private Border BuildSwatchBorder(MozaPalette.Swatch sw, bool gapBefore = false)
         {
             var border = new Border
             {
                 Width = 26, Height = 26, CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
-                Margin = new Thickness(2, 0, 0, 0),
+                Margin = ChipMargin(gapBefore),
                 Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(sw.Value),
+                Background = new SolidColorBrush(sw.Display),
                 ToolTip = sw.Label,
                 Tag = sw,
             };
@@ -112,7 +152,7 @@ namespace MozaControls
             {
                 // Diagonal strikethrough overlay
                 var grid = new Grid();
-                grid.Children.Add(new Border { Background = new SolidColorBrush(sw.Value) });
+                grid.Children.Add(new Border { Background = new SolidColorBrush(sw.Display) });
                 grid.Children.Add(new Line
                 {
                     X1 = 4, Y1 = 22, X2 = 22, Y2 = 4,
@@ -130,28 +170,85 @@ namespace MozaControls
             return border;
         }
 
+        // Trailing SAVED chip; Tag/Background/Visibility follow MozaPalette.SavedColor.
+        private Border BuildSavedSwatch()
+        {
+            var border = new Border
+            {
+                Width = 26, Height = 26, CornerRadius = new CornerRadius(4),
+                BorderThickness = new Thickness(1),
+                Margin = ChipMargin(gapBefore: false),
+                Cursor = Cursors.Hand,
+                ToolTip = Strings.Tooltip_SavedColor,
+                Visibility = Visibility.Collapsed,
+            };
+            border.SetResourceReference(Border.BorderBrushProperty, "BorderBrightBrush");
+            border.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                if (!(border.Tag is MozaPalette.Swatch sw)) return;
+                SelectedColor = sw.Value;
+                ColorChanged?.Invoke(this, sw.Value);
+            };
+            return border;
+        }
+
+        private void OnSavedColorChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.CheckAccess()) SyncSavedSwatch();
+            else Dispatcher.BeginInvoke(new Action(SyncSavedSwatch));
+        }
+
+        private void SyncSavedSwatch()
+        {
+            if (_savedSwatch == null) return;
+            var saved = MozaPalette.SavedColor;
+            if (saved == null)
+            {
+                _savedSwatch.Tag = null;
+                _savedSwatch.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                _savedSwatch.Tag = new MozaPalette.Swatch("saved", Strings.Tooltip_SavedColor, saved.Value);
+                _savedSwatch.Background = new SolidColorBrush(saved.Value);
+                _savedSwatch.Visibility = Visibility.Visible;
+            }
+            Refresh();
+        }
+
         private void Refresh()
         {
             if (_root == null) return;
-            // Update selected ring on each swatch
-            foreach (var child in _root.Children)
+            // One ring at most: a standard swatch wins, SAVED only when none matched.
+            bool standardMatched = false;
+            foreach (var b in Chips())
             {
-                if (child is Border b && b.Tag is MozaPalette.Swatch sw)
+                if (ReferenceEquals(b, _savedSwatch)) continue;
+                if (b.Tag is MozaPalette.Swatch sw)
                 {
                     bool isSelected = ColorsApproxEqual(sw.Value, SelectedColor);
-                    if (isSelected)
-                    {
-                        b.BorderThickness = new Thickness(2);
-                        b.SetResourceReference(Border.BorderBrushProperty, "CyanBrush");
-                        b.Effect = (System.Windows.Media.Effects.Effect?)TryFindResource("CyanGlowSoftEffect");
-                    }
-                    else
-                    {
-                        b.BorderThickness = new Thickness(1);
-                        b.SetResourceReference(Border.BorderBrushProperty, "BorderBrightBrush");
-                        b.Effect = null;
-                    }
+                    standardMatched |= isSelected;
+                    SetRing(b, isSelected);
                 }
+            }
+            if (_savedSwatch != null && _savedSwatch.Tag is MozaPalette.Swatch saved)
+                SetRing(_savedSwatch, !standardMatched && ColorsApproxEqual(saved.Value, SelectedColor));
+        }
+
+        private void SetRing(Border b, bool on)
+        {
+            if (on)
+            {
+                b.BorderThickness = new Thickness(2);
+                b.SetResourceReference(Border.BorderBrushProperty, "CyanBrush");
+                b.Effect = (System.Windows.Media.Effects.Effect?)TryFindResource("CyanGlowSoftEffect");
+            }
+            else
+            {
+                b.BorderThickness = new Thickness(1);
+                b.SetResourceReference(Border.BorderBrushProperty, "BorderBrightBrush");
+                b.Effect = null;
             }
         }
 

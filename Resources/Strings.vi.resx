@@ -291,7 +291,6 @@
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Chưa được kiểm thử.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Chọn màu LED</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>BẢNG MÀU</value></data>
-  <data name="Label_Last" xml:space="preserve"><value>GẦN NHẤT</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>TINH CHỈNH · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>HỦY</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>OK</value></data>
@@ -793,4 +792,5 @@ Id: {2}</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Chuyển đổi thất bại: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Đã bỏ {0}% tiện ích</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Giới hạn nút</value></data>
+  <data name="Tooltip_SavedColor" xml:space="preserve"><value>Màu đã lưu</value></data>
 </root>

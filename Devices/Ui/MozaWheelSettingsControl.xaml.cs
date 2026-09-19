@@ -435,19 +435,31 @@ skipReadByMode:
             _ => "",
         };
 
+        private static void ResetSwatchBorder(Border swatch)
+        {
+            swatch.BorderBrush = GetCachedBrush(85, 85, 85);
+            swatch.BorderThickness = new Thickness(1);
+            swatch.Effect = null;
+        }
+
         private void SelectSwatchForEditor(Border swatch, ColorSwatchInfo info)
         {
             var s = info.Section;
             if (s == SwatchSection.None) return;
+            var (editor, label, palette) = GetEditorWidgets(s);
+            if (editor == null || label == null || palette == null) return;
 
-            // Restore the previously-selected swatch's default border.
+            // Same LED again while its editor is open: toggle it closed.
             var prev = GetSelectedSwatch(s);
-            if (prev != null && !ReferenceEquals(prev, swatch))
+            if (ReferenceEquals(prev, swatch) && editor.Visibility == Visibility.Visible)
             {
-                prev.BorderBrush = GetCachedBrush(85, 85, 85);
-                prev.BorderThickness = new Thickness(1);
-                prev.Effect = null;
+                ResetSwatchBorder(swatch);
+                SetSelectedSwatch(s, null);
+                editor.Visibility = Visibility.Collapsed;
+                return;
             }
+
+            if (prev != null) ResetSwatchBorder(prev);
 
             // Highlight the new selection with cyan + soft glow.
             swatch.BorderBrush = (Brush)(TryFindResource("CyanBrush") ?? Brushes.Cyan);
@@ -457,8 +469,6 @@ skipReadByMode:
 
             // Pre-seed palette with the swatch's current colour and reveal the
             // editor row + label.
-            var (editor, label, palette) = GetEditorWidgets(s);
-            if (editor == null || label == null || palette == null) return;
             var current = info.ColorSource[info.Index];
             using (_suppressor.Begin())
             {

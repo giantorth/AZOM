@@ -320,7 +320,6 @@
   <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="Label_Last" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>YOWL!!</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>WROOF!!</value></data>
@@ -783,4 +782,5 @@
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversion flopped: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets buried in the yard</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Node leash</value></data>
+  <data name="Tooltip_SavedColor" xml:space="preserve"><value>Buried bone!</value></data>
 </root>
