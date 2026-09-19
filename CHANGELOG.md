@@ -26,6 +26,9 @@ All notable changes to the AZOM plugin are documented here.
   when the upload finishes — or earlier, if it stops making progress, so a stuck transfer
   never keeps the LEDs to itself.
 
+- **Knob rings can be filled on alternating LEDs.** A button beside "Fill ring" on the Knobs
+  tab colours every other LED in the group that contains the selected one.
+
 ### Changed
 
 - **The LED colour palette is two rows of standard colours.** Red, orange, yellow, green, cyan,

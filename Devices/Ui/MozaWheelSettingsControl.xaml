@@ -562,23 +562,23 @@
                                 <Border x:Name="WiKnobEditorPanel" Style="{StaticResource InnerCardBorder}"
                                         Visibility="Collapsed">
                                     <StackPanel>
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="WiKnobEditorLabel" Grid.Column="0"
-                                                       Text="{x:Static res:Strings.Label_KnobEditing}"
-                                                       Style="{StaticResource SectionTitleText}"
-                                                       VerticalAlignment="Center"/>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                <Button Content="{x:Static res:Strings.Button_FillRingWithSelected}" Margin="0,0,8,0"
-                                                        Click="WiKnobFillRing_Click"/>
-                                                <Button Content="{x:Static res:Strings.Button_CopyKnobToAll}"
-                                                        Click="WiKnobCopyToAll_Click"/>
-                                            </StackPanel>
-                                        </Grid>
+                                        <TextBlock x:Name="WiKnobEditorLabel"
+                                                   Text="{x:Static res:Strings.Label_KnobEditing}"
+                                                   Style="{StaticResource SectionTitleText}"
+                                                   Margin="0,0,0,10"/>
                                         <ctrl:PaletteStrip x:Name="WiKnobPalette"/>
+                                        <!-- Bulk actions on the selected knob; wraps in wide locales -->
+                                        <WrapPanel Margin="0,10,0,0">
+                                            <Button Content="{x:Static res:Strings.Button_FillRingWithSelected}" Margin="0,0,8,4"
+                                                    Click="WiKnobFillRing_Click"/>
+                                            <!-- Only the parity group containing the selected LED is offered -->
+                                            <Button x:Name="WiKnobFillOddButton" Content="{x:Static res:Strings.Button_FillOddLeds}"
+                                                    Margin="0,0,8,4" Visibility="Collapsed" Click="WiKnobFillOdd_Click"/>
+                                            <Button x:Name="WiKnobFillEvenButton" Content="{x:Static res:Strings.Button_FillEvenLeds}"
+                                                    Margin="0,0,8,4" Visibility="Collapsed" Click="WiKnobFillEven_Click"/>
+                                            <Button Content="{x:Static res:Strings.Button_CopyKnobToAll}" Margin="0,0,0,4"
+                                                    Click="WiKnobCopyToAll_Click"/>
+                                        </WrapPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

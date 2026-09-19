@@ -14,7 +14,8 @@ namespace MozaPlugin.Devices.Ui
     // Phase 7 knob page: per-knob KnobRingViz (ring slot count tracks the
     // wheel's per-knob LED count — 12 for most knobs, 8 for the KS Pro middle
     // knob — plus a centre swatch), a single shared PaletteStrip editor below,
-    // and bulk actions ("Fill ring with selected", "Copy this knob to all").
+    // and bulk actions ("Fill ring with selected", "Fill odd/even LEDs", "Copy
+    // this knob to all").
     //
     // Renders overlay-first (saved sparse arrays win; _data fills unset slots with
     // the wheel's own values — see RefreshWheel) and persists slot-by-slot:
@@ -352,6 +353,7 @@ namespace MozaPlugin.Devices.Ui
             _wiSelectedSlot = slot;
             HighlightSelectedKnob();
             UpdateEditorLabel();
+            UpdateFillParityButtons();
             if (WiKnobEditorPanel != null) WiKnobEditorPanel.Visibility = Visibility.Visible;
             // Pre-seed palette with the slot's current colour
             if (WiKnobPalette != null && _wiKnobViz != null)
@@ -402,6 +404,17 @@ namespace MozaPlugin.Devices.Ui
             }
             else slotName = "—";
             WiKnobEditorLabel.Text = $"EDITING · KNOB {_wiSelectedKnob + 1} · {slotName}";
+        }
+
+        // Offer only the parity group the selected ring LED belongs to; the
+        // centre is in neither, so it gets no parity button.
+        private void UpdateFillParityButtons()
+        {
+            bool ring = _wiSelectedSlot >= 0;
+            if (WiKnobFillOddButton != null)
+                WiKnobFillOddButton.Visibility = ring && _wiSelectedSlot % 2 == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (WiKnobFillEvenButton != null)
+                WiKnobFillEvenButton.Visibility = ring && _wiSelectedSlot % 2 == 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void OnPaletteColorPicked(Color c)
@@ -458,18 +471,30 @@ namespace MozaPlugin.Devices.Ui
         // "Fill ring with selected" — write the current palette colour to every
         // present ring LED on the currently selected knob and persist those slots.
         private void WiKnobFillRing_Click(object sender, RoutedEventArgs e)
+            => FillSelectedKnobRing(null);
+
+        // Odd/even follow the 1-based LED number the editor label shows, so
+        // LED 01 is odd (0-based slot 0).
+        private void WiKnobFillOdd_Click(object sender, RoutedEventArgs e)
+            => FillSelectedKnobRing(slot => slot % 2 == 0);
+
+        private void WiKnobFillEven_Click(object sender, RoutedEventArgs e)
+            => FillSelectedKnobRing(slot => slot % 2 == 1);
+
+        private void FillSelectedKnobRing(Func<int, bool>? slotFilter)
         {
             if (_suppressEvents) return;
             if (_data == null || _plugin == null || WiKnobPalette == null || _wiSelectedKnob < 0) return;
             var c = WiKnobPalette.SelectedColor;
             int knob = _wiSelectedKnob;
-            PersistKnobRingSlots(BulkSetKnobRingColor(knob, c.R, c.G, c.B));
+            PersistKnobRingSlots(BulkSetKnobRingColor(knob, c.R, c.G, c.B, slotFilter));
             _plugin.SaveSettings();
             // Mirror in-memory so the next refresh tick paints the new ring
             if (_wiKnobViz != null && knob < _wiKnobViz.Length)
             {
                 var viz = _wiKnobViz[knob];
-                for (int i = 0; i < viz.RingColors!.Count; i++) viz.RingColors[i] = c;
+                for (int i = 0; i < viz.RingColors!.Count; i++)
+                    if (slotFilter == null || slotFilter(i)) viz.RingColors[i] = c;
             }
         }
 

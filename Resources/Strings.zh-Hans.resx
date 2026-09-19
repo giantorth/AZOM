@@ -793,4 +793,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>已丢弃 {0}% 的组件</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>节点上限</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>已保存的颜色</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>填充奇数 LED</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>填充偶数 LED</value></data>
 </root>

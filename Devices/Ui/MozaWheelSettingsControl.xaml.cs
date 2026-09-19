@@ -581,7 +581,9 @@ skipReadByMode:
 
         // Write one colour to every ring LED of a knob (wire + _data mirror) and
         // return the (ringIndex, packed) slots written so the caller can persist them.
-        private System.Collections.Generic.List<(int absIdx, int packed)> BulkSetKnobRingColor(int knobIdx, byte r, byte g, byte b)
+        // slotFilter (0-based ring slot) narrows the write, e.g. to odd LEDs only.
+        private System.Collections.Generic.List<(int absIdx, int packed)> BulkSetKnobRingColor(
+            int knobIdx, byte r, byte g, byte b, Func<int, bool>? slotFilter = null)
         {
             var slots = new System.Collections.Generic.List<(int absIdx, int packed)>();
             if (_data == null || _plugin == null) return slots;
@@ -594,6 +596,7 @@ skipReadByMode:
             int packed = MozaProfile.PackColor(new[] { r, g, b });
             for (int i = 0; i < count; i++)
             {
+                if (slotFilter != null && !slotFilter(i)) continue;
                 int ledIdx = startIdx + i;
                 if (ledIdx >= MozaData.KnobRingLedMax) break;
                 // Wheel-LED write + live-cache invalidation.

@@ -798,4 +798,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % av modulene forkastet</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Nodegrense</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Lagret farge</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>FYLL ULIKE LED-ER</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>FYLL LIKE LED-ER</value></data>
 </root>

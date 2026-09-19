@@ -572,6 +572,8 @@ namespace MozaPlugin.Resources
         public static string Subtitle_KnobColours => Get("Subtitle_KnobColours");
         public static string Label_KnobEditing => Get("Label_KnobEditing");
         public static string Button_FillRingWithSelected => Get("Button_FillRingWithSelected");
+        public static string Button_FillOddLeds => Get("Button_FillOddLeds");
+        public static string Button_FillEvenLeds => Get("Button_FillEvenLeds");
         public static string Button_CopyKnobToAll => Get("Button_CopyKnobToAll");
         public static string Section_SleepLight => Get("Section_SleepLight");
         public static string Subtitle_SleepLight => Get("Subtitle_SleepLight");

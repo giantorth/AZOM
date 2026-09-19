@@ -783,4 +783,6 @@
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets buried in the yard</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Node leash</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Buried bone!</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>YAP ODD!!</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>YAP EVEN!!</value></data>
 </root>

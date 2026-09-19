@@ -793,4 +793,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % der Widgets verworfen</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Knotenlimit</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Gespeicherte Farbe</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>UNGERADE LEDS FÜLLEN</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>GERADE LEDS FÜLLEN</value></data>
 </root>

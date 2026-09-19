@@ -796,4 +796,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% dei widget scartati</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Limite nodi</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Colore salvato</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>RIEMPI LED IMPARI</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>RIEMPI LED PARI</value></data>
 </root>

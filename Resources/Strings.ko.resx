@@ -792,4 +792,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>위젯 {0}% 삭제됨</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>노드 제한</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>저장된 색상</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>홀수 LED 채우기</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>짝수 LED 채우기</value></data>
 </root>

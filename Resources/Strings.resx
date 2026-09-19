@@ -800,4 +800,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets dropped</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Node limit</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Saved color</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>FILL ODD LEDS</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>FILL EVEN LEDS</value></data>
 </root>

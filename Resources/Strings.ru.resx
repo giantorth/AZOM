@@ -793,4 +793,6 @@ Id: {2}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Отброшено {0}% виджетов</value></data>
   <data name="Label_NodeLimit" xml:space="preserve"><value>Лимит узлов</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Сохранённый цвет</value></data>
+  <data name="Button_FillOddLeds" xml:space="preserve"><value>ЗАПОЛНИТЬ НЕЧЁТНЫЕ LED</value></data>
+  <data name="Button_FillEvenLeds" xml:space="preserve"><value>ЗАПОЛНИТЬ ЧЁТНЫЕ LED</value></data>
 </root>
