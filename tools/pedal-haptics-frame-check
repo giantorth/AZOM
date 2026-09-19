@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+"""Regression check for Protocol/MozaPedalHapticsProtocol.cs frame building.
+
+Mirrors BuildSetFrame / BuildDisableFrame / BuildQueryFrame / BuildRoadTextureFrame
+in Python and diffs each against known-good bytes: the reference frames for the
+S12 vibration command, plus the frames observed in moza.pcap (2026-09-11) from a
+unit routed behind a wheelbase.
+
+Covers both envelopes — the 11-byte USB CDC form addressed 0x12, and the
+12-byte extended form addressed 0x1F + extended id 0x1E that a routed unit uses.
+
+Needs no capture, no hardware and no build. Like tools/cmd-frame, it exists so a
+change to the emitter can be checked against real bytes before deploying:
+
+    tools/pedal-haptics-frame-check
+"""
+
+import sys
+
+MAX_STRENGTH = 0xFFFF
+MIN_HZ, MAX_HZ = 10, 100
+MIN_MS, MAX_MS = 1, 60000
+
+
+def wire_checksum(data, length):
+    """MozaProtocol.CalculateWireChecksum: magic 0x0D, plus 0x7E counted twice
+    in body positions 2.. because stuffing doubles it on the wire."""
+    s = 0x0D + sum(data[:length])
+    s += sum(0x7E for b in data[2:length] if b == 0x7E)
+    return s & 0xFF
+
+
+def clamp_duration(ms):
+    if ms <= 0:
+        return 0
+    return max(MIN_MS, min(ms, MAX_MS))
+
+
+def enc_freq(hz):
+    if hz <= 0:
+        return 0
+    return max(MIN_HZ, min(round(hz), MAX_HZ))
+
+
+def enc_strength(level01):
+    if level01 <= 0:
+        return 0
+    if level01 >= 1.0:
+        return MAX_STRENGTH
+    return max(0, min(round(level01 * MAX_STRENGTH), MAX_STRENGTH))
+
+
+def build(ext, sub, pedal, slot, enable, duration, frequency, strength):
+    """The raw payload assembler — callers pass already-encoded u16s."""
+    length = 17 if ext else 16
+    f = bytearray(length)
+    f[0] = 0x7E
+    f[1] = 0x0C if ext else 0x0B
+    f[2] = 0x4D
+    f[3] = 0x1F if ext else 0x12
+    p = 4
+    if ext:
+        f[p] = 0x1E
+        p += 1
+    f[p + 0] = 0x01          # vibration command
+    f[p + 1] = sub           # 01 set / 02 query
+    f[p + 2] = pedal
+    f[p + 3] = slot
+    f[p + 4] = enable
+    f[p + 5], f[p + 6] = duration >> 8, duration & 0xFF
+    f[p + 7], f[p + 8] = frequency >> 8, frequency & 0xFF
+    f[p + 9], f[p + 10] = strength >> 8, strength & 0xFF
+    f[length - 1] = wire_checksum(f, length - 1)
+    return bytes(f)
+
+
+def set_frame(ext, pedal, slot, enable, ms, hz, level01):
+    if not enable:
+        return build(ext, 0x01, pedal, slot, 0, 0, 0, 0)
+    return build(ext, 0x01, pedal, slot, 1,
+                 clamp_duration(ms), enc_freq(hz), enc_strength(level01))
+
+
+def road_frame(ext, pedal, enable, position, level01):
+    if not enable:
+        return build(ext, 0x01, pedal, 0x08, 0, 0, 0, 0)
+    return build(ext, 0x01, pedal, 0x08, 1,
+                 0, max(0, min(position, 100)), enc_strength(level01))
+
+
+def query_frame(ext, pedal, slot):
+    return build(ext, 0x02, pedal, slot, 0, 0, 0, 0)
+
+
+THROTTLE, BRAKE, CLUTCH = 1, 2, 3
+TC, ABS, LOCKUP, ENGINE, WHEELSLIP, ROAD = 0, 1, 2, 4, 7, 8
+
+# --- Reference frames for the vibration command (USB CDC envelope) ----------
+# Each is a documented known-good frame for the S12 module.
+REFERENCE = [
+    ("TC     brake  50Hz ~50% 500ms",
+     lambda: set_frame(False, BRAKE, TC, True, 500, 50, 32768 / 65535),
+     "7e0b4d12010102000101f4003280 00a1"),
+    ("TC     brake  stop",
+     lambda: set_frame(False, BRAKE, TC, False, 0, 0, 0),
+     "7e0b4d120101020000000000000000f9"),
+    ("TC     brake  50Hz 20% update",
+     lambda: set_frame(False, BRAKE, TC, True, 500, 50, 0.20),
+     "7e0b4d12010102000101f40032333387"),
+    ("ABS    brake  50Hz ~50% 500ms",
+     lambda: set_frame(False, BRAKE, ABS, True, 500, 50, 32768 / 65535),
+     "7e0b4d12010102010101f4003280 00a2"),
+    ("ABS    brake  stop",
+     lambda: set_frame(False, BRAKE, ABS, False, 0, 0, 0),
+     "7e0b4d120101020100000000000000fa"),
+    ("Engine brake  60Hz 20% 1000ms",
+     lambda: set_frame(False, BRAKE, ENGINE, True, 1000, 60, 0.20),
+     "7e0b4d1201010204010 3e8003c33338b"),
+    ("Road   brake  pos 50 20%",
+     lambda: road_frame(False, BRAKE, True, 50, 0.20),
+     "7e0b4d120101020801000000323333 9a"),
+    ("Query  brake  TC",
+     lambda: query_frame(False, BRAKE, TC),
+     "7e0b4d1201020200000000000000 00fa"),
+    # Same vibration carried over the extended envelope.
+    ("TC     brake  50Hz ~50% 500ms [ext]",
+     lambda: set_frame(True, BRAKE, TC, True, 500, 50, 32768 / 65535),
+     "7e0c4d1f1e010102000101f4003280 00cd"),
+]
+
+# --- Frames observed in moza.pcap, extended envelope ------------------------
+# Strengths are expressed as raw/65535 so the encoder round-trips them exactly;
+# the underlying slider percentages are not recoverable from the capture.
+CAPTURE = [
+    ("brake  Lockup    50ms  50Hz",
+     lambda: set_frame(True, BRAKE, LOCKUP, True, 50, 50, 32767 / 65535),
+     "7e0c4d1f1e0101020201003200327fff0a"),
+    # The reference says slot 8 takes no duration, but the capture carried 100 ms
+    # in that field anyway — harmless, since the slot ignores it as a timeout.
+    # Built raw here so our emitter can follow the reference (duration 0) without
+    # this case silently pinning it to the observed behaviour instead.
+    ("brake  Road      pos 100 [capture sent dur=100, not 0]",
+     lambda: build(True, 0x01, BRAKE, ROAD, 1, 100, 100, 32767),
+     "7e0c4d1f1e0101020801006400647fff74"),
+    ("brake  Road      pos 100, reference shape (dur=0)",
+     lambda: road_frame(True, BRAKE, True, 100, 32767 / 65535),
+     "7e0c4d1f1e0101020801000000647fff10"),
+    ("throt  TC       200ms  81Hz",
+     lambda: set_frame(True, THROTTLE, TC, True, 200, 81, 40631 / 65535),
+     "7e0c4d1f1e010101000100c800519eb793"),
+    ("throt  WheelSlip 400ms 40Hz",
+     lambda: set_frame(True, THROTTLE, WHEELSLIP, True, 400, 40, 20315 / 65535),
+     "7e0c4d1f1e0101010701019000284f5b8f"),
+    ("brake  Lockup    stop",
+     lambda: set_frame(True, BRAKE, LOCKUP, False, 0, 0, 0),
+     "7e0c4d1f1e010102020000000000000027"),
+    ("brake  Road      stop",
+     lambda: road_frame(True, BRAKE, False, 0, 0),
+     "7e0c4d1f1e01010208000000000000002d"),
+    ("throt  TC        stop",
+     lambda: set_frame(True, THROTTLE, TC, False, 0, 0, 0),
+     "7e0c4d1f1e010101000000000000000024"),
+    ("throt  WheelSlip stop",
+     lambda: set_frame(True, THROTTLE, WHEELSLIP, False, 0, 0, 0),
+     "7e0c4d1f1e01010107000000000000002b"),
+]
+
+# --- Encoder spot checks ----------------------------------------------------
+
+# --- Channel mapping + emission budget -------------------------------------
+# Keep in sync with MozaPedalHapticsProtocol: the channel order is a
+# user-visible contract (reordering moves every effect a user assigned), and
+# the budget is what keeps 27 channels from swamping the link.
+SLOTS_PER_PEDAL = 9
+CHANNELS = 3 * SLOTS_PER_PEDAL
+TICK_MS = 20
+MAX_FRAMES_PER_TICK = 8
+STREAM_DURATION_MS = 500
+FRAME_BYTES = 17                      # extended envelope, the larger of the two
+LINK_BYTES_PER_SEC = 115200 / 10      # 8N1 = 10 bits per byte
+
+
+def pedal_for_channel(ch):
+    return ch // SLOTS_PER_PEDAL + 1
+
+
+def slot_for_channel(ch):
+    return ch % SLOTS_PER_PEDAL
+
+
+def check_mapping():
+    pairs = [(pedal_for_channel(c), slot_for_channel(c)) for c in range(CHANNELS)]
+    expected = [(p, s) for p in (1, 2, 3) for s in range(SLOTS_PER_PEDAL)]
+    return pairs == expected
+
+
+def worst_refresh_ms():
+    ticks = -(-CHANNELS // MAX_FRAMES_PER_TICK)   # ceil
+    return ticks * TICK_MS
+
+
+def peak_bytes_per_sec():
+    return MAX_FRAMES_PER_TICK * (1000 / TICK_MS) * FRAME_BYTES
+
+
+CHANNEL_CHECKS = [
+    ("channel order is pedal-major and covers every (pedal, slot) once",
+     check_mapping, True),
+    ("channel 0 -> throttle slot 0",
+     lambda: (pedal_for_channel(0), slot_for_channel(0)), (1, 0)),
+    ("channel 13 -> brake slot 4 (engine)",
+     lambda: (pedal_for_channel(13), slot_for_channel(13)), (2, 4)),
+    ("channel 26 -> clutch slot 8 (road texture)",
+     lambda: (pedal_for_channel(26), slot_for_channel(26)), (3, 8)),
+    # With every channel live the round-robin must still revisit each one well
+    # inside the duration, or effects stutter as they lapse and restart.
+    ("worst-case refresh stays inside the streamed duration",
+     lambda: worst_refresh_ms() < STREAM_DURATION_MS, True),
+    ("even all-27 refresh has >= 2x duration margin",
+     lambda: STREAM_DURATION_MS / worst_refresh_ms() >= 2.0, True),
+    # A flat per-tick refresh of 27 channels would be ~23 kB/s, over a 115200
+    # link's capacity; the budget has to keep peak well under it.
+    ("a realistic load (8 channels) is never throttled",
+     lambda: 8 <= MAX_FRAMES_PER_TICK, True),
+    ("peak output stays under the link rate",
+     lambda: peak_bytes_per_sec() < LINK_BYTES_PER_SEC * 0.75, True),
+]
+ENCODERS = [
+    ("strength 20% -> 13107", lambda: enc_strength(0.20), 13107),
+    ("strength 100% -> 65535", lambda: enc_strength(1.0), 65535),
+    ("strength 0 -> 0", lambda: enc_strength(0.0), 0),
+    ("freq 5Hz clamps up to 10", lambda: enc_freq(5), 10),
+    ("freq 250Hz clamps down to 100", lambda: enc_freq(250), 100),
+    ("duration 90000 clamps to 60000", lambda: clamp_duration(90000), 60000),
+]
+
+
+def run(group, cases):
+    print(f"== {group}")
+    fails = 0
+    for label, fn, expect in cases:
+        want = expect.replace(" ", "")
+        got = fn().hex()
+        ok = got == want
+        fails += 0 if ok else 1
+        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
+        if not ok:
+            print(f"        expected {want}")
+            print(f"        got      {got}")
+    return fails, len(cases)
+
+
+def main():
+    fails = total = 0
+    for group, cases in (("reference frames", REFERENCE),
+                         ("moza.pcap frames", CAPTURE)):
+        f, n = run(group, cases)
+        fails += f
+        total += n
+
+    print("== channels and budget")
+    for label, fn, expect in CHANNEL_CHECKS:
+        got = fn()
+        ok = got == expect
+        fails += 0 if ok else 1
+        total += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
+        if not ok:
+            print(f"        expected {expect}, got {got}")
+
+    print("== encoders")
+    for label, fn, expect in ENCODERS:
+        got = fn()
+        ok = got == expect
+        fails += 0 if ok else 1
+        total += 1
+        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
+        if not ok:
+            print(f"        expected {expect}, got {got}")
+
+    print(f"\n{total - fails}/{total} passed")
+    return 1 if fails else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

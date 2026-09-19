@@ -102,6 +102,8 @@ namespace MozaPlugin
         // while the base IS the primary — gated on PrimaryBoundToHub.
         private MozaBaseDeviceManager _baseManager = null!;
         private MozaMBoosterRegistry? _mboosterRegistry;
+        // Pedal-haptics units (bus device 0x1F). See MozaPlugin.PedalHaptics.cs.
+        private Devices.PedalHaptics.MozaPedalHapticsRegistry? _pedalHapticsRegistry;
         // Dedicated lane for peripherals plugged STRAIGHT into the PC (their own
         // USB port + PID) rather than through a base/hub — one connection per
         // attached pedal set / handbrake. Config/calibration only; axes stay HID.
@@ -150,6 +152,13 @@ namespace MozaPlugin
         private Timer _pollTimer = null!;
         private Timer _retryTimer = null!;
         private Timer _reconnectTimer = null!;
+        // LED keepalive re-feed. Its own timer rather than a rider on the 250 ms
+        // _retryTimer: that tick shares one re-entry flag with four pipes of
+        // retransmits, and a slow pass there would drop the LED feed with it.
+        // Period is set by the tightest obligation on the wire — the CM2 flag lane's
+        // ~12.5 Hz refresh — not by the wheel's 0.75 s sections.
+        private Timer _ledKeepaliveTimer = null!;
+        private const int LedKeepaliveIntervalMs = 40;
         // Base-tab temperature-graph history. Sampled every 500 ms by a
         // plugin-lifetime timer (independent of the settings panel) so the graph
         // shows the full 5-minute window the moment the panel opens rather than
@@ -365,11 +374,12 @@ namespace MozaPlugin
         // (or whenever the FFB Lag Fix override is on). See ProcessResponsivenessManager.
         private ProcessResponsivenessManager? _responsiveness;
 
-        // Control Mapper IVariantProvider bridge — see ControlMapper/. Registration
+        // Control Mapper IVariantProvider bridge — see Integration/. Registration
         // is reflection-based against an internal SimHub API, so the bridge is wrapped
         // in defensive guards and gated on MozaPluginSettings.EnableControlMapperVariants.
         // Constructed in Init when the toggle is on; null otherwise.
         private Integration.ControlMapperBridge? _controlMapperBridge;
+        internal Integration.ControlMapperBridge? ControlMapperBridge => _controlMapperBridge;
         // Tick budget for retrying registration in DataUpdate when ControlMapperPlugin
         // wasn't loaded yet at Init time. ~50 ticks (~0.8 s at 60 Hz). 0 = stop trying.
         private int _controlMapperRetryTicks;
@@ -762,6 +772,51 @@ namespace MozaPlugin
         /// <summary>The dedicated CM2-dash tier-def sender (drives any attached CM2, bus
         /// or USB, independent of the wheel), or null when no CM2 is present.</summary>
         internal TelemetrySender? Cm2Sender => _cm2Sender;
+
+        /// <summary>
+        /// True while a dashboard upload is in flight on either display
+        /// pipeline. The live LED pipeline stands down for the duration and the
+        /// wheel's RPM bar becomes the transfer's progress meter — see
+        /// <see cref="Devices.Led.UploadProgressLedBar"/>.
+        /// </summary>
+        internal bool IsDashboardUploadInFlight =>
+            (_telemetrySender?.IsUploadInFlight ?? false)
+            || (_cm2Sender?.IsUploadInFlight ?? false);
+
+        /// <summary>
+        /// 0..1 progress of the in-flight dashboard upload (whichever pipeline
+        /// is transferring), 0 when none is. Only one upload runs at a time —
+        /// both senders share the wheel's file-transfer sessions — so the max
+        /// is just "the one that is live".
+        /// </summary>
+        /// <summary>
+        /// Monotonic ack count for the pipeline currently uploading, 0 when none
+        /// is. Liveness only — the absolute value is meaningless across
+        /// pipelines, callers just watch it move.
+        /// </summary>
+        internal long DashboardUploadAckedChunks
+        {
+            get
+            {
+                if (_telemetrySender?.IsUploadInFlight ?? false)
+                    return _telemetrySender!.UploadAckedChunkCount;
+                if (_cm2Sender?.IsUploadInFlight ?? false)
+                    return _cm2Sender!.UploadAckedChunkCount;
+                return 0L;
+            }
+        }
+
+        internal double DashboardUploadProgress
+        {
+            get
+            {
+                double wheel = (_telemetrySender?.IsUploadInFlight ?? false)
+                    ? _telemetrySender!.UploadProgress : 0.0;
+                double dash = (_cm2Sender?.IsUploadInFlight ?? false)
+                    ? _cm2Sender!.UploadProgress : 0.0;
+                return wheel > dash ? wheel : dash;
+            }
+        }
 
         // "Send Test Pattern" toggle, shared across every display pipeline. The
         // tier-def senders consume it via their own TestMode; the standalone FSR1

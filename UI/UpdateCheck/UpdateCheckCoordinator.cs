@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using SimHub.Plugins;
-using MozaPlugin.Resources;
 
 namespace MozaPlugin.UI.UpdateCheck
 {
@@ -86,8 +85,7 @@ namespace MozaPlugin.UI.UpdateCheck
                                 {
                                     if (ch.Number == prNumber)
                                     {
-                                        settings.UpdateChannelLabel = string.Format(
-                                            Strings.Option_ReleaseChannelPr, ch.Number, ch.Title);
+                                        settings.UpdateChannelLabel = ch.Title;
                                         break;
                                     }
                                 }

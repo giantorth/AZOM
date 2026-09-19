@@ -323,11 +323,17 @@ namespace MozaPlugin.Telemetry
                 $"0x{_initHandshakeSession:X2} (mirror of tier-def session).");
         }
 
-        public void SwitchToProfile(uint slotIndex, MultiStreamProfile? newProfile)
+        /// <returns><c>true</c> when the FF kind=4 frame actually reached the wire
+        /// and the follow-up (burst or restart) was scheduled; <c>false</c> when
+        /// <see cref="SendDashboardSwitch"/> suppressed it (disconnected, non-Active,
+        /// or inside the post-emit cooldown). Callers that own a one-shot — e.g.
+        /// <c>DualDisplayCoordinator.TickCm2DashboardReassert</c> — must not consume
+        /// it on <c>false</c>, or the switch is lost for the pipeline's lifetime.</returns>
+        public bool SwitchToProfile(uint slotIndex, MultiStreamProfile? newProfile)
         {
             bool emitted = SendDashboardSwitch(slotIndex);
             if (newProfile != null) Profile = newProfile;
-            if (!emitted) return;
+            if (!emitted) return false;
 
             if (EnableHotRenegotiation)
             {
@@ -354,6 +360,7 @@ namespace MozaPlugin.Telemetry
                     $"(EnableHotRenegotiation=false)");
                 RestartForSwitch();
             }
+            return true;
         }
 
         /// <summary>

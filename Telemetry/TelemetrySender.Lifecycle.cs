@@ -629,6 +629,7 @@ namespace MozaPlugin.Telemetry
             // Disarm convergence — a torn-down pipeline shouldn't keep
             // firing kind=4 nudges into a session being closed.
             _postSwitchConvergence.Disarm();
+            _postSwitchKind4Confirmed = false;
             try { _uploader?.Reset(); } catch { }
             _sessions.Reset();
             _dispatcher.Reset();

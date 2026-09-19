@@ -104,6 +104,66 @@ namespace MozaPlugin.Devices.Led
             }
         }
 
+        /// <summary>
+        /// Drive every registered driver's keepalive. Called from the plugin's LED
+        /// keepalive timer — the re-feed must survive SimHub's LED pipeline going quiet,
+        /// which is the whole reason it no longer rides <c>Display()</c>. Each instance
+        /// re-checks <see cref="IsConnected"/>, so the model-specific drivers that aren't
+        /// the attached wheel no-op. The registry snapshot is taken under the lock and
+        /// released before ticking: HardwareApplier and UI handlers take the same lock,
+        /// and emitting under it would couple them to the wire.
+        /// </summary>
+        internal static void TickKeepaliveAll()
+        {
+            MozaLedDeviceManager[] snapshot;
+            lock (s_instancesLock)
+            {
+                if (s_instances.Count == 0) return;
+                snapshot = s_instances.ToArray();
+            }
+            foreach (var inst in snapshot)
+                inst.TickKeepalive();
+        }
+
+        /// <summary>
+        /// Keepalive state of the live driver for the Diagnostics tab, or null when no
+        /// registered driver matches the attached wheel. Ages are seconds; -1 = never.
+        /// </summary>
+        internal static (int HoldSec, double SrcQuietSec, double RpmFedSec, double BtnFedSec,
+                         double KnobFedSec, int Skips)? LiveKeepaliveSnapshot()
+        {
+            MozaLedDeviceManager[] snapshot;
+            lock (s_instancesLock)
+            {
+                if (s_instances.Count == 0) return null;
+                snapshot = s_instances.ToArray();
+            }
+            foreach (var inst in snapshot)
+            {
+                if (!inst.IsConnected()) continue;
+                long now = DateTime.UtcNow.Ticks;
+                int hold = MozaPlugin.Instance?.Settings?.WheelKeepaliveTimeoutSec
+                           ?? (int)KeepaliveHoldSeconds;
+                return (hold,
+                        AgeSeconds(now, Interlocked.Read(ref inst._lastDisplayUtcTicks)),
+                        AgeSeconds(now, Interlocked.Read(ref inst._rpmFedUtcTicks)),
+                        AgeSeconds(now, Interlocked.Read(ref inst._btnFedUtcTicks)),
+                        AgeSeconds(now, Interlocked.Read(ref inst._knobFedUtcTicks)),
+                        Volatile.Read(ref inst._keepaliveSkips));
+            }
+            return null;
+        }
+
+        /// <summary>Seconds since a UTC-ticks stamp; -1 when the stamp was never set.</summary>
+        private static double AgeSeconds(long nowTicks, long stampTicks)
+            => stampTicks == 0 ? -1.0 : (nowTicks - stampTicks) / (double)TimeSpan.TicksPerSecond;
+
+        /// <summary>Milliseconds since a UTC-ticks stamp; never-set reads as elapsed.</summary>
+        private static double MsSince(long stampTicks)
+            => stampTicks == 0
+                ? double.MaxValue
+                : (DateTime.UtcNow.Ticks - stampTicks) / (double)TimeSpan.TicksPerMillisecond;
+
         // "dash-flag-color1".."dash-flag-color6" — built once; these were
         // interpolated per flag LED per frame on the 60 Hz Display() path.
         private static readonly string[] s_dashFlagColorCommands = BuildDashFlagColorCommands();
@@ -190,13 +250,19 @@ namespace MozaPlugin.Devices.Led
         private int _lastButtonBitmask = -1;
         private int _lastKnobBitmask = -1;
 
-        // Keepalive. _lastSendTime = last "any live send" (per-model FPS throttle).
-        private DateTime _lastSendTime = DateTime.MinValue;
-        // Unified per-section keepalive table. *FedUtc = when the keepalive last re-fed
-        // a section (1 Hz pacing). The firmware renders live LEDs only WHILE the bitmask
-        // is fed; stop feeding and the section reverts to its stored/idle render. So each
-        // section is re-fed while it is "engaged", but engaged differs by section because
-        // SimHub treats the channels differently when an effect halts:
+        // Keepalive. _lastSendUtcTicks = last "any live send" (per-model FPS throttle).
+        //
+        // Every stamp below is UTC ticks (0 = never) behind Interlocked, not DateTime:
+        // Display() stamps the *Changed slots on SimHub's LED thread, TickKeepalive()
+        // stamps the *Fed slots on the keepalive timer, and ResetCachedLedState /
+        // InvalidateLiveCache zero them from the data and UI threads. A DateTime is a
+        // 64-bit struct and tears on x86.
+        private long _lastSendUtcTicks;
+        // Unified per-section keepalive table. *FedUtcTicks = when the keepalive last
+        // re-fed a section (1 Hz pacing). The firmware renders live LEDs only WHILE the
+        // bitmask is fed; stop feeding and the section reverts to its stored/idle render.
+        // So each section is re-fed while it is "engaged", but engaged differs by section
+        // because SimHub treats the channels differently when an effect halts:
         //   • RPM / buttons — SimHub keeps sending them (black) after a halt, so "channel
         //     present" can't detect a halt. Engaged = currently lit, OR within the hold
         //     window since the content last CHANGED (_rpm/_btnChangedUtc). A steadily-
@@ -208,12 +274,18 @@ namespace MozaPlugin.Devices.Led
         //     present, lit or black). Keyed on CHANGE it would time out a steady-off-but-
         //     active effect after the hold; keyed on channel-present it holds the off while
         //     the effect runs and reverts only once SimHub stops sending it.
-        private DateTime _rpmChangedUtc = DateTime.MinValue;
-        private DateTime _rpmFedUtc = DateTime.MinValue;
-        private DateTime _btnChangedUtc = DateTime.MinValue;
-        private DateTime _btnFedUtc = DateTime.MinValue;
-        private DateTime _knobDrivenUtc = DateTime.MinValue;
-        private DateTime _knobFedUtc = DateTime.MinValue;
+        private long _rpmChangedUtcTicks;
+        private long _rpmFedUtcTicks;
+        private long _btnChangedUtcTicks;
+        private long _btnFedUtcTicks;
+        private long _knobDrivenUtcTicks;
+        private long _knobFedUtcTicks;
+        // Last time Display() reached the send region, i.e. the last frame SimHub's LED
+        // pipeline actually handed us. Diagnostics only — it tells a bug report whether
+        // the source went quiet or we did.
+        private long _lastDisplayUtcTicks;
+        // Keepalive ticks skipped because Display() held the emit lock. Diagnostics only.
+        private int _keepaliveSkips;
         // The firmware drops live-LED ownership 1000 ms after the last feed. Scheduling
         // the feed AT 1.0 s guaranteed a late arrival once Display() sampling jitter was
         // added (+98 ms observed), reverting the knob ring to stored colours ~0.7x/s.
@@ -225,6 +297,19 @@ namespace MozaPlugin.Devices.Led
 
         // ES wheel wake-up
         private bool _ledsAwake;
+
+        // Latched while the live pipeline is standing down for a dashboard
+        // upload, so the resume edge can re-arm the caches. See the upload
+        // guard in Display().
+        private bool _uploadPaused;
+
+        // Serialises the two emitters into the paced one-shot FIFO: Display() on
+        // SimHub's LED thread and TickKeepalive() on the keepalive timer. Wheel LED
+        // writes need each colour chunk to land ahead of the bitmask that lights it,
+        // and interleaved enqueues would split that group. Display() takes it; the
+        // keepalive only TryEnters and skips, so SimHub's thread is never the one
+        // waiting on a replay. Critical section is enqueue-only — no device round trip.
+        private readonly object _emitLock = new object();
 
         /// <summary>
         /// Expected wheel model prefix for this device instance.
@@ -355,10 +440,14 @@ namespace MozaPlugin.Devices.Led
             // may be a differently-configured wheel or profile.
             _knobChannelEverLit = false;
             _knobBlackSinceUtc = DateTime.MinValue;
-            _rpmChangedUtc = _rpmFedUtc = DateTime.MinValue;
-            _btnChangedUtc = _btnFedUtc = DateTime.MinValue;
-            _knobDrivenUtc = _knobFedUtc = DateTime.MinValue;
+            Interlocked.Exchange(ref _rpmChangedUtcTicks, 0L);
+            Interlocked.Exchange(ref _rpmFedUtcTicks, 0L);
+            Interlocked.Exchange(ref _btnChangedUtcTicks, 0L);
+            Interlocked.Exchange(ref _btnFedUtcTicks, 0L);
+            Interlocked.Exchange(ref _knobDrivenUtcTicks, 0L);
+            Interlocked.Exchange(ref _knobFedUtcTicks, 0L);
             _ledsAwake = false;
+            _uploadPaused = false;
         }
 
         public bool IsConnected() => IsModelConnected(MozaPlugin.Instance, ExpectedModelPrefix);
@@ -536,6 +625,11 @@ namespace MozaPlugin.Devices.Led
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
 
+            // Released in the finally below. Taken just before the send region so the
+            // keepalive timer can't interleave its replay between a colour chunk and the
+            // bitmask that lights it. See _emitLock.
+            bool emitLockHeld = false;
+
             try
             {
                 var ledColors = leds?.Invoke() ?? Array.Empty<Color>();
@@ -566,6 +660,39 @@ namespace MozaPlugin.Devices.Led
                 // computed for it; only the hardware write is suppressed.
                 if (!IsConnected())
                     return;
+
+                // Dashboard upload standing the pipeline down: the RPM bar
+                // becomes the transfer's progress meter (UploadProgressLedBar,
+                // fed from the telemetry tick). Two reasons to pause rather
+                // than interleave — the upload and a 60 Hz LED stream contend
+                // for the same half-duplex link (the contention the negotiation
+                // throttle below exists for, only worse: the wheel processes
+                // upload rounds at a few hundred B/s), and both writers would
+                // otherwise fight over the group-0 frame buffer. _lastState is
+                // already captured above, so SimHub's own LED preview keeps
+                // updating; only the hardware writes stop.
+                //
+                // The gate is IsStandDownActive, NOT the raw in-flight flag: a
+                // wedged upload holds that flag for minutes before its attempt
+                // terminates (bundle C4KX4GKK: 6 min 17 s with no byte
+                // progress), and the LEDs must not be hostage to it. See
+                // UploadProgressLedBar.StallReleaseSeconds.
+                //
+                // On the trailing edge every cached frame describes state the
+                // wheel no longer holds — the progress bar overwrote the RPM
+                // buffer and the button / knob / flag groups reverted to their
+                // stored palettes once their keepalives stopped — so re-arm the
+                // whole cache.
+                if (UploadProgressLedBar.IsStandDownActive)
+                {
+                    _uploadPaused = true;
+                    return;
+                }
+                if (_uploadPaused)
+                {
+                    _uploadPaused = false;
+                    InvalidateLiveCache(LedKind.All);
+                }
 
                 // Catalog-negotiation LED throttle: while the wheel is (re)advertising
                 // its catalog (cold-start or a post-switch hot-reneg burst) the link is
@@ -687,6 +814,11 @@ namespace MozaPlugin.Devices.Led
 
                 bool anySent = false;
 
+                // Everything below enqueues wheel LED frames. Hold the emit lock for the
+                // whole region so a colour/bitmask group stays contiguous in the paced
+                // one-shot FIFO.
+                Monitor.Enter(_emitLock, ref emitLockHeld);
+
                 // Per-model live LED wire-rate cap (frames/sec; 0 = unlimited).
                 // SimHub drives this at 60 Hz; some rims (the wireless bare-"CS")
                 // can't take the RPM stream at the full radio cadence and wedge
@@ -694,10 +826,10 @@ namespace MozaPlugin.Devices.Led
                 // sends WITHOUT updating _lastLeds/_lastButtons/_lastKnobs, so the
                 // change is re-evaluated next tick and the latest colour state
                 // still goes out — just no faster than the cap. The keepalive
-                // below is seconds-scale (gated on _lastSendTime) and unaffected.
+                // below is seconds-scale (gated on _lastSendUtcTicks) and unaffected.
                 int maxLedFps = modelInfo?.MaxLedFps ?? 0;
-                bool ledThrottled = maxLedFps > 0
-                    && (DateTime.UtcNow - _lastSendTime).TotalMilliseconds < 1000.0 / maxLedFps;
+                double sinceSendMs = MsSince(Interlocked.Read(ref _lastSendUtcTicks));
+                bool ledThrottled = maxLedFps > 0 && sinceSendMs < 1000.0 / maxLedFps;
 
                 // Wheels with flag LEDs receive a single (rpmN + 6)-LED telemetry
                 // sequence from SimHub laid out as [flag 1..3][rpm 1..N][flag 4..6].
@@ -738,7 +870,7 @@ namespace MozaPlugin.Devices.Led
                 if (shouldSendRpm)
                 {
                     _lastLeds = (Color[])rpmColors.Clone();
-                    _rpmChangedUtc = DateTime.UtcNow;
+                    Interlocked.Exchange(ref _rpmChangedUtcTicks, DateTime.UtcNow.Ticks);
 
                     int count = Math.Min(rpmColors.Length, rpmN);
 
@@ -833,7 +965,8 @@ namespace MozaPlugin.Devices.Led
                         if (changed || (forceRefresh && (c.R | c.G | c.B) != 0))
                         {
                             _lastFlagColors[i] = c;
-                            _rpmChangedUtc = DateTime.UtcNow; // flags ride the RPM keepalive row
+                            // flags ride the RPM keepalive row
+                            Interlocked.Exchange(ref _rpmChangedUtcTicks, DateTime.UtcNow.Ticks);
                             plugin.DeviceManager.WriteArray(
                                 DashFlagColorCommand(i),
                                 new byte[] { c.R, c.G, c.B });
@@ -904,7 +1037,7 @@ namespace MozaPlugin.Devices.Led
                     if (shouldSendButtons)
                     {
                         _lastButtons = (Color[])buttonColors.Clone();
-                        _btnChangedUtc = DateTime.UtcNow;
+                        Interlocked.Exchange(ref _btnChangedUtcTicks, DateTime.UtcNow.Ticks);
 
                         int buttonCount = Math.Min(buttonColors.Length, modelInfo.ButtonLedCount);
                         var buttonMap = modelInfo.ButtonLedMap;
@@ -951,7 +1084,7 @@ namespace MozaPlugin.Devices.Led
                     // SimHub is feeding the knob channel this frame (lit or black) — stamp
                     // it so the keepalive holds the knob "off" while the effect runs and
                     // only lets it revert once SimHub stops sending the channel.
-                    _knobDrivenUtc = DateTime.UtcNow;
+                    Interlocked.Exchange(ref _knobDrivenUtcTicks, DateTime.UtcNow.Ticks);
 
                     int knobCount = modelInfo.KnobCount;
                     Color[] knobColors;
@@ -1109,84 +1242,175 @@ namespace MozaPlugin.Devices.Led
 
                 if (anySent)
                 {
-                    _lastSendTime = DateTime.UtcNow;
+                    Interlocked.Exchange(ref _lastSendUtcTicks, DateTime.UtcNow.Ticks);
                     // Mark the live-path active for the cross-instance gate that
                     // suppresses static writes (HardwareApplier, UI handlers).
                     NoteLiveSend();
                 }
 
-                // --- Unified per-section keepalive ---
-                // The firmware renders live LEDs only WHILE their bitmask is fed; stop
-                // feeding and the group reverts to its stored/idle render. So re-feed each
-                // section's last frame (colour + bitmask) at ~1 Hz while it's CURRENTLY LIT
-                // (hold the lit frame indefinitely) OR within the hold window since it last
-                // CHANGED (render an "off" — knobs store active=window so it goes dark —
-                // for the hold, then let it revert). Keying on content (lit / recent change)
-                // rather than "SimHub is sending the channel" is what lets a steadily-black
-                // section time out: after an effect halt SimHub keeps sending black RPM/
-                // buttons but stops the knob channel, and a channel-presence key held the
-                // RPM/buttons off forever while knobs reverted. 0 = no hold. *FedUtc paces
-                // each section independently.
-                var kaNow = DateTime.UtcNow;
-                int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
-                // While a game is actively feeding telemetry, NEVER pause the keepalive —
-                // the wheel must stay live for the whole session (incl. menus/pauses) and
-                // only sleep once the game is closed. The lit/hold gate (which lets a
-                // steadily-black section time out) applies only when no game is active.
-                bool gameActive = plugin.IsGameActive;
-                if (_lastLeds != null && (gameActive || AnyLit(_lastLeds) || WithinHold(kaNow, _rpmChangedUtc, holdSec))
-                    && (kaNow - _rpmFedUtc).TotalSeconds >= KeepaliveIntervalSeconds)
+                // The keepalive itself runs on the plugin's LED keepalive timer, not
+                // here — see TickKeepalive(). Stamp the source clock so it (and the
+                // Diagnostics tab) can tell a quiet SimHub from a quiet plugin.
+                Interlocked.Exchange(ref _lastDisplayUtcTicks, DateTime.UtcNow.Ticks);
+            }
+            finally
+            {
+                if (emitLockHeld) Monitor.Exit(_emitLock);
+                AfterDisplay?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>
+        /// Unified per-section keepalive, driven by the plugin's LED keepalive timer.
+        ///
+        /// <para>The firmware renders live LEDs only WHILE their bitmask is fed; stop
+        /// feeding and the group reverts to its stored/idle render. So re-feed each
+        /// section's last frame (colour + bitmask) at ~1 Hz while it's CURRENTLY LIT
+        /// (hold the lit frame indefinitely) OR within the hold window since it last
+        /// CHANGED (render an "off" — knobs store active=window so it goes dark — for
+        /// the hold, then let it revert). Keying on content (lit / recent change) rather
+        /// than "SimHub is sending the channel" is what lets a steadily-black section
+        /// time out: after an effect halt SimHub keeps sending black RPM/buttons but
+        /// stops the knob channel, and a channel-presence key held the RPM/buttons off
+        /// forever while knobs reverted. 0 = no hold. *FedUtcTicks paces each section
+        /// independently.</para>
+        ///
+        /// <para>This deliberately does NOT ride <c>Display()</c>. SimHub owns when that
+        /// runs, and when its LED pipeline goes quiet the re-feed used to stop with it —
+        /// the firmware then dropped LED ownership ~1 s later and the wheel reverted to
+        /// its idle effect no matter what the user's timeout said (bundle 2X7HPMMS: an
+        /// 8 s stall mid-race against a 100 s setting). Every guard Display() applies
+        /// above its old keepalive block is therefore re-evaluated here.</para>
+        /// </summary>
+        internal void TickKeepalive()
+        {
+            if (MozaPlugin.IsShuttingDown) return;
+
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.Data.IsConnected) return;
+            // Model-match gate: only the extension whose ExpectedModelPrefix matches the
+            // attached wheel may write. Without it every registered driver would re-feed.
+            if (!IsConnected()) return;
+
+            // Upload stand-down. The timer never clears _uploadPaused and never feeds
+            // while it is set: on the trailing edge the progress bar has overwritten the
+            // RPM frame buffer, and only Display() re-arms the caches. Staying dark until
+            // it does is the safe direction.
+            if (UploadProgressLedBar.IsStandDownActive || _uploadPaused) return;
+
+            // Catalog negotiation saturates the half-duplex link; hold off exactly as the
+            // live path does so inbound catalog chunks aren't dropped.
+            if (plugin.TelemetrySender?.WheelInCatalogNegotiation == true) return;
+
+            bool isOldWheel = plugin.IsOldWheelDetected;
+            bool isNewWheel = !isOldWheel && plugin.IsNewWheelDetected;
+            if (!isNewWheel && !isOldWheel) return;
+
+            // Cheap pre-check outside the lock, so a tick with nothing due never contends
+            // with SimHub's LED thread. The authoritative snapshot is retaken under the
+            // lock below. Display() assigns fresh clones, so a reference read is either
+            // the whole old array or the whole new one, never a torn one.
+            var leds = _lastLeds;
+            var buttons = _lastButtons;
+            var knobs = _lastKnobs;
+            if (leds == null && buttons == null && knobs == null) return;
+
+            // Read live, not from the transition cache: a mode change while Display() is
+            // quiet must still park the group.
+            var modelInfo = plugin.WheelModelInfo;
+            int btnLedMode = plugin.Data.WheelButtonsLedMode;
+            int knobLedMode = plugin.Data.WheelKnobLedMode;
+
+            long kaNow = DateTime.UtcNow.Ticks;
+            int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
+            // While a game is actively feeding telemetry, NEVER pause the keepalive —
+            // the wheel must stay live for the whole session (incl. menus/pauses) and
+            // only sleep once the game is closed. The lit/hold gate (which lets a
+            // steadily-black section time out) applies only when no game is active.
+            bool gameActive = plugin.IsGameActive;
+
+            bool rpmDue = leds != null
+                && (gameActive || AnyLit(leds) || WithinHold(kaNow, Interlocked.Read(ref _rpmChangedUtcTicks), holdSec))
+                && DueAfter(kaNow, Interlocked.Read(ref _rpmFedUtcTicks), KeepaliveIntervalSeconds);
+            // Mode predicate here too: a group in Off/Static renders its stored palette
+            // and discards live frames, so re-feeding them is pure wire traffic.
+            bool btnDue = isNewWheel && buttons != null && GroupRendersLiveFrames(btnLedMode)
+                && (gameActive || AnyLit(buttons) || WithinHold(kaNow, Interlocked.Read(ref _btnChangedUtcTicks), holdSec))
+                && DueAfter(kaNow, Interlocked.Read(ref _btnFedUtcTicks), KeepaliveIntervalSeconds);
+            bool knobDue = isNewWheel && knobs != null && modelInfo?.KnobCount > 0
+                && GroupRendersLiveFrames(knobLedMode)
+                && (gameActive || AnyLit(knobs) || WithinHold(kaNow, Interlocked.Read(ref _knobDrivenUtcTicks), holdSec))
+                && DueAfter(kaNow, Interlocked.Read(ref _knobFedUtcTicks), KeepaliveIntervalSeconds);
+            if (!rpmDue && !btnDue && !knobDue) return;
+
+            // TryEnter, never Enter: if Display() is mid-frame it is already feeding the
+            // wire, so a skipped re-feed is redundant rather than lost. Blocking here
+            // would put the keepalive timer in front of SimHub's LED thread.
+            if (!Monitor.TryEnter(_emitLock))
+            {
+                Interlocked.Increment(ref _keepaliveSkips);
+                return;
+            }
+            try
+            {
+                // Retake the caches now that Display() provably isn't inside its send
+                // region: this pairs each colour array with the bitmask of the same
+                // frame, which a read taken before the lock could not guarantee.
+                leds = _lastLeds;
+                buttons = _lastButtons;
+                knobs = _lastKnobs;
+
+                if (rpmDue && leds != null)
                 {
-                    _rpmFedUtc = kaNow; _lastSendTime = kaNow;
-                    ResendRpmFlags(plugin, isNewWheel, isOldWheel);
+                    Interlocked.Exchange(ref _rpmFedUtcTicks, kaNow);
+                    Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
+                    ResendRpmFlags(plugin, leds, isNewWheel, isOldWheel);
                     NoteLiveSend();
                 }
-                // Mode predicate here too: a group in Off/Static renders its stored
-                // palette and discards live frames, so re-feeding them is pure wire
-                // traffic. (The transition edge above also nulls the cache, so this is
-                // the belt to that braces.)
-                if (isNewWheel && _lastButtons != null && GroupRendersLiveFrames(btnLedMode)
-                    && (gameActive || AnyLit(_lastButtons) || WithinHold(kaNow, _btnChangedUtc, holdSec))
-                    && (kaNow - _btnFedUtc).TotalSeconds >= KeepaliveIntervalSeconds)
+                if (btnDue && buttons != null)
                 {
-                    _btnFedUtc = kaNow; _lastSendTime = kaNow;
-                    ResendButtons(plugin);
+                    Interlocked.Exchange(ref _btnFedUtcTicks, kaNow);
+                    Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
+                    ResendButtons(plugin, buttons);
                     NoteLiveSend();
                 }
-                if (isNewWheel && _lastKnobs != null && modelInfo?.KnobCount > 0
-                    && GroupRendersLiveFrames(knobLedMode)
-                    && (gameActive || AnyLit(_lastKnobs) || WithinHold(kaNow, _knobDrivenUtc, holdSec))
-                    && (kaNow - _knobFedUtc).TotalSeconds >= KeepaliveIntervalSeconds)
+                if (knobDue && knobs != null && modelInfo != null)
                 {
-                    _knobFedUtc = kaNow; _lastSendTime = kaNow;
-                    ResendKnobs(plugin, modelInfo);
+                    Interlocked.Exchange(ref _knobFedUtcTicks, kaNow);
+                    Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
+                    ResendKnobs(plugin, knobs, modelInfo);
                     NoteLiveSend();
                 }
             }
             finally
             {
-                AfterDisplay?.Invoke(this, EventArgs.Empty);
+                Monitor.Exit(_emitLock);
             }
         }
 
         // True while a section is still inside its keepalive hold window measured from
         // its last change. holdSec 0 (UI: pause immediately) or a never-changed section
-        // (MinValue) → not held.
-        private static bool WithinHold(DateTime now, DateTime changedUtc, int holdSec)
-            => holdSec > 0 && changedUtc != DateTime.MinValue && (now - changedUtc).TotalSeconds < holdSec;
+        // (0 ticks) → not held.
+        private static bool WithinHold(long nowTicks, long changedTicks, int holdSec)
+            => holdSec > 0 && changedTicks != 0
+               && (nowTicks - changedTicks) < holdSec * TimeSpan.TicksPerSecond;
+
+        // True once `seconds` have elapsed since a stamp. Never-fed (0 ticks) is due.
+        private static bool DueAfter(long nowTicks, long lastTicks, double seconds)
+            => lastTicks == 0 || (nowTicks - lastTicks) >= (long)(seconds * TimeSpan.TicksPerSecond);
 
         /// <summary>Re-feed the last RPM (and flag) frame — colour + bitmask — to keep
-        /// the firmware rendering it.</summary>
-        private void ResendRpmFlags(MozaPlugin plugin, bool isNewWheel, bool isOldWheel)
+        /// the firmware rendering it. <paramref name="leds"/> is the caller's cache
+        /// snapshot, so a concurrent Display() re-assignment can't null it mid-call.</summary>
+        private void ResendRpmFlags(MozaPlugin plugin, Color[] leds, bool isNewWheel, bool isOldWheel)
         {
-            if (_lastLeds == null) return;
             var modelInfo = plugin.WheelModelInfo;
             int rpmN = modelInfo?.RpmLedCount ?? MozaDeviceConstants.RpmLedCount;
-            int count = Math.Min(_lastLeds.Length, rpmN);
+            int count = Math.Min(leds.Length, rpmN);
 
             if (isNewWheel)
             {
-                SendColorChunks(plugin, _lastLeds, count, "wheel-telemetry-rpm-colors");
+                SendColorChunks(plugin, leds, count, "wheel-telemetry-rpm-colors");
                 if (_lastRpmBitmask >= 0)
                     plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
                         BuildWindowedBitmaskBytes(_lastRpmBitmask, (1 << rpmN) - 1));
@@ -1209,13 +1433,12 @@ namespace MozaPlugin.Devices.Led
         }
 
         /// <summary>Re-feed the last button frame — colour + bitmask (new-protocol wheels).</summary>
-        private void ResendButtons(MozaPlugin plugin)
+        private void ResendButtons(MozaPlugin plugin, Color[] buttons)
         {
-            if (_lastButtons == null) return;
             var modelInfo = plugin.WheelModelInfo;
             if (modelInfo == null) return;
-            int count = Math.Min(_lastButtons.Length, modelInfo.ButtonLedCount);
-            SendColorChunks(plugin, _lastButtons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap);
+            int count = Math.Min(buttons.Length, modelInfo.ButtonLedCount);
+            SendColorChunks(plugin, buttons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap);
             if (_lastButtonBitmask >= 0)
                 plugin.DeviceManager.WriteArray("wheel-send-buttons-telemetry",
                     BuildWindowedBitmaskBytes(_lastButtonBitmask, modelInfo.ButtonWindowMask));
@@ -1223,11 +1446,10 @@ namespace MozaPlugin.Devices.Led
 
         /// <summary>Re-feed the last knob frame — colour + bitmask (active=window, so an
         /// all-black "off" renders dark instead of reverting to EEPROM).</summary>
-        private void ResendKnobs(MozaPlugin plugin, WheelModelInfo modelInfo)
+        private void ResendKnobs(MozaPlugin plugin, Color[] knobs, WheelModelInfo modelInfo)
         {
-            if (_lastKnobs == null) return;
-            int count = Math.Min(_lastKnobs.Length, modelInfo.KnobCount);
-            SendColorChunks(plugin, _lastKnobs, count, "wheel-telemetry-knob-colors");
+            int count = Math.Min(knobs.Length, modelInfo.KnobCount);
+            SendColorChunks(plugin, knobs, count, "wheel-telemetry-knob-colors");
             if (_lastKnobBitmask >= 0)
                 plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
                     BuildWindowedBitmaskBytes(_lastKnobBitmask, (1 << modelInfo.KnobCount) - 1));

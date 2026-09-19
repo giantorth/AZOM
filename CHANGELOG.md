@@ -2,6 +2,118 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.6.1]
+
+### Added
+
+- **Pedal haptics.** The S12 pedal vibration module shows up as its own SimHub ShakeIt
+  device, with nine effect channels each for throttle, brake and clutch.
+
+- **Convert a SimHub dashboard to MOZA format.** A Files tab button turns a `.djson` or
+  `.simhubdash` into an uploadable `.mzdash` — widgets, images, fonts and formulas — and
+  reports what it could not carry across.
+
+- **mBooster travel and motor calibration.** Both run from the pedal's tab, per pedal on a
+  chained pair.
+
+- **The Files tab's dashboard list is sorted.**
+
+- **The wheel's RPM bar shows upload progress.** While a dashboard is uploading, the LEDs
+  stop following telemetry and the RPM bar fills up as the transfer lands, with the LED at
+  the fill edge pulsing orange. The lights on either end of the bar stay out, so the fill spans
+  only the bar itself. Pausing the LEDs is deliberate: they and the upload share one link,
+  and the upload gets it for the duration. The bar clears and the LEDs go back to telemetry
+  when the upload finishes — or earlier, if it stops making progress, so a stuck transfer
+  never keeps the LEDs to itself.
+
+- **Knob rings can be filled on alternating LEDs.** A button beside "Fill ring" on the Knobs
+  tab colours every other LED in the group that contains the selected one.
+
+### Changed
+
+- **The LED colour palette is two rows of standard colours.** Red, orange, yellow, green, cyan,
+  blue, purple and magenta over their pastel tints, plus off and white, with the last custom
+  colour as the final swatch of every palette, kept across restarts.
+
+- **Clicking a selected LED again closes its colour editor.**
+
+### Fixed
+
+- **The LEDs stay lit when SimHub's effect pipeline stalls.** The keepalive now runs on
+  its own timer instead of riding SimHub's LED callback, so a pause in that callback no
+  longer drops the wheel and dash back to their own lighting mid-session.
+
+- **A shifter on its own USB port stays connected.** Its keepalive stopped after the first
+  answer, so the port was closed as dead and reopened every 35 seconds.
+
+- **A shifter's settings are no longer re-written on every connect.** They are read back
+  first and only what the profile changes is written, sparing the shifter's EEPROM.
+
+- **A rim that hasn't identified yet no longer gets its base port bounced.** The
+  display-wedge watchdog waits for the wheel model to resolve before it can fire.
+
+- **Two chained mBoosters get their own settings and calibration.** Which pedal sits on
+  the USB unit is now read from the pedal's own heartbeat instead of assumed to be the
+  throttle.
+
+- **An mBooster comes back after its calibration reboot.** Its pedal positions and its
+  pedal row no longer stay gone until SimHub restarts.
+
+- **mBooster Max Force goes down to 0 kg.** The 24 kg floor was a Pit House UI limit, not
+  a hardware one, and it kept pulling lighter settings back up to 24.
+
+- **AB9 engine vibration now has a 20hz floor** 
+
+- **A CM2 dash shows data on every dashboard, not just the one it started on.** Switching
+  it to another dashboard left the display rendering with no telemetry behind it.
+
+- **A dashboard switched with the CM2's own buttons is followed** — the plugin no longer
+  pulls the dash back to its previously saved dashboard on the next restart.
+
+- **Other serial devices keep working.** The plugin was opening every COM port it couldn't
+  identify while hunting for a wheelbase, holding a DIY pedal set or Arduino dash away from
+  SimHub's own scanner; it now leaves ports the registry attributes to another vendor alone.
+
+- **mBooster settings survive a reconnect.** When the pedal's serial arrived mid-session its
+  two settings entries were reconciled by letting one replace the other outright, so a single
+  stored value on one side could discard everything on the other; they are now merged field by
+  field.
+
+- **mBooster calibration reaches the pedal.** On a unit hosting a passive pedal the whole
+  connect-time config batch was addressed to a chained device that wasn't there.
+
+- **Dashboard uploads no longer stall part-way.** An upload could stop advancing at any
+  percentage and sit there indefinitely, never finishing and never failing. The plugin was
+  overrunning the cable, losing its place in the wheel's replies, and giving up on the one
+  chunk the wheel was waiting for while flooding it with chunks it discards. It now paces
+  itself, re-sends only what the wheel is asking for, and reports a failure instead of
+  hanging.
+- **The upload percentage on the Files tab is no longer wrong.** It read the wheel's own
+  byte count, which sometimes reports the full size before anything has actually been sent,
+  so the figure could sit at 100 % for the whole upload. It now counts what has been sent.
+- **Starting a second upload while one is running no longer breaks both.** Clicking Upload
+  again — or reconnecting mid-transfer — used to start a second attempt that fought the first
+  over the same connection; both could fail. The second request is now declined while one is
+  in progress.
+- **A game's saved dashboard survives re-uploading that dashboard.** It was remembered by
+  the wheel's internal id, which changes on every upload; it is now remembered by name, and
+  its channel mappings follow.
+- **The BUTTON/KNOB selector applies correctly.** 
+- **Dropped unecessary idle polls.** .
+- **Control Mapper fixes.** The plugin no longer stamps a wheel name SimHub will never match, 
+  and puts its wheel recognizer back when SimHub rebuilds its list.
+- **mBooster range limits no longer clamp deadzone and max force.**
+- **The mBooster force curve editor no longer stops a node short of the end.**
+- **A CM2 dash is no longer classified as a CM1.**
+- **The FSR1 gap box updates on the dashboards where it stayed blank.**
+- **Knob LED colours stop being forced black.** Saved all-black palettes are repaired on load.
+- **A connected accessory stays detected** instead of dropping out of the device list and
+  coming back.
+- **The old shared "MOZA Wheel Base" device is retired on upgrade,** so you stop seeing two
+  wheelbases.
+- **The update selector no longer lists PR build names.**
+- **The Help tab's GitHub link points at the right repository.**
+
 ## [1.6.0]
 
 ### Added

@@ -193,6 +193,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 _sender.Watchdog.NoteSession02FirstInbound();
                 // Wheel-reported dashboard slot tracker.
                 _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
+                _sender.SlotTracker.TryAbsorbKind4Echo(chunkPayload);
                 // FF-record reassembly (device display log, kind=14).
                 _sender.FeedFfRecords(session, seq, chunkPayload);
 
@@ -231,6 +232,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 // strict padding/bound validation rejects the mgmt session's
                 // 0x06 acks and 0x04 catalog-URL records.
                 _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
+                _sender.SlotTracker.TryAbsorbKind4Echo(chunkPayload);
                 // FF-record reassembly. Scanned on both catalog sessions
                 // because which one carries the FF records is Form-dependent;
                 // a duplicate feed (FlagByte == MgmtPort) is dropped by seq.
@@ -314,7 +316,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                         // configJson state (EnabledDashboards) just became
                         // available. On cold start the catalog burst can land
                         // BEFORE this, so the first catalog-only synth resolved
-                        // the dashboard key (wheel:<id>) to nothing and applied 0
+                        // the dashboard key (wheel:<name>) to nothing and applied 0
                         // user channel mappings — leaving the synth pinned with
                         // default bindings until a dashboard switch. Re-apply now
                         // that the key resolves; no tier-def re-emit (only the

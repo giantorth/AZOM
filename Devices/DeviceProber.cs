@@ -205,9 +205,25 @@ namespace MozaPlugin.Devices
             // we stay quiet rather than risk wedging it. wheel-knob-brightness is
             // still read on known knob wheels (lights the Rotary-group presence
             // flag used by knob-ring writes).
+            //
+            // Knob palettes are seeded here like the RPM/button colours above (once,
+            // at detect) so _data holds the wheel's stored Active + ring colours before
+            // the Knobs tab is opened. PitHouse sweeps cmd 0x27 ROLE0 per knob within
+            // ~3 s of connect (docs/protocol/findings/2026-05-10-knob-led-cmd27.md).
+            // Single paced sweep, not a poll: a ~1 Hz ring poll (cmd 0x1F) produced
+            // "Unexpected cmd: 31" firmware warnings on the Universal Hub path.
             if (info.KnobCount > 0)
             {
                 cmds.Add("wheel-knob-brightness");
+                int knobs = System.Math.Min(info.KnobCount, MozaData.WheelKnobMax);
+                for (int k = 1; k <= knobs; k++)
+                    cmds.Add($"wheel-knob{k}-active-color");
+                if (info.KnobRingLeds != null)
+                {
+                    int ring = System.Math.Min(info.KnobRingLedTotal, MozaData.KnobRingLedMax);
+                    for (int i = 1; i <= ring; i++)
+                        cmds.Add($"wheel-knob-bg-color{i}");
+                }
             }
 
             return cmds.ToArray();
@@ -376,7 +392,9 @@ namespace MozaPlugin.Devices
             if (bridgedDash)
                 _deviceManager.SendDisplayProbe(MozaProtocol.DeviceDash);
 
-            if (DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
+            // A dash latched CM1 this session must not get the CM2 definition back on
+            // re-attach; the discriminator restores it if evidence says CM2.
+            if (!_plugin.DashIsCm1 && DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
             _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
             MozaLog.Info(bridgedDash
@@ -468,7 +486,9 @@ namespace MozaPlugin.Devices
             }
             _detectionState.HgpOwner = _deviceManager;
             _detectionState.HgpDetected = true;
-            _plugin.HardwareApplier.ApplyHgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            // Profile values reach the device as each settings readback lands, and only
+            // where they differ — every 0x52 write is an EEPROM commit on the shifter.
+            _plugin.HardwareApplier.ArmShifterConnectApply(ShifterModelKind.Hgp);
             if (issueReads) _deviceManager.ReadSettings(HgpSettingsReadCommands);
             MozaLog.Info("[AZOM] HGP shifter detected");
         }
@@ -482,7 +502,7 @@ namespace MozaPlugin.Devices
             }
             _detectionState.SgpOwner = _deviceManager;
             _detectionState.SgpDetected = true;
-            _plugin.HardwareApplier.ApplySgpToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ArmShifterConnectApply(ShifterModelKind.Sgp);
             if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
             MozaLog.Info("[AZOM] SGP shifter detected");
         }
@@ -1207,6 +1227,14 @@ namespace MozaPlugin.Devices
                     if (!string.IsNullOrEmpty(_data.DisplayModelName))
                     {
                         DebugIdentity("display-model", $"[AZOM] Display model: {_data.DisplayModelName}");
+                        // A known CM2 display identity answered at 0x14 is positive CM2
+                        // evidence for the CM1 discriminator (and what un-latches a
+                        // mis-latched CM1). A display WHEEL answers this probe too, hence
+                        // the device-id check; display replies carry the raw (swapped) id.
+                        if ((deviceId == MozaProtocol.DeviceDash || deviceId == MozaProtocol.DashDeviceIdSwapped)
+                            && _plugin.IsCm2BehindBaseCandidate
+                            && MozaDeviceConstants.IsCm2DisplayModel(_data.DisplayModelName))
+                            _plugin.DualDisplay?.NoteCm2Evidence(global::MozaPlugin.Telemetry.Cm2Evidence.DisplayModel);
                         // Bridged CM2 confirmed by display identity. The CM2 itself is
                         // driven by the dedicated _cm2Sender at 0x14 (EnsureCm2Pipeline,
                         // already running) — NOT the main sender. This block only

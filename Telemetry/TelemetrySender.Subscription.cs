@@ -361,9 +361,9 @@ namespace MozaPlugin.Telemetry
             // coordinator uses for the mzdash path). DashboardBindingCoordinator
             // skipped this branch when profile was null at apply time, so the
             // synthesised path owns it. Resolved per active dashboard key
-            // candidate (wheel:<id> > file:<name>:<sha> > builtin:<name>).
+            // candidate (wheel:<name> > file:<name>:<sha> > builtin:<name>).
             //
-            // Cold-start race: the wheel:<id> candidate needs the configJson
+            // Cold-start race: the wheel:<name> candidate needs the configJson
             // state (EnabledDashboards), which can land AFTER this catalog burst
             // — so a first synth here may resolve 0 overrides. The catalog-keyed
             // dedup at the top would then pin the mapping-less profile until a
@@ -449,12 +449,12 @@ namespace MozaPlugin.Telemetry
         /// dashboard key) and apply them to <paramref name="profile"/>'s channels
         /// in place, overriding each matched URL's
         /// <see cref="ChannelDefinition.SimHubProperty"/>. Returns the number of
-        /// override entries applied; 0 when none resolve (e.g. the wheel:&lt;id&gt;
+        /// override entries applied; 0 when none resolve (e.g. the wheel:&lt;name&gt;
         /// dashboard key can't be resolved yet because the configJson state hasn't
         /// arrived). Only the per-channel property binding changes — the wire
         /// layout is untouched, so callers need no tier-def re-emit (the frame
         /// builder reads ch.SimHubProperty live each frame). The dashboard key is
-        /// resolved per candidate (wheel:&lt;id&gt; > file:&lt;name&gt;:&lt;sha&gt;
+        /// resolved per candidate (wheel:&lt;name&gt; > file:&lt;name&gt;:&lt;sha&gt;
         /// > builtin:&lt;name&gt;), or the fixed <see cref="MappingDashKeys"/> for
         /// a CM2 sender.
         /// </summary>
@@ -485,7 +485,7 @@ namespace MozaPlugin.Telemetry
         /// The catalog-only synth (<see cref="MaybeSwapProfileForCatalog"/>)
         /// applies user mappings keyed on the active dashboard key, which
         /// <see cref="Telemetry.ChannelMappingCoordinator.GetActiveDashboardKeyCandidates"/> resolves from
-        /// the wheel's configJson (the wheel:&lt;id&gt; candidate). On cold start
+        /// the wheel's configJson (the wheel:&lt;name&gt; candidate). On cold start
         /// the wheel's catalog burst can land BEFORE its configJson burst
         /// (verified: catalog at T, configJson ~1.2 s later), so the first synth
         /// resolves 0 overrides and the catalog-keyed dedup then pins the
@@ -498,6 +498,9 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         internal void ReapplyUserChannelMappingsAfterConfigJson()
         {
+            // Wheel lane only: id → name now resolves, so rewrite legacy mapping keys.
+            if (MappingDashKeys == null)
+                MozaPlugin.Instance?.ChannelMapping.MigrateLegacyWheelKeys();
             var profile = _profile;
             if (profile == null || profile.Tiers.Count == 0) return;
             int n = ApplyUserChannelMappings(profile);

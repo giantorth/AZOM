@@ -50,9 +50,45 @@ namespace MozaPlugin.UI
             catch { return "unknown"; }
         }
 
+        /// <summary>Host SimHub version (SimHubWPF.exe file version); "—" when unavailable.</summary>
+        public static string GetSimHubVersion() => s_simHubVersion ??= ComputeSimHubVersion();
+
+        private static string? s_simHubVersion;
+
+        private static string ComputeSimHubVersion()
+        {
+            try
+            {
+                string? path = Assembly.GetEntryAssembly()?.Location;
+                if (string.IsNullOrEmpty(path))
+                    path = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (string.IsNullOrEmpty(path)) return "—";
+                var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(path!);
+                string? v = fvi.ProductVersion;
+                if (string.IsNullOrWhiteSpace(v)) v = fvi.FileVersion;
+                return string.IsNullOrWhiteSpace(v) ? "—" : v!.Trim();
+            }
+            catch { return "—"; }
+        }
+
         // ── Per-panel builders ──────────────────────────────────────────
 
-        public static string BuildPluginInfo() => $"Version:        {GetPluginVersion()}";
+        public static string BuildPluginInfo()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Version:        {GetPluginVersion()}");
+            sb.Append($"SimHub:         {GetSimHubVersion()}");
+            return sb.ToString();
+        }
+
+        /// <summary>Control Mapper variant-bridge state; see ControlMapperBridge.BuildDiagnostics.</summary>
+        public static string BuildControlMapper(MozaPlugin plugin)
+        {
+            var bridge = plugin?.ControlMapperBridge;
+            if (bridge == null) return "(bridge disabled — EnableControlMapperVariants is false)";
+            try { return bridge.BuildDiagnostics(); }
+            catch (Exception ex) { return $"(failed: {ex.Message})"; }
+        }
 
         public static string BuildUsbDetection(MozaPlugin plugin)
         {
@@ -167,7 +203,9 @@ namespace MozaPlugin.UI
         /// <para><c>binary=</c> is the presence-probe latch that gates the settings
         /// reads, and <c>read=</c> whether those reads actually came back: a lane that
         /// is connected with <c>read=no</c> means the tab is showing MozaData defaults,
-        /// not the device's stored calibration.</para>
+        /// not the device's stored calibration. <c>rx=</c> is the age of the lane's
+        /// last inbound byte; the lane is polled every 5 s and the connection closes
+        /// a port silent for 30 s, so a healthy lane never shows more than ~5 s.</para>
         /// </summary>
         public static string BuildStandalonePeripherals(MozaPlugin plugin, MozaData data)
         {
@@ -201,10 +239,12 @@ namespace MozaPlugin.UI
                         : "n/a";
                 // capture= is this lane's CaptureLabel, i.e. the exact "source" column
                 // its frames carry in serial-capture-*.txt — ties a row to its traffic.
+                var rxAge = c.Connection.InboundAge;
+                string rx = rxAge.HasValue ? $"{(long)rxAge.Value.TotalMilliseconds} ms ago" : "—";
                 sb.AppendLine(
                     $"        tabFlag={(c.SharedFlagSet ? "set" : "clear")}  " +
                     $"ownsWrites={(c.OwnsPeripheral ? "yes" : "no")}  settingsRead={read}  " +
-                    $"pendingReads={c.PendingResponses.PendingCount}  capture={c.Connection.CaptureLabel}");
+                    $"pendingReads={c.PendingResponses.PendingCount}  rx={rx}  capture={c.Connection.CaptureLabel}");
                 var f = c.Connection.LastFailure;
                 if (f.Kind != ConnectionFailureKind.None)
                     sb.AppendLine($"        lastFailure={f.Kind} port={Blank(f.PortName ?? "")} '{f.Message}'");
@@ -267,13 +307,14 @@ namespace MozaPlugin.UI
                 // Per-axis role resolution for a chained lane — the actual
                 // routing (which HID axis drives throttle/brake/clutch), so a
                 // mis-mapping is visible straight from the bundle.
-                if (d.AxisCount > 1)
+                if (d.AxisSlotCount > 1)
                 {
                     // ax<i>[+/-/?] = role — + connected, - not connected, ? unknown
                     // (device hasn't streamed a "PD Linked" diagnostic this session).
+                    // axes= is the raw HID count: 0 means the HID never paired.
                     var connected = d.ConnectedAxes;
                     var roleParts = new System.Collections.Generic.List<string>();
-                    for (int a = 0; a < d.AxisCount && a < MBoosterDeviceController.MaxAxes; a++)
+                    for (int a = 0; a < d.AxisSlotCount; a++)
                     {
                         string flag = connected == null ? "?" : (a < connected.Length && connected[a] ? "+" : "-");
                         roleParts.Add($"ax{a}[{flag}]={MozaMBoosterRegistry.ResolveAxisRole(s, a, d.ConnectedAxisCount)}");
@@ -286,8 +327,56 @@ namespace MozaPlugin.UI
                     sb.AppendLine($"        axes={d.AxisCount}  connected={d.ConnectedAxisCount}  roles=[{string.Join(", ", roleParts)}]");
                 }
                 AppendMBoosterPedalConfig(sb, d, s);
+                AppendMBoosterStatusRegisters(sb, d);
+                // Routed chain: which chained ids announced themselves, and
+                // whether they went on to ANSWER — the pair that decides
+                // whether each pedal gets its own singleton registers or both
+                // fall back to the host and share one set (bug 34JAASN5).
+                if (d.IsRouted)
+                {
+                    var chain = d.RoutedChainIds;
+                    if (chain.Length > 0)
+                    {
+                        var parts = new System.Collections.Generic.List<string>();
+                        foreach (var dev in chain)
+                            parts.Add($"0x{dev:x2}{(d.DeviceHasAnswered(dev) ? "(answers)" : "(silent)")}");
+                        sb.AppendLine($"        routedChain=[{string.Join(", ", parts)}]  addressable=[{string.Join(", ", System.Array.ConvertAll(d.MotorIds, x => $"0x{x:x2}"))}]");
+                    }
+                    else
+                    {
+                        sb.AppendLine("        routedChain=[none announced]");
+                    }
+                }
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// The group-35 status registers real Pit House polls that AZOM had no
+        /// names for. Only 0xB4 has a decoded meaning — the pedal's
+        /// calibration-mode state (2 = normal, 0 = mid travel calibration),
+        /// which is why a travel calibration MUST be followed by a soft reboot.
+        /// The rest (0x0D, 0x21-0x24) read as per-unit constants in every
+        /// capture so far and are printed raw so the next bundle from a
+        /// different topology can settle what they mean, instead of the values
+        /// being guessed at. See docs/protocol/devices/mbooster.md.
+        /// </summary>
+        private static void AppendMBoosterStatusRegisters(StringBuilder sb, MBoosterDeviceController d)
+        {
+            var regs = d.StatusRegisters();
+            if (regs.Count == 0) return;
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var kv in regs)
+            {
+                // Key is "<dev hex>:mbooster-<name>" — drop the shared prefix.
+                int cut = kv.Key.IndexOf(":mbooster-", StringComparison.Ordinal);
+                string label = cut >= 0
+                    ? kv.Key.Substring(0, cut + 1) + kv.Key.Substring(cut + ":mbooster-".Length)
+                    : kv.Key;
+                parts.Add($"{label}={kv.Value}");
+            }
+            parts.Sort(StringComparer.Ordinal);
+            sb.AppendLine($"        status=[{string.Join(", ", parts)}]");
         }
 
         /// <summary>
@@ -310,6 +399,14 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"        active pedals={(d.ActiveAxisCount < 0 ? "? (type diagnostic not streamed yet)" : d.ActiveAxisCount.ToString())}" +
                 $"  deviceReportedMaxThreshold={FmtKg(d.DeviceReportedMaxThresholdKg)}");
+            // Every unit on the lane with the identity it reported — host and
+            // each chained id — so a genuine chain shows two distinct serials
+            // and which chained ids ever answered.
+            var units = new System.Collections.Generic.List<string>();
+            foreach (var u in d.ChainUnits())
+                units.Add($"0x{u.dev:x2} {(u.dev == d.HostDeviceId ? "host" : u.answered ? "chained(answers)" : "chained(silent)")}" +
+                          $" serial={(string.IsNullOrEmpty(u.serial) ? "—" : Redact(u.serial!))} model={(string.IsNullOrEmpty(u.model) ? "—" : u.model)}");
+            sb.AppendLine($"        units=[{string.Join(", ", units)}]");
             foreach (int a in d.ConnectedAxisIndices())
             {
                 string type = types == null || a >= types.Length ? "?"
@@ -322,7 +419,13 @@ namespace MozaPlugin.UI
                 // no frame is sent to.
                 int roleIdx = MBoosterDeviceController.RoleIndexOf(role);
                 byte dev = d.MotorDeviceForRole(roleIdx, a);
-                sb.AppendLine($"        ax{a} {role}/{type} → dev 0x{dev:x2}");
+                // host/remote from the host heartbeat (RoleLocality); "(seed)"
+                // while it still comes from the persisted cache.
+                var loc = d.RoleLocality;
+                string where = loc != null && roleIdx >= 0 && roleIdx < loc.Length
+                    ? MBoosterDeviceController.LocalityLabel(loc[roleIdx]) + (d.RoleLocalityIsSeed ? "(seed)" : "")
+                    : "?";
+                sb.AppendLine($"        ax{a} {role}/{type}/{where} → dev 0x{dev:x2}");
                 var cfg = MozaMBoosterRegistry.PeekPedalConfig(s, a, d.SoleConnectedAxis());
                 if (cfg == null) { sb.AppendLine("             (no config row)"); continue; }
                 sb.AppendLine(
@@ -338,6 +441,7 @@ namespace MozaPlugin.UI
                     $"travel={FmtMm(cfg.TravelStartMm)}..{FmtMm(cfg.TravelEndMm)} " +
                     $"endstop={FmtRaw(cfg.EndstopFrontStiffness)}/{FmtRaw(cfg.EndstopEndStiffness)} " +
                     $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
+                    $"damping={FmtPct(cfg.DampingPressPct)}/{FmtPct(cfg.DampingReleasePct)} " +
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
                     $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")}");
             }
@@ -500,6 +604,28 @@ namespace MozaPlugin.UI
                                + $"  want bri rpm={Bri(overlay.WheelRpmBrightness)} "
                                + $"btn={Bri(overlay.WheelButtonsBrightness)} knob={Bri(overlay.WheelKnobRingBrightness)}"
                              : ""));
+            // Per-encoder BUTTON/KNOB signal mode (0=Buttons, 1=Knob). Four views, because
+            // they are known to disagree: the profile's wish (overlay), the wheel's own
+            // 2A [fw] readback (data), and what the write cache thinks is in the register.
+            // `fw` is the firmware index the write addresses — it is NOT the logical knob
+            // on CS Pro / KS Pro (WheelModelInfo.KnobSignalModeOrder). The wheel stores all
+            // of them in one bitmask it also logs as "Table 2, Param 19 Written: N" in the
+            // Firmware debug section below, so the two can be compared directly.
+            int encCount = model.KnobEncoderCount >= 0
+                ? Math.Min(model.KnobEncoderCount, MozaData.WheelKnobMax) : swept;
+            if (encCount > 0)
+            {
+                var sigOv = overlay?.WheelKnobSignalModes;
+                sb.AppendLine("Knob signal:    knob   fw  overlay  data  mode c/w");
+                for (int k = 0; k < encCount; k++)
+                {
+                    int fw = model.SignalModeFirmwareIndex(k);
+                    string o = sigOv != null && k < sigOv.Length && sigOv[k] >= 0
+                        ? sigOv[k].ToString(CultureInfo.InvariantCulture) : "—";
+                    sb.AppendLine($"                {k + 1,4}  {fw,3}  {o,7}  {Bri(d.WheelKnobSignalModes[k]),4}"
+                                  + $"  {Cfg($"wheel-knob-signal-mode{fw}")}");
+                }
+            }
             // Header and rows share one width table so the columns line up. mode next to
             // mode-cache/want is the load-bearing pair: a wheel reporting Static while the
             // plugin wants SimHub means the mode write never landed, and the firmware is
@@ -523,6 +649,20 @@ namespace MozaPlugin.UI
                 Bri(plugin.WheelLedAppliedBrightnessKnob), Cfg("wheel-knob-brightness")));
             sb.Append($"Flags (meter):  wheel={Bri(d.WheelFlagsBrightness)} "
                       + $"cache/want={Cfg("dash-flags-brightness")}  (dev 0x14, not a wheel LED group)");
+
+            // LED keepalive. srcQuiet is how long since SimHub's LED pipeline last
+            // handed us a frame; the fed ages are how long since we last re-fed each
+            // section. srcQuiet climbing while the fed ages stay under a second is the
+            // keepalive doing its job through a stalled source.
+            var ka = Devices.Led.MozaLedDeviceManager.LiveKeepaliveSnapshot();
+            if (ka != null)
+            {
+                string Secs(double s) => s < 0 ? "never" : $"{s:F1}s";
+                sb.AppendLine();
+                sb.Append($"LED keepalive:  hold={ka.Value.HoldSec}s srcQuiet={Secs(ka.Value.SrcQuietSec)} "
+                          + $"fed rpm={Secs(ka.Value.RpmFedSec)} btn={Secs(ka.Value.BtnFedSec)} "
+                          + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips}");
+            }
             return sb.ToString();
         }
 
@@ -620,10 +760,11 @@ namespace MozaPlugin.UI
 
             // CM1-vs-CM2 classification of a BRIDGED dash (a USB 0x0025 dash is always a
             // real CM2, so the line is omitted there). Reports the evidence, not a guess:
-            // only the CM1-exclusive 0x8E param-read answer latches CM1, and only a
-            // tier-def catalog proves CM2 — a dash showing neither stays undecided and is
-            // re-probed. "undecided" with probes climbing and ans=no is the normal
-            // steady state for a real CM2 whose catalog hasn't arrived yet.
+            // only a correlated 0x8E param-read answer latches CM1; CM2 evidence
+            // (display identity / catalog) vetoes it and reverses a latch. A dash
+            // showing neither stays undecided and is re-probed — "undecided" with
+            // probes climbing and 0x8E=no is the steady state for a CM2 whose catalog
+            // hasn't arrived yet.
             if (plugin != null && plugin.IsCm2Present && !dashUsb)
             {
                 var dd = plugin.DualDisplay;
@@ -636,13 +777,8 @@ namespace MozaPlugin.UI
                 else if (dd == null)
                     cls = "undecided (coordinator not wired yet)";
                 else
-                {
-                    var forSpan = dd.DiscriminatingFor;
-                    cls = $"undecided (0x8E ans={(dd.DashParamReadAnswered ? "yes" : "no")}, " +
-                          $"probes={dd.Cm1ProbeCount}, " +
-                          $"deciding {(forSpan.HasValue ? $"{forSpan.Value.TotalSeconds:F0}s" : "not started")}, " +
-                          $"catalog=0)";
-                }
+                    cls = "undecided (catalog=0)";
+                if (dd != null) cls += $" {dd.DescribeDiscriminator()}";
                 sb.AppendLine();
                 sb.Append($"Dash class:        {cls}");
             }
@@ -659,6 +795,31 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 dash lane:     {cm2.TargetDescription} on {cm2.ConnectionRef?.CaptureLabel} pipe " +
                     $"(frames={cm2.FramesSent}, {cm2.Phase})");
+
+                // The CM2's OWN switch/binding state. Every other section of this
+                // report (Session state, Dashboard state, the channel catalog, the
+                // last subscription) reads the MAIN sender, so on a wheel+CM2 rig a
+                // CM2-side fault was invisible here and only the raw log showed it.
+                sb.AppendLine();
+                sb.Append(
+                    $"CM2 switch state:  slot={cm2.WheelReportedSlot} lastKind4={cm2.LastEmittedKind4Slot} " +
+                    $"catalog={cm2.CatalogCount} hotReneg={YesNo(cm2.EnableHotRenegotiation)} " +
+                    $"cooldown={YesNo(cm2.IsInSilenceCooldown)}");
+                sb.AppendLine();
+                sb.Append($"CM2 engaged:       {cm2.Watchdog?.DisplayEngagementText() ?? "(n/a)"}");
+
+                // The CM2's dashboard list — the slot above indexes THIS list, not the
+                // wheel's, so both are needed to tell a wrong-slot from a wrong-list.
+                var cm2List = cm2.WheelState?.ConfigJsonList;
+                sb.AppendLine();
+                if (cm2List == null || cm2List.Count == 0)
+                    sb.Append("CM2 dashboards:    (none advertised yet)");
+                else
+                    sb.Append($"CM2 dashboards ({cm2List.Count}): {string.Join(", ", cm2List)}");
+                // The saved name the re-assert resolves to a slot; a value absent from
+                // the list above is why a re-assert silently does nothing.
+                sb.AppendLine();
+                sb.Append($"CM2 saved dash:    {Blank(plugin!.ActiveCm2DashboardName)}");
             }
             else if (cm2Present)
             {
@@ -683,6 +844,7 @@ namespace MozaPlugin.UI
                 sb.Append(
                     $"CM2 LED driver:    fw={fw} engaged={(snap.Engaged ? "yes" : "no")} everLit={(snap.EverLit ? "yes" : "no")} " +
                     $"lastNonBlack={Age(snap.LastNonBlackTicks)} lastBitmask={mask} sentAgo={Age(snap.LastBitmaskSendTicks)} " +
+                    $"srcQuiet={Age(snap.LastDisplayTicks)} " +
                     $"sends: bitmask={snap.BitmaskSends} rpmColor={snap.RpmColorSends} flag={snap.FlagSends}");
             }
             return sb.ToString();

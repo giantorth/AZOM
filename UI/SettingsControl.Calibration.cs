@@ -308,22 +308,21 @@ namespace MozaPlugin.UI
         /// these to the wrong physical pedal. Falls back to the axis device
         /// until the map resolves. (Direction/Min/Max/output-curve stay on the
         /// host 0x12, which aggregates the output mapping.)</summary>
-        private static byte MBoosterCalibDevice(global::MozaPlugin.Devices.MBooster.MBoosterDeviceController? controller, int axisIndex)
+        private static bool TryMBoosterCalibDevice(global::MozaPlugin.Devices.MBooster.MBoosterDeviceController? controller, int axisIndex, out byte dev)
         {
-            if (controller == null) return global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
-            // Resolve against the CONNECTED axis count, not the raw HID axis
+            dev = global::MozaPlugin.Protocol.MozaProtocol.DeviceMain;
+            if (controller == null) return false;
+            // Resolves against the CONNECTED axis count, not the raw HID axis
             // count — same fix as MBoosterSelectedPedalRolePrefix. Otherwise
             // a chain-capable hub with fewer pedals wired than raw axis slots
             // falls into ResolveAxisRole's axis-order fallback here too,
             // routing calibration writes (Travel/Endstop/Max Threshold/
-            // Sensor Ratio) to the wrong physical MotorDeviceForRole.
-            int axisCount = controller.ConnectedAxisIndices().Count;
-            if (axisCount <= 0) axisCount = 1;
-            var role = global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(controller.CurrentSettings, axisIndex, axisCount);
-            int roleIdx = role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? 0
-                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? 1
-                        : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? 2 : -1;
-            return controller.MotorDeviceForRole(roleIdx, axisIndex);
+            // Sensor Ratio) to the wrong physical MotorDeviceForRole. The
+            // resolution now lives on the controller so the connect-time apply
+            // and MBoosterCalibrationRunner share this exact path. False while
+            // a chained pedal's unit is unplaced: the value is saved and the
+            // RoutingResolved re-apply pushes it.
+            return controller.TryCalibDeviceForAxis(axisIndex, out dev);
         }
 
         /// <summary>
@@ -335,7 +334,7 @@ namespace MozaPlugin.UI
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            if (!TryMBoosterCalibDevice(controller, _mboosterEffectPedalIndex, out byte dev)) return;
             controller.QueueCalibWrite($"{dev:x2}:{key}", () => push(controller, dev));
         }
 
@@ -355,8 +354,8 @@ namespace MozaPlugin.UI
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            if (!controller.IsAxisMotorized(_mboosterEffectPedalIndex)) return;
-            byte dev = MBoosterCalibDevice(controller, _mboosterEffectPedalIndex);
+            if (!controller.OwnsSingletonRegisters(_mboosterEffectPedalIndex)) return;
+            if (!TryMBoosterCalibDevice(controller, _mboosterEffectPedalIndex, out byte dev)) return;
             controller.QueueCalibWrite($"{dev:x2}:{key}", () => push(controller, dev));
         }
 
@@ -391,7 +390,7 @@ namespace MozaPlugin.UI
         {
             // Singleton Pedal Feel hardware — see QueueMBoosterPedalFeelPush.
             if (!controller.IsAxisMotorized(axisIndex)) return;
-            byte dev = MBoosterCalibDevice(controller, axisIndex);
+            if (!TryMBoosterCalibDevice(controller, axisIndex, out byte dev)) return;
             double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
             float[]? curveY = s.InputCurveY;
@@ -439,9 +438,8 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
-        // Max Force (24..200kg Brake) — the force at which the pedal's raw HID
-        // axis
-        // reaches 100% travel. Also the Pedal Feel curve's own top-right
+        // Max Force (0..200kg on an active pedal) — the force at which the
+        // pedal's raw HID axis reaches 100% travel. Also the Pedal Feel curve's own top-right
         // point, which is bound two-way to this slider — dragging that point
         // vertically lands here (see MozaCurveEditor.AnchorEndDraggableInY).
         // CONFIRMED real hardware calibration

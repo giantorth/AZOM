@@ -75,6 +75,8 @@ namespace MozaPlugin.Protocol
         // Wheel device id 0x17 (DeviceWheel = 23) with nibbles swapped, as it
         // appears in response frames at data[1].
         public const byte WheelDeviceIdSwapped = 0x71;
+        // Dash device id 0x14 (DeviceDash = 20) with nibbles swapped (data[1]).
+        public const byte DashDeviceIdSwapped = 0x41;
 
         // Boot/firmware debug noise on data[0] — silenced everywhere.
         public const byte FirmwareDebugGroup = 0x0E;

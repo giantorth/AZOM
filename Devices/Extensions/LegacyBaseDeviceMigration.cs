@@ -34,9 +34,11 @@ namespace MozaPlugin.Devices.Extensions
     ///     the id and the instance — with the user's whole ShakeIt effect tree —
     ///     disappears from the Devices page.
     ///   • "MOZA Wheel Base" — the shared 18-LED definition
-    ///     (<see cref="MozaDeviceConstants.BaseAmbientGuid"/>), whose definition folder
-    ///     DeviceDefinitionDeployer.RemoveLegacyBaseDefinition deletes once a
-    ///     model-named one lands.
+    ///     (<see cref="MozaDeviceConstants.BaseAmbientGuid"/>). Its definition folder is
+    ///     retired by DeviceDefinitionDeployer.RemoveLegacyBaseDefinition, driven from
+    ///     MozaBaseDeviceExtension.TryRetireLegacyDefinition once this scan's settings
+    ///     have been carried across — until then both wheelbases sit in SimHub's
+    ///     Devices page and both drive the ambient strip.
     ///
     /// Both leave their settings behind: SimHub's own DeviceInstance.GetSettingsPath()
     /// is "PluginsData\Common\Devices\{InstanceId}", and it only removes that folder

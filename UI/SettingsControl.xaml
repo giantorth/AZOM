@@ -22,6 +22,12 @@
                  channel-mapping editor) needs this to show/hide its panel based on row.IsEditing. -->
             <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
 
+            <!-- Declared here as well as in Themes/Generic.xaml: that dictionary is
+                 the custom controls' theme scope, so its keys don't reach this file's
+                 own DataTemplates. Used by the mBooster row list's per-pedal
+                 calibration status line, which stays collapsed while empty. -->
+            <ctrl:EmptyStringToVisibilityConverter x:Key="EmptyStringToVisibility"/>
+
             <!-- Legacy keys preserved so the hidden Wheel/AB9/mBooster/Hub tabs (kept in
                  the visual tree but Visibility=Collapsed in Phase 1) still resolve.
                  They route to the new design's brushes + typography so any pixels they
@@ -1866,19 +1872,24 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Margin="0,3">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="160"/>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="160"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Style="{StaticResource MBoosterDeviceRowButtonStyle}"
+                                            <Button Grid.Row="0" Grid.Column="0" Style="{StaticResource MBoosterDeviceRowButtonStyle}"
                                                     Content="{Binding Label}" HorizontalAlignment="Left"
                                                     Click="MBoosterDeviceRow_Click"/>
-                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}"
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}"
                                                        VerticalAlignment="Center" Margin="16,0,10,0"/>
-                                            <ComboBox Grid.Column="2" SelectedIndex="{Binding RoleIndex, Mode=TwoWay}">
+                                            <ComboBox Grid.Row="0" Grid.Column="2" SelectedIndex="{Binding RoleIndex, Mode=TwoWay}">
                                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Disabled}"/>
                                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
                                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
@@ -1887,13 +1898,31 @@
                                             <!-- Only shown for the selected row — editing a non-selected
                                                  device's name isn't useful since its config isn't on
                                                  screen anyway, and it declutters the common case. -->
-                                            <TextBlock Grid.Column="3" Text="{x:Static res:Strings.SliderLabel_DisplayName}" Style="{StaticResource LabelText}"
+                                            <TextBlock Grid.Row="0" Grid.Column="3" Text="{x:Static res:Strings.SliderLabel_DisplayName}" Style="{StaticResource LabelText}"
                                                        VerticalAlignment="Center" Margin="16,0,10,0"
                                                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
-                                            <TextBox Grid.Column="4" Style="{StaticResource LfeNameBox}" MaxLength="40"
+                                            <TextBox Grid.Row="0" Grid.Column="4" Style="{StaticResource LfeNameBox}" MaxLength="40"
                                                      Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                                                      ToolTip="{x:Static res:Strings.Hint_MBoosterDisplayName}"
                                                      Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
+                                            <!-- Per-pedal hardware calibration routines. On this row so
+                                                 there is no doubt which pedal they act on: a unit hosting
+                                                 two ACTIVE pedals answers both on one device id, so one
+                                                 shared pair could not say (bug GVT5H8B8). Hidden for a
+                                                 passive pedal, which has no motor to sweep or locate.
+                                                 Enable/caption pushed by RefreshMBoosterCalUi. -->
+                                            <StackPanel Grid.Row="0" Grid.Column="5" Orientation="Horizontal"
+                                                        VerticalAlignment="Center" Margin="16,0,0,0"
+                                                        Visibility="{Binding CalVisible, Converter={StaticResource BoolToVisibility}}">
+                                                <Button Content="{Binding TravelCalLabel}" IsEnabled="{Binding TravelCalEnabled}"
+                                                        Margin="0,0,6,0" Click="MBoosterRowTravelCal_Click"/>
+                                                <Button Content="{Binding MotorCalLabel}" IsEnabled="{Binding MotorCalEnabled}"
+                                                        Click="MBoosterRowMotorCal_Click"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6"
+                                                       Text="{Binding CalStatus}" Style="{StaticResource MutedHintText}"
+                                                       TextWrapping="Wrap" Margin="0,4,0,2"
+                                                       Visibility="{Binding CalStatus, Converter={StaticResource EmptyStringToVisibility}}"/>
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -2192,6 +2221,39 @@
                                               IsCollapsible="True">
                                 <StackPanel>
                                     <ctrl:OffOnToggle x:Name="MBoosterSegDampEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,0,12" Checked="MBoosterSegDampEnable_Changed" Unchecked="MBoosterSegDampEnable_Changed"/>
+                                    <!-- Plain (non-segmented) Virtual Damping, cmdId 0xAD selectors
+                                         0/1. A register set of its own that Pit House writes in the
+                                         same burst as the 0xB7 segments below — the firmware logs
+                                         `virtual_damping_press`/`_release` for these and
+                                         `virtual_damping_press1..3` for the segments. Same card
+                                         because it is the same feature family, so it inherits this
+                                         card's passive-pedal gating. -->
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingPress}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterDampingPressSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterDampingSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterDampingPressValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterDampingPressSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="0"/>
+                                    </Grid>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingRelease}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterDampingReleaseSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterDampingSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterDampingReleaseValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterDampingReleaseSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="0"/>
+                                    </Grid>
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"

@@ -14,6 +14,16 @@ The plugin implements these as the `shifter-*` command family
 ([`Protocol/MozaCommandDatabase.cs`](../../../Protocol/MozaCommandDatabase.cs)); config surface
 via the standalone-peripheral lane + a "Shifter" settings tab.
 
+**Write policy.** Every group `0x52` write is an EEPROM commit on the shifter (its group `0x0E`
+debug stream echoes `param_manage.c:346 Table 9, Param N Written` per setting), so the plugin
+never pushes the profile blind at detect. Detect arms a reconcile, the per-model `0x51` reads go
+out, and each readback writes that one setting only if the profile's value differs
+(`HardwareApplier.PrimeShifterCfgFromDevice`). Later profile applies and tab writes go through the
+same per-model cache, which is static so a plugin reload cannot re-write what the shifter already
+holds. Background: bundle `T3AAXZRX` (v1.6.0, 2026-09-17) reconnected its standalone SGP every
+35 s and re-applied five settings on each connect — six Table-9 commits per reconnect, about
+1,170 in a two-hour session.
+
 ## Telling HGP from SGP
 
 On its own USB port the two are told apart by **PID** (`0x001E` vs `0x0023`) and nothing else is

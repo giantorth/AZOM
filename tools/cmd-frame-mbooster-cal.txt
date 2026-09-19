@@ -1,0 +1,89 @@
+# Byte-exact expectations for the mBooster calibration flow, taken verbatim
+# from the two 2026-09-08 Pit House captures ("Brake pedal travel calibration"
+# and "Brake motor calibration", VID 346e PID 0008, single unit at dev 0x12).
+#
+#   tools/cmd-frame --check tools/cmd-frame-mbooster-cal.txt
+#
+# Format:  <expected hex> | <command-name> read|write [value] [device]
+# Device defaults to 0x12.
+
+# --- connect / post-reboot identity handshake, in Pit House's own order
+7e 00 09 12 a6                | mbooster-presence       read
+7e 04 04 12 00 00 00 00 a5    | mbooster-device-type    read
+7e 00 06 12 a3                | mbooster-mcu-uid        read
+7e 01 02 12 00 a0             | mbooster-device-presence read
+7e 04 05 12 00 00 00 00 a6    | mbooster-capabilities   read
+7e 01 07 12 01 a6             | mbooster-model-name     read
+7e 01 0f 12 01 ae             | mbooster-sw-version     read
+7e 01 11 12 04 b3             | mbooster-identity-11    read
+7e 01 08 12 01 a7             | mbooster-hw-version     read
+7e 01 10 12 00 ae             | mbooster-serial-a       read
+7e 01 08 12 02 a8             | mbooster-hw-sub         read
+7e 01 10 12 01 af             | mbooster-serial-b       read
+
+# --- plain virtual damping (0xAD): captured values 0x6666 press (40%,
+#     firmware decoded 4.80000) and 0x4000 release (25%, 2.50003)
+7e 05 24 12 ad 00 00 66 66 3f | mbooster-brake-damping-press   write 0x6666
+7e 05 24 12 ad 00 01 40 00 b4 | mbooster-brake-damping-release write 0x4000
+
+# --- registers Pit House reads that we now name
+7e 05 23 12 b4 00 00 00 00 79 | mbooster-calibration-state read
+7e 03 23 12 0d 00 00 d0       | mbooster-status-0d      read
+7e 03 23 12 21 00 00 e4       | mbooster-status-21      read
+7e 03 23 12 22 00 00 e5       | mbooster-status-22      read
+7e 03 23 12 23 00 00 e6       | mbooster-status-23      read
+7e 05 23 12 24 00 00 00 00 e9 | mbooster-status-24      read
+
+# --- the rest of Pit House's per-cycle config read set, which
+#     RequestCalibrationReads was missing
+7e 03 23 12 84 00 00 47       | mbooster-brake-travel-start read
+7e 03 23 12 85 00 00 48       | mbooster-brake-travel-end   read
+7e 05 23 12 ab 00 07 00 00 77 | mbooster-brake-deadzone      read
+7e 05 23 12 ad 00 00 00 00 72 | mbooster-brake-damping-press   read
+7e 05 23 12 ad 00 01 00 00 73 | mbooster-brake-damping-release read
+7e 05 23 12 ae 00 00 00 00 73 | mbooster-brake-friction-0    read
+7e 05 23 12 ae 00 01 00 00 74 | mbooster-brake-friction-1    read
+7e 05 23 12 b2 00 00 00 00 77 | mbooster-brake-endstop-front read
+7e 05 23 12 b2 00 01 00 00 78 | mbooster-brake-endstop-end   read
+7e 05 23 12 b3 00 00 00 00 78 | mbooster-brake-threshold     read
+7e 05 23 12 1a 00 00 00 00 df | mbooster-brake-angle-ratio   read
+7e 03 23 12 01 00 00 c4       | mbooster-throttle-dir        read
+
+# --- travel calibration (brake pair is the capture-confirmed one)
+7e 03 26 12 0d 00 00 d3       | mbooster-brake-cal-start write 0
+7e 03 26 12 11 00 00 d7       | mbooster-brake-cal-stop  write 0
+
+# --- motor rotor-locate calibration
+7e 03 2a 12 14 00 01 df       | mbooster-motor-cal-enter  write 1
+7e 03 2a 12 15 01 03 e3       | mbooster-motor-cal-locate write 0x103
+7e 03 2a 12 15 00 00 df       | mbooster-motor-cal-locate write 0
+
+# --- soft reboot
+7e 01 01 12 02 a1             | mbooster-soft-reboot write 0
+
+# --- the read-only y-node registers: Pit House reads all fifteen every cycle
+7e 05 23 12 0e 00 00 00 00 d3 | mbooster-throttle-y1 read
+7e 05 23 12 0f 00 00 00 00 d4 | mbooster-throttle-y2 read
+7e 05 23 12 10 00 00 00 00 d5 | mbooster-throttle-y3 read
+7e 05 23 12 11 00 00 00 00 d6 | mbooster-throttle-y4 read
+7e 05 23 12 1b 00 00 00 00 e0 | mbooster-throttle-y5 read
+7e 05 23 12 12 00 00 00 00 d7 | mbooster-brake-y1 read
+7e 05 23 12 13 00 00 00 00 d8 | mbooster-brake-y2 read
+7e 05 23 12 14 00 00 00 00 d9 | mbooster-brake-y3 read
+7e 05 23 12 15 00 00 00 00 da | mbooster-brake-y4 read
+7e 05 23 12 1c 00 00 00 00 e1 | mbooster-brake-y5 read
+7e 05 23 12 16 00 00 00 00 db | mbooster-clutch-y1 read
+7e 05 23 12 17 00 00 00 00 dc | mbooster-clutch-y2 read
+7e 05 23 12 18 00 00 00 00 dd | mbooster-clutch-y3 read
+7e 05 23 12 19 00 00 00 00 de | mbooster-clutch-y4 read
+7e 05 23 12 1d 00 00 00 00 e2 | mbooster-clutch-y5 read
+
+# --- remaining dir/min/max reads (throttle-dir above; the rest of 0x02-0x09)
+7e 03 23 12 02 00 00 c5       | mbooster-throttle-min read
+7e 03 23 12 03 00 00 c6       | mbooster-throttle-max read
+7e 03 23 12 04 00 00 c7       | mbooster-brake-dir    read
+7e 03 23 12 05 00 00 c8       | mbooster-brake-min    read
+7e 03 23 12 06 00 00 c9       | mbooster-brake-max    read
+7e 03 23 12 07 00 00 ca       | mbooster-clutch-dir   read
+7e 03 23 12 08 00 00 cb       | mbooster-clutch-min   read
+7e 03 23 12 09 00 00 cc       | mbooster-clutch-max   read

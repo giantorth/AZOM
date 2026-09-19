@@ -40,6 +40,7 @@ namespace MozaPlugin
             _tempHistoryTimer?.Stop();
             _torqueHistoryTimer?.Stop();
             _retryTimer?.Stop();
+            _ledKeepaliveTimer?.Stop();
             _reconnectTimer?.Stop();
 
             // Stop the AB9 engine-vib worker before the AB9 manager / connection
@@ -59,6 +60,8 @@ namespace MozaPlugin
             // list. The bridge is null when the toggle was off or construction
             // failed in Init.
             try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
+            // Static persistence hook captures this instance; drop it on teardown.
+            MozaControls.MozaPalette.SavedColorPersist = null;
 
             // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
             // effect immediately on shutdown. Without this the firmware keeps
@@ -80,6 +83,9 @@ namespace MozaPlugin
             // position-merge path (which writes to _data) doesn't race.
             try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
             try { DisposeRoutedMBoosterProbes(); } catch { }
+            // Pedal-haptics units — Dispose stops each motor loop, which sends
+            // the disable frames before the pipe goes away.
+            try { _pedalHapticsRegistry?.Dispose(); _pedalHapticsRegistry = null; } catch { }
             // Standalone pedals/handbrake connections — close before MozaData
             // teardown so the response path (which writes to _data) can't race.
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
@@ -113,6 +119,12 @@ namespace MozaPlugin
             // doesn't leave two ticking the same connection after re-Init.
             try { _fsr1Driver?.Dispose(); } catch { }
             _fsr1Driver = null;
+            try
+            {
+                if (_cm2Sender != null)
+                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
+            catch { }
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
             try { _cm1Driver?.Dispose(); } catch { }
@@ -258,6 +270,7 @@ namespace MozaPlugin
             _tempHistoryTimer?.Dispose();
             _torqueHistoryTimer?.Dispose();
             _retryTimer?.Dispose();
+            _ledKeepaliveTimer?.Dispose();
             _reconnectTimer?.Dispose();
 
             // 8. Null Instance last so any straggler callback can still no-op via IsShuttingDown.

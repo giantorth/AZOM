@@ -1,0 +1,196 @@
+#!/usr/bin/env python3
+"""Answer "does the device actually answer this poll?" from diagnostic bundles.
+
+The telemetry widget/parity poll cycle (TelemetrySender.SendOneWidgetPoll) is a
+rotating set of reads the plugin emits at idle purely so the wheel keeps seeing
+host activity — nothing consumes the answers, so nothing in the plugin notices
+when a slot has been emitting garbage for a year. That is exactly what happened
+to the grp-0x0E discovery probes: an operator-precedence slip sent all twelve to
+device 0x00, and it went unseen because no code path cares about the replies.
+
+So: measure. This walks the serial captures in every unpacked bug-report bundle
+(worker/bundles/<TICKET>/files/serial-capture-*.txt) and, for every distinct
+frame the PLUGIN transmits, reports how often the device answered within a short
+window. A poll with a ~0 % answer rate is either dead weight or malformed; a poll
+at 85-90 % is a live conversation and must not be trimmed.
+
+It is deliberately capture-driven rather than a hardcoded copy of the slot table:
+a table would drift out of sync with the source and quietly start auditing a
+cycle the plugin no longer emits.
+
+Sub-id length (how many leading payload bytes the reply echoes before the value)
+is not knowable from the wire alone, so each request is scored at every plausible
+length 1..4 and the best-matching one is reported. That is why a row shows `sub`
+separately from the full payload.
+
+Usage:
+    tools/poll-audit                      # every bundle
+    tools/poll-audit WDCZXZ83 C4KX4GKK    # named tickets only
+    tools/poll-audit --min-sent 20        # hide one-off frames
+    tools/poll-audit --dir /path/to/bundles
+"""
+import argparse
+import os
+import re
+import sys
+from collections import defaultdict
+
+DEFAULT_BUNDLES = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "worker", "bundles")
+
+# Replies to a read normally land in single-digit ms; 400 ms is generous enough
+# to survive a busy write queue without pairing unrelated traffic.
+WINDOW_MS = 400.0
+MAX_SUBID = 4
+
+LINE = re.compile(r"^(\d{4}-\d\d-\d\d) (\d\d):(\d\d):(\d\d\.\d+) +([TR]) +(\S+) +(.*)$")
+
+
+def swap(dev):
+    """Device id as it appears in a reply — the nibbles are exchanged."""
+    return ((dev & 0x0F) << 4) | ((dev >> 4) & 0x0F)
+
+
+def parse(path):
+    for line in open(path, errors="replace"):
+        m = LINE.match(line.rstrip("\n"))
+        if not m:
+            continue
+        day, hh, mm, ss, direction, src, body = m.groups()
+        try:
+            raw = bytes(int(x, 16) for x in body.split())
+        except ValueError:
+            continue
+        # Captures never span midnight in practice; day-of-year keeps the
+        # startup and rolling files from colliding when both are loaded.
+        t = (int(day[-2:]) * 86400 + int(hh) * 3600 + int(mm) * 60 + float(ss)) * 1000.0
+        yield t, direction, src, raw
+
+
+def collect(paths):
+    """(grp, dev, payload) -> [times] for TX, (grp, dev, prefix) -> [times] for RX."""
+    tx = defaultdict(list)
+    rx = defaultdict(list)
+    for path in paths:
+        for t, direction, _src, raw in parse(path):
+            if direction == "T":
+                # Framed request: 7e LEN GRP DEV payload... CHECKSUM
+                if len(raw) >= 6 and raw[0] == 0x7E:
+                    tx[(raw[2], raw[3], raw[4:-1])].append(t)
+            else:
+                # Reply: GRP DEV payload... (no framing, no checksum)
+                if len(raw) >= 3:
+                    for n in range(1, MAX_SUBID + 1):
+                        if len(raw) - 2 >= n:
+                            rx[(raw[0], raw[1], raw[2:2 + n])].append(t)
+    for v in tx.values():
+        v.sort()
+    for v in rx.values():
+        v.sort()
+    return tx, rx
+
+
+def match(sent, answers):
+    """Greedy in-order pairing: each reply answers at most one request."""
+    n, j = 0, 0
+    for t in sent:
+        while j < len(answers) and answers[j] < t:
+            j += 1
+        if j < len(answers) and answers[j] - t <= WINDOW_MS:
+            n += 1
+            j += 1
+    return n
+
+
+def score(tx, rx):
+    """For each distinct request, the sub-id length that explains it best."""
+    out = {}
+    for (grp, dev, payload), sent in tx.items():
+        best = (0, 1)
+        for n in range(1, min(MAX_SUBID, len(payload)) + 1):
+            answers = rx.get((grp | 0x80, swap(dev), payload[:n]), [])
+            if not answers:
+                continue
+            m = match(sent, answers)
+            if m > best[0]:
+                best = (m, n)
+        out[(grp, dev, payload)] = (len(sent), best[0], best[1])
+    return out
+
+
+def hexs(bs):
+    return " ".join(f"{b:02x}" for b in bs)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("tickets", nargs="*", help="bundle ticket ids (default: all)")
+    ap.add_argument("--dir", default=DEFAULT_BUNDLES, help="bundle root")
+    ap.add_argument("--min-sent", type=int, default=5,
+                    help="hide frames sent fewer than this many times (default 5)")
+    ap.add_argument("--group", type=lambda s: int(s, 0), default=None,
+                    help="restrict to one wire group, e.g. 0x40")
+    args = ap.parse_args()
+
+    if not os.path.isdir(args.dir):
+        sys.exit(f"no bundle directory: {args.dir}")
+    tickets = args.tickets or sorted(os.listdir(args.dir))
+
+    total = defaultdict(lambda: [0, 0, 1])
+    per_model = defaultdict(lambda: defaultdict(lambda: [0, 0]))
+    used = []
+    for ticket in tickets:
+        fdir = os.path.join(args.dir, ticket, "files")
+        if not os.path.isdir(fdir):
+            continue
+        paths = [os.path.join(fdir, f) for f in sorted(os.listdir(fdir))
+                 if f.startswith("serial-capture")]
+        if not paths:
+            continue
+        model = "?"
+        report = os.path.join(fdir, "report.txt")
+        if os.path.exists(report):
+            for line in open(report, errors="replace"):
+                if line.startswith("Wheel model:"):
+                    model = line.split(":", 1)[1].strip() or "?"
+        used.append((ticket, model))
+        tx, rx = collect(paths)
+        for key, (sent, matched, sub) in score(tx, rx).items():
+            total[key][0] += sent
+            total[key][1] += matched
+            total[key][2] = max(total[key][2], sub)
+            pm = per_model[key][model]
+            pm[0] += sent
+            pm[1] += matched
+
+    if not used:
+        sys.exit("no bundles with serial captures found")
+
+    models = sorted({m for _t, m in used})
+    print(f"bundles: {len(used)}   models: {', '.join(models)}")
+    print(f"window: {WINDOW_MS:.0f} ms   min-sent: {args.min_sent}\n")
+
+    rows = [(k, v) for k, v in total.items()
+            if v[0] >= args.min_sent and (args.group is None or k[0] == args.group)]
+    rows.sort(key=lambda kv: (kv[0][0], kv[0][1], kv[0][2]))
+
+    print(f"{'grp':>3} {'dev':>3}  {'sub-id':<12} {'payload':<26} "
+          f"{'sent':>7} {'ans':>7} {'rate':>7}   per-model")
+    for (grp, dev, payload), (sent, matched, sub) in rows:
+        rate = f"{100.0 * matched / sent:5.1f}%" if sent else "    —"
+        detail = "  ".join(
+            f"{m}:{pm[1]}/{pm[0]}" for m, pm in sorted(per_model[(grp, dev, payload)].items()))
+        print(f"{grp:>3x} {dev:>3x}  {hexs(payload[:sub]):<12} {hexs(payload):<26} "
+              f"{sent:>7} {matched:>7} {rate:>7}   {detail}")
+
+    dead = [r for r in rows if r[1][1] == 0]
+    if dead:
+        print("\nnever answered (trim candidates — confirm against a PitHouse capture "
+              "before removing a WRITE):")
+        for (grp, dev, payload), (sent, _m, _s) in dead:
+            print(f"  grp 0x{grp:02x} dev 0x{dev:02x}  {hexs(payload)}   x{sent}")
+
+
+if __name__ == "__main__":
+    main()

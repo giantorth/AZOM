@@ -104,20 +104,44 @@ the currently-attached wheel.
   `"R5 Black # MOT-1"`) as the variant.
 - The variant computation lives in one canonical method, `MozaVariantProvider.ComputeCurrentVariant()`,
   shared by `GetVariant`, `Poll`, and `ControlMapperBridge`'s auto-create / detach paths.
-- Exposes a `public event EventHandler VariantChanged` matching the Fanatec/Simucube convention;
-  fired from `Poll()` when the resolved variant string transitions.
+- Exposes `IVariantProvider.VariantChanged`, fired from `Poll()` when the resolved variant string
+  transitions. SimHub never subscribes to it (see below); the bridge does.
+
+### SimHub internals the bridge depends on (decompiled 9.11.17, 9.12.4, 9.12.7 — identical)
+
+- `VariantHelper.GetVariant` returns null unless `Settings.RecognizeIndiviualWheels && VariantProviders != null`.
+  SimHub's UI label for that setting is **"Recognize supported wheels as individual controllers"**.
+- `RemapperWorker.ProcessControllers` calls `UpdateVariantProviders()` every ~3 ms: toggle on →
+  `Start()` (early-returns once the list exists), toggle off or `OutputMode == Disabled` → `Stop()`
+  (unsubscribes, disposes the providers, **sets the list to null**). Both lock `typeof(VariantHelper)`.
+- `Start()` subscribes `VariantChanged` only for the providers it creates (Simucube, Fanatec,
+  Simagic). A provider appended later is never subscribed, so its event triggers nothing.
+- `UpdateControllerList` matches saved mappings on InterfacePath / ControllerID / VID+PID **and
+  Variant** (case-insensitive). Unmatched devices go to `UnmappedControllers`.
+  `ControllerState.Available` is keyed on ControllerID alone — `Available=True` does not mean acquired.
+- `SharpHelper.AquireController` retries an unacquired mapping every 5 s (`Debouncer(5000)`) and
+  `SetAsUnplugged`s it when `Description.Variant != GetVariant(vid, pid)` (ordinal). Only
+  `ControllerStatus.Acquired` shows as connected. So a mapping stamped with a wheel name can never
+  acquire while the toggle is off, and a null-Variant mapping works only while it is off.
 
 ### ControlMapperBridge
 
 - Walks the reflection chain (`ControlMapperPlugin → remapperWorker → variantHelper →
   VariantProviders`) defensively — every step that fails calls `LogGiveUp("…")` once and disables
   the bridge for the session rather than throwing.
-- Lazy-materializes the provider list via `VariantHelper.Start()` when the user hasn't yet enabled
-  Control Mapper's "Recognize Individual Wheels" toggle (without which `VariantHelper.GetVariant`
-  returns null for every query, killing every mapping).
-- After registering, calls `RemapperWorker.UpdateControllerList()` once so any wheel already
-  plugged in at SimHub launch gets re-keyed with the MOZA variant on the first pass instead of
-  waiting for the wheel-attach `VariantChanged` to fire it later.
+- Inserts the provider under `lock (variantHelper.GetType())` — the same object SimHub locks —
+  and never calls `Start()` itself: while the toggle is off the list is null, and the next SimHub
+  tick would `Stop()` a list we materialised. Registration still succeeds; `Poll()` re-reads the
+  list once a second and re-inserts the provider when SimHub has rebuilt it (toggle off→on, output
+  disabled→enabled), then requests a re-enumeration.
+- Subscribes to its own provider's `VariantChanged` and calls the public
+  `ControlMapperPluginSettings.UpdateControllerList()` (async, SimHub's own path) on registration,
+  on every variant change and after a re-insert — the re-enumeration SimHub's bundled providers get
+  from `VariantHelper` and ours would otherwise never get. Without it a variant-less wheelbase entry
+  lingers in the "Add Source Controller" dropdown after the wheel model resolves.
+- Reads `RecognizeIndiviualWheels` and logs the state at registration (Warn once when the list is
+  absent), in the `CM diag` dumps and in the Diagnostics tab's `=== Control Mapper ===` section,
+  which also shows each MOZA mapping's `ControllerStatus`.
 
 ### Workarounds (keyed off the `ControllerMappings.CollectionChanged` subscription)
 
@@ -126,7 +150,9 @@ the currently-attached wheel.
    updater mutates the shared description on every `UpdateControllerList` tick, so saved mappings
    inherit Variant rewrites whenever the wheel changes. The fix clones the new mapping's
    `ControllerDescription` (`Activator.CreateInstance` + `CopyFrom`) and stamps `Variant` with the
-   currently-detected wheel before SimHub's next tick sees it.
+   currently-detected wheel before SimHub's next tick sees it — **only while the toggle is on**. With
+   it off SimHub computes null for every device, so a stamped mapping could never acquire; the clone
+   then keeps the enumerated (null) Variant.
 2. **Deduplicate double-adds** (`DeduplicateMozaMapping`) — the MOZA base can enumerate under two
    DirectInput interface paths (one with a USB serial, one synthesized — observed under Wine), so
    it appears twice in "Add Source Controller" and the user can map the same physical wheelbase for
@@ -157,12 +183,15 @@ string and `AquireController`'s per-variant gate dispatches input to the matchin
 
 ### Wiring
 
-- `MozaPlugin` holds a `ControlMapper.ControlMapperBridge?` field, constructed in `Init` only when
+- `MozaPlugin` holds an `Integration.ControlMapperBridge?` field, constructed in `Init` only when
   `MozaPluginSettings.EnableControlMapperVariants` is true (hidden setting, default true, flippable
   via JSON file edit if a future SimHub assembly change breaks the reflection chain).
 - Registration tries immediately and retries up to ~50 ticks (~0.8 s at 60 Hz) in `DataUpdate`
-  for slow `ControlMapperPlugin` load order; `Poll()` runs every `DataUpdate` tick; `Unregister()`
-  removes the provider in `End` so plugin reload without SimHub restart doesn't leave a dead entry
-  in `VariantHelper.VariantProviders`.
+  for slow `ControlMapperPlugin` load order; `Poll()` runs every `DataUpdate` tick (provider-list
+  re-check throttled to 1 s); `Unregister()` removes the provider from the **live** list in `End` so
+  plugin reload without SimHub restart doesn't leave a dead entry in `VariantHelper.VariantProviders`.
 - Logging keeps Info-level reserved for significant lifecycle/action events; verbose per-tick
   diagnostics go to Debug.
+- Diagnostics: `ControlMapperBridge.BuildDiagnostics()` feeds `=== Control Mapper ===` in the
+  Diagnostics tab and the bug-report bundle (bridge state, toggle, live variant, per-mapping
+  Status); bundles also record the host SimHub version.

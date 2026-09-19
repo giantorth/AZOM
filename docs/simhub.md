@@ -1148,7 +1148,7 @@ public interface IVariantProvider
 }
 ```
 
-By convention (matching `FanatecVariantProvider` / `SimucubeVariantProvider`), providers also expose a public `EventHandler` event named exactly **`VariantChanged`**. `VariantHelper` reflects on this event by name when it subscribes — fire the event when your detected variant changes and the helper triggers controller re-enumeration.
+The interface also declares `event EventHandler VariantChanged`. `VariantHelper.Start()` subscribes to it — but **only for the three providers it creates itself** (Simucube, Fanatec, Simagic); a provider appended to the list afterwards is never subscribed, so its `VariantChanged` reaches nobody. A late-registered provider has to request the re-enumeration itself through the public `ControlMapperPluginSettings.UpdateControllerList()`.
 
 ### The variant pipeline
 
@@ -1170,20 +1170,20 @@ if (VariantProviders == null) return null;
 return VariantProviders.Select(p => p.GetVariant(vid, pid)).FirstOrDefault(v => v != null);
 ```
 
-**Lazy-initialization gotcha**: `VariantProviders` is null until `VariantHelper.Start()` runs. `Start()` is called from `RemapperWorker.UpdateVariantProviders()`, which gates on the user toggle:
+**Lazy-initialization gotcha**: `VariantProviders` is null until `VariantHelper.Start()` runs. `RemapperWorker.UpdateVariantProviders()` is called from the constructor **and on every `ProcessControllers` tick (~3 ms)**, gated on the user toggle:
 
 ```csharp
 RemapperWorker.UpdateVariantProviders() {
     if (settings.RecognizeIndiviualWheels)
-        variantHelper.Start();   // creates the list, adds Simucube + Fanatec, subscribes to providers' VariantChanged
+        variantHelper.Start();   // no-op once the list exists; otherwise creates it, adds Simucube + Fanatec + Simagic, subscribes to THEIR VariantChanged
     else
-        variantHelper.Stop();    // unsubscribes
+        variantHelper.Stop();    // unsubscribes, disposes the providers and sets VariantProviders = null
 }
 ```
 
-If the user has `RecognizeIndiviualWheels` off, the variant pipeline is dead — every `GetVariant` call returns null and `AquireController`'s variant check (below) fails on every saved mapping. **This is a hard prerequisite** to document for users. (The MOZA bridge's `TryRegister` deliberately calls `VariantHelper.Start()` to force-create the provider list and insert `MozaVariantProvider` even when the toggle is off, so enabling "Recognize individual wheels" takes effect immediately — the provider is already present and waiting; the toggle remains the master gate for `GetVariant` returning non-null.)
+Both methods lock on `typeof(VariantHelper)`. `OutputMode == Disabled` also calls `Stop()` every tick. So with the toggle off (or output disabled) the list — and anything a plugin appended to it — is gone, and when the toggle comes back `Start()` builds a fresh list without the plugin's provider. Every `GetVariant` call returns null while the toggle is off, so `AquireController`'s variant check (below) fails on every saved mapping that carries a Variant, while a mapping whose Variant is null keeps working. The MOZA bridge therefore never stamps a Variant while the toggle is off, re-inserts its provider (under the same lock) when it sees a list it isn't in, and reports the state in the diagnostics dump. SimHub's UI label for the toggle is "Recognize supported wheels as individual controllers".
 
-`RemapperWorker.UpdateControllerList` is wired into `variantHelper.VariantChanged` in `RemapperWorker.ctor`. So provider-side `VariantChanged` → `VariantHelper.VariantChanged` → `UpdateControllerList()` → controller re-enumeration.
+`RemapperWorker.UpdateControllerList` is wired into `variantHelper.VariantChanged` in `RemapperWorker.ctor`, and `VariantHelper` forwards its bundled providers' events there. A provider appended later is not subscribed; the bridge calls `ControlMapperPluginSettings.UpdateControllerList()` (public, `Task.Run` → `RemapperWorker.UpdateControllerList`) from its own `VariantChanged` handler instead.
 
 ### Registering a custom provider
 
@@ -1204,26 +1204,19 @@ object vh = rw.GetType().GetField("variantHelper", BindingFlags.NonPublic | Bind
 FieldInfo providersField = vh.GetType().GetField(
     "VariantProviders", BindingFlags.NonPublic | BindingFlags.Instance);
 
-// Lazy-materialize the list if the user hasn't flipped RecognizeIndiviualWheels yet
-if (providersField.GetValue(vh) == null) {
-    vh.GetType().GetMethod("Start", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(vh, null);
+// The list is null while the toggle is off (Stop() nulls it) — don't call Start()
+// yourself: the next ProcessControllers tick would Stop() it again and discard your
+// provider. Insert under SimHub's own lock and re-check about once a second from Poll().
+lock (vh.GetType()) {
+    if (providersField.GetValue(vh) is IList providers && !providers.Contains(myProvider))
+        providers.Add(myProvider);
 }
 
-((IList)providersField.GetValue(vh)).Add(myProvider);
-
-// Refresh subscriptions — Start() unconditionally re-subscribes to every provider
-// (yes, this double-subscribes the original Fanatec + Simucube providers; benign noise,
-// not a correctness bug, since SimHub doesn't track subscription counts itself).
-rw.GetType().GetMethod(
-    "UpdateVariantProviders",
-    BindingFlags.NonPublic | BindingFlags.Instance).Invoke(rw, null);
-
-// Force an immediate re-enumeration so the new provider's variant lands on the first
-// pass (controllers attached before our bridge registered are otherwise stamped with
-// variant=null until the next VariantChanged fires).
-rw.GetType().GetMethod(
-    "UpdateControllerList",
-    BindingFlags.NonPublic | BindingFlags.Instance).Invoke(rw, null);
+// Start() early-returns once the list exists, so it will NOT subscribe to your
+// VariantChanged. Ask for the re-enumeration yourself — on registration and on every
+// variant change — through the public async entry point (Task.Run inside SimHub):
+object settings = cmType.GetField("controlMapperPluginSettings").GetValue(cmInstance);
+settings.GetType().GetMethod("UpdateControllerList", Type.EmptyTypes).Invoke(settings, null);
 ```
 
 ### How variant flows through controller enumeration
@@ -1264,44 +1257,40 @@ So **`Available` is "is the DirectInput device currently plugged in"**, NOT "doe
 The real per-variant gate. Called from `ProcessControllers` before any input is polled:
 
 ```csharp
-bool AquireController(DirectInput directInput, ControllerSourceMapping mapping, VariantHelper helper, …) {
-    if (mapping.ControllerState.Device != null) {
-        if (!mapping.IsEnabled)        { cleanup; return false; }
-        if (!mapping.ControllerState.Available) { cleanup; return false; }
-        if (mapping.ControllerState.AcquireDebouncer.Debounce()) return false;
-
-        // First variant check (when device already acquired):
-        if (SharpHelper.GetCurrentVariant(mapping, helper) != mapping.Description.Variant) {
-            SharpHelper.SetAsUnplugged(mapping);       // sets ControllerStatus = Disconnected
-            return false;
-        }
+bool AquireController(DirectInput directInput, ControllerSourceMapping mapping, VariantHelper helper, Action onConnect, …) {
+    if (mapping.ControllerState.Device == null) {
+        if (mapping.Description.IsVJoySimHubDriven) { SetAsUnplugged(mapping); return false; }
+        if (mapping.IsEnabled && mapping.ControllerState.Available) {
+            // Debouncer(5000): true once every 5 s → an unacquired mapping is retried every 5 s
+            if (mapping.ControllerState.AcquireDebouncer.Debounce()) {
+                try {
+                    // Ordinal, case-sensitive; null != "KS Pro"
+                    if (mapping.Description.Variant != helper.GetVariant(vid, pid)) { SetAsUnplugged(mapping); return false; }
+                    mapping.ControllerState.Device = CreateJoystick(directInput, mapping.Description.ControllerID); // NonExclusive | Background
+                    mapping.ControllerState.ControllerStatus = ControllerStatus.Acquired;
+                    onConnect?.Invoke();
+                } catch (Exception ex) {
+                    mapping.ControllerState.ControllerStatus = ControllerStatus.Error;
+                    Logging.Current.Error("Error while acquiring device " + ex);
+                }
+            }
+        } else SetAsUnplugged(mapping);
     } else {
-        try {
-            mapping.ControllerState.Device = SharpHelper.CreateJoystick(directInput, mapping.Description.ControllerID);
-            // …onConnected.Invoke()…
-        } catch { SharpHelper.SetAsUnplugged(mapping); return false; }
-
-        // Second variant check (after acquire), ToLower-normalized:
-        if (SharpHelper.GetCurrentVariant(mapping, helper)?.ToLower() != mapping.Description.Variant?.ToLower()) {
-            mapping.ControllerState.Device.Dispose();
-            mapping.ControllerState.Device = null;
-            SharpHelper.SetAsUnplugged(mapping);
-            return false;
+        // Already acquired: drop it when disabled, or when the live variant no longer matches (ToLower compare)
+        if (!mapping.IsEnabled) { dispose; Device = null; }
+        else if (mapping.Description.Variant?.ToLower() != helper.GetVariant(vid, pid)?.ToLower()) {
+            dispose; Device = null; SetAsUnplugged(mapping); return false;
         }
     }
     return mapping.ControllerState.Device != null;
 }
 
-// SharpHelper.GetCurrentVariant — calls our provider via the helper:
-string GetCurrentVariant(ControllerSourceMapping mapping, VariantHelper helper) {
-    return helper.GetVariant(mapping.Description.VendorID, mapping.Description.ProductId);
-}
-
-// SharpHelper.SetAsUnplugged — minimal:
 void SetAsUnplugged(ControllerSourceMapping mapping) {
-    mapping.ControllerState.ControllerStatus = ControllerStatus.Disconnected;
+    mapping.ControllerState.ControllerStatus = ControllerStatus.Unplugged;   // enum: None, Unplugged, Acquired, Disabled, Error
 }
 ```
+
+`ControllerState.IsConnected` is `ControllerStatus == Acquired`; that — not `Available` — is what the UI renders as connected. `UpdateControllerList` calls `AcquireDebouncer.ResetDebounce()` on every Available mapping, so a re-enumeration also forces an immediate acquire attempt.
 
 `ProcessControllers` short-circuits the input loop body on `AquireController` returning false, so **per-variant input dispatch works correctly** even when `Available` is variant-agnostic.
 

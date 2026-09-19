@@ -534,8 +534,7 @@ namespace MozaPlugin.UI
                     {
                         UpdateChannelCombo.Items.Add(new ComboBoxItem
                         {
-                            Content = string.Format(
-                                Strings.Option_ReleaseChannelPr, ch.Number, ch.Title),
+                            Content = ch.Title,
                             Tag = ch.ChannelId,
                         });
                         if (ch.ChannelId == selectedId) selectedPresent = true;

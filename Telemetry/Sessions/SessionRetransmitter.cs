@@ -69,7 +69,76 @@ namespace MozaPlugin.Telemetry.Sessions
         private int _lastEvictWarnTickCount;
         private const int EvictWarnIntervalMs = 60000;
 
+        // Session whose chunks must never be dropped on retry exhaustion, and
+        // whose retransmits are confined to the peer's ack frontier. 0 = none.
+        // Single-valued rather than a set: only one upload runs at a time
+        // (WheelUploadCoordinator.RunBackgroundUpload takes an exclusive claim),
+        // and nothing else needs the guarantee yet.
+        private byte _heldSession;
+
+        // Chunks removed because the peer ACKED them — never because we gave up
+        // on them. Monotonic. The upload's flow control needs "is the peer's
+        // window moving", and QueueSize cannot answer that: it falls both when
+        // the peer acks and when DueRetransmits evicts a chunk at maxRetries.
+        // Conflating the two is what let bundle 8MKDKT7R run for six minutes
+        // without its 90 s stall abort ever firing — every eviction re-armed
+        // the deadline — while the host emitted 1082 chunks past a wheel ack
+        // that had been frozen at seq 1391 the whole time.
+        private long _ackedChunks;
+
+        // Frames re-offered on the held session. A held chunk is only re-sent
+        // because the peer never acked it, so this rising IS the loss signal a
+        // transfer's congestion window needs — distinct from the ack counter,
+        // which says the peer is making progress but not at what cost.
+        private long _heldRetransmits;
+
         public int QueueSize { get { lock (_lock) return _queue.Count; } }
+
+        /// <summary>
+        /// Count of chunks the peer has acknowledged since this retransmitter
+        /// was created. Monotonic, and never advanced by eviction or
+        /// <see cref="DropSession"/> — so a caller watching it for liveness sees
+        /// only genuine peer progress. See <see cref="_ackedChunks"/>.
+        /// </summary>
+        public long AckedChunkCount { get { lock (_lock) return _ackedChunks; } }
+
+        /// <summary>
+        /// Monotonic count of retransmissions issued on the held session — the
+        /// loss signal for <c>WheelUploadCoordinator</c>'s congestion window.
+        /// Zero while a transfer is landing cleanly.
+        /// </summary>
+        public long HeldRetransmitCount { get { lock (_lock) return _heldRetransmits; } }
+
+        /// <summary>
+        /// Mark <paramref name="session"/> as a reliable stream for the duration
+        /// of a transfer: its unacked chunks are never dropped on retry
+        /// exhaustion, and its retransmits are confined to
+        /// <see cref="HeldRetransmitWindow"/> seqs above the peer's ack
+        /// frontier. Call <see cref="ReleaseHold"/> when the transfer ends.
+        /// </summary>
+        public void HoldSession(byte session)
+        {
+            lock (_lock) _heldSession = session;
+        }
+
+        /// <summary>Undo <see cref="HoldSession"/>. No-op if a different
+        /// session is held (a later transfer already took the hold).</summary>
+        public void ReleaseHold(byte session)
+        {
+            lock (_lock) { if (_heldSession == session) _heldSession = 0; }
+        }
+
+        /// <summary>
+        /// How many seqs above a held session's lowest unacked chunk stay
+        /// eligible for retransmit. The peer's fc:00 ack is CUMULATIVE: it
+        /// discards everything past its first gap until that gap is filled, so
+        /// re-sending the whole unacked span is both useless and actively
+        /// harmful — in bundle 8MKDKT7R it put 1255 distinct frames on the wire
+        /// 20.9 times each (24.7x amplification, 6.3 kB/s, 64 % of a half-duplex
+        /// link) while starving the one chunk that would have unblocked the
+        /// transfer. Small window, so the missing chunk gets the bandwidth.
+        /// </summary>
+        private const int HeldRetransmitWindow = 8;
 
         /// <summary>
         /// Inspect <paramref name="frame"/>; if it's a session-data chunk on
@@ -126,6 +195,11 @@ namespace MozaPlugin.Telemetry.Sessions
                     bool haveVictim = false;
                     foreach (var kv in _queue)
                     {
+                        // Never evict a held session's chunk — see HoldSession.
+                        // The frontier window plus the transfer's own stall
+                        // abort keep a held queue far below MaxQueueSize, so
+                        // skipping these cannot leave the cap unenforceable.
+                        if (_heldSession != 0 && kv.Key.session == _heldSession) continue;
                         if (!haveVictim || kv.Value.LastSentTicks < victimTicks)
                         {
                             victimTicks = kv.Value.LastSentTicks;
@@ -166,7 +240,13 @@ namespace MozaPlugin.Telemetry.Sessions
         /// <paramref name="ackSeq"/>. Mirrors how PitHouse stops retransmitting
         /// on ack.
         /// </summary>
-        public void Ack(byte session, int ackSeq)
+        public void Ack(byte session, int ackSeq) => AckCore(session, ackSeq, countAsAcked: true);
+
+        // countAsAcked distinguishes a genuine peer ack from a caller throwing
+        // the session away (DropSession routes here with int.MaxValue). Only
+        // the former may advance AckedChunkCount, or a teardown would look like
+        // progress to anything watching it for liveness.
+        private void AckCore(byte session, int ackSeq, bool countAsAcked)
         {
             if (_count == 0) return;   // idle fast path — read-thread caller
             lock (_lock)
@@ -181,6 +261,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 {
                     foreach (var k in doomed) _queue.Remove(k);
                     _count = _queue.Count;
+                    if (countAsAcked) _ackedChunks += doomed.Count;
                 }
             }
         }
@@ -226,16 +307,43 @@ namespace MozaPlugin.Telemetry.Sessions
             List<byte[]>? output = null;
             lock (_lock)
             {
+                // Held session: anchor its retransmit window on the lowest
+                // unacked seq — the chunk the peer is actually waiting for.
+                byte held = _heldSession;
+                int heldFloor = int.MaxValue;
+                if (held != 0)
+                {
+                    foreach (var kv in _queue)
+                        if (kv.Key.session == held && kv.Key.seq < heldFloor)
+                            heldFloor = kv.Key.seq;
+                }
+
                 List<(byte, int)>? doomed = null;
                 foreach (var kv in _queue)
                 {
+                    bool isHeld = held != 0 && kv.Key.session == held;
+                    // Past the frontier window on a held session — the peer will
+                    // discard it until the gap below is filled, so spending wire
+                    // on it only delays the fill.
+                    if (isHeld && kv.Key.seq >= heldFloor + HeldRetransmitWindow) continue;
                     if (now - kv.Value.LastSentTicks < kv.Value.NextDelayMs) continue;
                     if (kv.Value.SendCount >= maxRetries)
                     {
-                        (doomed ??= new List<(byte, int)>()).Add(kv.Key);
-                        continue;
+                        // A held session's chunks are never dropped: on a
+                        // reliable stream an evicted chunk is not recovery, it
+                        // is a guaranteed deadlock — the peer's cumulative ack
+                        // can never advance past the hole. Keep offering it at
+                        // the capped backoff and let the transfer's own stall
+                        // timeout (which watches AckedChunkCount) decide to give
+                        // up and report a failure.
+                        if (!isHeld)
+                        {
+                            (doomed ??= new List<(byte, int)>()).Add(kv.Key);
+                            continue;
+                        }
                     }
                     (output ??= new List<byte[]>()).Add(kv.Value.Frame);
+                    if (isHeld) _heldRetransmits++;
                     kv.Value.LastSentTicks = now;
                     kv.Value.SendCount++;
                     int next = kv.Value.NextDelayMs * 2;
@@ -253,7 +361,8 @@ namespace MozaPlugin.Telemetry.Sessions
         /// <summary>Drop every queued chunk for <paramref name="session"/> —
         /// a fresh device-init starts a new seq generation, and stale prior-
         /// generation chunks would retransmit unackable seqs into it.</summary>
-        public void DropSession(byte session) => Ack(session, int.MaxValue);
+        public void DropSession(byte session)
+            => AckCore(session, int.MaxValue, countAsAcked: false);
 
         public void Clear()
         {

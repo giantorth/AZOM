@@ -188,6 +188,226 @@ per-chunk CRC32-LE matched as well).
 
 **Sim impact.** The pre-2026-04-24 sim emitted a 4-byte `ff ff ff ff` trailer — 3 bytes longer than the real wheel — and set `size_LE = body_len` assuming an 8-byte header. Both errors compounded: PitHouse parsed size field, walked N bytes into the body, and its internal state machine's `next_message_offset` pointer landed 3 bytes past the real message end, at which point the sentinel scan / status XOR check failed and PitHouse sat on "resources syncing" waiting for a message it would never recognise. `build_file_transfer_response` in `sim/wheel_sim.py` now emits a 1-byte XOR status byte and sets `size = body_len + 2`.
 
+### Host emit rate: leave the wheel room to answer
+
+The link is half-duplex 115200 (11520 B/s). `WriteBudget.TargetBytesPerWindow`
+calls 11000 B/s "100 %". Session-data frames on the upload path measure
+**67 wire bytes**, so the emit loop's per-frame delay sets the outbound rate
+directly:
+
+| `InterFrameDelayMs` | outbound | % of 11000 B/s budget | + ~750 B/s inbound = % of wire |
+|---|---|---|---|
+| 6 | 11167 B/s | 101.5 % | 103 % |
+| 8 | 8375 B/s | 76 % | 79 % |
+
+6 ms oversubscribes the wire, and its in-code justification ("~64 wire bytes per
+chunk → 10.7 kB/s, ~85 % of budget") was arithmetic that never held. Measured
+over the 30 s upload window in bug bundle **8RDM91JG**: `43 17 7c 00` traffic
+alone ran 10720 B/s (96.5 % of all outbound), total outbound 11111 B/s = 101 %
+of budget, combined with inbound 11861 B/s = **103 % of the wire**.
+
+A saturated half-duplex link crowds out the wheel's own b2h chunks, and the
+losses show up as reassembler forward gaps and wheel window re-bursts. Both
+observed stalls sat pinned at 97-105 % budget for the whole transfer:
+8RDM91JG hung at 20 % (`bw=49104/244879`), **C4KX4GKK** — a different rig,
+native Windows, KS Pro, no LED traffic at all — timed out at 95.7 %
+(`last bw=233244 total=243630`) after 681 write-budget warnings.
+
+Useful throughput at 6 ms was ~2 kB/s of acked payload against 10.7 kB/s
+pushed: a 5:1 waste ratio that is retransmit churn. Pacing slower moves more.
+
+### A backwards seq on the upload session is a re-burst, not a new burst
+
+On a forward gap the wheel **re-bursts its whole unacked window**, not just the
+missing chunk. So during an upload a b2h seq *below* the reassembler's
+high-water mark is routine. `SessionDataReassembler.Insert` classifies any
+`seq < _lastSeq` as a new burst: it clears the buffer and resets the seq.
+
+For the zlib dir-listing that buffer was designed for, that is correct. For the
+6-byte ack sub-msg stream it is **fatal**, because the clear lands
+mid-sub-msg:
+
+* the buffer then begins partway into a sub-msg body;
+* `WalkAckSubMsgs`' three-pad-byte (`00 00 00`) check fails at offset 0;
+* the walk offset was reset to 0 as well, so it fails identically on every
+  later chunk — the ack stream is **permanently desynchronised**.
+
+Ground truth, 8RDM91JG:
+
+```
+07:48:04.397  Upload ack type=0x01 bw=49104 total=244879   ← last ack ever parsed
+07:48:04.825  Reassembler seq restart (sess=0x04 upload): got seq=81,
+              last was 82; clearing 3874B buffer (assuming new burst)
+07:49:09.949  Reassembler forward gap: got seq=184, expected 182
+```
+
+The wheel never stopped talking. Counting `7c 00 04 01` inbound chunks in the
+capture: 74 before the restart (23 s), then **103 (67 s) + 189 (127 s) = 292
+further reply chunks, ~17.8 KB — from which not one ack sub-msg was parsed**.
+`_ackProgress` never set again, so the completion wait simply spun to timeout.
+Because a mis-aligned offset can also land on a zero run inside a body, the
+walker may instead parse *garbage* zero-size sub-msgs rather than stall — worse,
+not better.
+
+Fix: before feeding a chunk to either ack reassembler during an in-flight
+upload, drop it when `seq <= HighWaterSeq` (`WheelUploadCoordinator.IsUploadRetransmit`).
+The bytes are already buffered, so the walker keeps its alignment and the caller
+still acks — `GetInboundAckSeq` re-affirms the high-water mark, which is what
+tells the wheel to move past its re-burst. Bound the check to a window
+(1024 chunks, vs the wheel's ~765-chunk receive window) so a genuine wheel-side
+session restart or a u16 seq wrap still reaches the restart path instead of
+being dropped forever. Only while `IsUploadInFlight`: outside an upload this
+same buffer carries dir-listing blobs whose bursts legitimately restart low.
+
+A forward gap is unaffected and still recovers through `GapDetected` +
+cumulative ack — which is exactly why C4KX4GKK, whose stream only ever hit
+forward gaps, reached 95.7 % while 8RDM91JG died at 20 %.
+
+### One upload attempt at a time
+
+Every per-attempt field on `WheelUploadCoordinator` is single-instance:
+`_acquireTarget`, `_acquireOpenSeq`, `_outboundSeq`, the four wait events, and
+`_isUploadInFlight`. Nothing serialised `RunBackgroundUpload`, and two callers
+queue it straight onto the thread pool — `TriggerManualUpload` (a second click
+on the Files tab) and `QueueBackgroundUploadIfReady` (a reconnect landing
+mid-transfer). Overlapping runs therefore clobber each other's session
+acquisition, share one outbound seq counter, and each one's `finally` clears
+`_isUploadInFlight` out from under the other.
+
+Signature in bundle **C4KX4GKK** — three attempts against one live transfer,
+the two newcomers dying `NoFtSession` ~15 s in (5 FT-ACT attempts x 3 s) while
+the live one kept acking:
+
+```
+11:58:11.281  Uploading dashboard ... token=0x403F9B85   ← live, acking to bw=167772
+12:07:04.968  Uploading dashboard ... token=0x400FEC4E
+12:07:19.970  Dashboard upload: NoFtSession                ← 15 s, never acquired
+12:07:27.796  Uploading dashboard ... token=0x400E9FF6
+12:07:42.797  Dashboard upload: NoFtSession
+```
+
+`RunBackgroundUpload` now takes an `Interlocked` claim and rejects a second
+concurrent call, returning **without** firing `UploadCompleted` — that event is
+what hands the LEDs back, and a spurious one would end the stand-down
+mid-transfer.
+
+### Group-0 live RPM frames PERSIST; they do not lapse on their own
+
+The unified keepalive in `MozaLedDeviceManager` is built on "the firmware
+renders live LEDs only WHILE their bitmask is fed; stop feeding and the section
+reverts to its stored/idle render", with a 0.75 s interval because ownership
+drops 1000 ms after the last feed. That is **verified for the knob rings**
+(group 3) — the observation it was written from was a ring reverting to stored
+colours ~0.7x/s when the feed landed late.
+
+It does **not** hold for the RPM strip (group 0). Ground truth, bundle
+**NS9G817J** (W17 / CS Pro):
+
+```
+08:26:14.111  Session 0x04 sub-msg 2 complete-ack (bytes_written=244879 total=244879)
+08:26:14.632  Upload progress bar released      ← host stops feeding group 0
+08:27:40      capture ends — the amber fill is STILL LIT on the rim
+```
+
+Across those 85 s the capture carries **zero** `3f 17 19 00` (colour chunk) and
+zero `3f 17 1a 00` (active+window bitmask) frames — the only `3f 17 19 01`
+traffic is group 1, the button LEDs. Nothing repainted the strip and nothing
+needed to: the wheel simply held the last frame it was given.
+
+Consequence for any code that drives group 0: **going quiet does not turn the
+LEDs off.** The live pipeline already accounts for this without saying so — its
+`rpmChanged` path emits an explicit all-black colour frame plus `active=0` over
+the full window on a lit -> off transition, then goes quiet. Anything else that
+paints the strip (`UploadProgressLedBar`) has to blank it the same way when it
+stands down, and one all-black frame is the proven form. It must stay one-shot:
+re-sending all-black on a cadence pins the wheel in live-render mode and blocks
+its firmware sleep light.
+
+The upside is that group 0 needs no keepalive at all, so the progress meter runs
+at 1 Hz with every frame carrying a change, rather than paying a sub-1 s
+re-feed on a link an upload is already saturating.
+
+### `bytes_written` is not a progress counter
+
+The ack sub-msg trailer's `bytes_written:u32 BE` looks like a byte counter and
+sometimes behaves like one, but it is **not** monotone from zero and must not be
+used to drive a progress display. Two uploads of a byte-identical payload
+(md5 `75f037d4…`, `total_size` 244879) on the same W17, 38 minutes apart:
+
+| bundle | ready-ack (sub-msg 1) | status | subsequent acks |
+|---|---|---|---|
+| 8RDM91JG | `bw=0 total=244879` | `0x1D` | type=0x01, genuine 4092-byte steps |
+| NS9G817J | `bw=244879 total=244879` | `0x2C` | type=0x11, `bw=total` for the whole transfer |
+
+NS9G817J's ready-ack landed **0.2 s** after the upload started, before a single
+type=0x03 content sub-msg had been emitted, already reporting the full size.
+It was a fresh single attempt — no earlier attempt in the session, and the
+preceding one (8RDM91JG, a different session) had stalled at `bw=49104`, so the
+wheel did not hold a complete staging file either. The status byte differs
+between the two shapes (`0x1D` vs `0x2C`), which is the only correlate observed
+so far; what selects the shape is not established.
+
+Consequence: anything that shows transfer progress must use the **host emit
+fraction** — type=0x03 content sub-msgs handed to the wire out of the total the
+payload was chunked into (`WheelUploadCoordinator.UploadProgress`). That is
+always monotone from 0, always meaningful, and stalls exactly when the emit loop
+stalls in its backlog drain. Both the Files tab percentage and the RPM-bar
+progress meter read it.
+
+`bw`/`total` remains the right answer to a different question — "does the wheel
+have all the bytes" — which is how the Files tab still decides
+complete-vs-stopped, and how the coordinator recognises the
+complete-via-progress firmware variant.
+
+### Outbound flow control: retransmit at the ack frontier, and never drop
+
+The wheel's `fc:00 [session] [ack_seq:u16 LE]` is a **cumulative** ack, so two
+rules follow for the host side of an upload. Both were being broken, and
+together they deadlocked bundle **8MKDKT7R** (KS Pro) for six minutes.
+
+Note when parsing captures: the inbound ack frame carries a `c3 71` prefix
+before `fc 00`, so a matcher anchored at byte 0 sees no acks at all.
+
+**Observed state over the last 5 minutes of that transfer:**
+
+| | |
+|---|---|
+| wheel's sess-0x04 ack_seq | **frozen at 1391** — 3986 of 4094 acks repeat it |
+| host's highest sent seq | **2473** |
+| chunks sent past the ack point | **1082** |
+| distinct frames / transmissions | 1255 / 26174 → 20.9x each, **24.7x amplification** |
+
+The wheel was waiting for seq 1392. It never arrived, so its cumulative ack
+could not move, so everything from 1393 up was discarded on receipt.
+
+**Rule 1 — retransmit only at the frontier.** Re-offering the whole unacked
+span is not just wasted wire, it starves the one chunk that would unblock the
+transfer: 6.3 kB/s, 64 % of a half-duplex link, spent on frames the wheel was
+guaranteed to discard. `SessionRetransmitter.HoldSession` confines a held
+session's retransmits to `HeldRetransmitWindow` (8) seqs above its lowest
+unacked chunk. Modelled against the state above: 1136 frames instead of 37650,
+**33x less wire**, and seqs 1392-1399 get all of it.
+
+**Rule 2 — never drop an unacked chunk on a reliable stream.**
+`DueRetransmits` evicts at `maxRetries` (30). For a cumulative-ack stream an
+eviction is not recovery, it is a *permanent* deadlock: seq 1392 was dropped
+after 30 attempts, after which no future traffic could ever advance the wheel's
+ack. A held session is exempt from both that eviction and the `MaxQueueSize`
+LRU; the transfer's own stall timeout is what gives up, and it reports a
+failure instead of hanging.
+
+**And `QueueSize` is not a window signal.** The upload's pacing loop used queue
+depth for liveness — but depth falls both when the wheel acks *and* when the
+retransmitter gives up. Every eviction therefore re-armed the 90 s stall
+deadline, so the abort never fired, and the same false "window drained" reading
+let the emit loop run 1082 chunks past the wheel. `AckedChunkCount` is
+monotonic and advanced **only** by a genuine ack — never by eviction, never by
+`DropSession` — and is what the pacing loop watches now.
+
+Finally: the upload path never called `DropSession` on exit (Session09 and
+`DashboardDownloader` both do), so a finished attempt's unacked chunks kept
+retransmitting into a session nobody was reading. It does now.
+
 ### Session data chunk CRC — 4 bytes LE
 
 **Verified 2026-04-24 (again).** Each session `7c:00` data chunk carries a **4-byte CRC32-LE** trailer over the net body. A previous revision of this section briefly claimed 3 bytes; that claim was an artifact of a buggy `extract_frames` helper that dropped the last 2 bytes of each frame (real CRC's last byte + frame checksum). When raw tshark output is inspected directly every chunk's last 4 bytes match `zlib.crc32(net)` LE exactly.

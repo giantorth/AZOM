@@ -63,6 +63,10 @@ namespace MozaPlugin.Devices.Led
         // device-side standby animation can take back over.
         private bool _wasActive;
 
+        // Latched while this pipeline is standing down for a dashboard upload,
+        // so the resume edge can drop the per-strip change detection.
+        private bool _uploadPaused;
+
         // LED-bitmask keepalive: the base firmware blanks its strip LEDs if the
         // bitmask isn't refreshed within a few seconds, even when unchanged — the
         // R25 capture sends the bitmask every frame (colors only on change). Re-send
@@ -238,6 +242,27 @@ namespace MozaPlugin.Devices.Led
                 var plugin = MozaPlugin.Instance;
                 if (plugin == null || !plugin.Data.IsConnected || !plugin.IsBaseAmbientLedSupported)
                     return;
+
+                // Dashboard upload standing the pipeline down (see the same
+                // guard, and why it is not the raw in-flight flag, in
+                // MozaLedDeviceManager). Both strips ride the same wheelbase
+                // link the transfer needs. On resume, drop the per-strip change
+                // detection: the firmware's standby animation reclaimed the
+                // strips once the 1 Hz bitmask stopped, so an unchanged frame
+                // must still be re-sent.
+                if (UploadProgressLedBar.IsStandDownActive)
+                {
+                    _uploadPaused = true;
+                    return;
+                }
+                if (_uploadPaused)
+                {
+                    _uploadPaused = false;
+                    _lastBitmask[0] = _lastBitmask[1] = -1;
+                    _lastColorHash[0] = _lastColorHash[1] = 0;
+                    _lastSendTime = DateTime.MinValue;
+                    _wasActive = false;
+                }
 
                 // No telemetry colors this frame — issue a single release
                 // (bitmask=0 to both strips) on the active→idle transition,

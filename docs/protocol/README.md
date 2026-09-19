@@ -18,7 +18,7 @@ Hierarchical split of the original `docs/moza-protocol.md`. Layout is **function
 | [`leds/`](leds/) | LED color commands, base ambient strips (`0x20/0x22`), wheel LED group architecture (`0x3F/0x40` extended) |
 | [`settings/`](settings/) | Wheel settings (`0x3F/0x40`, dev `0x17`), dashboard settings (`0x32/0x33`, dev `0x14`), EEPROM direct access (`0x0A`) |
 | [`periodic/`](periodic/) | Group `0x0E` parameter reader, `0x1F`, `0x28`, `0x29`, `0x2B` periodic / occasional commands |
-| [`devices/`](devices/) | Per-device pages — main hub (`0x12`), wheelbase (`0x13`), dash (`0x14`), wheel (`0x17`), pedals (`0x19`), shifter / handbrake / e-stop, AB9 active shifter. Device ID table cross-links into functional pages |
+| [`devices/`](devices/) | Per-device pages — main hub (`0x12`), wheelbase (`0x13`), dash (`0x14`), wheel (`0x17`), pedals (`0x19`), shifter / handbrake / e-stop, AB9 active shifter, S12 pedal vibration (group `0x4D`). Device ID table cross-links into functional pages |
 | [`plugin/`](plugin/) | SimHub plugin implementation notes: startup phases, session management, tier impl, reassembly fallback |
 | [`findings/`](findings/) | Dated journal entries from deep-dive sessions. Kept verbatim for traceability; canonical info is reflected in the topical pages |
 

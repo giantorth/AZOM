@@ -89,6 +89,19 @@ namespace MozaPlugin
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
 
+                // SAVED chip on every PaletteStrip: restore the last CUSTOM pick and
+                // route new picks back into settings. Static hook re-set per Init
+                // like PaletteStrip.CustomPickerFactory; cleared in End.
+                var savedRgb = _settings.LastCustomLedColor >= 0
+                    ? MozaProfile.UnpackColor(_settings.LastCustomLedColor) : null;
+                MozaControls.MozaPalette.SeedSavedColor(savedRgb != null
+                    ? Color.FromRgb(savedRgb[0], savedRgb[1], savedRgb[2]) : (Color?)null);
+                MozaControls.MozaPalette.SavedColorPersist = c =>
+                {
+                    _settings.LastCustomLedColor = MozaProfile.PackColor(new[] { c.R, c.G, c.B });
+                    SaveSettings();
+                };
+
                 // Sweep leftover install artifacts before doing anything
                 // heavyweight. After a successful in-app update + SimHub
                 // restart, we land here with the NEW DLL loaded and the
@@ -169,6 +182,15 @@ namespace MozaPlugin
                 {
                     _settings.MBoosterCurveArraysFixedSeventhsBug = true;
                     FixMBoosterCurveArraysSeventhsBug();
+                }
+
+                // Saved knob palettes that are entirely black were laundered from an
+                // unseeded _data mirror, not chosen — null them once so the wheel's
+                // own stored colours show and nothing re-writes black on apply.
+                if (!_settings.KnobColorAllBlackRepaired)
+                {
+                    _settings.KnobColorAllBlackRepaired = true;
+                    _profileCoordinator.RepairAllBlackKnobColorArrays();
                 }
 
                 // Initialise the GUID↔model registry up front — page-GUID
@@ -539,12 +561,23 @@ namespace MozaPlugin
                     customEffectFormulaEvaluator: CreateHapticsFormulaResolver(),
                     onSerialResolved: OnMBoosterSerialResolved,
                     connectivitySeedLookup: LookupMBoosterKnownPedals,
-                    onConnectivityResolved: OnMBoosterConnectivityResolved);
+                    onConnectivityResolved: OnMBoosterConnectivityResolved,
+                    chainRolesSeedLookup: LookupMBoosterKnownChainRoles,
+                    onChainRolesResolved: OnMBoosterChainRolesResolved);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.
                 try { _mboosterRegistry.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Initial refresh: {ex.Message}"); }
+
+                // Pedal-haptics registry — owns routed lanes handed over by the
+                // device prober plus any USB unit it discovers by probe. Same
+                // initial-walk reasoning as the mBooster above.
+                _pedalHapticsRegistry = new Devices.PedalHaptics.MozaPedalHapticsRegistry(
+                    isShuttingDown: () => IsShuttingDown);
+                _pedalHapticsRegistry.DeviceDetected += OnPedalHapticsDeviceDetected;
+                try { _pedalHapticsRegistry.Refresh(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
 
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
@@ -632,6 +665,21 @@ namespace MozaPlugin
                 };
                 _retryTimer.AutoReset = true;
                 _retryTimer.Start();
+
+                // LED keepalive re-feed. The firmware renders host-driven LEDs only
+                // while they keep being fed, and SimHub's Display() callback is not a
+                // cadence we control — when it goes quiet the wheel used to revert
+                // within ~1 s regardless of the user's keepalive timeout (2X7HPMMS).
+                _ledKeepaliveTimer = new Timer(LedKeepaliveIntervalMs);
+                _ledKeepaliveTimer.Elapsed += (s, e) =>
+                {
+                    if (IsShuttingDown) return;
+                    if (Interlocked.CompareExchange(ref _ledKeepaliveTickInProgress, 1, 0) != 0) return;
+                    try { TickLedKeepalive(); }
+                    finally { Interlocked.Exchange(ref _ledKeepaliveTickInProgress, 0); }
+                };
+                _ledKeepaliveTimer.AutoReset = true;
+                _ledKeepaliveTimer.Start();
 
                 _reconnectTimer = new Timer(5000);
                 _reconnectTimer.Elapsed += (s, e) =>
@@ -871,6 +919,7 @@ namespace MozaPlugin
             try { _tempHistoryTimer?.Stop(); } catch { }
             try { _torqueHistoryTimer?.Stop(); } catch { }
             try { _retryTimer?.Stop(); } catch { }
+            try { _ledKeepaliveTimer?.Stop(); } catch { }
             try { _reconnectTimer?.Stop(); } catch { }
             try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
 
@@ -944,6 +993,12 @@ namespace MozaPlugin
             // persistent wire left these ticking next to the next Init's pair.
             try { _fsr1Driver?.Dispose(); } catch { }
             _fsr1Driver = null;
+            try
+            {
+                if (_cm2Sender != null && _dashboardBindingCoordinator != null)
+                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
+            catch { }
             try { _cm2Sender?.Dispose(); } catch { }
             _cm2Sender = null;
             try { _cm1Driver?.Dispose(); } catch { }
@@ -985,6 +1040,7 @@ namespace MozaPlugin
             try { _tempHistoryTimer?.Dispose(); } catch { }
             try { _torqueHistoryTimer?.Dispose(); } catch { }
             try { _retryTimer?.Dispose(); } catch { }
+            try { _ledKeepaliveTimer?.Dispose(); } catch { }
             try { _reconnectTimer?.Dispose(); } catch { }
             try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }
 

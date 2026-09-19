@@ -114,7 +114,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// <param name="busy">True while the HOT burst is pending or some
         /// other higher-priority cycle owns sess=0x01/0x02. Defers sampling
         /// so we don't measure mid-burst.</param>
-        public TickDecision TickIfArmed(long nowUtcTicks, int currentSignature, bool busy)
+        /// <param name="nudgeAllowed">False = sample-only: keep the streak /
+        /// deadline logic but never ask for a kind=4 re-emit (the device already
+        /// confirmed the switch by echo).</param>
+        public TickDecision TickIfArmed(long nowUtcTicks, int currentSignature, bool busy, bool nudgeAllowed = true)
         {
             lock (_lock)
             {
@@ -164,6 +167,8 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     _lastSignature = currentSignature;
                     _matchCount = 1;
                 }
+
+                if (!nudgeAllowed) return TickDecision.NoAction;
 
                 if (_nudgesSent >= MaxNudges)
                 {

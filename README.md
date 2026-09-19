@@ -5,11 +5,11 @@
 > [!IMPORTANT]
 > **The Unofficial MOZA SimHub Plugin is now named AZOM.**
 
-[![Release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin)](https://github.com/giantorth/moza-simhub-plugin/releases/latest)
-[![Pre-release](https://img.shields.io/github/v/release/giantorth/moza-simhub-plugin?include_prereleases&label=pre-release&color=orange)](https://github.com/giantorth/moza-simhub-plugin/releases)
-[![License: GPL v3](https://img.shields.io/github/license/giantorth/moza-simhub-plugin)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/giantorth/AZOM)](https://github.com/giantorth/AZOM/releases/latest)
+[![Pre-release](https://img.shields.io/github/v/release/giantorth/AZOM?include_prereleases&label=pre-release&color=orange)](https://github.com/giantorth/AZOM/releases)
+[![License: GPL v3](https://img.shields.io/github/license/giantorth/AZOM)](LICENSE)
 [![Discord](https://img.shields.io/discord/1494517781016608888?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/J4enw43e62)
-[![Stars](https://img.shields.io/github/stars/giantorth/moza-simhub-plugin?label=Star&logo=github&color=yellow)](https://github.com/giantorth/moza-simhub-plugin/stargazers)
+[![Stars](https://img.shields.io/github/stars/giantorth/AZOM?label=Star&logo=github&color=yellow)](https://github.com/giantorth/AZOM/stargazers)
 [![Sponsor](https://img.shields.io/github/sponsors/giantorth?label=Sponsor&logo=github&color=ea4aaa)](https://github.com/sponsors/giantorth)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/giantorth)
 # AZOM
@@ -56,14 +56,14 @@ _Thank you to a gracious alpha tester who provided these custom effect and dashb
 
 ## Installation
 
-1. Download the latest `MozaPlugin_<version>.zip` from the [Releases](https://github.com/giantorth/moza-simhub-plugin/releases) page.
+1. Download the latest `MozaPlugin_<version>.zip` from the [Releases](https://github.com/giantorth/AZOM/releases) page.
 2. Extract `MozaPlugin.dll` into your SimHub installation directory. 
 
 > Simhub defaults to `C:\Program Files (x86)\SimHub\`
 
 Restart SimHub — the plugin appears under Settings > Plugins as "AZOM".
 
-**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/moza-simhub-plugin/releases). Easier: in the plugin, open Options > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
+**Development builds.** Every open pull request publishes per-commit pre-release builds on the [releases page](https://github.com/giantorth/AZOM/releases). Easier: in the plugin, open Options > Updates and pick the PR in the release-channel dropdown to install and track it. Expect bugs or broken features — use the stable release above if you need something reliable.
 
 **Device setup:** Connect your hardware and restart SimHub. The plugin auto-detects connected devices (wheel model, dashboard) and deploys matching device definitions. A banner in the plugin settings panel will prompt you to restart SimHub, after which the devices appear under Devices ready to add. Requires SimHub 9.11.8+.
 

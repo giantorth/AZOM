@@ -57,8 +57,9 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Walk the port-discovery cache for supported peripheral PIDs; spawn a
         /// controller for any newly-attached device, drop any whose port has
-        /// disappeared, reconnect disconnected ones, and re-probe connected-but-
-        /// undetected ones. Idempotent — no-ops on a healthy steady state.
+        /// disappeared, reconnect disconnected ones, and poll connected ones
+        /// (probe until confirmed, keepalive after — see
+        /// <see cref="StandalonePeripheralController.Poll"/>). Idempotent.
         /// </summary>
         public void Refresh()
         {
@@ -135,8 +136,8 @@ namespace MozaPlugin.Devices
                 }
             }
 
-            // Reconnect disconnected + re-probe connected-but-undetected. Snapshot
-            // under the lock, act outside it.
+            // Reconnect disconnected + poll connected. Snapshot under the lock,
+            // act outside it.
             List<StandalonePeripheralController> snapshot;
             lock (_lock)
                 snapshot = new List<StandalonePeripheralController>(_order);
