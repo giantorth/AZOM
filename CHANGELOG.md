@@ -8,7 +8,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **The wheel's RPM bar shows upload progress.** While a dashboard is uploading, the LEDs
   stop following telemetry and the RPM bar fills up as the transfer lands, with the LED at
-  the fill edge blinking. The lights on either end of the bar stay out, so the fill spans
+  the fill edge pulsing orange. The lights on either end of the bar stay out, so the fill spans
   only the bar itself. Pausing the LEDs is deliberate: they and the upload share one link,
   and the upload gets it for the duration. The bar clears and the LEDs go back to telemetry
   when the upload finishes — or earlier, if it stops making progress, so a stuck transfer

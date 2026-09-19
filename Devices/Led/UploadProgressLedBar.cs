@@ -29,7 +29,7 @@ namespace MozaPlugin.Devices.Led
     /// <see cref="Telemetry.Dashboard.WheelUploadCoordinator.UploadProgress"/>
     /// for why that is not a progress counter. It reads 0 through the metadata
     /// handshake, which the frontier LED covers: the LED at the fill edge
-    /// toggles once a second, so the bar shows it is alive before it has
+    /// pulses once a second, so the bar shows it is alive before it has
     /// anything to fill. Liveness is separate — see
     /// <see cref="StallReleaseSeconds"/>.
     ///
@@ -39,8 +39,23 @@ namespace MozaPlugin.Devices.Led
     /// </summary>
     internal static class UploadProgressLedBar
     {
-        /// <summary>Fill colour — amber, matching the Files tab's in-flight status text.</summary>
-        private static readonly Color FillColor = Color.FromArgb(255, 140, 0);
+        /// <summary>Fill colour for segments already transferred.</summary>
+        private static readonly Color FillColor = Color.FromArgb(0, 200, 0);
+
+        /// <summary>
+        /// Frontier colour — the segment currently filling. Amber, matching the
+        /// Files tab's in-flight status text, so it reads as "working" against
+        /// the green of the segments already done.
+        /// </summary>
+        private static readonly Color FrontierColor = Color.FromArgb(255, 140, 0);
+
+        /// <summary>
+        /// Frontier's dim phase. The frontier alternates between this and
+        /// <see cref="FrontierColor"/> on the 1 Hz progress step, so it pulses
+        /// rather than blinking — dimming instead of going dark keeps the fill
+        /// edge readable at a glance and keeps the bar's length unambiguous.
+        /// </summary>
+        private static readonly Color FrontierDimColor = Color.FromArgb(64, 35, 0);
 
         /// <summary>
         /// Wire feed cadence: one frame per second, which is also one frame per
@@ -65,8 +80,8 @@ namespace MozaPlugin.Devices.Led
 
         /// <summary>
         /// Feeds per progress step. 1 — the displayed progress and the frontier
-        /// LED's blink phase advance on every feed, giving the 1 Hz update and
-        /// the 1 s on / 1 s off blink asked for.
+        /// LED's pulse phase advance on every feed, giving the 1 Hz update and
+        /// a 1 s bright / 1 s dim pulse on the segment currently filling.
         /// </summary>
         private const int FeedsPerProgressStep = 1;
 
@@ -80,7 +95,7 @@ namespace MozaPlugin.Devices.Led
         /// notice — its completion deadline rolls forward on every ack sub-msg,
         /// not on actual byte progress. Bundle C4KX4GKK stopped advancing at
         /// <c>bw=167772</c> (12:00:47) and did not terminate until 12:07:04:
-        /// <b>6 min 17 s</b> of frozen amber bar with the user's RPM, button and
+        /// <b>6 min 17 s</b> of frozen bar with the user's RPM, button and
         /// knob LEDs held off. This bounds that.</para>
         ///
         /// <para>Watches the wheel's ACK COUNT, not the displayed fraction.
@@ -194,7 +209,7 @@ namespace MozaPlugin.Devices.Led
                 var now = DateTime.UtcNow;
                 if (s_engaged && (now - s_lastFeedUtc).TotalSeconds < FeedIntervalSeconds) return;
 
-                // Re-sample progress (and step the blink) on the first feed and
+                // Re-sample progress (and step the pulse) on the first feed and
                 // every FeedsPerProgressStep-th one after it; the feeds in
                 // between re-send an identical frame purely to hold ownership.
                 bool sampled = !s_engaged || ++s_feedsSinceProgress >= FeedsPerProgressStep;
@@ -262,8 +277,12 @@ namespace MozaPlugin.Devices.Led
                 int active = 0;
                 for (int i = 0; i < barCount; i++)
                 {
-                    if (i >= lit && !(i == frontier && s_frontierLit)) continue;
-                    colors[side + i] = FillColor;
+                    Color c;
+                    if (i < lit) c = FillColor;                    // segment done
+                    else if (i == frontier)                        // segment filling
+                        c = s_frontierLit ? FrontierColor : FrontierDimColor;
+                    else continue;                                 // not reached
+                    colors[side + i] = c;
                     active |= 1 << (side + i);
                 }
 
