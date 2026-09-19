@@ -418,14 +418,23 @@ namespace MozaPlugin.Devices.Ui
                 // the name persisted from last session.
                 if (string.IsNullOrEmpty(prev)) prev = _plugin.Settings?.LastUploadLibraryName;
                 UploadLibraryCombo.Items.Clear();
+                // Sorted for the picker only. CachedNames comes out in
+                // Dictionary key order — arbitrary, and it reshuffles as entries
+                // are added and removed — which reads as random in a dropdown.
+                // Deliberately NOT sorted at the source: DashboardBindingCoordinator
+                // feeds the same list to the wheel as its configJson library, where
+                // position IS the switch-command slot index.
+                var names = new List<string>();
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (_plugin.DashCache != null)
                 {
                     foreach (var name in _plugin.DashCache.CachedNames)
-                        if (seen.Add(name)) UploadLibraryCombo.Items.Add(name);
+                        if (seen.Add(name)) names.Add(name);
                 }
                 foreach (var p in _plugin.DashProfileStore.BuiltinProfiles)
-                    if (seen.Add(p.Name)) UploadLibraryCombo.Items.Add(p.Name);
+                    if (seen.Add(p.Name)) names.Add(p.Name);
+                names.Sort(UiHelpers.NaturalNameComparer);
+                foreach (var name in names) UploadLibraryCombo.Items.Add(name);
                 if (!string.IsNullOrEmpty(prev) && UploadLibraryCombo.Items.Contains(prev))
                     UploadLibraryCombo.SelectedItem = prev;
                 else if (UploadLibraryCombo.Items.Count > 0 && UploadLibraryCombo.SelectedItem == null)

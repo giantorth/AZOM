@@ -74,5 +74,58 @@ namespace MozaPlugin.UI
             string prefix = brace >= 0 ? format.Substring(0, brace) : format;
             return prefix.Length > 0 && text.StartsWith(prefix, System.StringComparison.Ordinal);
         }
+
+        /// <summary>
+        /// Case-insensitive comparer that orders embedded digit runs by VALUE,
+        /// so "Rally V2" sorts before "Rally V10" instead of after it. Dashboard
+        /// names are overwhelmingly "&lt;car or series&gt; &lt;number&gt;", which
+        /// plain string ordering shuffles in exactly the way people notice.
+        /// Ties break on the ordinal comparison so the order is total and stable.
+        /// </summary>
+        public static readonly System.Collections.Generic.IComparer<string> NaturalNameComparer
+            = new NaturalComparer();
+
+        private sealed class NaturalComparer : System.Collections.Generic.IComparer<string>
+        {
+            public int Compare(string? a, string? b)
+            {
+                if (ReferenceEquals(a, b)) return 0;
+                if (a == null) return -1;
+                if (b == null) return 1;
+
+                int i = 0, j = 0;
+                while (i < a.Length && j < b.Length)
+                {
+                    bool da = char.IsDigit(a[i]), db = char.IsDigit(b[j]);
+                    if (da && db)
+                    {
+                        // Compare the whole digit runs numerically. Leading zeros
+                        // are skipped first so "007" and "7" compare equal here
+                        // and fall through to the ordinal tiebreak below.
+                        int si = i, sj = j;
+                        while (si < a.Length && a[si] == '0') si++;
+                        while (sj < b.Length && b[sj] == '0') sj++;
+                        int ei = si; while (ei < a.Length && char.IsDigit(a[ei])) ei++;
+                        int ej = sj; while (ej < b.Length && char.IsDigit(b[ej])) ej++;
+                        int la = ei - si, lb = ej - sj;
+                        if (la != lb) return la - lb;          // longer run = bigger number
+                        for (int k = 0; k < la; k++)
+                        {
+                            int d = a[si + k] - b[sj + k];
+                            if (d != 0) return d;
+                        }
+                        i = ei; j = ej;
+                        continue;
+                    }
+                    if (da != db) return da ? -1 : 1;          // digits before letters
+                    int c = char.ToUpperInvariant(a[i]).CompareTo(char.ToUpperInvariant(b[j]));
+                    if (c != 0) return c;
+                    i++; j++;
+                }
+                if (i < a.Length) return 1;
+                if (j < b.Length) return -1;
+                return string.CompareOrdinal(a, b);
+            }
+        }
     }
 }
