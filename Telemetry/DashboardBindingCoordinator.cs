@@ -474,7 +474,7 @@ namespace MozaPlugin.Telemetry
             if (!_plugin.ShouldDriveDashboard())
             {
                 if (_plugin.ActiveCm2Sender != null || _plugin.IsCm2Present)
-                    return ApplyProfileDashboardToCm2(key!);
+                    return ApplyProfileDashboardToCm2(profile, key!);
                 MozaLog.Info("[AZOM] Profile dashboard key " + key +
                              " has no display lane (screenless wheel, no CM2) — leaving current selection");
                 return true;
@@ -500,37 +500,27 @@ namespace MozaPlugin.Telemetry
                 return false;
             }
             ClearDeferReason();
+            _plugin.ChannelMapping.MigrateLegacyWheelKeys();
 
             // Resolve target dashboard name + branch-specific side data.
             string targetName;
             string mzdashPath = "";
             string sourceTag;
 
-            if (key!.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
-                string id = key.Substring("wheel:".Length);
-                WheelDashboardEntry? match = null;
-                if (state.EnabledDashboards != null)
-                {
-                    foreach (var entry in state.EnabledDashboards)
-                    {
-                        if (entry != null && string.Equals(entry.Id, id, StringComparison.OrdinalIgnoreCase))
-                        {
-                            match = entry;
-                            break;
-                        }
-                    }
-                }
+                var match = WheelDashboardKey.Resolve(state, key);
                 if (match == null)
                 {
-                    MozaLog.Info("[AZOM] Profile dashboard key not found in current wheel catalog (id=" +
-                                 id + "); leaving current selection");
+                    MozaLog.Info("[AZOM] Profile dashboard key not found in current wheel catalog (" +
+                                 key + "); leaving current selection");
                     return true;
                 }
-                targetName = match.Title;
-                sourceTag = $"wheel:{id} ('{match.Title}')";
+                key = CanonicalizeWheelKey(profile, key!, match);
+                targetName = match.SlotName;
+                sourceTag = $"{key} (title '{match.Title}')";
             }
-            else if (key.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            else if (key!.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
             {
                 // file:<filename>:<sha1-first-8> — filename → local mzdash + bare name for slot lookup.
                 string remainder = key.Substring("file:".Length);
@@ -628,7 +618,7 @@ namespace MozaPlugin.Telemetry
             //   - file: local file exists → slotless restart; wheel keeps current binding.
             //   - file: local file missing AND no slot → leave current selection.
             //   - builtin: slotless OnDashboardSwitched restarts against the named builtin.
-            if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
                 MozaLog.Info("[AZOM] Profile dashboard '" + targetName +
                              "' missing from configJsonList; leaving current selection");
@@ -664,6 +654,18 @@ namespace MozaPlugin.Telemetry
             return true;
         }
 
+        /// <summary>Legacy <c>wheel:&lt;id&gt;</c> keys break on re-upload (the wheel
+        /// reissues the id); once resolved, rewrite the profile's key to the name form.</summary>
+        private static string CanonicalizeWheelKey(MozaProfile profile, string key, WheelDashboardEntry match)
+        {
+            string canonical = WheelDashboardKey.For(match);
+            if (string.Equals(canonical, key, StringComparison.OrdinalIgnoreCase)) return key;
+            if (string.Equals(profile.TelemetryDashboardKey, key, StringComparison.OrdinalIgnoreCase))
+                profile.TelemetryDashboardKey = canonical;
+            MozaLog.Info($"[AZOM] Migrated profile dashboard key {key} → {canonical}");
+            return canonical;
+        }
+
         /// <summary>
         /// CM2-lane counterpart of <see cref="ApplyTelemetryDashboardFromProfile"/>
         /// for rigs whose MAIN sender never runs (screenless wheel / no wheel).
@@ -671,7 +673,7 @@ namespace MozaPlugin.Telemetry
         /// OnCm2DashboardSwitched — the same path the CM2 UI combo uses. Never
         /// touches the wheel-lane ActiveTelemetryProfileName/MzdashPath fields.
         /// </summary>
-        private bool ApplyProfileDashboardToCm2(string key)
+        private bool ApplyProfileDashboardToCm2(MozaProfile profile, string key)
         {
             var cm2 = _plugin.ActiveCm2Sender;
             if (cm2 == null || !cm2.IsActive || cm2.IsInSilenceCooldown)
@@ -694,28 +696,17 @@ namespace MozaPlugin.Telemetry
             // Resolve key → name against the CM2's own catalog. file: keys match by
             // bare name only — the CM2 is catalog-only, no mzdash side-load.
             string targetName;
-            if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
-                string id = key.Substring("wheel:".Length);
-                WheelDashboardEntry? match = null;
-                if (state.EnabledDashboards != null)
-                {
-                    foreach (var entry in state.EnabledDashboards)
-                    {
-                        if (entry != null && string.Equals(entry.Id, id, StringComparison.OrdinalIgnoreCase))
-                        {
-                            match = entry;
-                            break;
-                        }
-                    }
-                }
+                var match = WheelDashboardKey.Resolve(state, key);
                 if (match == null)
                 {
-                    MozaLog.Info("[AZOM] Profile dashboard key not found in CM2 catalog (id=" +
-                                 id + "); leaving CM2 selection");
+                    MozaLog.Info("[AZOM] Profile dashboard key not found in CM2 catalog (" +
+                                 key + "); leaving CM2 selection");
                     return true;
                 }
-                targetName = match.Title;
+                key = CanonicalizeWheelKey(profile, key, match);
+                targetName = match.SlotName;
             }
             else if (key.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
             {

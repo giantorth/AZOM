@@ -33,7 +33,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         // for that plugin instance — and that's how the wheel ends up stuck
         // on the wrong dashboard after a game switch, because neither the
         // catalog re-sync probe nor ApplyTelemetryDashboardFromProfile can
-        // resolve a wheel:<id> key to a slot without it.
+        // resolve a wheel:<name> key to a slot without it.
         //
         // Reset by HardReset() — wheel hot-swap, schema upgrade, dispose.
         //

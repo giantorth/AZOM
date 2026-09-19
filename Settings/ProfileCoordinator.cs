@@ -26,7 +26,7 @@ namespace MozaPlugin.Settings
 
         internal void SaveSettings()
         {
-            // Resolve the current dashboard key (wheel:<id> > file:<...> > builtin:<name>)
+            // Resolve the current dashboard key (wheel:<name> > file:<...> > builtin:<name>)
             // so the active SimHub profile records which dashboard the user picked.
             // Re-applied on profile load so each game keeps its own dashboard selection.
             string? activeDashKey = null;

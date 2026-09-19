@@ -68,6 +68,9 @@ All notable changes to the AZOM plugin are documented here.
   again — or reconnecting mid-transfer — used to start a second attempt that fought the first
   over the same connection; both could fail. The second request is now declined while one is
   in progress.
+- **A game's saved dashboard survives re-uploading that dashboard.** It was remembered by
+  the wheel's internal id, which changes on every upload; it is now remembered by name, and
+  its channel mappings follow.
 - **The BUTTON/KNOB selector applies correctly.** 
 - **Dropped unecessary idle polls.** .
 - **Control Mapper fixes.** The plugin no longer stamps a wheel name SimHub will never match, 

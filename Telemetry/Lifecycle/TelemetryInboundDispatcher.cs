@@ -316,7 +316,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                         // configJson state (EnabledDashboards) just became
                         // available. On cold start the catalog burst can land
                         // BEFORE this, so the first catalog-only synth resolved
-                        // the dashboard key (wheel:<id>) to nothing and applied 0
+                        // the dashboard key (wheel:<name>) to nothing and applied 0
                         // user channel mappings — leaving the synth pinned with
                         // default bindings until a dashboard switch. Re-apply now
                         // that the key resolves; no tier-def re-emit (only the

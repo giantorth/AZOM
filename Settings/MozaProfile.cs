@@ -636,7 +636,9 @@ namespace MozaPlugin.Settings
 
         // ===== Active dashboard for this game profile =====
         // Stable key in the same format ChannelMappingCoordinator.GetActiveDashboardKeyCandidates() emits:
-        //   "wheel:<configJsonId>"     — wheel-resident dashboard, stable across re-uploads
+        //   "wheel:<name>"             — wheel-resident dashboard, by slot-table name (dirName);
+        //                                the configJson id changes on every upload, so legacy
+        //                                "wheel:<id>" keys are migrated on first resolve
         //   "file:<filename>:<sha1-8>" — custom .mzdash file
         //   "builtin:<name>"           — embedded plugin profile
         // Null = no preference; the wheel keeps whatever dashboard is currently displayed
