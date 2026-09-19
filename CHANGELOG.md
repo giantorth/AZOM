@@ -6,6 +6,18 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Added
 
+- **Pedal haptics.** The S12 pedal vibration module shows up as its own SimHub ShakeIt
+  device, with nine effect channels each for throttle, brake and clutch.
+
+- **Convert a SimHub dashboard to MOZA format.** A Files tab button turns a `.djson` or
+  `.simhubdash` into an uploadable `.mzdash` — widgets, images, fonts and formulas — and
+  reports what it could not carry across.
+
+- **mBooster travel and motor calibration.** Both run from the pedal's tab, per pedal on a
+  chained pair.
+
+- **The Files tab's dashboard list is sorted.**
+
 - **The wheel's RPM bar shows upload progress.** While a dashboard is uploading, the LEDs
   stop following telemetry and the RPM bar fills up as the transfer lands, with the LED at
   the fill edge pulsing orange. The lights on either end of the bar stay out, so the fill spans
@@ -75,6 +87,17 @@ All notable changes to the AZOM plugin are documented here.
 - **Dropped unecessary idle polls.** .
 - **Control Mapper fixes.** The plugin no longer stamps a wheel name SimHub will never match, 
   and puts its wheel recognizer back when SimHub rebuilds its list.
+- **mBooster range limits no longer clamp deadzone and max force.**
+- **The mBooster force curve editor no longer stops a node short of the end.**
+- **A CM2 dash is no longer classified as a CM1.**
+- **The FSR1 gap box updates on the dashboards where it stayed blank.**
+- **Knob LED colours stop being forced black.** Saved all-black palettes are repaired on load.
+- **A connected accessory stays detected** instead of dropping out of the device list and
+  coming back.
+- **The old shared "MOZA Wheel Base" device is retired on upgrade,** so you stop seeing two
+  wheelbases.
+- **The update selector no longer lists PR build names.**
+- **The Help tab's GitHub link points at the right repository.**
 
 ## [1.6.0]
 
