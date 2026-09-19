@@ -795,4 +795,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>Cruscotti SimHub (*.djson;*.simhubdash)|*.djson;*.simhubdash|Tutti i file (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversione non riuscita: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% dei widget scartati</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Limite nodi</value></data>
 </root>

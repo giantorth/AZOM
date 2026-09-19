@@ -42,6 +42,8 @@ internal static class Program
         string telemetryPath = Path.Combine(RepoRoot(), "Data", "Telemetry.json");
         bool quiet = false;
         string? display = null;
+        int? maxNodes = null;
+        string? simhub = null;
 
         for (int i = 2; i < args.Length; i++)
         {
@@ -49,6 +51,9 @@ internal static class Program
             {
                 case "--telemetry" when i + 1 < args.Length: telemetryPath = args[++i]; break;
                 case "--display" when i + 1 < args.Length: display = args[++i]; break;
+                case "--max-nodes" when i + 1 < args.Length && int.TryParse(args[i + 1], out int mn):
+                    maxNodes = mn; i++; break;
+                case "--simhub" when i + 1 < args.Length: simhub = args[++i]; break;
                 case "--quiet": quiet = true; break;
                 default:
                     Console.Error.WriteLine($"unknown argument '{args[i]}'");
@@ -74,6 +79,13 @@ internal static class Program
         }
         Console.WriteLine($"canvas : {converter.CanvasWidth}x{converter.CanvasHeight}"
             + (display == null ? " (default)" : $" for {display}"));
+        if (maxNodes.HasValue) converter.MaxNodes = maxNodes.Value;
+        Console.WriteLine($"budget : {converter.MaxNodes} nodes for page expansion");
+
+        // library: image references resolve against <SimHub>/ImageLibrary. A stock
+        // template sits inside the install, so walk up from the input to find it.
+        converter.SimHubRoot = simhub ?? FindSimHubRoot(input);
+        Console.WriteLine($"simhub : {converter.SimHubRoot ?? "(not found — library: images will be missing)"}");
 
         var inputs = new List<string>();
         if (Directory.Exists(input))
@@ -186,6 +198,23 @@ internal static class Program
                                     (int?)o["package_level"] ?? 0));
         }
         return rows;
+    }
+
+    /// <summary>Walk up from the input until a directory holding <c>ImageLibrary</c> is
+    /// found — the SimHub install, for <c>library:</c> image references.</summary>
+    private static string? FindSimHubRoot(string input)
+    {
+        try
+        {
+            var dir = new DirectoryInfo(Directory.Exists(input) ? input : Path.GetDirectoryName(Path.GetFullPath(input)) ?? ".");
+            while (dir != null)
+            {
+                if (Directory.Exists(Path.Combine(dir.FullName, "ImageLibrary"))) return dir.FullName;
+                dir = dir.Parent;
+            }
+        }
+        catch { }
+        return null;
     }
 
     /// <summary>Walk up from the binary to the repo root, so the default Telemetry.json

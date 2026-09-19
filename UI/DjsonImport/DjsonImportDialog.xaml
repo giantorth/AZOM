@@ -45,11 +45,13 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Source file -->
+        <!-- Source file + node ceiling -->
         <Grid Grid.Row="0" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button Grid.Column="0" Content="{x:Static res:Strings.Button_PickDjson}"
                     Margin="0,0,8,0" Click="PickFile_Click"/>
@@ -57,6 +59,11 @@
                        Style="{StaticResource MutedHintText}"
                        Text="{x:Static res:Strings.Status_NoFileSelected}"
                        TextTrimming="CharacterEllipsis"/>
+            <TextBlock Grid.Column="2" Text="{x:Static res:Strings.Label_NodeLimit}"
+                       VerticalAlignment="Center" Margin="12,0,6,0"/>
+            <TextBox Grid.Column="3" x:Name="NodeLimitBox" Width="64"
+                     VerticalAlignment="Center" TextAlignment="Right"
+                     FontFamily="{StaticResource FontMono}" Padding="6,3"/>
         </Grid>
 
         <!-- Outcome data line -->

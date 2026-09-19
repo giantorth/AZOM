@@ -17,6 +17,49 @@ namespace MozaPlugin.UI.DjsonImport
 
         /// <summary>The same paths, for the document's <c>imageResources</c> array.</summary>
         public List<string> Resources { get; } = new List<string>();
+
+        internal string OutputDir { get; set; } = "";
+        internal string? StudioImageRoot { get; set; }
+        internal string? SimHubRoot { get; set; }
+        internal ConversionReport? Report { get; set; }
+
+        /// <summary>
+        /// Resolve an image reference from an item to its <c>MD5/…</c> path.
+        ///
+        /// <para>Names are looked up in what the archives yielded. A <c>library:</c>
+        /// reference — <c>library:Icons\ABS.png</c> — is SimHub's shared image library
+        /// at <c>&lt;SimHub&gt;/ImageLibrary/</c>, never in a dashboard's own archive, so
+        /// it is read from there on first use and content-addressed like the rest.</para>
+        /// </summary>
+        public bool TryResolve(string? name, out string src)
+        {
+            src = "";
+            string n = (name ?? "").Trim();
+            if (n.Length == 0) return false;
+            if (ByName.TryGetValue(n, out var hit)) { src = hit; return true; }
+
+            const string prefix = "library:";
+            if (!n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.IsNullOrEmpty(SimHubRoot)) return false;
+
+            string relative = n.Substring(prefix.Length).Replace('\\', Path.DirectorySeparatorChar)
+                                                        .Replace('/', Path.DirectorySeparatorChar)
+                                                        .TrimStart(Path.DirectorySeparatorChar);
+            string path = Path.Combine(SimHubRoot!, "ImageLibrary", relative);
+            if (!File.Exists(path)) return false;
+
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(path); }
+            catch (Exception ex)
+            {
+                Report?.Notes.Add($"library image '{relative}' could not be read: {ex.Message}");
+                return false;
+            }
+
+            if (!ResourceExtractor.Register(this, n, Path.GetExtension(path), bytes)) return false;
+            src = ByName[n];
+            return true;
+        }
     }
 
     /// <summary>
@@ -47,39 +90,66 @@ namespace MozaPlugin.UI.DjsonImport
         /// <c>Resource/MD5/</c> inside it.</param>
         /// <param name="studioImageRoot">Dashboard Studio's shared image pool, or null to
         /// skip that copy.</param>
+        /// <param name="simHubRoot">The SimHub install, for <c>library:</c> image references
+        /// (<c>&lt;root&gt;/ImageLibrary/</c>). Null when unknown; those images then report
+        /// as not found.</param>
         public static ImageSet Extract(string djsonPath, string outputDir,
-                                       string? studioImageRoot, ConversionReport report)
+                                       string? studioImageRoot, ConversionReport report,
+                                       string? simHubRoot = null)
         {
-            var set = new ImageSet();
-            string md5Dir = Path.Combine(outputDir, "Resource", "MD5");
+            var set = new ImageSet
+            {
+                OutputDir = outputDir,
+                StudioImageRoot = studioImageRoot,
+                SimHubRoot = simHubRoot,
+                Report = report,
+            };
 
             foreach (var (name, ext, bytes) in EnumerateSources(djsonPath, report))
-            {
-                if (!AllowedExtensions.Contains(ext))
-                {
-                    report.Notes.Add($"image '{name}{ext}' skipped — "
-                                   + "the upload path only carries png/jpg/jpeg/bmp/gif");
-                    continue;
-                }
-
-                // Recompute rather than trusting Images[].MD5: the bundle is
-                // content-addressed and a stale hash would point the wheel at nothing.
-                string hash = Md5Hex(bytes);
-                string relative = $"MD5/{hash}{ext.ToLowerInvariant()}";
-
-                if (!set.ByName.ContainsKey(name)) set.ByName[name] = relative;
-                if (!set.Resources.Contains(relative)) set.Resources.Add(relative);
-
-                Write(Path.Combine(md5Dir, $"{hash}{ext.ToLowerInvariant()}"), bytes, report);
-
-                if (!string.IsNullOrEmpty(studioImageRoot))
-                {
-                    Write(Path.Combine(studioImageRoot!, "MD5", $"{hash}{ext.ToLowerInvariant()}"),
-                          bytes, report);
-                }
-            }
+                Register(set, name, ext, bytes);
 
             return set;
+        }
+
+        /// <summary>
+        /// Content-address one image into the set and write it beside the dashboard (and
+        /// into Studio's pool). The type comes from the bytes, not the name: SimHub stores
+        /// some archive entries with no extension at all, and a PNG called <c>RPM</c> is
+        /// still a PNG.
+        /// </summary>
+        internal static bool Register(ImageSet set, string name, string declaredExt, byte[] bytes)
+        {
+            var report = set.Report;
+            string ext = SniffExtension(bytes) ?? declaredExt;
+            if (!AllowedExtensions.Contains(ext))
+            {
+                report?.Notes.Add($"image '{name}{declaredExt}' skipped — not a png/jpg/jpeg/bmp/gif");
+                return false;
+            }
+            ext = ext.ToLowerInvariant();
+
+            // Recompute rather than trusting Images[].MD5: the bundle is content-addressed
+            // and a stale hash would point the wheel at nothing.
+            string hash = Md5Hex(bytes);
+            string relative = $"MD5/{hash}{ext}";
+
+            if (!set.ByName.ContainsKey(name)) set.ByName[name] = relative;
+            if (!set.Resources.Contains(relative)) set.Resources.Add(relative);
+
+            Write(Path.Combine(set.OutputDir, "Resource", "MD5", $"{hash}{ext}"), bytes, report);
+            if (!string.IsNullOrEmpty(set.StudioImageRoot))
+                Write(Path.Combine(set.StudioImageRoot!, "MD5", $"{hash}{ext}"), bytes, report);
+            return true;
+        }
+
+        /// <summary>File type from the first bytes, or null when unrecognised.</summary>
+        private static string? SniffExtension(byte[] b)
+        {
+            if (b.Length >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) return ".png";
+            if (b.Length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return ".jpg";
+            if (b.Length >= 6 && b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x38) return ".gif";
+            if (b.Length >= 2 && b[0] == 0x42 && b[1] == 0x4D) return ".bmp";
+            return null;
         }
 
         /// <summary>
@@ -108,6 +178,27 @@ namespace MozaPlugin.UI.DjsonImport
             {
                 if (string.Equals(sibling, archive, StringComparison.OrdinalIgnoreCase)) continue;
                 foreach (var entry in ReadArchive(sibling, report)) yield return entry;
+            }
+
+            // Widgets included from SimHub's shared _Library tree keep their images in
+            // their own archives there, not in the host dashboard's folder.
+            string? parent = null;
+            try { parent = Directory.GetParent(dir!)?.FullName; } catch { }
+            if (parent != null)
+            {
+                string library = Path.Combine(parent, "_Library");
+                if (Directory.Exists(library))
+                {
+                    IEnumerable<string> archives;
+                    try { archives = Directory.GetFiles(library, "*.djson.ressources", SearchOption.AllDirectories); }
+                    catch (Exception ex)
+                    {
+                        report.Notes.Add($"could not scan '{library}': {ex.Message}");
+                        archives = Array.Empty<string>();
+                    }
+                    foreach (var a in archives)
+                        foreach (var entry in ReadArchive(a, report)) yield return entry;
+                }
             }
 
             foreach (var file in SafeListFiles(dir!, report))
@@ -175,7 +266,7 @@ namespace MozaPlugin.UI.DjsonImport
             }
         }
 
-        private static void Write(string path, byte[] bytes, ConversionReport report)
+        private static void Write(string path, byte[] bytes, ConversionReport? report)
         {
             try
             {
@@ -190,7 +281,7 @@ namespace MozaPlugin.UI.DjsonImport
             }
             catch (Exception ex)
             {
-                report.Notes.Add($"could not write '{path}': {ex.Message}");
+                report?.Notes.Add($"could not write '{path}': {ex.Message}");
             }
         }
 

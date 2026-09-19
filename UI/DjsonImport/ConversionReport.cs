@@ -39,6 +39,11 @@ namespace MozaPlugin.UI.DjsonImport
         public int CanvasWidth { get; set; }
         public int CanvasHeight { get; set; }
         public int ScreenCount { get; set; }
+        /// <summary>Elements in the emitted file, Window included. The id cap is 10000; the
+        /// largest dashboard seen loaded on a wheel is 817.</summary>
+        public int NodeCount { get; set; }
+        /// <summary>Bindings the wheel evaluates per frame across the whole file.</summary>
+        public int BindingCount { get; set; }
         /// <summary>Uniform scale applied to fit the wheel canvas, per screen.</summary>
         public List<double> ScreenFitScales { get; } = new List<double>();
 
@@ -119,6 +124,7 @@ namespace MozaPlugin.UI.DjsonImport
                             + ")");
             }
             sb.AppendLine($"items      : {Summary()}");
+            if (NodeCount > 0) sb.AppendLine($"nodes      : {NodeCount} ({BindingCount} bindings)");
             sb.AppendLine($"channels   : {Channels.Count}"
                         + (ChannelOverrides.Count > 0
                             ? $" ({ChannelOverrides.Count} fed from SimHub)" : ""));

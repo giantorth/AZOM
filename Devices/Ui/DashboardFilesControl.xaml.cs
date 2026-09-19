@@ -289,7 +289,7 @@ namespace MozaPlugin.Devices.Ui
             }
 
             var dialog = new DjsonImportDialog(
-                _plugin.DashProfileStore, ideal, _plugin.ActiveTelemetryMzdashFolder)
+                _plugin.DashProfileStore, ideal, _plugin.ActiveTelemetryMzdashFolder, _plugin.Settings)
             {
                 Owner = Window.GetWindow(this),
             };
@@ -297,6 +297,8 @@ namespace MozaPlugin.Devices.Ui
 
             if (!dialog.Converted) return;
 
+            // The node ceiling typed into the dialog persists with the settings.
+            _plugin.SaveSettings();
             PublishChannelOverrides(dialog.Result, dialog.ConvertedPath);
             _plugin.ReloadDashboardLibrary();
             SeedUploadLibrary(force: true);

@@ -651,6 +651,11 @@ namespace MozaPlugin.Settings
         // Download dashboards from the wheel when it reports them.
         public bool TelemetryDownloadDashboard { get; set; } = false;
 
+        // Node ceiling for the SimHub .djson importer's sub-dashboard page expansion.
+        // 0 = the converter's proven default. An oversized dashboard locks the wheel's
+        // firmware, so this is the knob for bisecting the real limit against hardware.
+        public int DjsonImportMaxNodes { get; set; } = 0;
+
         // Telemetry send rate in Hz
         public int TelemetrySendRateHz { get; set; } = 20;
 

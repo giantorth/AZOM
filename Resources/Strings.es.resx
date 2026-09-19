@@ -797,4 +797,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>Paneles de SimHub (*.djson;*.simhubdash)|*.djson;*.simhubdash|Todos los archivos (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Error de conversión: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % de los widgets descartados</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Límite de nodos</value></data>
 </root>

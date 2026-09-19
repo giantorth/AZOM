@@ -791,4 +791,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>Ταμπλό SimHub (*.djson;*.simhubdash)|*.djson;*.simhubdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Η μετατροπή απέτυχε: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Απορρίφθηκε το {0}% των widget</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Όριο κόμβων</value></data>
 </root>

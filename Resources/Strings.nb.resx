@@ -797,4 +797,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub-dashbord (*.djson;*.simhubdash)|*.djson;*.simhubdash|Alle filer (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Konverteringen mislyktes: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % av modulene forkastet</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Nodegrense</value></data>
 </root>

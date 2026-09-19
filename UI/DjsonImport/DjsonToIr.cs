@@ -6,6 +6,20 @@ using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.UI.DjsonImport
 {
+    /// <summary>A widget whose page is chosen by a bound selector, and what inlining
+    /// every page as its own layer would add to the output.</summary>
+    public sealed class PageExpansionCandidate
+    {
+        public string File { get; set; } = "";
+        public int Pages { get; set; }
+        /// <summary>How many times the dashboard places this widget.</summary>
+        public int Instances { get; set; }
+        /// <summary>Nodes added beyond the single static page, summed over instances.
+        /// Widgets nested inside those pages are counted as one item each, so this
+        /// undercounts a little — enough for budgeting, not for the id cap.</summary>
+        public int ExtraNodes { get; set; }
+    }
+
     /// <summary>
     /// Maps SimHub's item tree onto the format-neutral <see cref="IrNode"/> tree.
     ///
@@ -19,7 +33,7 @@ namespace MozaPlugin.UI.DjsonImport
         private readonly BindingTranslator _bindings;
         private readonly FontMap _fonts;
         private readonly ConversionReport _report;
-        private readonly IReadOnlyDictionary<string, string> _images;
+        private readonly ImageSet _images;
         private readonly string _sourceDir;
 
         /// <summary>Guards against a widget cycle (A includes B includes A), which would
@@ -29,8 +43,23 @@ namespace MozaPlugin.UI.DjsonImport
 
         private const int MaxRepetitions = 64;
 
+        /// <summary>Widget files whose bound page selector may expand into one layer per
+        /// page. Null expands none — the probe pass runs that way to price each candidate,
+        /// then the converter picks a set against its node budget and passes it in.</summary>
+        public ISet<string>? ExpandedWidgets { get; set; }
+
+        /// <summary>Every paged widget met during the walk, keyed by file, with what
+        /// expanding it would cost. The converter reads this after the probe pass.</summary>
+        public Dictionary<string, PageExpansionCandidate> PagedWidgets { get; } =
+            new Dictionary<string, PageExpansionCandidate>(StringComparer.OrdinalIgnoreCase);
+
+        // Parsed widget files, for pricing nested widgets without re-reading a file that
+        // a dashboard may place 25 times.
+        private readonly Dictionary<string, JObject?> _widgetRoots =
+            new Dictionary<string, JObject?>(StringComparer.OrdinalIgnoreCase);
+
         public DjsonToIr(BindingTranslator bindings, FontMap fonts, ConversionReport report,
-                         IReadOnlyDictionary<string, string> images, string sourceDir)
+                         ImageSet images, string sourceDir)
         {
             _bindings = bindings;
             _fonts = fonts;
@@ -222,6 +251,9 @@ namespace MozaPlugin.UI.DjsonImport
                     Visible = DjsonReader.Bool(item, "Visible", true),
                 };
                 layer.Effect.Opacity = Opacity(item);
+                // A layer's own Visible/Opacity bindings gate the whole subtree — this is
+                // how a dashboard stacks alternate panels in one slot and picks one live.
+                _bindings.Apply(item, layer, "Layer");
 
                 foreach (var child in DjsonReader.Items(item["Childrens"]))
                     AddConverted(layer.Children, child);
@@ -287,14 +319,8 @@ namespace MozaPlugin.UI.DjsonImport
                     Visible = DjsonReader.Bool(item, "Visible", true),
                 };
                 host.Effect.Opacity = Opacity(item);
-
-                // A widget file carries its own Screens[]; the item embeds the first one.
-                foreach (var screen in DjsonReader.Items(root["Screens"]))
-                {
-                    foreach (var child in DjsonReader.Items(screen["Items"]))
-                        AddConverted(host.Children, child);
-                    break;
-                }
+                // The container's own Visible/Opacity bindings gate the whole subtree.
+                _bindings.Apply(item, host, "WidgetItem");
 
                 // A WidgetItem draws the referenced dashboard INTO its own rectangle, so
                 // the widget's coordinates are in the widget's own canvas and have to be
@@ -323,6 +349,8 @@ namespace MozaPlugin.UI.DjsonImport
                     }
                 }
 
+                InlineWidgetPages(item, root, host, name, fileName);
+
                 foreach (var c in host.Children)
                     CanvasFitter.ScaleAndOffset(c, scale, left, top);
 
@@ -334,6 +362,132 @@ namespace MozaPlugin.UI.DjsonImport
             {
                 _widgetStack.Remove(path);
             }
+        }
+
+        /// <summary>
+        /// Inline the widget's pages into <paramref name="host"/>.
+        ///
+        /// <para>A widget file is a dashboard in its own right and may have many pages
+        /// (the Lovely Dashboard's MFM has 16). <c>InitialScreenIndex</c> picks which one
+        /// shows. When that index is a plain number, that page alone is inlined. When it
+        /// is <b>bound</b> — the widget pages at runtime — every page is inlined as its own
+        /// layer whose visibility tests the selector against its position: the flattened
+        /// equivalent of a paging sub-dashboard, and the only way the switch survives on
+        /// a wheel that has no notion of nested dashboards.</para>
+        ///
+        /// <para>Next/PreviousScreenCommand (input-driven paging) has no wheel equivalent
+        /// and is not carried; the static index is the honest fallback there.</para>
+        /// </summary>
+        private void InlineWidgetPages(JObject item, JObject root, IrNode host,
+                                       string name, string fileName)
+        {
+            var screens = new List<JObject>(DjsonReader.Items(root["Screens"]));
+            if (screens.Count == 0) return;
+
+            int pick = Math.Max(0, Math.Min(DjsonReader.Int(item, "InitialScreenIndex", 0),
+                                            screens.Count - 1));
+            var selectorSpec = DjsonReader.Obj(DjsonReader.Obj(item, "Bindings"), "InitialScreenIndex");
+            bool paged = selectorSpec != null && screens.Count > 1;
+
+            if (paged)
+            {
+                // Price the expansion whether or not it is admitted this pass — the
+                // converter budgets from these figures after the probe.
+                if (!PagedWidgets.TryGetValue(fileName, out var cand))
+                {
+                    cand = new PageExpansionCandidate { File = fileName, Pages = screens.Count };
+                    PagedWidgets[fileName] = cand;
+                }
+                cand.Instances++;
+                var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { fileName };
+                for (int i = 0; i < screens.Count; i++)
+                    if (i != pick) cand.ExtraNodes += 1 + CountItems(screens[i]["Items"], visiting);
+            }
+
+            bool admitted = paged && ExpandedWidgets != null && ExpandedWidgets.Contains(fileName);
+            string? selectorJs = admitted ? _bindings.TranslateExpression(selectorSpec!) : null;
+
+            if (selectorJs == null)
+            {
+                foreach (var child in DjsonReader.Items(screens[pick]["Items"]))
+                    AddConverted(host.Children, child);
+
+                if (screens.Count > 1)
+                {
+                    string why = !paged ? "static InitialScreenIndex"
+                               : !admitted ? "page expansion is over the node budget"
+                               : "its bound page selector could not be carried";
+                    _report.Notes.Add($"widget '{fileName}' has {screens.Count} pages — "
+                                    + $"page {pick + 1} inlined ({why})");
+                }
+                return;
+            }
+
+            for (int i = 0; i < screens.Count; i++)
+            {
+                var page = new IrNode { Kind = IrKind.Layer, Name = $"{name} page {i + 1}" };
+                foreach (var child in DjsonReader.Items(screens[i]["Items"]))
+                    AddConverted(page.Children, child);
+                if (page.Children.Count == 0) continue;
+
+                // One selector value, read by every page: a bound selector lands on a
+                // single borrowed channel, so N pages cost one allocation, not N.
+                page.Bindings.Add(new IrBinding
+                {
+                    Target = "general.visible",
+                    Expression = $"(Math.round(Number({selectorJs}))==={i})",
+                    Format = JsFormatters.ChainIdentity,
+                });
+                host.Children.Add(page);
+            }
+
+            _report.Notes.Add($"widget '{fileName}': {screens.Count} pages inlined as layers "
+                            + "switched by its bound page selector");
+        }
+
+        /// <summary>
+        /// Nodes an item list would produce once inlined: nested layers, and nested
+        /// widgets at the size of the page they would show. Counting a nested widget as
+        /// one item undercounted a widget-heavy dashboard by a third, which made the node
+        /// budget an estimate rather than a ceiling.
+        /// </summary>
+        private int CountItems(JToken? items, HashSet<string> visiting)
+        {
+            int n = 0;
+            foreach (var it in DjsonReader.Items(items))
+            {
+                n++;
+                n += CountItems(it["Childrens"], visiting);
+
+                if (!string.Equals(DjsonReader.ShortTypeName(it), "WidgetItem", StringComparison.Ordinal))
+                    continue;
+
+                string file = DjsonReader.Str(it, "FileName");
+                if (file.Length == 0 || !visiting.Add(file)) continue;   // missing or cyclic
+                try
+                {
+                    var root = LoadWidgetRoot(file);
+                    if (root == null) continue;
+                    var pages = new List<JObject>(DjsonReader.Items(root["Screens"]));
+                    if (pages.Count == 0) continue;
+                    int pick = Math.Max(0, Math.Min(DjsonReader.Int(it, "InitialScreenIndex", 0), pages.Count - 1));
+                    n += CountItems(pages[pick]["Items"], visiting);
+                }
+                finally
+                {
+                    visiting.Remove(file);
+                }
+            }
+            return n;
+        }
+
+        private JObject? LoadWidgetRoot(string fileName)
+        {
+            if (_widgetRoots.TryGetValue(fileName, out var cached)) return cached;
+            string? path = ResolveWidgetPath(fileName);
+            var (root, _) = path == null ? (null, "") : DjsonReader.Load(path);
+            _widgetRoots[fileName] = root;
+            return root;
         }
 
         private string? ResolveWidgetPath(string fileName)
@@ -388,9 +542,16 @@ namespace MozaPlugin.UI.DjsonImport
         {
             var node = new IrNode { Kind = IrKind.Image };
             string imageName = DjsonReader.Str(item, "Image");
-            if (imageName.Length > 0 && _images.TryGetValue(imageName, out var src))
+            bool bound = DjsonReader.Obj(DjsonReader.Obj(item, "Bindings"), "Image") != null;
+            if (imageName.Length == 0)
+            {
+                // With a binding the translator decides whether the image can be carried;
+                // without one there is simply nothing to show.
+                if (!bound) _report.Notes.Add($"image item '{name}' names no image in the source");
+            }
+            else if (_images.TryResolve(imageName, out var src))
                 node.ImageSrc = src;
-            else if (imageName.Length > 0)
+            else
                 _report.Notes.Add($"image '{imageName}' (item '{name}') not found in the resource archive");
             return node;
         }
@@ -465,21 +626,39 @@ namespace MozaPlugin.UI.DjsonImport
                 ? DjsonReader.Int(item, "ProgressBarAlignment")
                 : DjsonReader.Int(item, "GaugeAlignment");
 
+            var gauge = new IrGauge
+            {
+                Minimum = DjsonReader.Num(item, "Minimum", 0),
+                Maximum = DjsonReader.Num(item, "Maximum", 100),
+                Value = DjsonReader.Num(item, "Value", 0),
+                GaugeColor = ColorOf(item, colorKey, "#FFFFFFFF"),
+                BackgroundColor = ColorOf(item, "BackgroundColor", "#00000000"),
+                Vertical = vertical,
+                Alignment = GaugeAlign(alignRaw),
+            };
+
+            // mzdash's linearGauge has the same two image slots SimHub does.
+            gauge.GaugeImage = ResolveGaugeImage(item, "GaugeImage");
+            gauge.BackgroundImage = ResolveGaugeImage(item, "BackgroundImage");
+
             return new IrNode
             {
                 Kind = IrKind.LinearGauge,
                 Background = ColorOf(item, "BackgroundColor", "#00000000"),
-                Gauge = new IrGauge
-                {
-                    Minimum = DjsonReader.Num(item, "Minimum", 0),
-                    Maximum = DjsonReader.Num(item, "Maximum", 100),
-                    Value = DjsonReader.Num(item, "Value", 0),
-                    GaugeColor = ColorOf(item, colorKey, "#FFFFFFFF"),
-                    BackgroundColor = ColorOf(item, "BackgroundColor", "#00000000"),
-                    Vertical = vertical,
-                    Alignment = GaugeAlign(alignRaw),
-                },
+                Gauge = gauge,
             };
+        }
+
+        /// <summary>A gauge's image slot, or empty. SimHub writes <c>"None"</c> for unset,
+        /// and a stray value naming the dashboard file itself has been seen.</summary>
+        private string ResolveGaugeImage(JObject item, string key)
+        {
+            string name = DjsonReader.Str(item, key);
+            if (name.Length == 0 || string.Equals(name, "None", StringComparison.OrdinalIgnoreCase)) return "";
+            if (name.EndsWith(".djson", StringComparison.OrdinalIgnoreCase)) return "";
+            if (_images.TryResolve(name, out var src)) return src;
+            _report.Notes.Add($"gauge image '{name}' not found in the resource archive");
+            return "";
         }
 
         private IrNode CircularGauge(JObject item)
@@ -556,13 +735,44 @@ namespace MozaPlugin.UI.DjsonImport
             return node;
         }
 
-        /// <summary>One SimHub shift light is one LED. Rendered as an ellipse whose
-        /// visibility tracks the RPM percentage crossing this LED's share of the bar.</summary>
+        /// <summary>
+        /// One SimHub shift light is one LED: an on-image and an off-image, switched when
+        /// the RPM percentage crosses this LED's share of the bar. When both images are in
+        /// the bundle it is emitted exactly that way — an <c>Image.qml</c> whose
+        /// <c>image.src</c> flips between the two paths. Without the images it degrades to
+        /// an ellipse that appears at the threshold.
+        /// </summary>
         private IEnumerable<IrNode> ConvertShiftLight(JObject item, string name)
         {
             int index = Math.Max(1, DjsonReader.Int(item, "LedNumber", 1));
             int total = Math.Max(1, DjsonReader.Int(item, "TotalLeds", 1));
             double threshold = (double)index / (total + 1) * 100.0;
+
+            const string rpmUrl = "v1/gameData/CarSettings_CurrentDisplayedRPMPercent";
+            string test = string.Format(CultureInfo.InvariantCulture, "(({0})>={1})",
+                ChannelResolver.ChannelRead(rpmUrl),
+                threshold.ToString("0.##", CultureInfo.InvariantCulture));
+            _report.Channels.Add(rpmUrl);
+
+            bool haveOn = _images.TryResolve(DjsonReader.Str(item, "OnImage"), out var onSrc);
+            bool haveOff = _images.TryResolve(DjsonReader.Str(item, "OffImage"), out var offSrc);
+
+            if (haveOn && haveOff)
+            {
+                var led = new IrNode { Kind = IrKind.Image, Name = name, ImageSrc = offSrc };
+                ApplyCommon(item, led);
+                led.Bindings.Add(new IrBinding
+                {
+                    Target = "image.src",
+                    Expression = test,
+                    Format = "((function(m){return m[String(_result)]||'';})({'true':"
+                           + NCalcToJs.JsString(onSrc) + ",'false':" + NCalcToJs.JsString(offSrc) + "}))",
+                });
+                _report.Record("ShiftLightItem", name, ItemOutcome.Converted,
+                    "on/off images switched at the LED's RPM threshold");
+                yield return led;
+                yield break;
+            }
 
             var node = new IrNode
             {
@@ -571,21 +781,15 @@ namespace MozaPlugin.UI.DjsonImport
                 Background = ColorOf(item, "BackgroundColor", "#FFFF0000"),
             };
             ApplyCommon(item, node);
-
             node.Bindings.Add(new IrBinding
             {
                 Target = "general.visible",
-                Expression = string.Format(CultureInfo.InvariantCulture,
-                    "(({0})>={1})",
-                    ChannelResolver.ChannelRead("v1/gameData/CarSettings_CurrentDisplayedRPMPercent"),
-                    threshold.ToString("0.##", CultureInfo.InvariantCulture)),
+                Expression = test,
                 Format = JsFormatters.ChainIdentity,
             });
-            _report.Channels.Add("v1/gameData/CarSettings_CurrentDisplayedRPMPercent");
 
             _report.Record("ShiftLightItem", name, ItemOutcome.Substituted,
-                "LED image replaced by an RPM-threshold ellipse "
-                + "(the wheel's own RPM LEDs usually cover this already)");
+                "LED images not in the bundle — replaced by an RPM-threshold ellipse");
             yield return node;
         }
 

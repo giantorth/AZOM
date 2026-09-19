@@ -105,6 +105,9 @@ namespace MozaPlugin.UI.DjsonImport
 
         // LinearGauge
         public bool Vertical { get; set; }
+        /// <summary><c>MD5/…</c> paths for the gauge's fill and backdrop images, or empty.</summary>
+        public string GaugeImage { get; set; } = "";
+        public string BackgroundImage { get; set; } = "";
         /// <summary>mzdash spelling: AlignLeft / AlignRight / AlignTop / AlignBottom.</summary>
         public string Alignment { get; set; } = "AlignLeft";
 

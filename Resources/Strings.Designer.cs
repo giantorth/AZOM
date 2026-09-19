@@ -850,5 +850,6 @@ namespace MozaPlugin.Resources
         public static string FileFilter_Djson => Get("FileFilter_Djson");
         public static string Status_DjsonConvertFailed => Get("Status_DjsonConvertFailed");
         public static string Status_DjsonHeavyLoss => Get("Status_DjsonHeavyLoss");
+        public static string Label_NodeLimit => Get("Label_NodeLimit");
     }
 }

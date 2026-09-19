@@ -6,6 +6,7 @@ using System.Windows.Media;
 using Microsoft.Win32;
 using MozaPlugin.Diagnostics;
 using MozaPlugin.Resources;
+using MozaPlugin.Settings;
 using MozaPlugin.Telemetry.Dashboard;
 using Newtonsoft.Json.Linq;
 
@@ -53,13 +54,34 @@ namespace MozaPlugin.UI.DjsonImport
         /// <param name="idealDeviceInfos">The connected display's descriptor from the
         /// wheel's own configJson, or null when no wheel is connected. Never substitute
         /// Studio's built-in literal — it describes one specific wheel.</param>
+        /// <param name="settings">Plugin settings, for the persisted node ceiling. The
+        /// caller saves after the dialog closes.</param>
         public DjsonImportDialog(DashboardProfileStore store, JArray? idealDeviceInfos,
-                                 string? libraryFolder)
+                                 string? libraryFolder, MozaPluginSettings? settings)
         {
             _store = store;
             _idealDeviceInfos = idealDeviceInfos;
             _libraryFolder = libraryFolder;
+            _settings = settings;
             InitializeComponent();
+
+            int limit = settings != null && settings.DjsonImportMaxNodes > 0
+                ? settings.DjsonImportMaxNodes
+                : DjsonConverter.DefaultMaxNodes;
+            NodeLimitBox.Text = limit.ToString();
+        }
+
+        private readonly MozaPluginSettings? _settings;
+
+        /// <summary>The node ceiling typed into the dialog, clamped to the schema's hard
+        /// cap. Falls back to the proven default when the field isn't a number.</summary>
+        private int ReadNodeLimit()
+        {
+            if (!int.TryParse(NodeLimitBox.Text.Trim(), out int n) || n <= 0)
+                n = DjsonConverter.DefaultMaxNodes;
+            n = Math.Min(n, MzdashWriter.MaxElementId + 1);
+            NodeLimitBox.Text = n.ToString();
+            return n;
         }
 
         private void PickFile_Click(object sender, RoutedEventArgs e)
@@ -105,10 +127,13 @@ namespace MozaPlugin.UI.DjsonImport
                 var converter = PluginChannelCatalog.CreateConverter(_store);
                 converter.StudioImageRoot = DashboardStudioLauncher.ResolveImageRoot();
                 converter.IdealDeviceInfos = _idealDeviceInfos;
+                converter.SimHubRoot = FindSimHubRoot();
                 // Size the canvas for the display actually connected. Sizes differ a
                 // lot — a CM2 is 1280x720, the same 16:9 most SimHub dashboards are
                 // authored at, so targeting it needs almost no rescale.
                 converter.TargetDisplay(ProductTypeOf(_idealDeviceInfos));
+                converter.MaxNodes = ReadNodeLimit();
+                if (_settings != null) _settings.DjsonImportMaxNodes = converter.MaxNodes;
                 result = converter.Convert(_sourcePath!, outputRoot!);
             }
             catch (Exception ex)
@@ -205,14 +230,21 @@ namespace MozaPlugin.UI.DjsonImport
         /// own default then.</summary>
         private static string? FindSimHubTemplates()
         {
+            string? simhub = FindSimHubRoot();
+            if (simhub == null) return null;
+            string templates = Path.Combine(simhub, "DashTemplates");
+            return Directory.Exists(templates) ? templates : null;
+        }
+
+        /// <summary>The running SimHub's install directory — the plugin is loaded into
+        /// SimHub's process, so the entry assembly is SimHub itself.</summary>
+        private static string? FindSimHubRoot()
+        {
             try
             {
-                string? simhub = Path.GetDirectoryName(
+                string? dir = Path.GetDirectoryName(
                     System.Reflection.Assembly.GetEntryAssembly()?.Location);
-                if (string.IsNullOrEmpty(simhub)) return null;
-
-                string templates = Path.Combine(simhub!, "DashTemplates");
-                return Directory.Exists(templates) ? templates : null;
+                return string.IsNullOrEmpty(dir) || !Directory.Exists(dir) ? null : dir;
             }
             catch
             {

@@ -782,4 +782,5 @@
   <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub woof-boards (*.djson;*.simhubdash)|*.djson;*.simhubdash|Every last file (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Conversion flopped: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0}% of widgets buried in the yard</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Node leash</value></data>
 </root>

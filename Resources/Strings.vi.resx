@@ -792,4 +792,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>Bảng điều khiển SimHub (*.djson;*.simhubdash)|*.djson;*.simhubdash|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Chuyển đổi thất bại: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>Đã bỏ {0}% tiện ích</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Giới hạn nút</value></data>
 </root>

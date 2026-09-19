@@ -792,4 +792,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub-Dashboards (*.djson;*.simhubdash)|*.djson;*.simhubdash|Alle Dateien (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>Umwandlung fehlgeschlagen: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>{0} % der Widgets verworfen</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>Knotenlimit</value></data>
 </root>

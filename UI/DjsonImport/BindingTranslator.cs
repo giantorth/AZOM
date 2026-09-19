@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.UI.DjsonImport
@@ -22,12 +23,15 @@ namespace MozaPlugin.UI.DjsonImport
     {
         private readonly ChannelResolver _channels;
         private readonly NCalcToJs _js;
+        private readonly ImageSet _images;
         private readonly ConversionReport _report;
 
-        public BindingTranslator(ChannelResolver channels, NCalcToJs js, ConversionReport report)
+        public BindingTranslator(ChannelResolver channels, NCalcToJs js, ImageSet images,
+                                 ConversionReport report)
         {
             _channels = channels;
             _js = js;
+            _images = images;
             _report = report;
         }
 
@@ -107,8 +111,20 @@ namespace MozaPlugin.UI.DjsonImport
         /// <summary>Attach every binding this item implies to <paramref name="node"/>.
         /// Returns false when the item's sole purpose was a data source we could not
         /// resolve, so the caller can drop it rather than emit a dead widget.</summary>
+        /// <summary>
+        /// When set, only container (Layer) bindings and page selectors are translated;
+        /// leaf items are skipped entirely. The converter runs one pass in this mode
+        /// before the real one so the bindings that gate whole subtrees — a panel's
+        /// visibility, a widget's page selector — borrow their channels first. Left to
+        /// tree order, leaf readouts earlier in the walk drain the pool and a selector
+        /// controlling 29 pages of content is the thing that goes without.
+        /// </summary>
+        public bool ContainerBindingsOnly { get; set; }
+
         public bool Apply(JObject item, IrNode node, string shortType)
         {
+            if (ContainerBindingsOnly && node.Kind != IrKind.Layer) return true;
+
             bool builtInOk = ApplyBuiltIn(item, node, shortType);
             ApplyBehavior(item, node);
             ApplyFormulaBindings(item, node);
@@ -176,21 +192,30 @@ namespace MozaPlugin.UI.DjsonImport
                 // TargetPropertyName is optional — 59 bindings in the stock corpus omit
                 // it and the dictionary key is the only source of the target.
                 string sourceTarget = DjsonReader.Str(spec, "TargetPropertyName", prop.Name);
+
+                // A widget's page selector is handled by the widget inliner, which turns it
+                // into per-page visibility — not a binding on the host node.
+                if (sourceTarget == "InitialScreenIndex") continue;
+
                 string? target = MapTarget(sourceTarget, node.Kind);
                 if (target == null)
                 {
-                    _report.Notes.Add($"binding target '{sourceTarget}' has no mzdash equivalent");
+                    _report.Notes.Add(node.Kind == IrKind.Layer
+                        ? $"'{sourceTarget}' is bound on a container — a flattened layer has no "
+                          + "geometry or colour of its own, so its children keep their design-time values"
+                        : $"binding target '{sourceTarget}' has no mzdash equivalent");
                     continue;
                 }
 
                 string expression = DjsonReader.Str(DjsonReader.Obj(spec, "Formula"), "Expression");
                 if (expression.Length == 0) continue;
 
-                // A colour target needs a "#RRGGBB" string. Borrowed channels are numeric,
-                // so an expression that can only be evaluated by SimHub has nowhere to put
-                // a colour — offloading it would land a number in a colour slot and render
-                // black. Leave the design-time colour instead and report it.
-                var t = _js.Translate(expression, allowOffload: !IsColorTarget(target));
+                // Colour and image targets need text — a "#RRGGBB" or an image path.
+                // Borrowed channels are numeric, so an expression only SimHub can evaluate
+                // has nowhere to put such a value; offloading would land a number in the
+                // slot and render black or blank. Keep the design-time value and report it.
+                bool textResult = IsColorTarget(target) || target == "image.src";
+                var t = _js.Translate(expression, allowOffload: !textResult);
                 if (!t.Ok)
                 {
                     NoteFailure(expression, t);
@@ -198,6 +223,12 @@ namespace MozaPlugin.UI.DjsonImport
                 }
                 foreach (var u in t.Urls) _report.Channels.Add(u);
                 foreach (var note in t.Notes) _report.Notes.Add(note);
+
+                if (target == "image.src")
+                {
+                    AddImageBinding(node, t, expression);
+                    continue;
+                }
 
                 int mode = DjsonReader.Int(spec, "Mode", 2);
                 if (mode == 4)
@@ -220,6 +251,28 @@ namespace MozaPlugin.UI.DjsonImport
             }
         }
 
+        /// <summary>
+        /// Translate one binding's formula to wheel JS, offloading to SimHub when the wheel
+        /// cannot evaluate it. For callers that need the expression itself rather than a
+        /// binding on a node — the widget page selector, whose one value drives the
+        /// visibility of every inlined page. Null when it could not be carried.
+        /// </summary>
+        public string? TranslateExpression(JObject spec)
+        {
+            string expression = DjsonReader.Str(DjsonReader.Obj(spec, "Formula"), "Expression");
+            if (expression.Length == 0) return null;
+
+            var t = _js.Translate(expression, allowOffload: true);
+            if (!t.Ok)
+            {
+                NoteFailure(expression, t);
+                return null;
+            }
+            foreach (var u in t.Urls) _report.Channels.Add(u);
+            foreach (var note in t.Notes) _report.Notes.Add(note);
+            return t.Js;
+        }
+
         /// <summary>Pick the chain step that renders the value. A <c>FormatString</c> on the
         /// binding decides it; otherwise a text target stringifies and anything else (a
         /// gauge value, a colour, a visibility flag) passes through untouched.</summary>
@@ -236,6 +289,46 @@ namespace MozaPlugin.UI.DjsonImport
                 if (decimals >= 0) return JsFormatters.ChainDecimals(decimals);
             }
             return JsFormatters.ChainIdentity;
+        }
+
+        /// <summary>
+        /// A formula that picks an image by name — <c>if([Rpm] &gt; 85, 'LEDSOFF',
+        /// 'LEDSBLUE')</c>. The condition runs on the wheel; the name it produces is
+        /// mapped to the image's <c>MD5/…</c> path in the formatter step, from the string
+        /// literals the formula contains. Every named image is pulled into the bundle so
+        /// the path resolves. A formula that builds names dynamically (<c>'tyre-' + [n]</c>)
+        /// has no literals to map and keeps the static image.
+        /// </summary>
+        private void AddImageBinding(IrNode node, TranspileResult t, string expression)
+        {
+            var map = new System.Text.StringBuilder("{");
+            int mapped = 0;
+            foreach (var name in t.StringLiterals.Distinct())
+            {
+                if (!_images.TryResolve(name, out var src))
+                {
+                    _report.Notes.Add($"image '{name}' chosen by a formula was not found in the resource archive");
+                    continue;
+                }
+                if (mapped++ > 0) map.Append(',');
+                map.Append(NCalcToJs.JsString(name)).Append(':').Append(NCalcToJs.JsString(src));
+            }
+            map.Append('}');
+
+            if (mapped == 0)
+            {
+                _report.Notes.Add("image binding kept static — its formula names no image the bundle has: "
+                                + Truncate(expression));
+                return;
+            }
+
+            node.Bindings.Add(new IrBinding
+            {
+                Target = "image.src",
+                Expression = t.Js,
+                Format = "((function(m){var k=String(_result);return m.hasOwnProperty(k)?m[k]:'';})("
+                       + map + "))",
+            });
         }
 
         /// <summary>True for mzdash targets whose value is a colour string.</summary>
@@ -378,8 +471,15 @@ namespace MozaPlugin.UI.DjsonImport
             bool circular = kind == IrKind.CircularGauge;
             string gauge = linear ? "linearGauge" : "circularGauge";
 
+            // Layer.qml carries only general.{locked,visible} and effect.{blink*,opacity}.
+            // A geometry or colour binding on a flattened container has nowhere to land;
+            // its children already hold absolute coordinates and their own colours.
+            if (kind == IrKind.Layer && simhubTarget != "Visible" && simhubTarget != "Opacity")
+                return null;
+
             switch (simhubTarget)
             {
+                case "Image": return kind == IrKind.Image ? "image.src" : null;
                 case "Text": return "text.text";
                 case "TextColor": return "text.fontColor";
                 case "FontSize": return "text.fontSize";

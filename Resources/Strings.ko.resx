@@ -791,4 +791,5 @@ Id: {2}</value></data>
   <data name="FileFilter_Djson" xml:space="preserve"><value>SimHub 대시보드 (*.djson;*.simhubdash)|*.djson;*.simhubdash|모든 파일 (*.*)|*.*</value></data>
   <data name="Status_DjsonConvertFailed" xml:space="preserve"><value>변환 실패: {0}</value></data>
   <data name="Status_DjsonHeavyLoss" xml:space="preserve"><value>위젯 {0}% 삭제됨</value></data>
+  <data name="Label_NodeLimit" xml:space="preserve"><value>노드 제한</value></data>
 </root>

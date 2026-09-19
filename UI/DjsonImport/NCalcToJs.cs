@@ -18,6 +18,10 @@ namespace MozaPlugin.UI.DjsonImport
         public List<string> Problems { get; } = new List<string>();
         /// <summary>Non-fatal remarks about how it was converted.</summary>
         public List<string> Notes { get; } = new List<string>();
+        /// <summary>String literals the expression contained, in order. An image binding
+        /// like <c>if([Rpm] &gt; 85, 'LEDSOFF', 'LEDSBLUE')</c> names its images this way,
+        /// and the caller maps each to a <c>MD5/…</c> path.</summary>
+        public List<string> StringLiterals { get; } = new List<string>();
 
         public static TranspileResult Fail(string problem)
         {
@@ -310,6 +314,7 @@ namespace MozaPlugin.UI.DjsonImport
                         return new Arg(t.Text, null, ParseNumber(t.Text));
 
                     case TokKind.String:
+                        _result.StringLiterals.Add(t.Text);
                         return new Arg(JsString(t.Text), t.Text, null);
 
                     case TokKind.Property:
