@@ -234,6 +234,25 @@ tracks gain as well, so the channel still fades in and out.
 
 A steady effect on this channel therefore produces little or nothing. That is
 the hardware's design, not a bug.
+### Keepalive is mandatory on a dedicated lane
+
+The module never speaks unprompted, and once detected the plugin has nothing to
+say to it while no effect is running. On its own USB port that means the lane
+goes completely silent — and `MozaSerialConnection`'s half-open watchdog closes
+any port with no inbound for 30 s. Every other MOZA device is chatty enough that
+this never fires; this one is the exception.
+
+Left alone the failure is quiet and confusing: the port closes 30 s after
+connecting, detection stays latched so nothing reopens it, and effects appear to
+work only if you trigger them inside that first 30 s window. Reported as
+`TWV94SPY` — "clicking Test makes it work, but once I exit the test and go back
+in, it stops functioning".
+
+So the registry sends a presence query on every connected lane each 5 s poll
+tick. It costs one 16-byte frame, sits well inside the 30 s window, and doubles
+as the liveness check. Readiness is gated on a lane being detected **and**
+connected, so a dropped lane reports disconnected rather than silently
+swallowing frames.
 
 ### Detection
 

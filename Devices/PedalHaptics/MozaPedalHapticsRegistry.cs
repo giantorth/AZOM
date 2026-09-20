@@ -33,6 +33,21 @@ namespace MozaPlugin.Devices.PedalHaptics
         // Copy-on-write snapshot so the ShakeIt post path never takes _lock.
         private PedalHapticsDeviceController[] _snapshot = Array.Empty<PedalHapticsDeviceController>();
 
+        /// <summary>
+        /// Poll ticks between retries once a routed lane has backed off.
+        /// 5 s x 12 = once a minute, which still finds a unit attached later.
+        /// </summary>
+        private const int SlowRoutedProbeTicks = 12;
+
+        /// <summary>
+        /// Fast probes a speculative routed lane gets before backing off. Most
+        /// users have no unit on the pipe at all, so this must not settle into a
+        /// permanent 5 s query against a busy telemetry link.
+        /// </summary>
+        private const int FastRoutedProbeAttempts = 6;
+
+        private int _tick;
+
         private bool _disposed;
 
         /// <summary>Raised the first time any unit answers its presence query.</summary>
@@ -54,6 +69,24 @@ namespace MozaPlugin.Devices.PedalHaptics
                 return false;
             }
         }
+        /// <summary>
+        /// True when a detected unit is also reachable right now. Detection
+        /// latches for the life of a lane, but the transport can still drop
+        /// underneath it — so this, not <see cref="AnyDetected"/>, is what
+        /// SimHub's connected state must follow. Reporting connected while the
+        /// port is shut makes every frame vanish silently.
+        /// </summary>
+        public bool AnyReady
+        {
+            get
+            {
+                var snap = System.Threading.Volatile.Read(ref _snapshot);
+                for (int i = 0; i < snap.Length; i++)
+                    if (snap[i].Detected && snap[i].IsConnected) return true;
+                return false;
+            }
+        }
+
 
         /// <summary>Lock-free gate for the hot ShakeIt path.</summary>
         public bool HasControllers => System.Threading.Volatile.Read(ref _snapshot).Length > 0;
@@ -108,15 +141,17 @@ namespace MozaPlugin.Devices.PedalHaptics
 
         /// <summary>
         /// Poll tick: pick up newly-plugged USB units, retire ones whose port
-        /// vanished, and re-probe any lane that has not answered yet. Called from
-        /// the plugin's 5 s timer.
+        /// vanished, reopen lanes that dropped, and keep the connected ones
+        /// talking so the transport's idle watchdog does not close them. Called
+        /// from the plugin's 5 s timer.
         /// </summary>
         public void Refresh()
         {
             if (_disposed) return;
 
+            _tick++;
             SyncUsbLanes();
-            NudgeUndetectedLanes();
+            ServiceLanes();
         }
 
         private void SyncUsbLanes()
@@ -185,30 +220,49 @@ namespace MozaPlugin.Devices.PedalHaptics
         }
 
         /// <summary>
-        /// Re-send the presence query on every lane that has never answered.
-        /// Uncapped on purpose: routed lanes are registered speculatively on each
-        /// pipe, so this is the only thing that notices a unit plugged in after
-        /// SimHub started. One small frame every 5 s.
+        /// Per-tick lane servicing: reopen anything that dropped, and keep every
+        /// connected lane talking.
         ///
-        /// A USB lane whose port exists but whose connection dropped is also
-        /// reopened here, so a wedged port recovers without a replug.
+        /// The keepalive is not optional. Once a unit is detected the plugin has
+        /// nothing else to say to it while no effect is running, and the unit
+        /// never speaks unprompted — so the lane goes completely silent, and
+        /// <see cref="MozaSerialConnection"/>'s half-open watchdog closes the
+        /// port after 30 s of no inbound. That is correct behaviour for every
+        /// chatty MOZA device; this one is the exception, so it has to generate
+        /// its own traffic. A query every tick is far inside that window and
+        /// costs one 16-byte frame.
+        ///
+        /// Reconnect covers lanes that already answered once: detection latches,
+        /// so a dropped lane would otherwise sit detected-but-dead forever with
+        /// nothing to reopen it.
         /// </summary>
-        private void NudgeUndetectedLanes()
+        private void ServiceLanes()
         {
             var snap = System.Threading.Volatile.Read(ref _snapshot);
             for (int i = 0; i < snap.Length; i++)
             {
                 var c = snap[i];
-                if (c.Detected) continue;
 
-                if (!c.IsRouted && !c.IsConnected)
+                // A USB lane owns its port, so it can reopen itself. A routed one
+                // borrows its owner's pipe and must wait for that owner.
+                if (!c.IsConnected)
                 {
+                    if (c.IsRouted) continue;
                     try { c.TryConnect(); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM] Pedal-haptics reconnect: {ex.Message}"); }
                     continue;
                 }
 
-                if (!c.IsConnected) continue;
+                // Routed lanes are registered speculatively on every pipe, and on
+                // most setups there is no unit on the pipe at all. Give each a
+                // short burst of fast probes, then drop to a slow retry rather
+                // than querying a busy telemetry link every tick forever.
+                // The slow retry still finds a unit attached later.
+                if (c.IsRouted && !c.Detected
+                    && c.ProbeAttempts >= FastRoutedProbeAttempts
+                    && (_tick % SlowRoutedProbeTicks) != 0)
+                    continue;
+
                 try { c.SendPresenceProbe(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Pedal-haptics probe: {ex.Message}"); }
             }

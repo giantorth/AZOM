@@ -27,7 +27,7 @@ namespace MozaPlugin
         /// both the connection manager's state and the motors driver's.
         /// </summary>
         internal bool IsPedalHapticsReady =>
-            _pedalHapticsRegistry?.AnyDetected == true
+            _pedalHapticsRegistry?.AnyReady == true
             && Devices.Haptics.MozaPedalHapticsBridge.IsSupported;
 
         /// <summary>

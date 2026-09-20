@@ -38,6 +38,7 @@ namespace MozaPlugin.Devices.PedalHaptics
         private readonly PedalHapticsEffectWorker _worker;
 
         private int _detected;      // 0/1, latched on the first vibration reply
+        private int _probeAttempts;
         private bool _disposed;
 
         /// <summary>Stable key for this unit — the USB instance id, or a port label for a routed lane.</summary>
@@ -135,8 +136,15 @@ namespace MozaPlugin.Devices.PedalHaptics
         /// detection is really asking; the reported state itself is ignored.
         /// </summary>
         public void SendPresenceProbe()
-            => SendOneShot(MozaPedalHapticsProtocol.BuildQueryFrame(
+        {
+            System.Threading.Interlocked.Increment(ref _probeAttempts);
+            SendOneShot(MozaPedalHapticsProtocol.BuildQueryFrame(
                 Addressing, (byte)PedalHapticsPedal.Brake, ProbeSlot));
+        }
+
+        /// <summary>How many presence queries this lane has sent. Lets the registry back
+        /// off a speculative routed lane that is never going to answer.</summary>
+        public int ProbeAttempts => System.Threading.Volatile.Read(ref _probeAttempts);
 
         /// <summary>
         /// Send an effect frame. These go on the paced one-shot FIFO rather than
