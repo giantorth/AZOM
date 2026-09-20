@@ -20,6 +20,7 @@ import sys
 MAX_STRENGTH = 0xFFFF
 MIN_HZ, MAX_HZ = 10, 100
 MIN_MS, MAX_MS = 1, 60000
+STREAM_DURATION_MS = 500
 
 
 def wire_checksum(data, length):
@@ -81,12 +82,14 @@ def set_frame(ext, pedal, slot, enable, ms, hz, level01):
                  clamp_duration(ms), enc_freq(hz), enc_strength(level01))
 
 
-def road_frame(ext, pedal, enable, position, level01):
+def road_frame(ext, pedal, enable, position, level01, duration=STREAM_DURATION_MS):
+    """Slot 8. Duration is sent non-zero to mirror the C#: the written spec says
+    0 here, but Pit House sends 100 and a build that sent 0 had this slot report
+    as dead (TWV94SPY). Callers can still pass 0 to check the spec's own frame."""
     if not enable:
         return build(ext, 0x01, pedal, 0x08, 0, 0, 0, 0)
     return build(ext, 0x01, pedal, 0x08, 1,
-                 0, max(0, min(position, 100)), enc_strength(level01))
-
+                 clamp_duration(duration), max(0, min(position, 100)), enc_strength(level01))
 
 def query_frame(ext, pedal, slot):
     return build(ext, 0x02, pedal, slot, 0, 0, 0, 0)
@@ -117,7 +120,7 @@ REFERENCE = [
      lambda: set_frame(False, BRAKE, ENGINE, True, 1000, 60, 0.20),
      "7e0b4d1201010204010 3e8003c33338b"),
     ("Road   brake  pos 50 20%",
-     lambda: road_frame(False, BRAKE, True, 50, 0.20),
+     lambda: road_frame(False, BRAKE, True, 50, 0.20, duration=0),
      "7e0b4d120101020801000000323333 9a"),
     ("Query  brake  TC",
      lambda: query_frame(False, BRAKE, TC),
@@ -142,8 +145,8 @@ CAPTURE = [
     ("brake  Road      pos 100 [capture sent dur=100, not 0]",
      lambda: build(True, 0x01, BRAKE, ROAD, 1, 100, 100, 32767),
      "7e0c4d1f1e0101020801006400647fff74"),
-    ("brake  Road      pos 100, reference shape (dur=0)",
-     lambda: road_frame(True, BRAKE, True, 100, 32767 / 65535),
+    ("brake  Road      pos 100, spec shape (dur=0)",
+     lambda: road_frame(True, BRAKE, True, 100, 32767 / 65535, duration=0),
      "7e0c4d1f1e0101020801000000647fff10"),
     ("throt  TC       200ms  81Hz",
      lambda: set_frame(True, THROTTLE, TC, True, 200, 81, 40631 / 65535),
@@ -167,36 +170,47 @@ CAPTURE = [
 
 # --- Encoder spot checks ----------------------------------------------------
 
-# --- Channel mapping + emission budget -------------------------------------
-# Keep in sync with MozaPedalHapticsProtocol: the channel order is a
-# user-visible contract (reordering moves every effect a user assigned), and
-# the budget is what keeps 27 channels from swamping the link.
-SLOTS_PER_PEDAL = 9
-CHANNELS = 3 * SLOTS_PER_PEDAL
+# --- Channel allocation + emission budget ----------------------------------
+# Keep in sync with MozaPedalHapticsProtocol. Each pedal is its own SimHub
+# device; its channels are routing destinations that the worker allocates onto
+# the eight interchangeable hardware slots, so there are deliberately more
+# channels than slots.
+SLOT_POOL = 8                         # slots 0..7, interchangeable
+ROAD_SLOT = 8                         # outside the pool
+GENERIC_CHANNELS = 16
+CHANNELS_PER_PEDAL = GENERIC_CHANNELS + 1
+PEDALS = 3
 TICK_MS = 20
 MAX_FRAMES_PER_TICK = 8
-STREAM_DURATION_MS = 500
 FRAME_BYTES = 17                      # extended envelope, the larger of the two
 LINK_BYTES_PER_SEC = 115200 / 10      # 8N1 = 10 bits per byte
 
 
-def pedal_for_channel(ch):
-    return ch // SLOTS_PER_PEDAL + 1
-
-
-def slot_for_channel(ch):
-    return ch % SLOTS_PER_PEDAL
-
-
-def check_mapping():
-    pairs = [(pedal_for_channel(c), slot_for_channel(c)) for c in range(CHANNELS)]
-    expected = [(p, s) for p in (1, 2, 3) for s in range(SLOTS_PER_PEDAL)]
-    return pairs == expected
+def allocate(active_channels):
+    """Mirror PedalHapticsEffectWorker: a channel takes the next free slot from
+    a rotating cursor and keeps it while active; past the pool it shares."""
+    users = [0] * SLOT_POOL
+    held = {}
+    cursor = 0
+    for ch in active_channels:
+        slot = None
+        for n in range(SLOT_POOL):
+            cand = (cursor + n) % SLOT_POOL
+            if users[cand] == 0:
+                slot = cand
+                break
+        if slot is None:
+            slot = cursor % SLOT_POOL
+        users[slot] += 1
+        held[ch] = slot
+        cursor = slot + 1
+    return held, users
 
 
 def worst_refresh_ms():
-    ticks = -(-CHANNELS // MAX_FRAMES_PER_TICK)   # ceil
-    return ticks * TICK_MS
+    """Every slot of every pedal live at once — the ceiling the duration must cover."""
+    slots = PEDALS * (SLOT_POOL + 1)
+    return -(-slots // MAX_FRAMES_PER_TICK) * TICK_MS
 
 
 def peak_bytes_per_sec():
@@ -204,27 +218,35 @@ def peak_bytes_per_sec():
 
 
 CHANNEL_CHECKS = [
-    ("channel order is pedal-major and covers every (pedal, slot) once",
-     check_mapping, True),
-    ("channel 0 -> throttle slot 0",
-     lambda: (pedal_for_channel(0), slot_for_channel(0)), (1, 0)),
-    ("channel 13 -> brake slot 4 (engine)",
-     lambda: (pedal_for_channel(13), slot_for_channel(13)), (2, 4)),
-    ("channel 26 -> clutch slot 8 (road texture)",
-     lambda: (pedal_for_channel(26), slot_for_channel(26)), (3, 8)),
-    # With every channel live the round-robin must still revisit each one well
-    # inside the duration, or effects stutter as they lapse and restart.
+    ("eight active channels each get their own slot",
+     lambda: sorted(allocate(range(8))[0].values()), list(range(8))),
+    ("a ninth active channel shares rather than being dropped",
+     lambda: len(allocate(range(9))[0]), 9),
+    ("sharing wraps to slot 0 once the pool is full",
+     lambda: allocate(range(9))[0][8], 0),
+    ("seventeen active channels all keep an assignment",
+     lambda: len(allocate(range(17))[0]), 17),
+    ("no slot is left idle while any channel waits",
+     lambda: min(allocate(range(9))[1]) >= 1, True),
+    ("a lone channel does not always land on slot 0",
+     lambda: allocate([0, 1])[0][1], 1),
+    ("road texture sits outside the pool",
+     lambda: ROAD_SLOT >= SLOT_POOL, True),
+    ("more channels are offered than there are slots",
+     lambda: GENERIC_CHANNELS > SLOT_POOL, True),
+    # With every slot of every pedal live the round-robin must still revisit
+    # each one inside the duration, or effects lapse and restart audibly.
     ("worst-case refresh stays inside the streamed duration",
      lambda: worst_refresh_ms() < STREAM_DURATION_MS, True),
-    ("even all-27 refresh has >= 2x duration margin",
+    ("worst-case refresh has >= 2x duration margin",
      lambda: STREAM_DURATION_MS / worst_refresh_ms() >= 2.0, True),
-    # A flat per-tick refresh of 27 channels would be ~23 kB/s, over a 115200
-    # link's capacity; the budget has to keep peak well under it.
-    ("a realistic load (8 channels) is never throttled",
+    ("a realistic load (8 frames) is never throttled",
      lambda: 8 <= MAX_FRAMES_PER_TICK, True),
     ("peak output stays under the link rate",
      lambda: peak_bytes_per_sec() < LINK_BYTES_PER_SEC * 0.75, True),
 ]
+
+# --- Encoder spot checks ----------------------------------------------------
 ENCODERS = [
     ("strength 20% -> 13107", lambda: enc_strength(0.20), 13107),
     ("strength 100% -> 65535", lambda: enc_strength(1.0), 65535),

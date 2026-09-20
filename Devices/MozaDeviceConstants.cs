@@ -28,10 +28,12 @@ namespace MozaPlugin.Devices
         // user added under the old definition keeps routing to the base extension
         // until they re-add the model-named device.
         public const string BaseAmbientGuid   = "b8361c60-1bbd-4497-8cb4-af5df7db7251";
-        // Three-channel pedal vibration unit (bus device 0x1F). One fixed identity:
-        // the unit has no model variants to key on, and no identity traffic in any
-        // capture to learn one from.
-        public const string PedalHapticsGuid  = "f0d7c700-21e5-413d-9e43-e04239c8224c";
+        // S12 pedal vibration — one device per motor port, so each pedal keeps its
+        // own ShakeIt profile and channel list. Permanent once shipped: changing
+        // one orphans every effect a user assigned to that pedal.
+        public const string PedalHapticsThrottleGuid = "554167b0-3c2f-41d8-8e8e-6c3716b9459f";
+        public const string PedalHapticsBrakeGuid    = "5a050757-d2bb-498d-8077-22604ce8fff2";
+        public const string PedalHapticsClutchGuid   = "779ea51c-b3b3-4977-a4c0-fd8df610cd41";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -302,9 +304,23 @@ namespace MozaPlugin.Devices
         /// per-model definition or the legacy shared "MOZA Wheel Base" identity.</summary>
         public static bool IsBaseDevice(string deviceTypeId) => GetBaseModelPrefix(deviceTypeId) != null;
 
-        /// <summary>Returns true if the DeviceTypeID is the pedal-haptics unit.</summary>
+        /// <summary>
+        /// Pedal id for a pedal-haptics DeviceTypeID, or 0 when it is not one.
+        /// The extension reads its pedal from here — the three devices are
+        /// identical apart from which motor port they drive.
+        /// </summary>
+        public static byte PedalHapticsPedalFor(string deviceTypeId)
+        {
+            if (string.IsNullOrEmpty(deviceTypeId)) return 0;
+            if (Matches(deviceTypeId, PedalHapticsThrottleGuid)) return 1;
+            if (Matches(deviceTypeId, PedalHapticsBrakeGuid)) return 2;
+            if (Matches(deviceTypeId, PedalHapticsClutchGuid)) return 3;
+            return 0;
+        }
+
+        /// <summary>Returns true if the DeviceTypeID is one of the pedal-haptics devices.</summary>
         public static bool IsPedalHapticsDevice(string deviceTypeId) =>
-            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, PedalHapticsGuid);
+            PedalHapticsPedalFor(deviceTypeId) != 0;
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

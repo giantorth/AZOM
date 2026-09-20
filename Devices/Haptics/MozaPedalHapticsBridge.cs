@@ -11,6 +11,7 @@ using SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 using MozaPlugin.Integration;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.Haptics
 {
@@ -48,7 +49,7 @@ namespace MozaPlugin.Devices.Haptics
             new ConcurrentDictionary<Type, FieldInfo?>();
 
         /// <summary>Build the replacement manager lazily, inside a caller's guard.</summary>
-        public static object CreateConnectionManager() => new MozaPedalHapticsConnectionManager();
+        public static object CreateConnectionManager(byte pedal) => new MozaPedalHapticsConnectionManager(pedal);
 
         /// <summary>
         /// Replace SimHub's <c>StandardProtocolMotorsChannelsSettingsProvider</c>
@@ -60,7 +61,7 @@ namespace MozaPlugin.Devices.Haptics
         /// a profile switch or settings reload runs <c>CreateOutputManager</c>
         /// again and stamps a fresh stock provider over ours.
         /// </summary>
-        public static void TryInstallChannelsProvider(object motorsDeviceExtension)
+        public static void TryInstallChannelsProvider(object motorsDeviceExtension, byte pedal)
         {
             if (!IsSupported) return;
 
@@ -75,9 +76,9 @@ namespace MozaPlugin.Devices.Haptics
                 var settings = MozaBaseHapticsBridge.GetProp(hosted, "Settings");
                 if (settings == null) return;   // not constructed yet; retried next tick
 
-                Install(MozaBaseHapticsBridge.GetProp(settings, "OutputManager"), settings);
-                Install(MozaBaseHapticsBridge.GetProp(settings, "CurrentOutputManager"), settings);
-                Install(MozaBaseHapticsBridge.GetProp(MozaBaseHapticsBridge.GetProp(settings, "CurrentProfile"), "OutputManager"), settings);
+                Install(MozaBaseHapticsBridge.GetProp(settings, "OutputManager"), settings, pedal);
+                Install(MozaBaseHapticsBridge.GetProp(settings, "CurrentOutputManager"), settings, pedal);
+                Install(MozaBaseHapticsBridge.GetProp(MozaBaseHapticsBridge.GetProp(settings, "CurrentProfile"), "OutputManager"), settings, pedal);
             }
             catch (Exception ex)
             {
@@ -85,19 +86,21 @@ namespace MozaPlugin.Devices.Haptics
             }
         }
 
-        private static void Install(object? outputManager, object settings)
+        private static void Install(object? outputManager, object settings, byte pedal)
         {
             if (!(outputManager is MotorsOutputManagerBase manager)) return;
-            if (manager.ShakeItChannelsInfoProvider is MozaPedalHapticsChannelsProvider) return;
+            if (manager.ShakeItChannelsInfoProvider is MozaPedalHapticsChannelsProvider existing
+                && existing.PedalId == pedal) return;
 
-            var provider = new MozaPedalHapticsChannelsProvider();
+            var provider = new MozaPedalHapticsChannelsProvider(pedal);
             manager.ShakeItChannelsInfoProvider = provider;
 
             if (settings is SimHub.Plugins.DataPlugins.ShakeItV3.Settings.ShakeItSettings shakeItSettings)
                 provider.SetSettings(shakeItSettings);
 
-            MozaLog.Info("[AZOM] Installed the MOZA pedal-haptics channels provider "
-                       + "(Throttle / Brake / Clutch)");
+            MozaLog.Info($"[AZOM] Installed the MOZA pedal-haptics channels provider for the "
+                       + $"{MozaPedalHapticsProtocol.PedalLabel(pedal).ToLowerInvariant()} pedal "
+                       + $"({MozaPedalHapticsProtocol.ChannelsPerPedal} channels)");
         }
     }
 
@@ -112,7 +115,12 @@ namespace MozaPlugin.Devices.Haptics
     /// </summary>
     internal sealed class MozaPedalHapticsConnectionManager : ILedDeviceManager, IConnectableLedDeviceManager
     {
-        private readonly MozaPedalHapticsMotorsDriver _motors = new MozaPedalHapticsMotorsDriver();
+        private readonly MozaPedalHapticsMotorsDriver _motors;
+
+        internal MozaPedalHapticsConnectionManager(byte pedal)
+        {
+            _motors = new MozaPedalHapticsMotorsDriver(pedal);
+        }
         private bool _lastConnected;
 
         public LedModuleSettings? LedModuleSettings { get; set; }
@@ -166,12 +174,21 @@ namespace MozaPlugin.Devices.Haptics
 
     /// <summary>
     /// Sink for SimHub's ShakeIt motors mixer. The three MotorStates slots map
-    /// one-to-one onto the unit's three pedal motor channels; values go to the
+    /// onto one pedal motor's channel list; values go to the
     /// effect worker through the plugin so the worker stays the single wire
     /// owner.
     /// </summary>
     internal sealed class MozaPedalHapticsMotorsDriver : IMotorsDriver
     {
+        private readonly byte _pedal;
+        private readonly int _pedalIndex;
+
+        internal MozaPedalHapticsMotorsDriver(byte pedal)
+        {
+            _pedal = pedal;
+            _pedalIndex = pedal - MozaPedalHapticsProtocol.MinPedal;
+        }
+
         public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsReady == true;
 
         public string SerialNumber => "";
@@ -185,21 +202,21 @@ namespace MozaPlugin.Devices.Haptics
             var s = states?.States;
             if (s == null)
             {
-                plugin.ClearShakeItPedalHaptics();
+                plugin.ClearShakeItPedalHaptics(_pedalIndex);
                 return true;
             }
 
             // MotorStates is a fixed-size array whose length SimHub sets from the
-            // definition, but do not assume it reaches 27 — a stale definition on
-            // disk would hand back a shorter one, and indexing past it would throw
-            // on the data thread every tick.
-            int n = Math.Min(s.Length, Protocol.MozaPedalHapticsProtocol.ChannelCount);
+            // definition; do not assume it reaches ChannelsPerPedal, because a
+            // stale definition on disk would hand back a shorter one and indexing
+            // past it would throw on the data thread every tick.
+            int n = Math.Min(s.Length, MozaPedalHapticsProtocol.ChannelsPerPedal);
             for (int i = 0; i < n; i++)
-                plugin.PostShakeItPedalHapticsChannel(i, s[i].Gain, s[i].Frequency);
+                plugin.PostShakeItPedalHapticsChannel(_pedalIndex, i, s[i].Gain, s[i].Frequency);
             return true;
         }
 
-        public void Clear() => MozaPlugin.Instance?.ClearShakeItPedalHaptics();
+        public void Clear() => MozaPlugin.Instance?.ClearShakeItPedalHaptics(_pedalIndex);
 
         public void Dispose() => Clear();
     }

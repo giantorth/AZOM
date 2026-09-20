@@ -12,68 +12,91 @@ using MozaPlugin.Protocol;
 namespace MozaPlugin.Integration
 {
     /// <summary>
-    /// ShakeIt Motors channels provider for the S12 pedal vibration module —
-    /// three independent motors, one per pedal, selected by the pedal byte of
-    /// the group-0x4D vibration command. SimHub's tone mixer calls
-    /// <see cref="UpdateOutput"/> each data tick with the mixed per-pedal
-    /// (gain 0..1, frequency Hz); the values are forwarded through
-    /// <see cref="MozaPlugin.Instance"/> so
-    /// <see cref="Devices.PedalHaptics.PedalHapticsEffectWorker"/> stays the
-    /// single wire owner.
+    /// ShakeIt Motors channels provider for <b>one pedal</b> of an S12 module.
+    /// Each pedal port is its own SimHub device, so each gets its own provider
+    /// instance and its own ShakeIt profile — grouping all three into a single
+    /// device made the channel list long and forced unrelated pedals to share
+    /// one set of effect defaults.
     ///
-    /// Compare <see cref="MozaWheelbaseLfeChannelsProvider"/>, which this is
-    /// otherwise modelled on. That one forces a new effect to a single enabled
-    /// channel, because the wheelbase SUMS its three oscillators into one
-    /// physical actuator and enabling all three is a silent 3×. These three
-    /// channels are separate motors on separate pedals, so there is nothing to
-    /// sum and the stock all-enabled default is left alone — the user turns off
-    /// the pedals an effect should not reach.
+    /// The channels are numbered, not named after the firmware's slot labels.
+    /// Those labels (ABS, Lockup, Gear Shift…) describe nothing the hardware
+    /// actually does — every slot produces the same vibration — and with
+    /// round-robin allocation a channel does not own a fixed slot anyway. More
+    /// channels are offered than the module has oscillators, because the user
+    /// can build as many ShakeIt effects as they like;
+    /// <see cref="Devices.PedalHaptics.PedalHapticsEffectWorker"/> packs whichever
+    /// are live into the eight real slots and shares them past that.
     ///
-    /// Installed over SimHub's own <c>StandardProtocolMotorsChannelsSettingsProvider</c>
-    /// by <see cref="Devices.Haptics.MozaPedalHapticsBridge.TryInstallChannelsProvider"/>;
-    /// the declarative HapticsFeature path has no way to name a provider, and
-    /// without the swap the three channels show up as "Motor 1/2/3" with no clue
-    /// which pedal is which.
+    /// Road Texture is the exception and keeps its own named channel: it drives a
+    /// suspension position rather than a tone, so it cannot take part in the pool.
     ///
-    /// Constructed by the bridge — MUST stay public with a parameterless ctor,
-    /// and MUST NOT touch plugin state at construction time (it may be built
-    /// before plugin Init).
+    /// Constructed by the bridge — MUST stay public and constructible with no
+    /// arguments (the pedal parameter is optional for exactly that reason), and
+    /// MUST NOT touch plugin state at construction time.
     /// </summary>
     public sealed class MozaPedalHapticsChannelsProvider : IShakeItChannelsInfoProvider
     {
-        // Index order IS the wire mapping and is a user-visible contract:
-        // MozaPedalHapticsProtocol maps channel i to a (pedal, slot) pair, and
-        // reordering this list silently moves every effect a user already
-        // assigned. Pedal-major, so a pedal's nine slots sit together in the
-        // ShakeIt list: 0-8 throttle, 9-17 brake, 18-26 clutch.
-        private readonly List<ChannelInformation> _channels = BuildChannels();
+        private readonly byte _pedal;
+        private readonly int _pedalIndex;
+        private readonly List<ChannelInformation> _channels;
+
+        public MozaPedalHapticsChannelsProvider(
+            byte pedal = (byte)PedalHapticsPedal.Throttle)
+        {
+            _pedal = pedal;
+            _pedalIndex = pedal - MozaPedalHapticsProtocol.MinPedal;
+            _channels = BuildChannels();
+        }
 
         private static List<ChannelInformation> BuildChannels()
         {
-            var list = new List<ChannelInformation>(MozaPedalHapticsProtocol.ChannelCount);
-            for (int i = 0; i < MozaPedalHapticsProtocol.ChannelCount; i++)
+            var list = new List<ChannelInformation>(MozaPedalHapticsProtocol.ChannelsPerPedal);
+            for (int i = 0; i < MozaPedalHapticsProtocol.ChannelsPerPedal; i++)
                 list.Add(new ChannelInformation { Name = MozaPedalHapticsProtocol.ChannelName(i) });
             return list;
         }
 
-        public string DefaultSettingsKey => "MozaPedalHaptics";
+        /// <summary>Which pedal this instance drives — lets the bridge spot a provider
+        /// left behind by a different pedal's device and replace it.</summary>
+        public byte PedalId => _pedal;
+
+        /// <summary>
+        /// Per-pedal so each device keeps its own effect defaults; a shared key
+        /// would have all three pedals overwrite each other's.
+        /// </summary>
+        public string DefaultSettingsKey
+            => "MozaPedalHaptics" + MozaPedalHapticsProtocol.PedalLabel(_pedal);
 
         public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsReady == true;
 
         public List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager) => _channels;
 
-        // Separate actuators, so the stock all-enabled default is correct here.
+        // Channels are allocated to hardware on demand, so leaving a new effect
+        // enabled on all of them would burn the whole pool on one effect.
         public ChannelActivation CreateDefaultActivationFor(FFBPlacement placement, MotorsWithFrequencyOutputManagerBase manager)
-            => new ChannelActivation { IsEnabled = true };
+            => new ChannelActivation { IsEnabled = false };
 
         public void LoadDefaultPlatformSettings(EffectsContainerBase effectsContainerBase, ShakeItProfile shakeItProfile)
         {
-            // Corner placements mean nothing on a pedal set — three pedals are not
-            // four wheels — so collapse to mono where the effect allows it, the
-            // same as SimHub's own pedal providers. Channel activation is left at
-            // SimHub's defaults on purpose; see the class remarks.
+            // Corner placements mean nothing on a single pedal motor — collapse to
+            // mono where the effect allows it, as SimHub's own pedal providers do.
             if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
                 effectsContainerBase.AggregationMode = "Mono";
+
+            // Seed one enabled channel so a new effect does something immediately
+            // without claiming every slot. The hook has no channel index, so the
+            // activations are written per placement here.
+            var activation = effectsContainerBase.SettingsStore.GetSettings<DeviceChannelActivationSettings>();
+            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            {
+                if (!activation.Channels.TryGetValue(placement, out var pca))
+                {
+                    pca = new PlacementChannelsActivation();
+                    activation.Channels[placement] = pca;
+                }
+                for (int ch = 0; ch < _channels.Count; ch++)
+                    pca.Channels[ch] = new ChannelActivation { IsEnabled = ch == 0 };
+            }
         }
 
         public void UpdateOutput(Dictionary<int, ChannelValue> values)
@@ -89,11 +112,11 @@ namespace MozaPlugin.Integration
                     gain = c.Gain;
                     freq = c.Frequency;
                 }
-                plugin.PostShakeItPedalHapticsChannel(i, gain, freq);
+                plugin.PostShakeItPedalHapticsChannel(_pedalIndex, i, gain, freq);
             }
         }
 
-        public void Stop() => MozaPlugin.Instance?.ClearShakeItPedalHaptics();
+        public void Stop() => MozaPlugin.Instance?.ClearShakeItPedalHaptics(_pedalIndex);
 
         /// <summary>
         /// Band advertised to the ShakeIt tone mixer. The unit accepts 10-100 Hz

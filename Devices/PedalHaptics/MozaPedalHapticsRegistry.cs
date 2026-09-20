@@ -279,18 +279,18 @@ namespace MozaPlugin.Devices.PedalHaptics
         /// they mirror each other — the protocol gives no way to address units
         /// independently, and SimHub sees a single three-motor device.
         /// </summary>
-        public void PostChannel(int channel, double gain01, double freqHz)
+        public void PostChannel(int pedalIndex, int channel, double gain01, double freqHz)
         {
             var snap = System.Threading.Volatile.Read(ref _snapshot);
             for (int i = 0; i < snap.Length; i++)
-                snap[i].PostChannel(channel, gain01, freqHz);
+                snap[i].PostChannel(pedalIndex, channel, gain01, freqHz);
         }
 
-        public void ClearChannels()
+        public void ClearPedal(int pedalIndex)
         {
             var snap = System.Threading.Volatile.Read(ref _snapshot);
             for (int i = 0; i < snap.Length; i++)
-                snap[i].ClearChannels();
+                snap[i].ClearPedal(pedalIndex);
         }
 
         private void RebuildSnapshotLocked()

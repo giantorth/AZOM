@@ -124,47 +124,44 @@ namespace MozaPlugin.Protocol
         public const int SlotsPerPedal = 9;
 
         /// <summary>
-        /// Every addressable oscillator on a unit: three pedals × nine slots.
-        /// This is what the plugin exposes as ShakeIt channels, so the index
-        /// mapping below is part of the user-visible contract — reordering it
-        /// silently moves every effect a user has already assigned.
+        /// Slots the plugin treats as an interchangeable pool: 0..7. Every one of
+        /// them takes the same duration/frequency/strength and, on hardware,
+        /// produces the same vibration — the firmware names them after game
+        /// events but synthesizes nothing from those names, so which slot an
+        /// effect lands on does not matter. That is what makes round-robin
+        /// allocation safe.
         ///
-        /// Pedal-major: channels 0–8 are the throttle's nine slots, 9–17 the
-        /// brake's, 18–26 the clutch's.
+        /// <see cref="PedalHapticsEffectSlot.RoadTexture"/> is deliberately
+        /// excluded: it takes a suspension position instead of a frequency and
+        /// cannot stand in for a tone.
         /// </summary>
-        public const int ChannelCount = PedalCount * SlotsPerPedal;
+        public const int SlotPoolSize = 8;
 
-        /// <summary>Pedal id for a ShakeIt channel index.</summary>
-        public static byte PedalForChannel(int channel)
-            => ClampPedal((byte)(ClampChannel(channel) / SlotsPerPedal + 1));
+        /// <summary>The one slot outside the pool.</summary>
+        public const byte RoadTextureSlot = (byte)PedalHapticsEffectSlot.RoadTexture;
 
-        /// <summary>Effect slot for a ShakeIt channel index.</summary>
-        public static byte SlotForChannel(int channel)
-            => (byte)(ClampChannel(channel) % SlotsPerPedal);
+        /// <summary>
+        /// Generic ShakeIt channels offered per pedal. Deliberately larger than
+        /// <see cref="SlotPoolSize"/>: the user can build as many ShakeIt effects
+        /// as they like, and channels are routing destinations rather than
+        /// hardware, so the allocator packs whichever are live into the eight
+        /// real oscillators and shares them past that.
+        /// </summary>
+        public const int GenericChannelsPerPedal = 16;
 
-        private static int ClampChannel(int channel)
-        {
-            if (channel < 0) return 0;
-            if (channel >= ChannelCount) return ChannelCount - 1;
-            return channel;
-        }
+        /// <summary>Channels a pedal's device exposes: the generic pool plus Road Texture.</summary>
+        public const int ChannelsPerPedal = GenericChannelsPerPedal + 1;
 
-        /// <summary>Slot label, matching the names the module's own documentation uses.</summary>
-        public static string SlotName(byte slot) => slot switch
-        {
-            (byte)PedalHapticsEffectSlot.TractionControl => "Traction Control",
-            (byte)PedalHapticsEffectSlot.Abs             => "ABS",
-            (byte)PedalHapticsEffectSlot.Lockup          => "Lockup",
-            (byte)PedalHapticsEffectSlot.BrakeThreshold  => "Brake Threshold",
-            (byte)PedalHapticsEffectSlot.EngineVibration => "Engine",
-            (byte)PedalHapticsEffectSlot.ClutchBitePoint => "Bite Point",
-            (byte)PedalHapticsEffectSlot.GearShift       => "Gear Shift",
-            (byte)PedalHapticsEffectSlot.WheelSlip       => "Wheel Slip",
-            (byte)PedalHapticsEffectSlot.RoadTexture     => "Road Texture",
-            _ => "Slot " + slot,
-        };
+        /// <summary>Index of the Road Texture channel within a pedal's channel list.</summary>
+        public const int RoadTextureChannel = GenericChannelsPerPedal;
 
-        /// <summary>Pedal label with a leading capital, for channel names.</summary>
+        /// <summary>True for the one channel that drives <see cref="RoadTextureSlot"/> rather than the pool.</summary>
+        public static bool IsRoadTextureChannel(int channel) => channel == RoadTextureChannel;
+
+        /// <summary>Slot ids in the round-robin pool.</summary>
+        public static byte PoolSlot(int index) => (byte)(((index % SlotPoolSize) + SlotPoolSize) % SlotPoolSize);
+
+        /// <summary>Pedal label with a leading capital, for device and channel names.</summary>
         public static string PedalLabel(byte pedal) => pedal switch
         {
             (byte)PedalHapticsPedal.Throttle => "Throttle",
@@ -173,9 +170,14 @@ namespace MozaPlugin.Protocol
             _ => "Pedal " + pedal,
         };
 
-        /// <summary>ShakeIt channel name, e.g. "Brake: ABS".</summary>
+        /// <summary>
+        /// ShakeIt channel name within one pedal's device. Generic channels are
+        /// numbered rather than named after the firmware's slot labels — those
+        /// labels promise behaviour the hardware does not deliver, and with
+        /// round-robin allocation a channel does not own a fixed slot anyway.
+        /// </summary>
         public static string ChannelName(int channel)
-            => PedalLabel(PedalForChannel(channel)) + ": " + SlotName(SlotForChannel(channel));
+            => IsRoadTextureChannel(channel) ? "Road Texture" : "Effect " + (channel + 1);
 
         /// <summary>Accepted frequency band. Values outside it are clamped, not rejected.</summary>
         public const int MinFrequencyHz = 10;
@@ -272,9 +274,16 @@ namespace MozaPlugin.Protocol
 
         /// <summary>
         /// Build a Road Texture frame. That slot reuses the frequency field for
-        /// an integer suspension position (0..100) and takes no duration — the
-        /// firmware generates the texture from a stream of changing positions, so
-        /// a constant position settles to near-silence.
+        /// an integer suspension position (0..100), and the firmware generates
+        /// texture from the position CHANGING — a constant value settles to
+        /// near-silence.
+        ///
+        /// <b>Duration is sent non-zero</b> even though the written spec says to
+        /// send 0 for this slot. Pit House sends 100 here, and a user on a build
+        /// that sent 0 reported this slot as the only one that did nothing
+        /// (ticket TWV94SPY) — so a zero duration is most likely rejected
+        /// outright. The slot still times out on update silence rather than on
+        /// duration, so the value itself only has to be valid.
         /// </summary>
         public static byte[] BuildRoadTextureFrame(
             PedalHapticsAddressing addressing,
@@ -288,7 +297,7 @@ namespace MozaPlugin.Protocol
 
             return BuildPayloadFrame(
                 addressing, SubCmdSet, pedal, slot, enable: 1,
-                duration: 0,
+                duration: StreamDurationMs,
                 frequency: ClampRoadPosition(suspensionPosition),
                 strength: EncodeStrength(strength01));
         }

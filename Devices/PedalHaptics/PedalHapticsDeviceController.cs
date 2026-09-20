@@ -169,12 +169,15 @@ namespace MozaPlugin.Devices.PedalHaptics
             _connection.Send(frame);
         }
 
-        /// <summary>Publish one channel's latest ShakeIt output to the motor loop.</summary>
-        public void PostChannel(int channel, double gain01, double freqHz)
-            => _worker.PostChannel(channel, gain01, freqHz);
+        /// <summary>Publish one pedal channel's latest ShakeIt output to the motor loop.</summary>
+        public void PostChannel(int pedalIndex, int channel, double gain01, double freqHz)
+            => _worker.PostChannel(pedalIndex, channel, gain01, freqHz);
 
-        /// <summary>Drop every channel to silent (the ShakeIt provider's Stop path).</summary>
-        public void ClearChannels() => _worker.ClearChannels();
+        /// <summary>Drop one pedal to silent (that device's provider Stop path).</summary>
+        public void ClearPedal(int pedalIndex) => _worker.ClearPedal(pedalIndex);
+
+        /// <summary>Drop every pedal to silent.</summary>
+        public void ClearAll() => _worker.ClearAll();
 
         private void OnConnectionMessage(byte[] data)
         {

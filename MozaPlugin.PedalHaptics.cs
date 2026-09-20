@@ -88,11 +88,11 @@ namespace MozaPlugin
         /// from the provider on the SimHub data thread. Channels are pedal-major:
         /// 0-8 throttle, 9-17 brake, 18-26 clutch, each pedal's nine effect slots in order.
         /// </summary>
-        internal void PostShakeItPedalHapticsChannel(int channel, double gain01, double freqHz)
-            => _pedalHapticsRegistry?.PostChannel(channel, gain01, freqHz);
+        internal void PostShakeItPedalHapticsChannel(int pedalIndex, int channel, double gain01, double freqHz)
+            => _pedalHapticsRegistry?.PostChannel(pedalIndex, channel, gain01, freqHz);
 
         /// <summary>Drop every channel to silent, for the provider Stop path and the driver Clear.</summary>
-        internal void ClearShakeItPedalHaptics()
-            => _pedalHapticsRegistry?.ClearChannels();
+        internal void ClearShakeItPedalHaptics(int pedalIndex)
+            => _pedalHapticsRegistry?.ClearPedal(pedalIndex);
     }
 }

@@ -6,6 +6,7 @@ using SimHub.Plugins;
 using SimHub.Plugins.Devices.DeviceExtensions;
 using MozaPlugin.Devices.Haptics;
 using MozaPlugin.Devices.Led;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.Extensions
 {
@@ -47,10 +48,19 @@ namespace MozaPlugin.Devices.Extensions
         private MozaPedalHapticsConnectionManager? _connectionManager;
         private object? _originalConnectionManager;
 
-        public override string ExtentionTabTitle => "MOZA Pedal Haptics";
+        // Which motor port this device drives. Resolved in Init from the
+        // DeviceTypeID; the three pedal devices differ only by this.
+        private byte _pedal = (byte)PedalHapticsPedal.Throttle;
+
+        public override string ExtentionTabTitle =>
+            "MOZA " + MozaPedalHapticsProtocol.PedalLabel(_pedal) + " Haptics";
 
         public override void Init(PluginManager pluginManager)
         {
+            byte pedal = MozaDeviceConstants.PedalHapticsPedalFor(
+                LinkedDevice.DeviceDescriptor?.DeviceTypeID ?? "");
+            if (pedal != 0) _pedal = pedal;
+
             // Injection is deferred to DataUpdate() — running it here would beat
             // SimHub's own sub-device setup, same as on the wheelbase.
             TryInstallProvider();
@@ -101,7 +111,7 @@ namespace MozaPlugin.Devices.Extensions
 
             try
             {
-                var manager = (MozaPedalHapticsConnectionManager)MozaPedalHapticsBridge.CreateConnectionManager();
+                var manager = (MozaPedalHapticsConnectionManager)MozaPedalHapticsBridge.CreateConnectionManager(_pedal);
                 var previous = LedDriverInjection.SwapConnectionManager(instance, manager);
                 if (previous == null) return;
 
@@ -124,7 +134,7 @@ namespace MozaPlugin.Devices.Extensions
                     _motorsDevice = FindMotorsDevice();
                 if (_motorsDevice == null) return;
 
-                MozaPedalHapticsBridge.TryInstallChannelsProvider(_motorsDevice);
+                MozaPedalHapticsBridge.TryInstallChannelsProvider(_motorsDevice, _pedal);
             }
             catch (Exception ex)
             {
