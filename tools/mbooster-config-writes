@@ -55,11 +55,39 @@ CMDS = {
     0x84: ("brake-travel-start", "mm"),
     0x85: ("brake-travel-end", "mm"),
     0xab: ("brake-curve7", "pct65535-sel"),
+    0xad: ("brake-virtual-damping", "damping-sel"),
     0xae: ("brake-friction", "pct65535-sel"),
-    0xb2: ("brake-endstop", "endstop-sel"),
+    0xb2: ("brake-softlimit-hardness", "endstop-sel"),
     0xb3: ("brake-threshold", "kg"),
+    0xb4: ("calibration-state", "calstate"),
     0xb7: ("brake-segmented-damping", "segdamp"),
 }
+
+# Groups outside the 35/36 read/write pair that carry the two calibration
+# ROUTINES. Both are addressed to the pedal's own motor/config device id, the
+# same one the config writes above use.
+#   0x26 — pedal travel calibration: cmd 13 start / 17 stop for the brake,
+#          12/16 throttle and 14/18 clutch by symmetry with the wheelbase
+#          pedals bus. Pit House sends param 0x0000 and waits exactly 20.0s
+#          between start and stop, polling nothing.
+#   0x2A — "MotorCtrl" per the firmware's serial_reply_motor.c: cmd 0x14 param
+#          0x0001 enters debug mode, cmd 0x15 param 0x0103 starts the rotor
+#          locate, cmd 0x15 param 0x0000 queries it (echo low byte 1 =
+#          running, 3 = complete).
+# See docs/protocol/devices/mbooster.md.
+GROUP_TRAVEL_CAL = 0x26
+GROUP_MOTOR_CTRL = 0x2A
+
+TRAVEL_CAL_CMDS = {
+    12: "throttle-cal-start", 16: "throttle-cal-stop",
+    13: "brake-cal-start",    17: "brake-cal-stop",
+    14: "clutch-cal-start",   18: "clutch-cal-stop",
+}
+
+MOTOR_CTRL_CMDS = {0x14: "motor-cal-enter", 0x15: "motor-cal-locate"}
+
+MOTOR_LOCATE_PARAMS = {0x0103: "start locate", 0x0000: "query/stop"}
+MOTOR_STATES = {1: "running", 3: "complete"}
 
 
 def be(bs):
@@ -81,6 +109,12 @@ def decode(kind, payload):
     try:
         if kind == "kg":
             return f"{be(payload) * 200.0 / 65536.0:.2f} kg"
+        if kind == "calstate":
+            # 0xB4: 2 = normal operation, 0 = mid travel calibration. Proven by
+            # both 2026-09-08 captures (2→0 on cal-start, back to 2 only after
+            # the soft reboot).
+            v = be(payload)
+            return {2: "normal", 0: "IN CALIBRATION"}.get(v, f"unknown ({v})")
         if kind == "mm":
             return f"{be(payload) * 53.5 / 65536.0:.2f} mm"
         if kind == "float":
@@ -88,13 +122,37 @@ def decode(kind, payload):
             return None if v is None else f"{v:.4g}"
         if kind == "pct65535-sel" and len(payload) >= 3:
             return f"sel={payload[1]} {be(payload[2:]) * 100.0 / 65535.0:.3f}%"
+        if kind == "damping-sel" and len(payload) >= 3:
+            # 0xAD: selector arrives as the firmware's param_uint_high.
+            # Physical full scale differs per direction (press 12.0, release
+            # 10.0) — 0x6666 logged as virtual_damping_press 4.80000 and
+            # 0x4000 as virtual_damping_release 2.50003.
+            press = payload[1] == 0
+            pct = be(payload[2:]) * 100.0 / 65535.0
+            scale = 12.0 if press else 10.0
+            return (f"{'press' if press else 'release'} {pct:.1f}% "
+                    f"({pct * scale / 100.0:.3f})")
         if kind == "endstop-sel" and len(payload) >= 3:
-            sel = "front" if payload[1] == 0 else "end"
-            return f"{sel} {be(payload[2:]) * 10.0 / 65535.0:.2f}/10"
+            # 0xB2 is the firmware's softlimit_hardness_release (sel 0) /
+            # _press (sel 1): 0x4CCD logs as 0.30000, i.e. raw/65535 is a plain
+            # 0-1 fraction. This used to multiply by 10 and print "3.00/10".
+            sel = "release" if payload[1] == 0 else "press"
+            raw = be(payload[2:])
+            return f"{sel} {raw * 100.0 / 65535.0:.1f}% ({raw / 65535.0:.5f})"
         if kind == "segdamp" and len(payload) >= 20:
-            fields = [be(payload[i:i + 2]) * 100.0 / 65535.0 for i in range(0, 20, 2)]
-            names = ["d1P", "d2P", "d1R", "d2R", "s1P", "s1R", "s2P", "s2R", "s3P", "s3R"]
-            return " ".join(f"{n}={v:.0f}" for n, v in zip(names, fields))
+            # 0xB7 field order, confirmed by the firmware's own log echoing the
+            # write: damping_press_point1/2, damping_release_point1/2, then
+            # virtual_damping_press1, release1, press2, release2, press3,
+            # release3. The four POINTs are 0-1 fractions of pedal travel; the
+            # six stiffness values share 0xAD's per-direction full scales
+            # (press 12.0, release 10.0). The old decode printed all ten as
+            # uniform percentages with press/release interleaving wrong.
+            raw = [be(payload[i:i + 2]) for i in range(0, 20, 2)]
+            names = ["pressPt1", "pressPt2", "relPt1", "relPt2",
+                     "press1", "rel1", "press2", "rel2", "press3", "rel3"]
+            scales = [1.0, 1.0, 1.0, 1.0, 12.0, 10.0, 12.0, 10.0, 12.0, 10.0]
+            return " ".join(f"{n}={v / 65535.0 * sc:.3f}".rstrip("0").rstrip(".")
+                            for n, v, sc in zip(names, raw, scales))
     except Exception:
         pass
     return None
@@ -152,13 +210,59 @@ def main():
                 if args.fwlog and group == 0x0E and len(b) > 3:
                     txt = "".join(chr(c) if 32 <= c < 127 else "." for c in b[3:])
                     print(f"{ts} FWLOG  {txt}")
+                    continue
+                if args.tally or group == 0x0E:
+                    continue
+                # RX frames are `<group|0x80> <src> <cmd> <value…>` — no 0x7E,
+                # no length byte, no checksum (the bundle's reader already
+                # unframed them). The RESPONSE is where the real values live:
+                # a read request carries only zeros, so this is the only side
+                # that can show what the device actually holds — including
+                # whether a calibration ran (0xB4) and whether a rotor locate
+                # finished (group 0xAA cmd 0x15 low byte).
+                rgroup = group & 0x7F
+                if rgroup not in (GROUP_READ, GROUP_WRITE,
+                                  GROUP_TRAVEL_CAL, GROUP_MOTOR_CTRL):
+                    continue
+                rcmd, rvalue = b[2], b[3:]
+                if want is not None and rcmd != want:
+                    continue
+                hexs = " ".join(f"{x:02x}" for x in rvalue)
+                if rgroup == GROUP_MOTOR_CTRL and rcmd == 0x15:
+                    label_r = "motor-cal-locate"
+                    # cmd 0x15 carries two different meanings and so does its
+                    # echo. param_high 1 is the START-locate command being
+                    # echoed back verbatim; only a param_high 0 reply (the
+                    # echo of a query) reports a state in its low byte. Reading
+                    # the low byte unconditionally makes the start echo
+                    # (01 03) look like "complete".
+                    if len(rvalue) >= 2 and rvalue[0] != 0:
+                        note = "  → start-locate ack"
+                    else:
+                        state = be(rvalue) & 0xFF
+                        note = "  → " + MOTOR_STATES.get(state, f"state {state}")
+                elif rgroup == GROUP_TRAVEL_CAL:
+                    label_r = TRAVEL_CAL_CMDS.get(rcmd, f"cmd{rcmd}")
+                    note = "  → ack"
+                elif rgroup == GROUP_MOTOR_CTRL:
+                    label_r = MOTOR_CTRL_CMDS.get(rcmd, f"cmd0x{rcmd:02x}")
+                    note = "  → ack"
+                else:
+                    rname, rkind = CMDS.get(rcmd, (f"cmd0x{rcmd:02x}", None))
+                    label_r = rname
+                    pretty_r = decode(rkind, rvalue) if rkind and rvalue else None
+                    note = f"  → {pretty_r}" if pretty_r else ""
+                print(f"{ts} RESP  src=0x{src:02x} {label_r:24s} "
+                      f"raw={be(rvalue):<10d} [{hexs}]{note}")
+                any_rows = True
                 continue
 
             # TX: 7e <len> <group> <dev> <cmd> <payload…> <csum>
             if len(b) < 5 or b[0] != 0x7E:
                 continue
             ln, group, dev = b[1], b[2], b[3]
-            if group not in (GROUP_READ, GROUP_WRITE):
+            if group not in (GROUP_READ, GROUP_WRITE,
+                             GROUP_TRAVEL_CAL, GROUP_MOTOR_CTRL):
                 continue
             body = b[4:4 + ln]
             if not body:
@@ -170,10 +274,38 @@ def main():
             if args.tally:
                 continue
 
+            # The two calibration ROUTINES: a different group each, and the
+            # payload is a bare 2-byte param rather than a value in physical
+            # units, so they don't go through CMDS/decode at all.
+            if group in (GROUP_TRAVEL_CAL, GROUP_MOTOR_CTRL):
+                hexs = " ".join(f"{x:02x}" for x in payload)
+                param = be(payload)
+                if group == GROUP_TRAVEL_CAL:
+                    label = TRAVEL_CAL_CMDS.get(cmd, f"cmd{cmd}")
+                    note = "" if param == 0 else f"  (param 0x{param:04x} — Pit House sends 0x0000)"
+                else:
+                    label = MOTOR_CTRL_CMDS.get(cmd, f"cmd0x{cmd:02x}")
+                    if cmd == 0x15:
+                        note = "  → " + MOTOR_LOCATE_PARAMS.get(param, f"param 0x{param:04x}")
+                    elif cmd == 0x14:
+                        note = "  → enter debug mode" if param == 1 else f"  param 0x{param:04x}"
+                    else:
+                        note = ""
+                print(f"{ts} CALIB dev=0x{dev:02x} {label:24s} "
+                      f"param=0x{param:04x}   [{hexs}]{note}")
+                any_rows = True
+                continue
+
             name, kind = CMDS.get(cmd, (f"cmd0x{cmd:02x}", None))
-            pretty = decode(kind, payload) if kind and payload else None
+            is_read = group == GROUP_READ
+            # A READ frame's value bytes are a zero PLACEHOLDER that
+            # BuildReadMessage appends, not data — rendering them in physical
+            # units invents a reading the device never sent (a zeroed 0xB4
+            # read request would print "IN CALIBRATION"). Only the selector
+            # inside the cmd-id prefix is real, and that is already in the hex.
+            pretty = None if is_read else (decode(kind, payload) if kind and payload else None)
             hexs = " ".join(f"{x:02x}" for x in payload)
-            print(f"{ts} {'READ ' if group == GROUP_READ else 'WRITE'} "
+            print(f"{ts} {'READ ' if is_read else 'WRITE'} "
                   f"dev=0x{dev:02x} {name:24s} raw={be(payload):<10d} [{hexs}]"
                   + (f"  → {pretty}" if pretty else ""))
             any_rows = True

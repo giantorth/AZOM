@@ -1,0 +1,91 @@
+{
+  "_comment": [
+    "SimHub font family -> MOZA dashboard font family, for the .djson import path.",
+    "",
+    "The TARGET names are the family strings observed in real wheel-loaded dashboards",
+    "(~/dashes/*/*.mzdash), NOT the .ttf filenames in PitHouse's bin/DashboardFonts —",
+    "those differ: Arame-Mono.ttf is '0Arame', Frizon-2.ttf is 'FRIZON', manrope-*.ttf",
+    "is 'Manrope3', big-john-woff2-2.ttf is 'Big John', douyuFont.otf is 'DOUYU Font'.",
+    "Emitting a filename gives a silent fallback font on the wheel.",
+    "",
+    "Matching is case-insensitive. An unlisted family falls back to 'default' and is",
+    "recorded in the conversion report so the table can be extended."
+  ],
+
+  "default": "Lato",
+
+  "available": [
+    "Lato", "Roboto", "Montserrat", "Aileron", "League Gothic", "Furore",
+    "Big John", "FRIZON", "Genuine", "0Arame", "Manrope3",
+    "Alibaba PuHuiTi", "Source Han Sans CN", "Alimama ShuHeiTi",
+    "DOUYU Font", "Fontquan-XinYilogoTi"
+  ],
+
+  "map": {
+    "_comment": "grouped by the character being matched, not alphabetically",
+
+    "Lato": "Lato",
+
+    "Droid Sans": "Roboto",
+    "Arial": "Roboto",
+    "Segoe UI": "Roboto",
+    "Tahoma": "Roboto",
+    "Verdana": "Roboto",
+    "Calibri": "Roboto",
+
+    "Futura Md BT": "Montserrat",
+    "Futura": "Montserrat",
+    "Century Gothic": "Montserrat",
+
+    "EurasiaEx": "Aileron",
+    "Eurasia": "Aileron",
+    "Eurostar": "Aileron",
+    "Eurostile": "Aileron",
+
+    "Sui Generis": "Furore",
+    "Sui Generis Light": "Furore",
+    "Sui Generis Free": "Furore",
+    "RussellSquare": "Furore",
+    "Russell Square": "Furore",
+
+    "HandelGothic BT": "FRIZON",
+    "HandelGothic": "FRIZON",
+
+    "DymoFontInvers": "Big John",
+    "Dymo": "Big John",
+
+    "Electronic Highway Sign": "League Gothic",
+    "Oswald": "League Gothic",
+
+    "Cousine": "0Arame",
+    "Consolas": "0Arame",
+    "LCDMono": "0Arame",
+    "Courier New": "0Arame",
+    "Lucida Console": "0Arame",
+    "CPMono_v07 Plain": "0Arame",
+    "CPMono_v07 Bold": "0Arame",
+    "CPMono_v07 Light": "0Arame",
+    "CPMono": "0Arame",
+
+    "Bahnschrift": "League Gothic",
+    "Bahnschrift Condensed": "League Gothic",
+    "Bahnschrift SemiCondensed": "League Gothic",
+    "Roboto Condensed": "League Gothic",
+
+    "Microsoft JhengHei": "Source Han Sans CN",
+    "Microsoft JhengHei UI": "Source Han Sans CN",
+    "Microsoft YaHei": "Source Han Sans CN",
+    "SimSun": "Source Han Sans CN",
+    "PingFang SC": "Source Han Sans CN",
+    "Noto Sans CJK SC": "Source Han Sans CN",
+
+    "Monkirta Pursuit NC": "Furore",
+    "911 Porscha": "Big John",
+    "Arial Edit": "Roboto",
+    "Arial Narrow": "League Gothic",
+    "Impact": "Big John",
+    "Bebas Neue": "League Gothic",
+    "Orbitron": "Furore",
+    "Rajdhani": "Aileron"
+  }
+}

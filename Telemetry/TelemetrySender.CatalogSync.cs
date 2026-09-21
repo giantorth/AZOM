@@ -262,6 +262,10 @@ namespace MozaPlugin.Telemetry
             // its sample timestamp forward in this case so the post-burst
             // gap is measured from now.
             bool busy = _hotSwitch.IsBurstPending;
+            // A standalone dash that echoed our kind=4 has the switch; nudging it just
+            // re-runs its dashboard load (visible jump) and churns the very catalog
+            // this is meant to settle. Sample-only there; wheel lanes keep nudging.
+            bool nudgeAllowed = !(StandaloneDashboardMode && _postSwitchKind4Confirmed);
 
             int sig = ComputeCatalogSignature();
             long now = DateTime.UtcNow.Ticks;
@@ -269,7 +273,7 @@ namespace MozaPlugin.Telemetry
             int matchCountBefore = _postSwitchConvergence.MatchCount;
             int nudgesSentBefore = _postSwitchConvergence.NudgesSent;
 
-            var decision = _postSwitchConvergence.TickIfArmed(now, sig, busy);
+            var decision = _postSwitchConvergence.TickIfArmed(now, sig, busy, nudgeAllowed);
             switch (decision)
             {
                 case Lifecycle.PostSwitchCatalogConvergence.TickDecision.EmitNudge:
@@ -355,6 +359,7 @@ namespace MozaPlugin.Telemetry
         /// </summary>
         internal void ArmPostSwitchConvergence(int slot)
         {
+            _postSwitchKind4Confirmed = false;
             _postSwitchConvergence.Arm(slot, DateTime.UtcNow.Ticks);
             MozaLog.Debug(
                 $"[AZOM] Post-switch catalog convergence armed: slot={slot} " +
@@ -362,6 +367,17 @@ namespace MozaPlugin.Telemetry
                 $"threshold {Lifecycle.PostSwitchCatalogConvergence.StableSampleThreshold} samples, " +
                 $"deadline {Lifecycle.PostSwitchCatalogConvergence.DeadlineMs}ms, " +
                 $"max nudges {Lifecycle.PostSwitchCatalogConvergence.MaxNudges})");
+        }
+
+        /// <summary>WheelSlotTracker hook: the device echoed the host kind=4 for
+        /// <paramref name="slot"/>. Turns the armed convergence cycle sample-only on
+        /// a standalone dash.</summary>
+        internal void NotePostSwitchKind4Confirmed(int slot)
+        {
+            if (_postSwitchKind4Confirmed || slot != _postSwitchConvergence.TargetSlot) return;
+            _postSwitchKind4Confirmed = true;
+            if (StandaloneDashboardMode)
+                MozaLog.Debug($"[AZOM] kind=4 echo confirmed slot={slot} — post-switch convergence sample-only (no nudges)");
         }
     }
 }

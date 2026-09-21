@@ -28,6 +28,11 @@ namespace MozaPlugin.Devices.Extensions
                 yield return typeof(MozaDashDeviceExtension);
             }
 
+            if (MozaDeviceConstants.IsPedalHapticsDevice(typeId))
+            {
+                yield return typeof(MozaPedalHapticsDeviceExtension);
+            }
+
             if (MozaDeviceConstants.IsBaseDevice(typeId))
             {
                 yield return typeof(MozaBaseDeviceExtension);

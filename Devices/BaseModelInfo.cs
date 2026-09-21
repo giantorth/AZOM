@@ -197,10 +197,15 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Hardware code → thumbnail art key. A model token is coarser than the
-        /// product: "R16" covers V1, V2 and the Ultra, and they look nothing alike.
-        /// The hardware code is what actually identifies the unit, so art keys off
-        /// it where we have evidence and falls back to the token otherwise.
+        /// Hardware code → thumbnail art key, for the models a token cannot resolve
+        /// on its own: "R16" covers V1, V2 and the Ultra, and they look nothing alike,
+        /// so only the code says which is plugged in.
+        ///
+        /// Consulted AFTER DeviceDefinitionDeployer's token map, because the relation
+        /// runs both ways — D11 is the R21, R25 and R27 alike, so a code can be
+        /// coarser than the token too, and letting it win painted the R21 render onto
+        /// an R25 that ships its own. A code listed here is the answer only for a
+        /// model with no art of its own.
         ///
         /// Only codes confirmed against a base-suffixed string are listed. Notably
         /// absent: R3, R9 and the pre-Ultra R16s — no capture has shown their codes.
@@ -209,7 +214,7 @@ namespace MozaPlugin.Devices
         {
             ("D05", "R5"),     // RS21-D05-MC WB
             ("D07", "R12"),    // RS21-D07-MC WB, PID 0x0006
-            ("D11", "R21U"),   // R21 / R25 / R27
+            ("D11", "R21U"),   // R21 / R25 / R27; R21 and R25 resolve by token first
             ("D12", "R16U"),   // R16 Ultra, RS21-D12-HW BM-CU-V10
         };
 

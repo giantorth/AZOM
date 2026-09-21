@@ -28,6 +28,12 @@ namespace MozaPlugin.Devices
         // user added under the old definition keeps routing to the base extension
         // until they re-add the model-named device.
         public const string BaseAmbientGuid   = "b8361c60-1bbd-4497-8cb4-af5df7db7251";
+        // S12 pedal vibration — one device per motor port, so each pedal keeps its
+        // own ShakeIt profile and channel list. Permanent once shipped: changing
+        // one orphans every effect a user assigned to that pedal.
+        public const string PedalHapticsThrottleGuid = "554167b0-3c2f-41d8-8e8e-6c3716b9459f";
+        public const string PedalHapticsBrakeGuid    = "5a050757-d2bb-498d-8077-22604ce8fff2";
+        public const string PedalHapticsClutchGuid   = "779ea51c-b3b3-4977-a4c0-fd8df610cd41";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -274,6 +280,20 @@ namespace MozaPlugin.Devices
             return null;
         }
 
+        /// <summary>Display identities a bridged CM2 answers the group-0x43 model probe
+        /// with (docs/protocol/devices/dash-0x14.md). Positive CM2 evidence for the
+        /// CM1 discriminator.</summary>
+        private static readonly string[] Cm2DisplayModels = { "S09 Display" };
+
+        public static bool IsCm2DisplayModel(string? displayModelName)
+        {
+            if (string.IsNullOrEmpty(displayModelName)) return false;
+            string name = displayModelName!.Trim();
+            foreach (var m in Cm2DisplayModels)
+                if (string.Equals(name, m, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
         /// <summary>Returns true if the DeviceTypeID is a known dashboard device (standalone CM2 or base-bridged CM1).</summary>
         public static bool IsDashDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId)
@@ -283,6 +303,24 @@ namespace MozaPlugin.Devices
         /// <summary>Returns true if the DeviceTypeID is a wheelbase device — either a
         /// per-model definition or the legacy shared "MOZA Wheel Base" identity.</summary>
         public static bool IsBaseDevice(string deviceTypeId) => GetBaseModelPrefix(deviceTypeId) != null;
+
+        /// <summary>
+        /// Pedal id for a pedal-haptics DeviceTypeID, or 0 when it is not one.
+        /// The extension reads its pedal from here — the three devices are
+        /// identical apart from which motor port they drive.
+        /// </summary>
+        public static byte PedalHapticsPedalFor(string deviceTypeId)
+        {
+            if (string.IsNullOrEmpty(deviceTypeId)) return 0;
+            if (Matches(deviceTypeId, PedalHapticsThrottleGuid)) return 1;
+            if (Matches(deviceTypeId, PedalHapticsBrakeGuid)) return 2;
+            if (Matches(deviceTypeId, PedalHapticsClutchGuid)) return 3;
+            return 0;
+        }
+
+        /// <summary>Returns true if the DeviceTypeID is one of the pedal-haptics devices.</summary>
+        public static bool IsPedalHapticsDevice(string deviceTypeId) =>
+            PedalHapticsPedalFor(deviceTypeId) != 0;
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

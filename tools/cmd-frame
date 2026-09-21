@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Render the exact wire frame a registered MozaCommandDatabase entry emits.
+
+Parses the `AddCommand(...)` table straight out of
+Protocol/MozaCommandDatabase.cs, then rebuilds MozaCommand.BuildReadMessage /
+BuildWriteInt and MozaProtocol.CalculateWireChecksum in Python. That makes it
+possible to check a command's on-wire bytes against a real Pit House capture
+WITHOUT building or running the plugin — which is the only way to verify a new
+emitter byte-exactly when the hardware isn't on hand.
+
+Why it exists: the mBooster calibration routines (group 0x26 travel, group 0x2A
+MotorCtrl) have to match Pit House frame for frame or the pedal is left stuck
+in calibration mode. Diff this against the JSONL from tools/pcap_to_jsonl.py.
+
+Usage:
+    tools/cmd-frame mbooster-brake-cal-start --dev 0x12 --write 0
+    tools/cmd-frame mbooster-device-type --dev 0x12 --read
+    tools/cmd-frame --bus mbooster --list
+    tools/cmd-frame --check tools/cmd-frame-mbooster-cal.txt
+"""
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DB = REPO_ROOT / "Protocol" / "MozaCommandDatabase.cs"
+
+MESSAGE_START = 0x7E
+MAGIC_VALUE = 0x0D
+
+# AddCommand("name", "bus", readGroup, writeGroup, new byte[] { .. }, payloadBytes, "type")
+ADD_RE = re.compile(
+    r'AddCommand\(\s*"(?P<name>[^"]+)"\s*,\s*"(?P<bus>[^"]+)"\s*,'
+    r'\s*(?P<read>0x[0-9A-Fa-f]+|\d+)\s*,'
+    r'\s*(?P<write>0x[0-9A-Fa-f]+|\d+)\s*,'
+    r'\s*new byte\[\]\s*\{(?P<cmd>[^}]*)\}\s*,'
+    r'\s*(?P<payload>\d+)\s*,\s*"(?P<type>[^"]+)"\s*\)'
+)
+
+
+class Command:
+    def __init__(self, name, bus, read_group, write_group, command_id,
+                 payload_bytes, payload_type):
+        self.name = name
+        self.bus = bus
+        self.read_group = read_group
+        self.write_group = write_group
+        self.command_id = command_id
+        self.payload_bytes = payload_bytes
+        self.payload_type = payload_type
+
+
+def num(s: str) -> int:
+    s = s.strip()
+    return int(s, 16) if s.lower().startswith("0x") else int(s)
+
+
+def load_commands(path: Path = DB) -> dict[str, Command]:
+    src = path.read_text()
+    out: dict[str, Command] = {}
+    for m in ADD_RE.finditer(src):
+        body = m.group("cmd").strip()
+        cmd_id = [num(x) for x in body.split(",") if x.strip()] if body else []
+        out[m.group("name")] = Command(
+            m.group("name"), m.group("bus"),
+            num(m.group("read")), num(m.group("write")),
+            cmd_id, int(m.group("payload")), m.group("type"))
+    return out
+
+
+def wire_checksum(data: list[int]) -> int:
+    """MozaProtocol.CalculateWireChecksum — magic seed plus a second pass that
+    re-adds every 0x7E at index >= 2 (compensating for byte stuffing)."""
+    total = MAGIC_VALUE + sum(data)
+    total += sum(MESSAGE_START for b in data[2:] if b == MESSAGE_START)
+    return total & 0xFF
+
+
+def frame(group: int, device: int, command_id: list[int], payload: list[int]) -> list[int]:
+    msg = [MESSAGE_START, len(command_id) + len(payload), group, device]
+    msg += command_id
+    msg += payload
+    msg.append(wire_checksum(msg))
+    return msg
+
+
+def build_read(cmd: Command, device: int) -> list[int] | None:
+    if cmd.read_group == 0xFF:
+        return None
+    return frame(cmd.read_group, device, cmd.command_id, [0] * cmd.payload_bytes)
+
+
+def build_write_int(cmd: Command, device: int, value: int) -> list[int] | None:
+    if cmd.write_group == 0xFF:
+        return None
+    payload = [(value >> (8 * i)) & 0xFF for i in reversed(range(cmd.payload_bytes))]
+    return frame(cmd.write_group, device, cmd.command_id, payload)
+
+
+def fmt(msg: list[int]) -> str:
+    return " ".join(f"{b:02x}" for b in msg)
+
+
+def run_check(path: Path, commands: dict[str, Command]) -> int:
+    """Each non-comment line: <expected hex bytes> | <name> <read|write> [value] [dev]"""
+    failures = 0
+    checked = 0
+    for lineno, raw in enumerate(path.read_text().splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if "|" not in line:
+            print(f"{path}:{lineno}: no '|' separator", file=sys.stderr)
+            failures += 1
+            continue
+        expect_s, spec = (p.strip() for p in line.split("|", 1))
+        parts = spec.split()
+        name, kind = parts[0], parts[1]
+        value = num(parts[2]) if len(parts) > 2 and kind == "write" else 0
+        dev = num(parts[-1]) if len(parts) > 3 or (len(parts) == 3 and kind == "read") else 0x12
+        cmd = commands.get(name)
+        checked += 1
+        if cmd is None:
+            print(f"FAIL {name}: not registered in {DB.name}")
+            failures += 1
+            continue
+        got = build_read(cmd, dev) if kind == "read" else build_write_int(cmd, dev, value)
+        if got is None:
+            print(f"FAIL {name} {kind}: group is 0xFF (not {kind}able)")
+            failures += 1
+            continue
+        got_s = fmt(got)
+        if got_s != expect_s.lower():
+            print(f"FAIL {name} {kind}\n  expect {expect_s.lower()}\n  got    {got_s}")
+            failures += 1
+        else:
+            print(f"ok   {name} {kind}  {got_s}")
+    print(f"\n{checked - failures}/{checked} frames match", file=sys.stderr)
+    return 1 if failures else 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("name", nargs="?", help="command name from MozaCommandDatabase")
+    ap.add_argument("--dev", default="0x12", help="target device id (default 0x12)")
+    ap.add_argument("--read", action="store_true", help="render the read frame")
+    ap.add_argument("--write", metavar="VALUE", help="render the write frame for VALUE")
+    ap.add_argument("--bus", help="with --list, only this bus")
+    ap.add_argument("--list", action="store_true", help="list registered commands")
+    ap.add_argument("--check", metavar="FILE", help="verify expected frames from FILE")
+    args = ap.parse_args()
+
+    commands = load_commands()
+
+    if args.check:
+        return run_check(Path(args.check), commands)
+
+    if args.list:
+        for c in sorted(commands.values(), key=lambda c: (c.bus, c.name)):
+            if args.bus and c.bus != args.bus:
+                continue
+            ids = " ".join(f"{b:02x}" for b in c.command_id) or "-"
+            print(f"{c.bus:10s} {c.name:36s} read={c.read_group:#04x} "
+                  f"write={c.write_group:#04x} cmd=[{ids}] payload={c.payload_bytes}")
+        return 0
+
+    if not args.name:
+        ap.error("a command name is required unless --list/--check is given")
+    cmd = commands.get(args.name)
+    if cmd is None:
+        print(f"{args.name}: not registered in {DB.name}", file=sys.stderr)
+        return 1
+
+    dev = num(args.dev)
+    if args.read or args.write is None:
+        msg = build_read(cmd, dev)
+        print(f"read   {fmt(msg)}" if msg else "read   (not readable, group 0xFF)")
+    if args.write is not None:
+        msg = build_write_int(cmd, dev, num(args.write))
+        print(f"write  {fmt(msg)}" if msg else "write  (not writable, group 0xFF)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

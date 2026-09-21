@@ -130,6 +130,11 @@
       <ManifestResourceName>MozaPlugin.Resources.Strings.qps-ploc</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
+    <!-- SimHub .djson import tables (UI/DjsonImport). Data, not code: extending
+         property or font coverage is an edit here, never a recompile of the mapper. -->
+    <EmbeddedResource Include="Data\DjsonPropertyMap.json" LogicalName="MozaPlugin.Data.DjsonPropertyMap.json" />
+    <EmbeddedResource Include="Data\DjsonFontMap.json" LogicalName="MozaPlugin.Data.DjsonFontMap.json" />
+    <EmbeddedResource Include="Data\DjsonDisplayMap.json" LogicalName="MozaPlugin.Data.DjsonDisplayMap.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaWheelGeneric\MOZA Racing Wheel\device.json" LogicalName="MozaPlugin.Devices.WheelGeneric.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm2\MOZA CM2 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm2.device.json" />
     <EmbeddedResource Include="DeviceTemplates\MozaDashCm1\MOZA CM1 Racing Dash\device.json" LogicalName="MozaPlugin.Devices.DashCm1.device.json" />

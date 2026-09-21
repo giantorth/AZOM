@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>djson-convert</AssemblyName>
+    <RootNamespace>DjsonConvert</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Standalone dev tool: never part of the plugin build or the sln. -->
+    <IsPackable>false</IsPackable>
+    <!-- The linked plugin sources carry the plugin's own doc comments; this tool
+         does not ship XML docs, so don't warn about them. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The conversion pipeline itself, linked rather than copied so there is exactly
+         one implementation. Two files are excluded because they are the host bindings
+         rather than the pipeline: PluginChannelCatalog.cs reaches into plugin internals
+         (DashboardProfileStore), and the dialog is WPF. Program.cs stands in for both —
+         it reads Data/Telemetry.json directly and drives the converter from argv. -->
+    <Compile Include="../../UI/DjsonImport/*.cs"
+             Exclude="../../UI/DjsonImport/PluginChannelCatalog.cs;../../UI/DjsonImport/DjsonImportDialog.xaml.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same logical names the plugin uses: the pipeline loads these through
+         Assembly.GetExecutingAssembly(), which here is this tool. -->
+    <EmbeddedResource Include="../../Data/DjsonPropertyMap.json"
+                      LogicalName="MozaPlugin.Data.DjsonPropertyMap.json" />
+    <EmbeddedResource Include="../../Data/DjsonFontMap.json"
+                      LogicalName="MozaPlugin.Data.DjsonFontMap.json" />
+    <EmbeddedResource Include="../../Data/DjsonDisplayMap.json"
+                      LogicalName="MozaPlugin.Data.DjsonDisplayMap.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>

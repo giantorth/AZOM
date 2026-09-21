@@ -1,0 +1,35 @@
+{
+  "_comment": [
+    "Dashboard canvas geometry per MOZA display, for the .djson import path.",
+    "",
+    "Transcribed from Dashboard Studio's own :/elementMetaProperty/idealDeviceInfoMap.json",
+    "(MOZA Dashboard Studio.exe 1.0.6.14), cross-checked against the 47 factory dashboards",
+    "in PitHouse's bin/dashes: their canvas sizes are 1280x720 (14), 780x248 (11),",
+    "480x480 (9), 847x480 (8) and 1449x720 (5).",
+    "",
+    "The 1449x720 set has no entry in MOZA's map, so this table is a lookup for known",
+    "displays rather than an exhaustive list — an unmatched productType falls back to",
+    "'default' and the caller can still override the canvas explicitly.",
+    "",
+    "Matching is on the wheel's reported window.idealDeviceInfos[].productType, which the",
+    "plugin already parses into WheelDashboardDeviceInfo.",
+    "",
+    "Worth knowing: CM2 (S09) is 1280x720 — the same 16:9 a typical SimHub dashboard is",
+    "authored at, so a conversion targeting CM2 needs no meaningful rescale at all, where",
+    "the 780x248 wheel displays can only use about 57% of the canvas."
+  ],
+
+  "default": { "width": 780, "height": 248 },
+
+  "displays": {
+    "Display":     { "width": 480,  "height": 480,  "shape": "Round",             "note": "VGS" },
+    "W06 Display": { "width": 847,  "height": 480,  "shape": "CircularTrapezoid", "note": "ESSENZA SCV12" },
+    "W13 Display": { "width": 847,  "height": 480,  "shape": "Rectangle",         "note": "FSR V2" },
+    "W05 Display": { "width": 1417, "height": 700,  "shape": "Rectangle",         "note": "Porsche Mission R" },
+    "W17 Display": { "width": 780,  "height": 248,  "shape": "Rectangle",         "note": "CS Pro" },
+    "W18 Display": { "width": 780,  "height": 248,  "shape": "Rectangle",         "note": "KS Pro" },
+    "W20 Display": { "width": 780,  "height": 248,  "shape": "Rectangle",         "note": "Mustang GTD" },
+    "W22 Display": { "width": 340,  "height": 340,  "shape": "Rectangle",         "note": "W22" },
+    "S09 Display": { "width": 1280, "height": 720,  "shape": "Rectangle",         "note": "CM2" }
+  }
+}

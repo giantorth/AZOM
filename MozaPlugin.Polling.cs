@@ -173,6 +173,14 @@ namespace MozaPlugin
             try { NudgeRoutedMBoosterProbes(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Routed probe nudge: {ex.Message}"); }
 
+            // Pedal-haptics: a lane per connected pipe, then resolve outstanding
+            // probes, retire dead lanes and probe one new candidate port. Both
+            // calls are idempotent, so this simply re-runs every tick.
+            try { EnsureRoutedPedalHapticsLane(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Routed lane: {ex.Message}"); }
+            try { _pedalHapticsRegistry?.Refresh(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Refresh: {ex.Message}"); }
+
             // Standalone pedals/handbrake on their own ports (enumeration-
             // only, same device-source gate as the other dedicated lanes).
             if (deviceSourceLive)
@@ -270,6 +278,29 @@ namespace MozaPlugin
 
         private int _pollTickInProgress;
         private int _retryTickInProgress;
+        private int _ledKeepaliveTickInProgress;
+
+        /// <summary>
+        /// Re-feed the wheel and dash LED frames so the firmware keeps rendering them.
+        /// Runs on its own timer because SimHub's <c>Display()</c> callback is not a
+        /// cadence we control: when its LED pipeline stalls the re-feed used to stall
+        /// with it, the firmware dropped host LED ownership ~1 s later, and the wheel
+        /// fell back to its stored idle effect however long the user's keepalive timeout
+        /// was set (bundle 2X7HPMMS — an 8 s stall mid-race against a 100 s setting).
+        ///
+        /// <para>Each driver applies its own hold gates and pacing, so this is a cheap
+        /// fall-through on most ticks. Base ambient strips are not covered: that driver
+        /// recomputes from the live frame instead of replaying a cache, and has no hold
+        /// window to release on.</para>
+        /// </summary>
+        private void TickLedKeepalive()
+        {
+            try { Devices.Led.MozaLedDeviceManager.TickKeepaliveAll(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Wheel LED keepalive tick failed: {ex.Message}"); }
+
+            try { Devices.Led.MozaDashLedDeviceManager.Latest?.TickKeepalive(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Dash LED keepalive tick failed: {ex.Message}"); }
+        }
 
         private void PollStatus(object sender, ElapsedEventArgs e)
         {
@@ -315,6 +346,7 @@ namespace MozaPlugin
             // for a non-bus CM2). For a bus CM2 the wheelbase IS connected so the guard
             // below passes anyway — running them here only adds the USB-only case.
             _dualDisplay?.EnsureCm2Pipeline();
+            _dualDisplay?.TickCm2LaneHygiene();
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             _dualDisplay?.TickCm2DashboardReassert();
             _dualDisplay?.TickCm1Discriminator();
@@ -436,6 +468,29 @@ namespace MozaPlugin
                     _deviceManager.ProbeOtherWheelIds();
             }
 
+            // Bridged-dash liveness: any 0x14 reply since the last poll resets the miss
+            // counter; DashMissThreshold silent polls drop DashDetected so a dash
+            // power-cycle re-runs the MarkDashDetected cascade on re-attach. The 0x14
+            // presence poll below keeps a quiet-but-healthy dash (parked lane) answering.
+            if (DetectionState.DashDetected && !DashboardUsbConnected)
+            {
+                if (_deviceManager.DashRespondedSinceLastPoll)
+                {
+                    DetectionState.ResetDashPollMisses();
+                }
+                else
+                {
+                    int misses = DetectionState.IncrementDashPollMisses();
+                    if (misses >= DashMissThreshold)
+                    {
+                        MozaLog.Debug($"[AZOM] Bridged dash at 0x14 not responding ({misses} misses) — clearing dash detection");
+                        DetectionState.DashDetected = false;
+                        DetectionState.ResetDashPollMisses();
+                    }
+                }
+            }
+            _deviceManager.ResetDashResponseFlag();
+
             // Base temps/state are dev-0x13 reads the base main controller answers.
             // A hub-bound primary (post base→hub migration) can't reach the base
             // over the hub — the dedicated base-aux pipe polls them instead (see
@@ -462,8 +517,9 @@ namespace MozaPlugin
             // probe to 0x12 always ACKs from the base and can't distinguish.
             if (!DetectionState.NewWheelDetected && !DetectionState.OldWheelDetected)
                 _deviceManager.ProbeWheelDetection();
-            if (!DetectionState.DashDetected)
-                _deviceManager.SendPresenceProbe(MozaProtocol.DeviceDash);
+            // Bridged dash: probed every tick, detected or not — the ACK is its liveness
+            // heartbeat for the miss counter above (a standalone-USB CM2 has no 0x14).
+            _deviceManager.SendPresenceProbe(MozaProtocol.DeviceDash);
             // Also re-probe when the flag rode a persistent-wire reload but End()
             // cleared the owner: the ACK is the only thing that re-points it (and,
             // for pedals, re-arms the routed-mBooster probe — see MarkPedalsDetected).
@@ -526,18 +582,18 @@ namespace MozaPlugin
             // display detection (cleared in DeviceProber's display-model-name
             // case) or a manual Connection-enable toggle, so a permanently
             // wedged display can't loop the connection.
-            // Gated to NewWheelDetected only: old-protocol (ES) wheels never
-            // resolve WheelModelInfo (the wheel-model-name resolve is gated on
-            // NewWheelDetected because dev 0x13's model name is the base's, not
-            // the rim's), so WheelModelInfo stays null and `?.HasDisplay != false`
-            // reads null!=false == true — which would otherwise force a one-shot
-            // disconnect on a screenless ES wheel that has no display sub-device
-            // to wait for. Old wheels have no display; exclude them outright.
+            // Same resolved-model gate as the probe above. With WheelModelInfo
+            // null — identity reads unanswered (a bare "CS" mid Table-8 storm), or
+            // an ES rim, which never resolves it — `?.HasDisplay != false` reads
+            // true and the watchdog would bounce the base port over a rim that has
+            // no display to wait for.
             const long DisplayWedgeTimeoutMs = 60_000;
             long wheelDetectedTicks = WheelDetectedUtcTicks;
+            var wedgeModel = WheelModelInfo;
             if (!DisplayWedgeRecoveryFired
                 && DetectionState.NewWheelDetected
-                && WheelModelInfo?.HasDisplay != false
+                && wedgeModel != null
+                && wedgeModel.HasDisplay != false
                 && !IsDisplayDetected
                 && wheelDetectedTicks != 0)
             {
@@ -546,7 +602,7 @@ namespace MozaPlugin
                 if (elapsedMs >= DisplayWedgeTimeoutMs)
                 {
                     DisplayWedgeRecoveryFired = true;
-                    var hasDisplayStr = WheelModelInfo?.HasDisplay?.ToString() ?? "unknown";
+                    var hasDisplayStr = wedgeModel.HasDisplay?.ToString() ?? "unknown";
                     MozaLog.Warn(
                         $"[AZOM] Display sub-device wedge: wheel detected " +
                         $"{elapsedMs}ms ago (HasDisplay={hasDisplayStr}) but " +
@@ -561,11 +617,11 @@ namespace MozaPlugin
 
             // Group 3 (knob ring) brightness read once after group detected +
             // model resolved. The per-LED ring COLORS (wheel-knob-bg-color{N})
-            // are no longer read on the PollStatus path — they're driven by
-            // tab activation in MozaWheelSettingsControl.WheelTabs_SelectionChanged
-            // (gated on WheelKnobLedMode == 2 / Static), same policy as the
-            // RPM and Button color reads. Brightness is a single non-color
-            // status read, kept here as part of capability discovery.
+            // are not polled here — they're seeded once at detect in
+            // DeviceProber.BuildNewWheelLedReadCommands and re-read on Knobs-tab
+            // activation, same policy as the RPM and Button colors. Brightness is
+            // a single non-color status read, kept here as part of capability
+            // discovery.
             if (!DetectionState.Group3ColorsRead && DetectionState.NewWheelDetected && IsWheelLedGroupPresent(3))
             {
                 var model = WheelModelInfo;
@@ -573,7 +629,7 @@ namespace MozaPlugin
                 {
                     DetectionState.Group3ColorsRead = true;
                     _deviceManager.ReadSetting("wheel-knob-brightness");
-                    MozaLog.Debug($"[AZOM] Read knob ring brightness (color reads deferred to Knobs-tab activation)");
+                    MozaLog.Debug("[AZOM] Read knob ring brightness");
                 }
             }
 

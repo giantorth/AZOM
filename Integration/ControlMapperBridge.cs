@@ -1,56 +1,66 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using SimHub.Plugins;
 
 namespace MozaPlugin.Integration
 {
     /// <summary>
-    /// Reflection-based plumbing that registers a
-    /// <see cref="MozaVariantProvider"/> into SimHub's Control Mapper
-    /// <c>VariantHelper.VariantProviders</c> private list, then drives the
-    /// provider's wheel-change detection each tick.
-    ///
-    /// SimHub exposes no public registration API for variant providers
-    /// (only Fanatec and Simucube, both bundled inside
-    /// <c>SimHub.Plugins.dll</c>, are wired up by the helper at startup).
-    /// See <c>docs/controlmapper.md</c> for the research that defined this
-    /// approach. The bridge walks
-    /// <c>ControlMapperPlugin → remapperWorker → variantHelper →
-    /// VariantProviders</c> by field name and appends our provider. After
-    /// appending, it calls <c>RemapperWorker.UpdateVariantProviders</c> so
-    /// the helper re-subscribes to <see cref="MozaVariantProvider.VariantChanged"/>.
-    ///
-    /// Every reflection step is defensive — if a future SimHub assembly
-    /// renames any field or method, the bridge logs a single warning and
-    /// leaves the rest of the plugin untouched.
+    /// Reflection-based plumbing that registers a <see cref="MozaVariantProvider"/>
+    /// into SimHub's Control Mapper <c>VariantHelper.VariantProviders</c> private
+    /// list and keeps it there. SimHub exposes no public registration API for
+    /// variant providers (Simucube, Fanatec and Simagic are bundled inside
+    /// <c>SimHub.Plugins.dll</c> and created by <c>VariantHelper.Start()</c>).
+    /// <c>docs/controlmapper.md</c> holds the decompiled behaviour this relies on;
+    /// two facts shape the bridge:
+    /// <list type="bullet">
+    /// <item><c>Start()</c> subscribes <c>VariantChanged</c> only for the providers
+    /// it creates and early-returns once the list exists, so a provider added later
+    /// is never subscribed. The bridge therefore asks SimHub to re-enumerate
+    /// controllers itself, through the public
+    /// <c>ControlMapperPluginSettings.UpdateControllerList()</c>, whenever the wheel
+    /// variant changes.</item>
+    /// <item><c>Stop()</c> disposes the providers and nulls the list.
+    /// <c>RemapperWorker</c> calls <c>Start()</c>/<c>Stop()</c> every tick according
+    /// to the "Recognize supported wheels as individual controllers" toggle and the
+    /// output mode, so the list — and our entry in it — can vanish and reappear at
+    /// any time. <see cref="Poll"/> re-inserts the provider when SimHub rebuilds the
+    /// list.</item>
+    /// </list>
+    /// Every reflection step is defensive — if a future SimHub assembly renames any
+    /// field or method, the bridge logs a single warning and leaves the rest of the
+    /// plugin untouched.
     /// </summary>
     internal class ControlMapperBridge
     {
         private const string ControlMapperPluginTypeName =
             "SimHub.Plugins.OutputPlugins.ControlRemapper.ControlMapperPlugin";
+        private const string RecognizeWheelsLabel =
+            "Recognize supported wheels as individual controllers";
+        private const int ListRecheckIntervalMs = 1000;
 
         // Replaced by the entry a prior plugin instance left in VariantProviders
-        // (see Register) — Poll() must drive the instance SimHub actually holds.
+        // (see TryRegister) — Poll() must drive the instance SimHub actually holds.
         private MozaVariantProvider _provider = new MozaVariantProvider();
+        private MozaVariantProvider? _hookedProvider;
 
-        private object? _remapperWorker;
+        private object? _variantHelper;
+        private FieldInfo? _providersField;
+        // Live list we last saw our provider in; null while SimHub has no list
+        // (toggle off or Control Mapper output disabled).
         private IList? _providers;
-        private MethodInfo? _updateProvidersMethod;
-        // RemapperWorker.UpdateControllerList — invoked once at registration to
-        // re-key a wheel already plugged in at SimHub launch with the MOZA variant.
-        private MethodInfo? _updateControllerListMethod;
         private bool _registered;
         private bool _giveUpLogged;
+        private bool _updateRequestUnavailableLogged;
+        private int _lastListRecheckTick;
 
-        // Diagnostic: cached reflection for dumping ControllerMappings state
-        // when our provider detects a variant change. Lets us see, in the
-        // SimHub log, exactly what happens to each saved mapping's Variant
-        // (and ControllerID + Available + IsEnabled) across a wheel swap.
-        // Resolved lazily on first dump attempt; null entries make the dump
-        // a no-op.
+        // ControlMapperPluginSettings (public type) and the members read through it.
         private object? _controlMapperSettings;
         private PropertyInfo? _settingsControllerMappingsProp;
+        private PropertyInfo? _settingsRecognizeWheelsProp;
+        private MethodInfo? _settingsUpdateControllerListMethod;
         private PropertyInfo? _csmDescriptionProp;
         private PropertyInfo? _csmStateProp;
         private PropertyInfo? _csmIsEnabledProp;
@@ -59,7 +69,8 @@ namespace MozaPlugin.Integration
         private PropertyInfo? _descProductIdProp;
         private PropertyInfo? _descVariantProp;
         private PropertyInfo? _stateAvailableProp;
-        private bool _diagResolveAttempted;
+        private PropertyInfo? _stateStatusProp;
+        private bool _settingsResolveAttempted;
         private string? _lastDiagVariant;
         // Cached so Unregister can detach the CollectionChanged handler: the
         // publisher (SimHub's ControllerMappings) outlives a plugin reload, and
@@ -87,6 +98,8 @@ namespace MozaPlugin.Integration
         /// <c>DataUpdate</c> up to a cap) OR when a SimHub assembly change
         /// has invalidated the lookup (in which case <see cref="LogGiveUp"/>
         /// has been called and the caller should stop retrying).
+        /// Registration succeeds even while SimHub has no provider list (toggle
+        /// off); <see cref="Poll"/> inserts the provider once the list exists.
         /// </summary>
         public bool TryRegister(PluginManager pm)
         {
@@ -140,8 +153,7 @@ namespace MozaPlugin.Integration
                 object? rw = rwField.GetValue(cmInstance);
                 if (rw == null) return false;
 
-                Type rwType = rw.GetType();
-                FieldInfo? vhField = rwType.GetField(
+                FieldInfo? vhField = rw.GetType().GetField(
                     "variantHelper", BindingFlags.NonPublic | BindingFlags.Instance);
                 if (vhField == null)
                 {
@@ -151,147 +163,57 @@ namespace MozaPlugin.Integration
                 object? vh = vhField.GetValue(rw);
                 if (vh == null) return false;
 
-                Type vhType = vh.GetType();
-                FieldInfo? providersField = vhType.GetField(
+                FieldInfo? providersField = vh.GetType().GetField(
                     "VariantProviders", BindingFlags.NonPublic | BindingFlags.Instance);
                 if (providersField == null)
                 {
                     LogGiveUp("VariantHelper.VariantProviders field not found");
                     return false;
                 }
-                _updateProvidersMethod = rwType.GetMethod(
-                    "UpdateVariantProviders",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
-                // VariantHelper.VariantProviders is lazy-created inside
-                // VariantHelper.Start() — and Start() only runs when the user
-                // has Control Mapper's "Recognize Individual Wheels" toggle
-                // enabled (RemapperWorker.UpdateVariantProviders gates on
-                // ControlMapperPluginSettings.RecognizeIndiviualWheels). If
-                // the list is null right now we have to materialize it
-                // ourselves so we have somewhere to add our provider. The
-                // user's toggle is then respected by the
-                // UpdateVariantProviders call at the end of this method: if
-                // disabled, Stop() unsubscribes everything but leaves the
-                // populated list intact, so when the user flips the toggle
-                // on later our provider is already present.
-                object? providersRaw = providersField.GetValue(vh);
-                if (providersRaw == null)
+                // Settings first: the toggle, the async re-enumeration entry point
+                // and the mapping dump all hang off ControlMapperPluginSettings.
+                ResolveSettingsReflection(cmType, cmInstance);
+                HookMappingsCollectionChanged();
+
+                _variantHelper = vh;
+                _providersField = providersField;
+
+                bool listPresent;
+                int count;
+                bool adopted;
+                string? listError;
+                lock (vh.GetType())
                 {
-                    MethodInfo? startMethod = vhType.GetMethod(
-                        "Start", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (startMethod == null)
-                    {
-                        LogGiveUp("VariantHelper.Start method not found (cannot materialize provider list)");
-                        return false;
-                    }
-                    try { startMethod.Invoke(vh, null); }
-                    catch (Exception ex)
-                    {
-                        LogGiveUp(
-                            $"VariantHelper.Start threw while materializing list: " +
-                            ex.GetBaseException().Message);
-                        return false;
-                    }
-                    providersRaw = providersField.GetValue(vh);
+                    listError = SyncProviderIntoList(out listPresent, out count, out adopted, out _);
                 }
-
-                if (providersRaw is not IList providers)
+                if (listError != null)
                 {
-                    LogGiveUp(
-                        $"VariantHelper.VariantProviders is " +
-                        (providersRaw == null ? "still null after Start()" : "not an IList") +
-                        " (declared type: " + providersField.FieldType.FullName + ")");
+                    LogGiveUp(listError);
                     return false;
                 }
 
-                // Idempotency: a prior plugin instance may have left a
-                // provider in the list (plugin reload without SimHub
-                // restart). Reuse it instead of double-registering.
-                foreach (var existing in providers)
-                {
-                    if (existing is MozaVariantProvider existingProvider)
-                    {
-                        _provider = existingProvider;
-                        _providers = providers;
-                        _remapperWorker = rw;
-                        _registered = true;
-                        MozaLog.Info(
-                            "[AZOM] ControlMapper bridge: MozaVariantProvider already present, reusing existing entry");
-                        return true;
-                    }
-                }
+                HookProviderEvent();
+                _registered = true;
+                _lastListRecheckTick = Environment.TickCount;
 
-                providers.Add(_provider);
-                _providers = providers;
-                _remapperWorker = rw;
-
-                if (_updateProvidersMethod != null)
+                if (listPresent)
                 {
-                    try { _updateProvidersMethod.Invoke(rw, null); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn(
-                            "[AZOM] ControlMapper bridge: UpdateVariantProviders threw — provider registered " +
-                            "but VariantHelper may not have subscribed to VariantChanged: " +
-                            ex.GetBaseException().Message);
-                    }
+                    MozaLog.Info(
+                        $"[AZOM] ControlMapper bridge: {(adopted ? "reusing existing" : "registered")} MozaVariantProvider " +
+                        $"({count} providers total; \"{RecognizeWheelsLabel}\": {DescribeToggle()})");
                 }
                 else
                 {
                     MozaLog.Warn(
-                        "[AZOM] ControlMapper bridge: RemapperWorker.UpdateVariantProviders not found — wheel " +
-                        "hot-swap won't refresh Control Mapper automatically (user can manually rescan).");
+                        $"[AZOM] ControlMapper bridge: SimHub has no variant-provider list — \"{RecognizeWheelsLabel}\" " +
+                        $"is {DescribeToggle()} or Control Mapper output is disabled. MOZA per-wheel mappings stay inactive " +
+                        "until it is enabled; the provider is inserted automatically when SimHub creates the list.");
                 }
 
-                _registered = true;
-                MozaLog.Info(
-                    $"[AZOM] ControlMapper bridge: registered MozaVariantProvider " +
-                    $"({providers.Count} providers total)");
-
-                // Diagnostic capture — settings reference for periodic mapping dumps.
-                try
-                {
-                    FieldInfo? settingsField = cmType.GetField(
-                        "controlMapperPluginSettings",
-                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (settingsField != null)
-                        _controlMapperSettings = settingsField.GetValue(cmInstance);
-
-                    // Subscribe to ControllerMappings.CollectionChanged so we
-                    // get a dump every time the user clicks Add Source
-                    // Controller (or anything else mutates the collection).
-                    HookMappingsCollectionChanged();
-                }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: settings capture: {ex.Message}"); }
-
-                // Force an immediate controller re-enumeration so our provider's
-                // variant is picked up on the first pass instead of waiting for
-                // the wheel-attach VariantChanged later. ControlMapperPlugin.Init
-                // runs UpdateControllerList() once at startup — before our bridge
-                // has registered — so any wheel already plugged in at SimHub
-                // launch gets enumerated without a variant. Re-running it here
-                // re-keys the wheelbase entry with the current MOZA variant.
-                _updateControllerListMethod = rwType.GetMethod(
-                    "UpdateControllerList",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (_updateControllerListMethod != null)
-                {
-                    try
-                    {
-                        _updateControllerListMethod.Invoke(rw, null);
-                        MozaLog.Debug(
-                            "[AZOM] ControlMapper bridge: forced UpdateControllerList " +
-                            "to re-key controllers with MOZA variant");
-                    }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Debug(
-                            "[AZOM] ControlMapper bridge: UpdateControllerList threw — " +
-                            ex.GetBaseException().Message);
-                    }
-                }
-
+                // Controllers already plugged in were enumerated before our provider
+                // existed; re-key them now through SimHub's own async path.
+                RequestControllerListUpdate("registration");
                 return true;
             }
             catch (Exception ex)
@@ -301,28 +223,123 @@ namespace MozaPlugin.Integration
             }
         }
 
+        // Caller holds lock(_variantHelper.GetType()) — the same Type object
+        // VariantHelper.Start()/Stop() lock on while they build or drop the list.
+        // Adopts an existing MozaVariantProvider entry or appends ours. Returns a
+        // give-up reason when the field holds something other than a list.
+        private string? SyncProviderIntoList(out bool listPresent, out int count, out bool adopted, out bool inserted)
+        {
+            listPresent = false;
+            count = 0;
+            adopted = false;
+            inserted = false;
+
+            object? raw = _providersField!.GetValue(_variantHelper);
+            if (raw == null)
+            {
+                _providers = null;
+                return null;
+            }
+            if (raw is not IList list)
+            {
+                return "VariantHelper.VariantProviders is not an IList (declared type: "
+                    + _providersField.FieldType.FullName + ")";
+            }
+
+            listPresent = true;
+            MozaVariantProvider? existing = null;
+            foreach (object? entry in list)
+            {
+                if (entry is MozaVariantProvider p)
+                {
+                    existing = p;
+                    break;
+                }
+            }
+            if (existing != null)
+            {
+                if (!ReferenceEquals(existing, _provider))
+                {
+                    _provider = existing;
+                    adopted = true;
+                }
+            }
+            else
+            {
+                list.Add(_provider);
+                inserted = true;
+            }
+            _providers = list;
+            count = list.Count;
+            return null;
+        }
+
+        private void HookProviderEvent()
+        {
+            if (ReferenceEquals(_hookedProvider, _provider)) return;
+            UnhookProviderEvent();
+            _provider.VariantChanged += OnProviderVariantChanged;
+            _hookedProvider = _provider;
+        }
+
+        private void UnhookProviderEvent()
+        {
+            if (_hookedProvider == null) return;
+            try { _hookedProvider.VariantChanged -= OnProviderVariantChanged; } catch { }
+            _hookedProvider = null;
+        }
+
+        // SimHub's VariantHelper never subscribed to this provider (see class
+        // summary), so the re-enumeration its bundled providers get for free is
+        // requested here.
+        private void OnProviderVariantChanged(object? sender, EventArgs e)
+            => RequestControllerListUpdate("variant changed");
+
+        // ControlMapperPluginSettings.UpdateControllerList() — public, Task.Run
+        // inside SimHub, ends in RemapperWorker.UpdateControllerList. Same path the
+        // Control Mapper UI and the bundled providers use.
+        private void RequestControllerListUpdate(string reason)
+        {
+            if (_controlMapperSettings == null || _settingsUpdateControllerListMethod == null)
+            {
+                if (!_updateRequestUnavailableLogged)
+                {
+                    _updateRequestUnavailableLogged = true;
+                    MozaLog.Warn(
+                        "[AZOM] ControlMapper bridge: ControlMapperPluginSettings.UpdateControllerList not found — " +
+                        "controllers keep the variant they were enumerated with until SimHub rescans " +
+                        "(USB change or manual rescan).");
+                }
+                return;
+            }
+            try
+            {
+                _settingsUpdateControllerListMethod.Invoke(_controlMapperSettings, null);
+                MozaLog.Debug($"[AZOM] ControlMapper bridge: requested controller re-enumeration ({reason})");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] ControlMapper bridge: UpdateControllerList threw — {ex.GetBaseException().Message}");
+            }
+        }
+
         /// <summary>
-        /// Drive the provider's wheel-change detection. Called once per
-        /// <c>MozaPlugin.DataUpdate</c> tick. Cheap — the provider compares
-        /// a single string against its cache and only fires
-        /// <see cref="MozaVariantProvider.VariantChanged"/> on transition.
+        /// Drive the provider's wheel-change detection and keep the provider in
+        /// SimHub's list. Called once per <c>MozaPlugin.DataUpdate</c> tick. Cheap —
+        /// the provider compares a single string against its cache and only fires
+        /// <see cref="MozaVariantProvider.VariantChanged"/> on transition; the list
+        /// check runs once a second.
         ///
         /// We deliberately do NOT clone mappings or override <c>Available</c>
-        /// here. The IL of <c>RemapperWorker.UpdateControllerList</c> +
-        /// <c>SharpHelper.AquireController</c> shows SimHub already handles
-        /// per-variant mappings natively:
-        ///   - The match cascade in <c>UpdateControllerList</c> (b__2/b__3/
-        ///     b__10) includes Variant in every predicate, so each variant
-        ///     gets its own slot in ControllerMappings and a device whose
-        ///     current variant has no matching mapping shows up in
-        ///     UnmappedControllers (the "Add Source Controller" dropdown).
-        ///   - <c>AquireController</c> compares <c>GetCurrentVariant</c>
-        ///     against <c>Description.Variant</c> on every tick and calls
-        ///     <c>SetAsUnplugged</c> on mismatches — so only the mapping
-        ///     whose stored Variant matches the currently-attached wheel
-        ///     gets a Joystick acquire and forwards input.
-        /// Our role is just to provide the Variant string via the provider;
-        /// SimHub does the rest.
+        /// here. SimHub handles per-variant mappings natively: every match
+        /// predicate in <c>RemapperWorker.UpdateControllerList</c> includes
+        /// Variant, so each variant gets its own slot in ControllerMappings and a
+        /// device whose current variant has no matching mapping shows up in
+        /// UnmappedControllers (the "Add Source Controller" dropdown), and
+        /// <c>SharpHelper.AquireController</c> compares the live variant against
+        /// <c>Description.Variant</c> on every acquire attempt, so only the mapping
+        /// whose stored Variant matches the attached wheel forwards input.
         /// </summary>
         public void Poll()
         {
@@ -333,6 +350,8 @@ namespace MozaPlugin.Integration
                 MozaLog.Debug($"[AZOM] ControlMapper bridge poll: {ex.Message}");
             }
 
+            RecheckProviderList();
+
             // We deliberately do NOT auto-create a ControllerSourceMapping for a
             // newly-attached wheel. The user adds each MOZA source controller via
             // SimHub's "Add Source Controller" flow; the provider supplies the
@@ -342,10 +361,8 @@ namespace MozaPlugin.Integration
             // that SimHub never marked Available — see docs/controlmapper.md.)
             string? currentVariant = ComputeCurrentVariant();
 
-            // Diagnostic: when the wheel-side variant changes, dump every
-            // MOZA mapping's stored Description.Variant + Available + IsEnabled
-            // + ControllerID. This lets us see whether SimHub's UpdateControllerList
-            // is mutating saved Variant strings during a wheel swap.
+            // Diagnostic: when the wheel-side variant changes, dump every MOZA
+            // mapping's stored Variant + Status + Available + IsEnabled + ControllerID.
             try
             {
                 if (!string.Equals(currentVariant, _lastDiagVariant, StringComparison.Ordinal))
@@ -360,19 +377,148 @@ namespace MozaPlugin.Integration
             }
         }
 
+        // SimHub drops the provider list whenever the toggle is off or Control
+        // Mapper output is disabled, and rebuilds it without us when either comes
+        // back. Re-insert and re-key the controllers when that happens.
+        private void RecheckProviderList()
+        {
+            int now = Environment.TickCount;
+            if (unchecked(now - _lastListRecheckTick) < ListRecheckIntervalMs) return;
+            _lastListRecheckTick = now;
+            if (_variantHelper == null || _providersField == null) return;
+
+            bool hadList = _providers != null;
+            bool listPresent;
+            int count;
+            bool adopted;
+            bool inserted;
+            string? error;
+            try
+            {
+                lock (_variantHelper.GetType())
+                {
+                    error = SyncProviderIntoList(out listPresent, out count, out adopted, out inserted);
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[AZOM] ControlMapper bridge: provider list recheck threw — {ex.Message}");
+                return;
+            }
+            if (error != null)
+            {
+                MozaLog.Debug($"[AZOM] ControlMapper bridge: {error}");
+                return;
+            }
+
+            if (!listPresent)
+            {
+                if (hadList)
+                {
+                    MozaLog.Info(
+                        $"[AZOM] ControlMapper bridge: SimHub dropped its variant-provider list — \"{RecognizeWheelsLabel}\" " +
+                        "turned off or Control Mapper output disabled; MOZA per-wheel mappings inactive until it is back");
+                }
+                return;
+            }
+
+            if (inserted || adopted || !hadList)
+            {
+                HookProviderEvent();
+                MozaLog.Info(
+                    $"[AZOM] ControlMapper bridge: {(inserted ? "re-inserted" : "found")} MozaVariantProvider after SimHub " +
+                    $"rebuilt its list ({count} providers total; \"{RecognizeWheelsLabel}\": {DescribeToggle()})");
+                RequestControllerListUpdate("provider list rebuilt");
+            }
+        }
+
+        private bool? TryGetRecognizeIndividualWheels()
+        {
+            if (_controlMapperSettings == null || _settingsRecognizeWheelsProp == null) return null;
+            try { return _settingsRecognizeWheelsProp.GetValue(_controlMapperSettings) as bool?; }
+            catch { return null; }
+        }
+
+        private string DescribeToggle() => TryGetRecognizeIndividualWheels() switch
+        {
+            true => "on",
+            false => "off",
+            _ => "unknown",
+        };
+
         /// <summary>
-        /// Walk <c>ControlMapperPluginSettings.ControllerMappings</c> and log
-        /// the current state (Variant / ControllerID / Available / IsEnabled)
-        /// of every MOZA wheelbase mapping. Logs once per detected variant
-        /// transition to keep noise bounded.
+        /// Diagnostics-tab text: bridge state, SimHub's toggle, the live variant and
+        /// every MOZA wheelbase/hub mapping with its acquire status.
+        /// </summary>
+        public string BuildDiagnostics()
+        {
+            var sb = new StringBuilder();
+            bool listPresent = false;
+            bool inList = false;
+            int count = 0;
+            if (_variantHelper != null && _providersField != null)
+            {
+                try
+                {
+                    lock (_variantHelper.GetType())
+                    {
+                        if (_providersField.GetValue(_variantHelper) is IList list)
+                        {
+                            listPresent = true;
+                            count = list.Count;
+                            foreach (object? entry in list)
+                            {
+                                if (ReferenceEquals(entry, _provider)) { inList = true; break; }
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+            sb.AppendLine(
+                $"Bridge:         registered={(_registered ? "yes" : "no")}  givenUp={(_giveUpLogged ? "yes" : "no")}  " +
+                $"simhubList={(listPresent ? count + " provider(s)" : "none")}  providerInList={(inList ? "yes" : "no")}");
+            sb.AppendLine($"Toggle:         {DescribeToggle()}  ({RecognizeWheelsLabel})");
+            sb.AppendLine($"Variant:        {ComputeCurrentVariant() ?? "—"}");
+
+            List<string>? lines = CollectMozaMappingLines(out int total);
+            if (lines == null)
+            {
+                sb.AppendLine("Mappings:       (settings reflection unavailable)");
+            }
+            else
+            {
+                sb.AppendLine($"Mappings:       {lines.Count} MOZA wheelbase/hub of {total} total");
+                foreach (string line in lines) sb.AppendLine("  " + line);
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// Log the current state (Variant / ControllerID / Status / Available /
+        /// IsEnabled) of every MOZA wheelbase mapping. Called once per detected
+        /// variant transition and on every ControllerMappings change.
         /// </summary>
         private void DumpMappingsState(string currentVariantLabel)
         {
-            if (!_diagResolveAttempted)
+            List<string>? lines = CollectMozaMappingLines(out int total);
+            if (lines == null)
             {
-                _diagResolveAttempted = true;
-                ResolveDiagnosticReflection();
+                MozaLog.Debug("[AZOM] CM diag: reflection unavailable, skipping dump");
+                return;
             }
+            MozaLog.Debug(
+                $"[AZOM] CM diag (variant=\"{currentVariantLabel}\", toggle={DescribeToggle()}): "
+                + $"ControllerMappings.Count={total}");
+            foreach (string line in lines) MozaLog.Debug("[AZOM] CM diag   " + line);
+            MozaLog.Debug($"[AZOM] CM diag: {lines.Count} MOZA mapping(s) total");
+        }
+
+        // One line per MOZA wheelbase/hub ControllerSourceMapping; null when the
+        // settings reflection didn't resolve.
+        private List<string>? CollectMozaMappingLines(out int totalMappings)
+        {
+            totalMappings = 0;
             if (_controlMapperSettings == null
                 || _settingsControllerMappingsProp == null
                 || _csmDescriptionProp == null
@@ -381,24 +527,24 @@ namespace MozaPlugin.Integration
                 || _descVariantProp == null
                 || _descControllerIDProp == null
                 || _stateAvailableProp == null)
-            {
-                MozaLog.Debug("[AZOM] CM diag: reflection unavailable, skipping dump");
-                return;
-            }
+                return null;
+
             object? mappingsObj;
             try { mappingsObj = _settingsControllerMappingsProp.GetValue(_controlMapperSettings); }
-            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: get mappings: {ex.Message}"); return; }
-            if (mappingsObj is not IList mappings)
-            {
-                MozaLog.Debug("[AZOM] CM diag: mappings not an IList");
-                return;
-            }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: get mappings: {ex.Message}"); return null; }
+            if (mappingsObj is not IList mappings) return null;
 
+            var lines = new List<string>();
             int idx = 0;
-            int mozaCount = 0;
-            MozaLog.Debug($"[AZOM] CM diag (variant=\"{currentVariantLabel}\"): "
-                + $"ControllerMappings.Count={mappings.Count}");
-            foreach (object? entry in mappings)
+            object?[] snapshot;
+            try
+            {
+                snapshot = new object?[mappings.Count];
+                mappings.CopyTo(snapshot, 0);
+            }
+            catch { return null; }
+            totalMappings = snapshot.Length;
+            foreach (object? entry in snapshot)
             {
                 idx++;
                 if (entry == null) continue;
@@ -407,7 +553,7 @@ namespace MozaPlugin.Integration
                 catch { continue; }
                 if (desc == null) continue;
                 if (!IsMozaWheelbaseOrHubDesc(desc)) continue;
-                mozaCount++;
+
                 string variant = (_descVariantProp.GetValue(desc) as string) ?? "<null>";
                 object? cidObj = null;
                 try { cidObj = _descControllerIDProp.GetValue(desc); } catch { }
@@ -416,33 +562,58 @@ namespace MozaPlugin.Integration
                 object? state = null;
                 try { state = _csmStateProp.GetValue(entry); } catch { }
                 string availStr = "<n/a>";
-                if (state != null && _stateAvailableProp != null)
+                string statusStr = "<n/a>";
+                if (state != null)
                 {
-                    try { availStr = (_stateAvailableProp.GetValue(state) is bool b ? b.ToString() : "<?>"); }
+                    try { availStr = _stateAvailableProp.GetValue(state) is bool b ? b.ToString() : "<?>"; }
                     catch { }
+                    if (_stateStatusProp != null)
+                    {
+                        try { statusStr = _stateStatusProp.GetValue(state)?.ToString() ?? "<null>"; }
+                        catch { }
+                    }
                 }
                 string enabledStr = "<n/a>";
                 if (_csmIsEnabledProp != null)
                 {
-                    try { enabledStr = (_csmIsEnabledProp.GetValue(entry) is bool eb ? eb.ToString() : "<?>"); }
+                    try { enabledStr = _csmIsEnabledProp.GetValue(entry) is bool eb ? eb.ToString() : "<?>"; }
                     catch { }
                 }
-                MozaLog.Debug(
-                    $"[AZOM] CM diag   #{idx}: Variant=\"{variant}\" CtrlID={cidShort}.. "
+                lines.Add(
+                    $"#{idx}: Variant=\"{variant}\" CtrlID={cidShort}.. Status={statusStr} "
                     + $"Available={availStr} IsEnabled={enabledStr} DescObj={GetHash(desc):X}");
             }
-            MozaLog.Debug($"[AZOM] CM diag: {mozaCount} MOZA mapping(s) total");
+            return lines;
         }
 
-        private void ResolveDiagnosticReflection()
+        private void ResolveSettingsReflection(Type cmType, object cmInstance)
         {
-            if (_controlMapperSettings == null) return;
+            if (_settingsResolveAttempted) return;
+            _settingsResolveAttempted = true;
             try
             {
+                FieldInfo? settingsField = cmType.GetField(
+                    "controlMapperPluginSettings",
+                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                _controlMapperSettings = settingsField?.GetValue(cmInstance);
+                if (_controlMapperSettings == null)
+                {
+                    MozaLog.Debug("[AZOM] CM diag: controlMapperPluginSettings unavailable");
+                    return;
+                }
+
                 Type settingsType = _controlMapperSettings.GetType();
                 _settingsControllerMappingsProp = settingsType.GetProperty(
                     "ControllerMappings", BindingFlags.Public | BindingFlags.Instance);
-                if (_settingsControllerMappingsProp == null) return;
+                // SimHub's own spelling.
+                _settingsRecognizeWheelsProp = settingsType.GetProperty(
+                    "RecognizeIndiviualWheels", BindingFlags.Public | BindingFlags.Instance);
+                _settingsUpdateControllerListMethod = settingsType.GetMethod(
+                    "UpdateControllerList",
+                    BindingFlags.Public | BindingFlags.Instance,
+                    binder: null,
+                    types: Type.EmptyTypes,
+                    modifiers: null);
 
                 Assembly asm = settingsType.Assembly;
                 Type? csmType = asm.GetType(
@@ -461,6 +632,7 @@ namespace MozaPlugin.Integration
                 _descProductIdProp = descType.GetProperty("ProductId");
                 _descVariantProp = descType.GetProperty("Variant");
                 _stateAvailableProp = stateType.GetProperty("Available");
+                _stateStatusProp = stateType.GetProperty("ControllerStatus");
             }
             catch (Exception ex)
             {
@@ -503,20 +675,16 @@ namespace MozaPlugin.Integration
 
         /// <summary>
         /// Subscribe to <c>ControllerMappings.CollectionChanged</c> so the
-        /// bridge dumps the full mapping state immediately whenever the user
-        /// adds or removes a source controller. Reflection-based since the
-        /// concrete event type (<c>NotifyCollectionChangedEventHandler</c>)
-        /// lives in <c>System.Collections.Specialized</c> and is wired via
+        /// bridge sees every "Add Source Controller" (and dumps the mapping state
+        /// on any change). Reflection-based since the concrete event type
+        /// (<c>NotifyCollectionChangedEventHandler</c>) lives in
+        /// <c>System.Collections.Specialized</c> and is wired via
         /// <c>ObservableCollection&lt;T&gt;</c>.
         /// </summary>
         private void HookMappingsCollectionChanged()
         {
-            if (!_diagResolveAttempted)
-            {
-                _diagResolveAttempted = true;
-                ResolveDiagnosticReflection();
-            }
             if (_controlMapperSettings == null || _settingsControllerMappingsProp == null) return;
+            if (_mappingsCollChangedHandler != null) return;
             object? mappingsObj;
             try { mappingsObj = _settingsControllerMappingsProp.GetValue(_controlMapperSettings); }
             catch { return; }
@@ -598,9 +766,10 @@ namespace MozaPlugin.Integration
                 // through the shared reference and "infect" the others.
                 //
                 // Fix: deep-clone the new CSM's Description into an independent
-                // object, and stamp its Variant with the currently-attached
-                // wheel — that's what the user meant to add. AquireController's
-                // variant gating then works correctly per-mapping.
+                // object and, while SimHub is recognising individual wheels,
+                // stamp its Variant with the currently-attached wheel — that's
+                // what the user meant to add. AquireController's variant gating
+                // then works correctly per-mapping.
                 if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add
                     && e.NewItems != null)
                 {
@@ -622,8 +791,11 @@ namespace MozaPlugin.Integration
         /// <summary>
         /// If <paramref name="csm"/> is a MOZA wheelbase
         /// ControllerSourceMapping that shares its Description object with
-        /// anything else, replace its Description with an independent clone
-        /// whose <c>Variant</c> is set to the currently-attached wheel.
+        /// anything else, replace its Description with an independent clone.
+        /// The clone's <c>Variant</c> is set to the currently-attached wheel only
+        /// while SimHub's "Recognize supported wheels as individual controllers"
+        /// toggle is on: with it off, <c>VariantHelper.GetVariant</c> is null for
+        /// every device and a stamped mapping could never acquire.
         /// </summary>
         private void DetachMozaDescription(object csm, string? currentVariant)
         {
@@ -646,15 +818,15 @@ namespace MozaPlugin.Integration
             try { copyFrom.Invoke(clone, new[] { desc }); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: clone CopyFrom: {ex.Message}"); return; }
 
-            // Stamp the clone's Variant with the current detected wheel
-            // (what the user actually wanted to add). If no wheel is detected
-            // right now (currentVariant == null), preserve whatever Variant
-            // the original description had so we don't blank it.
+            // Toggle on and a wheel detected: stamp the live wheel. Otherwise keep
+            // whatever SimHub enumerated (null with the toggle off), so the mapping
+            // matches what AquireController will compute.
             int oldHash = GetHash(desc);
             string? originalVariant;
             try { originalVariant = _descVariantProp.GetValue(desc) as string; }
             catch { originalVariant = null; }
-            string targetVariant = currentVariant ?? originalVariant ?? string.Empty;
+            bool? toggle = TryGetRecognizeIndividualWheels();
+            string targetVariant = (toggle == true ? currentVariant : null) ?? originalVariant ?? string.Empty;
             try { _descVariantProp.SetValue(clone, targetVariant); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM diag: clone set Variant: {ex.Message}"); }
 
@@ -666,7 +838,7 @@ namespace MozaPlugin.Integration
                 $"[AZOM] CM diag: detached shared Description on new MOZA mapping "
                 + $"(oldDescObj={oldHash:X}, newDescObj={GetHash(clone):X}, "
                 + $"originalVariant=\"{originalVariant ?? "<null>"}\", "
-                + $"setVariant=\"{targetVariant}\")");
+                + $"setVariant=\"{targetVariant}\", toggle={DescribeToggle()})");
         }
 
         /// <summary>
@@ -781,26 +953,26 @@ namespace MozaPlugin.Integration
         /// </summary>
         public void Unregister()
         {
-            // Detach the CollectionChanged handler first — it can be subscribed
-            // even when provider registration never completed (_registered == false).
+            // Detach handlers first — they can be subscribed even when provider
+            // registration never completed (_registered == false).
             UnhookMappingsCollectionChanged();
+            UnhookProviderEvent();
             if (!_registered) return;
             try
             {
-                if (_providers != null)
+                if (_variantHelper != null && _providersField != null)
                 {
-                    for (int i = _providers.Count - 1; i >= 0; i--)
+                    lock (_variantHelper.GetType())
                     {
-                        if (_providers[i] is MozaVariantProvider)
-                            _providers.RemoveAt(i);
-                    }
-                    if (_updateProvidersMethod != null && _remapperWorker != null)
-                    {
-                        try { _updateProvidersMethod.Invoke(_remapperWorker, null); }
-                        catch (Exception ex)
+                        // The live list — the cached one may be an orphan SimHub
+                        // already dropped.
+                        if (_providersField.GetValue(_variantHelper) is IList live)
                         {
-                            MozaLog.Debug(
-                                $"[AZOM] ControlMapper bridge unregister UpdateVariantProviders: {ex.Message}");
+                            for (int i = live.Count - 1; i >= 0; i--)
+                            {
+                                if (live[i] is MozaVariantProvider)
+                                    live.RemoveAt(i);
+                            }
                         }
                     }
                 }
@@ -813,9 +985,8 @@ namespace MozaPlugin.Integration
             finally
             {
                 _providers = null;
-                _remapperWorker = null;
-                _updateProvidersMethod = null;
-                _updateControllerListMethod = null;
+                _variantHelper = null;
+                _providersField = null;
                 _registered = false;
             }
         }

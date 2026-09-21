@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctrl="clr-namespace:MozaControls"
         xmlns:res="clr-namespace:MozaPlugin.Resources"
-        Title="{x:Static res:Strings.Title_PickLedColor}" Width="380" Height="440"
+        Title="{x:Static res:Strings.Title_PickLedColor}" Width="380" SizeToContent="Height"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{DynamicResource BgDeepBrush}"
         TextElement.Foreground="{DynamicResource TextBrush}"
@@ -28,26 +28,10 @@
                    Foreground="{StaticResource TextFaintBrush}" Margin="0,0,0,8"/>
         <ctrl:PaletteStrip x:Name="Palette" Margin="0,0,0,14"/>
 
-        <!-- Preview + Last Used -->
-        <Grid Margin="0,0,0,14">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Border x:Name="ColorPreview" Grid.Column="0" Height="46" CornerRadius="5"
-                    BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
-                    Background="Black"/>
-            <StackPanel x:Name="LastColorPanel" Grid.Column="1" Orientation="Horizontal"
-                        VerticalAlignment="Center" Margin="12,0,0,0" Visibility="Collapsed">
-                <TextBlock Text="{x:Static res:Strings.Label_Last}" FontSize="10" FontWeight="SemiBold"
-                           Foreground="{StaticResource TextFaintBrush}"
-                           VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <Border x:Name="LastColorSwatch" Height="32" Width="32" CornerRadius="4"
-                        BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
-                        Cursor="Hand" Background="Black" Tag="0,0,0"
-                        MouseLeftButtonUp="Preset_Click"/>
-            </StackPanel>
-        </Grid>
+        <!-- Preview -->
+        <Border x:Name="ColorPreview" Height="46" CornerRadius="5" Margin="0,0,0,14"
+                BorderBrush="{StaticResource BorderBrightBrush}" BorderThickness="1"
+                Background="Black"/>
 
         <!-- HSV / RGB fine-tune -->
         <TextBlock Text="{x:Static res:Strings.Label_FineTuneRgb}" FontSize="10" FontWeight="SemiBold"

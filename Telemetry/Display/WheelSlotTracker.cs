@@ -1,5 +1,7 @@
 using System;
 using MozaPlugin.Telemetry.Dashboard;
+using MozaPlugin.Telemetry.Frames;
+using MozaPlugin.Telemetry.Sessions;
 
 namespace MozaPlugin.Telemetry.Display
 {
@@ -212,6 +214,61 @@ namespace MozaPlugin.Telemetry.Display
             _sender.ArmHotSwitchBurst();
 
             _sender.RaiseWheelInitiatedSwitch(slot);
+        }
+
+        /// <summary>
+        /// b2h echo of the host's kind=4 FF record on the FF session = the device took
+        /// the switch. Confirms <see cref="WheelReportedSlot"/> for devices that never
+        /// push a type-04 after a switch (CM2, bundle Z45VF4BC). Never raises
+        /// WheelInitiatedSwitch — the slot is ours — and leaves the type-04 field
+        /// auto-detect alone.
+        /// </summary>
+        public void TryAbsorbKind4Echo(byte[] chunkPayload)
+        {
+            if (!TryDecodeKind4Echo(chunkPayload, out int slot)) return;
+            if (slot != _lastEmittedKind4Slot)
+            {
+                // Not an echo. The CM2 also emits kind=4 records the host never asked
+                // for (Z45VF4BC: slots 2/3 a few seconds after each host switch, no
+                // b8 precursor); their meaning is unknown, so they are logged, not
+                // followed.
+                MozaLog.Debug($"[AZOM] device kind=4 slot={slot} (not an echo; lastEmitted={_lastEmittedKind4Slot}, reported={_wheelReportedSlot})");
+                return;
+            }
+            _sender.NotePostSwitchKind4Confirmed(slot);
+            if (slot == _wheelReportedSlot) return;
+            int prevSlot = _wheelReportedSlot;
+            _wheelReportedSlot = slot;
+            MozaLog.Debug($"[AZOM] kind=4 echo confirmed slot={slot} (was {prevSlot})");
+        }
+
+        /// <summary>Find a CRC-valid kind=4 FF record in a session-data chunk (4-byte
+        /// chunk CRC trailer included, as fed to <see cref="TryAbsorbType04Slot"/>).</summary>
+        internal static bool TryDecodeKind4Echo(byte[] payload, out int slot)
+        {
+            slot = -1;
+            if (payload == null || payload.Length <= 4) return false;
+            int len = payload.Length - 4;
+            uint wireCrc = (uint)(payload[len] | (payload[len + 1] << 8)
+                               | (payload[len + 2] << 16) | (payload[len + 3] << 24));
+            if (TierDefinitionBuilder.Crc32(payload, 0, len) != wireCrc) return false;
+
+            for (int at = 0; at < len; at++)
+            {
+                if (payload[at] != 0xFF) continue;
+                if (!FfRecordReader.TryParse(payload, at, len,
+                        out uint kind, out int valueOffset, out int valueLength, out _, out _))
+                    continue;
+                if (kind != SessionPropertyPushBuilder.DashSwitchField1 || valueLength != 8) continue;
+                uint s = (uint)(payload[valueOffset] | (payload[valueOffset + 1] << 8)
+                              | (payload[valueOffset + 2] << 16) | (payload[valueOffset + 3] << 24));
+                uint pad = (uint)(payload[valueOffset + 4] | (payload[valueOffset + 5] << 8)
+                                | (payload[valueOffset + 6] << 16) | (payload[valueOffset + 7] << 24));
+                if (pad != 0 || s > 255) continue;
+                slot = (int)s;
+                return true;
+            }
+            return false;
         }
     }
 }

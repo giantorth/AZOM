@@ -179,38 +179,51 @@ namespace MozaPlugin.Protocol
                 }
 
                 var threads = new List<Thread>();
+                // Every Moza HID path seen by the last full enumeration, opened
+                // or not — a path outside this set is a hot-plugged device.
+                var knownPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var openPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 int openCount = 0;
+
+                // Open one device on its own reader thread; false when it refused
+                // to open (left for the next hot-plug scan to retry).
+                bool TryStart((HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity) d)
+                {
+                    var (device, usages, deviceClass, identity) = d;
+                    knownPaths.Add(DevicePathOf(device));
+                    if (!device.TryOpen(out HidStream stream)) return false;
+                    try
+                    {
+                        openCount++;
+                        // Register so Dispose() can force-close on shutdown.
+                        lock (_streamsLock) _liveStreams.Add(stream);
+                        openPaths.Add(DevicePathOf(device));
+                        if (deviceClass == MozaHidClass.Stalks) _data.IsStalksConnected = true;
+
+                        bool isHandbrake = MozaUsbIds.IsHandbrakePid((ushort)device.ProductID);
+                        string idCapture = identity;
+                        MozaHidClass classCapture = deviceClass;
+                        // ReadDevice owns `stream` and disposes it before returning.
+                        var t = new Thread(() => ReadDevice(device, stream, usages, isHandbrake, classCapture, idCapture))
+                        {
+                            IsBackground = true,
+                            Name = $"MozaHid_{device.ProductID:X4}",
+                        };
+                        threads.Add(t);
+                        t.Start();
+                        return true;
+                    }
+                    catch
+                    {
+                        lock (_streamsLock) _liveStreams.Remove(stream);
+                        try { stream.Dispose(); } catch { }
+                        throw;
+                    }
+                }
 
                 try
                 {
-                    foreach (var (device, usages, deviceClass, identity) in devices)
-                    {
-                        if (!device.TryOpen(out HidStream stream)) continue;
-                        try
-                        {
-                            openCount++;
-                            // Register so Dispose() can force-close on shutdown.
-                            lock (_streamsLock) _liveStreams.Add(stream);
-
-                            bool isHandbrake = MozaUsbIds.IsHandbrakePid((ushort)device.ProductID);
-                            string idCapture = identity;
-                            MozaHidClass classCapture = deviceClass;
-                            // ReadDevice owns `stream` and disposes it before returning.
-                            var t = new Thread(() => ReadDevice(device, stream, usages, isHandbrake, classCapture, idCapture))
-                            {
-                                IsBackground = true,
-                                Name = $"MozaHid_{device.ProductID:X4}",
-                            };
-                            threads.Add(t);
-                            t.Start();
-                        }
-                        catch
-                        {
-                            lock (_streamsLock) _liveStreams.Remove(stream);
-                            try { stream.Dispose(); } catch { }
-                            throw;
-                        }
-                    }
+                    foreach (var d in devices) TryStart(d);
 
                     if (openCount > 0)
                         _data.IsHidConnected = true;
@@ -226,8 +239,32 @@ namespace MozaPlugin.Protocol
                     // stays stuck at its last value while pedals/handbrake (hub)
                     // keep updating. Single-device setups always recovered because
                     // the lone thread dying ended the wait and re-enumerated.
+                    //
+                    // The reverse case is a device that (re)appears while its
+                    // siblings stay up: an mBooster comes back ~5 s after the
+                    // calibration soft-reboot that ended the previous wait, the
+                    // re-enumerate in between finds only the base, and nothing
+                    // ends the new wait — so it stayed unopened until a SimHub
+                    // restart (bug 01MCT5T0: pedal positions dead, the brake row
+                    // gone). Scan for unknown Moza HID paths and open them
+                    // alongside the live devices; the cheap path check keeps the
+                    // descriptor walk (and its log lines) for real arrivals.
+                    int sinceScanMs = 0;
                     while (!_stop && threads.Count > 0 && threads.All(t => t.IsAlive))
+                    {
                         SleepInterruptible(250);
+                        sinceScanMs += 250;
+                        if (sinceScanMs < HotplugScanIntervalMs) continue;
+                        sinceScanMs = 0;
+                        if (!HasUnknownMozaHid(knownPaths)) continue;
+                        bool added = false;
+                        foreach (var d in FindMozaDevices())
+                        {
+                            if (openPaths.Contains(DevicePathOf(d.device))) { knownPaths.Add(DevicePathOf(d.device)); continue; }
+                            if (TryStart(d)) added = true;
+                        }
+                        if (added) _data.IsHidConnected = true;
+                    }
 
                     // A device dropped (or we're shutting down): force every
                     // still-open stream closed so the surviving ReadDevice threads
@@ -251,6 +288,30 @@ namespace MozaPlugin.Protocol
                 _data.IsHidConnected = false;
                 SleepInterruptible(1000);
             }
+        }
+
+        private const int HotplugScanIntervalMs = 2000;
+
+        private static string DevicePathOf(HidDevice dev)
+        {
+            try { return dev.DevicePath ?? ""; } catch { return ""; }
+        }
+
+        /// <summary>Whether a Moza-VID HID device exists whose path the last
+        /// enumeration never saw — the hot-plug trigger. Path check only: no
+        /// descriptor walk, no log lines, cheap enough to poll.</summary>
+        private static bool HasUnknownMozaHid(HashSet<string> knownPaths)
+        {
+            try
+            {
+                foreach (var dev in DeviceList.Local.GetHidDevices())
+                {
+                    if (dev.VendorID != MozaPortDiscovery.MozaVid) continue;
+                    if (!knownPaths.Contains(DevicePathOf(dev))) return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         /// <summary>

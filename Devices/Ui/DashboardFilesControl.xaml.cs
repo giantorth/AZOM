@@ -6,9 +6,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using MozaPlugin.Diagnostics;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.UI;
+using MozaPlugin.UI.DjsonImport;
 using MozaPlugin.Resources;
+using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Devices.Ui
 {
@@ -257,6 +260,101 @@ namespace MozaPlugin.Devices.Ui
             return !string.IsNullOrEmpty(p) && System.IO.File.Exists(p) ? p : null;
         }
 
+        /// <summary>
+        /// Convert a SimHub <c>.djson</c> dashboard to <c>.mzdash</c>.
+        ///
+        /// <para>The converter writes into Dashboard Studio's project root, which the
+        /// library scan already covers, so a successful conversion only needs the same
+        /// rescan the folder picker does for the new dashboard to appear in the upload
+        /// list.</para>
+        /// </summary>
+        private void ImportDjson_Click(object sender, RoutedEventArgs e)
+        {
+            if (_plugin == null) return;
+
+            // Seed the target display from the connected wheel's own configJson, never
+            // from Studio's built-in literal (it describes one specific wheel).
+            JArray? ideal = null;
+            var infos = ResolveIdealDeviceInfos();
+            if (infos.Count > 0)
+            {
+                try
+                {
+                    ideal = JArray.Parse(DashboardStudioLauncher.BuildIdealDeviceInfosJson(infos));
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] DashboardFiles: idealDeviceInfos not usable: {ex.Message}");
+                }
+            }
+
+            var dialog = new DjsonImportDialog(
+                _plugin.DashProfileStore, ideal, _plugin.ActiveTelemetryMzdashFolder, _plugin.Settings)
+            {
+                Owner = Window.GetWindow(this),
+            };
+            dialog.ShowDialog();
+
+            if (!dialog.Converted) return;
+
+            // The node ceiling typed into the dialog persists with the settings.
+            _plugin.SaveSettings();
+            PublishChannelOverrides(dialog.Result, dialog.ConvertedPath);
+            _plugin.ReloadDashboardLibrary();
+            SeedUploadLibrary(force: true);
+            RefreshDashboardUploadStatus();
+        }
+
+        /// <summary>
+        /// Persist the channel borrowings a conversion made.
+        ///
+        /// <para>Properties with no MOZA channel of their own are carried on a spare
+        /// catalog channel, with the plugin publishing SimHub's value there. That only
+        /// happens if the mapping is stored — the mzdash alone just reads whatever the
+        /// channel normally carries — so this runs before the library rescan.</para>
+        ///
+        /// <para>Keyed to the converted file rather than the active dashboard: the user
+        /// has not selected it yet, and the mapping must be waiting when they do.</para>
+        /// </summary>
+        private void PublishChannelOverrides(ConversionResult? result, string? mzdashPath)
+        {
+            var overrides = result?.Report.ChannelOverrides;
+            if (_plugin == null || overrides == null || overrides.Count == 0) return;
+            if (string.IsNullOrEmpty(mzdashPath)) return;
+
+            try
+            {
+                var profile = _plugin.DashProfileStore.ParseMzdash(mzdashPath!);
+                if (profile == null)
+                {
+                    MozaLog.Warn("[AZOM] DjsonImport: converted dashboard did not re-parse; "
+                               + "channel overrides not stored");
+                    return;
+                }
+
+                string dashKey = DashboardProfileStore.GetDashboardKey(mzdashPath, profile);
+                foreach (var o in overrides)
+                {
+                    if (IsCm2Target)
+                    {
+                        _plugin.ChannelMapping.Set(o.Url, o.Source,
+                            MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
+                    }
+                    else
+                    {
+                        _plugin.ChannelMapping.Set(o.Url, o.Source, pageGuid: null, fixedDashKey: dashKey);
+                    }
+                }
+
+                MozaLog.Info($"[AZOM] DjsonImport: stored {overrides.Count} channel override(s) "
+                           + $"for '{dashKey}'");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] DjsonImport: could not store channel overrides: {ex}");
+            }
+        }
+
         private void StudioCreate_Click(object sender, RoutedEventArgs e)
         {
             var infos = ResolveIdealDeviceInfos();
@@ -320,14 +418,23 @@ namespace MozaPlugin.Devices.Ui
                 // the name persisted from last session.
                 if (string.IsNullOrEmpty(prev)) prev = _plugin.Settings?.LastUploadLibraryName;
                 UploadLibraryCombo.Items.Clear();
+                // Sorted for the picker only. CachedNames comes out in
+                // Dictionary key order — arbitrary, and it reshuffles as entries
+                // are added and removed — which reads as random in a dropdown.
+                // Deliberately NOT sorted at the source: DashboardBindingCoordinator
+                // feeds the same list to the wheel as its configJson library, where
+                // position IS the switch-command slot index.
+                var names = new List<string>();
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (_plugin.DashCache != null)
                 {
                     foreach (var name in _plugin.DashCache.CachedNames)
-                        if (seen.Add(name)) UploadLibraryCombo.Items.Add(name);
+                        if (seen.Add(name)) names.Add(name);
                 }
                 foreach (var p in _plugin.DashProfileStore.BuiltinProfiles)
-                    if (seen.Add(p.Name)) UploadLibraryCombo.Items.Add(p.Name);
+                    if (seen.Add(p.Name)) names.Add(p.Name);
+                names.Sort(UiHelpers.NaturalNameComparer);
+                foreach (var name in names) UploadLibraryCombo.Items.Add(name);
                 if (!string.IsNullOrEmpty(prev) && UploadLibraryCombo.Items.Contains(prev))
                     UploadLibraryCombo.SelectedItem = prev;
                 else if (UploadLibraryCombo.Items.Count > 0 && UploadLibraryCombo.SelectedItem == null)
@@ -827,7 +934,13 @@ namespace MozaPlugin.Devices.Ui
             uint bw = ts?.UploadLastBytesWritten ?? 0;
             uint total = ts?.UploadLastTotalSize ?? 0;
             byte status = ts?.UploadLastStatusByte ?? 0;
-            int pct = total == 0 ? 0 : (int)(bw * 100L / total);
+            // Percentage comes from UploadProgress (content sub-msgs emitted),
+            // NOT bw/total: the wheel's ready-ack sometimes echoes total_size
+            // into bytes_written, which read 100 % before a single content chunk
+            // had gone out (bundle NS9G817J). bw/total still decides
+            // complete-vs-stopped below — "does the wheel have all the bytes"
+            // is exactly what it answers.
+            int pct = (int)Math.Round((ts?.UploadProgress ?? 0.0) * 100.0);
 
             UploadInfoProgressText.Text =
                   inFlight    ? string.Format(Strings.Upload_StatusUploading, pct)

@@ -147,6 +147,7 @@ src = src .. [[
 return {
     decode_2d               = decode_2d,
     decode_mbooster         = decode_mbooster,
+    decode_pedal_haptics    = decode_pedal_haptics,
     decode_cm1              = decode_cm1,
     decode_fsr1             = decode_fsr1,
     decode_chunk            = decode_chunk,
@@ -179,12 +180,14 @@ local function hexbytes(hex)
 end
 
 -- Run a decoder over a full frame `7E N grp dev payload... chk`.
-local function run(fn, framehex)
+-- offDelta shifts the payload offset (the S12 extended envelope puts a one-byte
+-- extended id first); anything after it is passed straight through to the decoder.
+local function run(fn, framehex, offDelta, ...)
     local bytes = hexbytes(framehex)
     local tvb = TvbNew(bytes)
     local n = bytes[2]
     local sink = {}
-    fn(tvb, tree_new(sink), 4, n)
+    fn(tvb, tree_new(sink), 4 + (offDelta or 0), n, ...)
     return sink, tvb, n, bytes
 end
 
@@ -227,8 +230,59 @@ do
     local s2 = select(1, run(M.decode_mbooster, "7E092412" .. "B1040000" .. "00" .. "0000" .. "0000" .. "7F"))
     check("mb effect (Engine=4)", s2["moza.mb.effect"], 4)
     check("mb enable off",        s2["moza.mb.enable"], 0)
+
 end
 
+
+print("== group 0x4D — S12 vibration (Protocol/MozaPedalHapticsProtocol.cs)")
+do
+    -- Extended envelope, verbatim from moza.pcap: brake / Lockup, 50 ms, 50 Hz,
+    -- strength 32767. `off` skips the extended id, so pass payload_off + 1.
+    local s = select(1, run(M.decode_pedal_haptics,
+        "7E0C4D1F" .. "1E" .. "0101" .. "02" .. "02" .. "01"
+        .. "0032" .. "0032" .. "7FFF" .. "0A", 1, true))
+    check("ph sub = set",     s["moza.ph.sub"],      1)
+    check("ph pedal = brake", s["moza.ph.pedal"],    2)
+    check("ph slot = Lockup", s["moza.ph.slot"],     2)
+    check("ph enable",        s["moza.ph.enable"],   1)
+    check("ph duration ms",   s["moza.ph.duration"], 50)
+    check("ph frequency Hz",  s["moza.ph.freq"],     50)
+    check("ph strength",      s["moza.ph.strength"], 32767)
+
+    -- USB envelope: no extended id, so the payload starts one byte earlier.
+    -- Reference frame — brake / TC, 500 ms, 50 Hz, strength 32768.
+    local s2 = select(1, run(M.decode_pedal_haptics,
+        "7E0B4D12" .. "0101" .. "02" .. "00" .. "01"
+        .. "01F4" .. "0032" .. "8000" .. "A1", 0, false))
+    check("ph usb pedal = brake", s2["moza.ph.pedal"],    2)
+    check("ph usb slot = TC",     s2["moza.ph.slot"],     0)
+    check("ph usb duration",      s2["moza.ph.duration"], 500)
+    check("ph usb frequency",     s2["moza.ph.freq"],     50)
+    check("ph usb strength",      s2["moza.ph.strength"], 32768)
+
+    -- Stop frame: pedal and slot preserved, every parameter zeroed.
+    local s3 = select(1, run(M.decode_pedal_haptics,
+        "7E0B4D12" .. "0101" .. "02" .. "00" .. "00"
+        .. "0000" .. "0000" .. "0000" .. "F9", 0, false))
+    check("ph stop enable",   s3["moza.ph.enable"],   0)
+    check("ph stop pedal",    s3["moza.ph.pedal"],    2)
+    check("ph stop slot",     s3["moza.ph.slot"],     0)
+    check("ph stop duration", s3["moza.ph.duration"], 0)
+
+    -- Query: sub-command 02, payload padded out.
+    local s4 = select(1, run(M.decode_pedal_haptics,
+        "7E0B4D12" .. "0102" .. "02" .. "00" .. "00"
+        .. "0000" .. "0000" .. "0000" .. "FA", 0, false))
+    check("ph query sub", s4["moza.ph.sub"], 2)
+
+    -- Slot 8 carries a suspension position in the frequency field, not Hz.
+    local s5 = select(1, run(M.decode_pedal_haptics,
+        "7E0B4D12" .. "0101" .. "02" .. "08" .. "01"
+        .. "0000" .. "0032" .. "3333" .. "9A", 0, false))
+    check("ph road slot",     s5["moza.ph.slot"], 8)
+    check("ph road position", s5["moza.ph.freq"], 50)
+    check("ph road strength", s5["moza.ph.strength"], 13107)
+end
 print("== group 0x35 — CM1 keyed value stream (docs/protocol/devices/dash-0x14.md)")
 do
     -- Two 6-byte records: key 0xF54D = 25.0, key 0xDAA1 = 120.5

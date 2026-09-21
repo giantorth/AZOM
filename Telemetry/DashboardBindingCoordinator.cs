@@ -474,7 +474,7 @@ namespace MozaPlugin.Telemetry
             if (!_plugin.ShouldDriveDashboard())
             {
                 if (_plugin.ActiveCm2Sender != null || _plugin.IsCm2Present)
-                    return ApplyProfileDashboardToCm2(key!);
+                    return ApplyProfileDashboardToCm2(profile, key!);
                 MozaLog.Info("[AZOM] Profile dashboard key " + key +
                              " has no display lane (screenless wheel, no CM2) — leaving current selection");
                 return true;
@@ -500,37 +500,27 @@ namespace MozaPlugin.Telemetry
                 return false;
             }
             ClearDeferReason();
+            _plugin.ChannelMapping.MigrateLegacyWheelKeys();
 
             // Resolve target dashboard name + branch-specific side data.
             string targetName;
             string mzdashPath = "";
             string sourceTag;
 
-            if (key!.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
-                string id = key.Substring("wheel:".Length);
-                WheelDashboardEntry? match = null;
-                if (state.EnabledDashboards != null)
-                {
-                    foreach (var entry in state.EnabledDashboards)
-                    {
-                        if (entry != null && string.Equals(entry.Id, id, StringComparison.OrdinalIgnoreCase))
-                        {
-                            match = entry;
-                            break;
-                        }
-                    }
-                }
+                var match = WheelDashboardKey.Resolve(state, key);
                 if (match == null)
                 {
-                    MozaLog.Info("[AZOM] Profile dashboard key not found in current wheel catalog (id=" +
-                                 id + "); leaving current selection");
+                    MozaLog.Info("[AZOM] Profile dashboard key not found in current wheel catalog (" +
+                                 key + "); leaving current selection");
                     return true;
                 }
-                targetName = match.Title;
-                sourceTag = $"wheel:{id} ('{match.Title}')";
+                key = CanonicalizeWheelKey(profile, key!, match);
+                targetName = match.SlotName;
+                sourceTag = $"{key} (title '{match.Title}')";
             }
-            else if (key.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            else if (key!.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
             {
                 // file:<filename>:<sha1-first-8> — filename → local mzdash + bare name for slot lookup.
                 string remainder = key.Substring("file:".Length);
@@ -628,7 +618,7 @@ namespace MozaPlugin.Telemetry
             //   - file: local file exists → slotless restart; wheel keeps current binding.
             //   - file: local file missing AND no slot → leave current selection.
             //   - builtin: slotless OnDashboardSwitched restarts against the named builtin.
-            if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
                 MozaLog.Info("[AZOM] Profile dashboard '" + targetName +
                              "' missing from configJsonList; leaving current selection");
@@ -664,6 +654,18 @@ namespace MozaPlugin.Telemetry
             return true;
         }
 
+        /// <summary>Legacy <c>wheel:&lt;id&gt;</c> keys break on re-upload (the wheel
+        /// reissues the id); once resolved, rewrite the profile's key to the name form.</summary>
+        private static string CanonicalizeWheelKey(MozaProfile profile, string key, WheelDashboardEntry match)
+        {
+            string canonical = WheelDashboardKey.For(match);
+            if (string.Equals(canonical, key, StringComparison.OrdinalIgnoreCase)) return key;
+            if (string.Equals(profile.TelemetryDashboardKey, key, StringComparison.OrdinalIgnoreCase))
+                profile.TelemetryDashboardKey = canonical;
+            MozaLog.Info($"[AZOM] Migrated profile dashboard key {key} → {canonical}");
+            return canonical;
+        }
+
         /// <summary>
         /// CM2-lane counterpart of <see cref="ApplyTelemetryDashboardFromProfile"/>
         /// for rigs whose MAIN sender never runs (screenless wheel / no wheel).
@@ -671,7 +673,7 @@ namespace MozaPlugin.Telemetry
         /// OnCm2DashboardSwitched — the same path the CM2 UI combo uses. Never
         /// touches the wheel-lane ActiveTelemetryProfileName/MzdashPath fields.
         /// </summary>
-        private bool ApplyProfileDashboardToCm2(string key)
+        private bool ApplyProfileDashboardToCm2(MozaProfile profile, string key)
         {
             var cm2 = _plugin.ActiveCm2Sender;
             if (cm2 == null || !cm2.IsActive || cm2.IsInSilenceCooldown)
@@ -694,28 +696,17 @@ namespace MozaPlugin.Telemetry
             // Resolve key → name against the CM2's own catalog. file: keys match by
             // bare name only — the CM2 is catalog-only, no mzdash side-load.
             string targetName;
-            if (key.StartsWith("wheel:", StringComparison.OrdinalIgnoreCase))
+            if (WheelDashboardKey.IsWheelKey(key))
             {
-                string id = key.Substring("wheel:".Length);
-                WheelDashboardEntry? match = null;
-                if (state.EnabledDashboards != null)
-                {
-                    foreach (var entry in state.EnabledDashboards)
-                    {
-                        if (entry != null && string.Equals(entry.Id, id, StringComparison.OrdinalIgnoreCase))
-                        {
-                            match = entry;
-                            break;
-                        }
-                    }
-                }
+                var match = WheelDashboardKey.Resolve(state, key);
                 if (match == null)
                 {
-                    MozaLog.Info("[AZOM] Profile dashboard key not found in CM2 catalog (id=" +
-                                 id + "); leaving CM2 selection");
+                    MozaLog.Info("[AZOM] Profile dashboard key not found in CM2 catalog (" +
+                                 key + "); leaving CM2 selection");
                     return true;
                 }
-                targetName = match.Title;
+                key = CanonicalizeWheelKey(profile, key, match);
+                targetName = match.SlotName;
             }
             else if (key.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
             {
@@ -773,18 +764,27 @@ namespace MozaPlugin.Telemetry
             return true;
         }
 
-        /// <summary>Slot-aware dashboard switch: emits FF kind=4, awaits echo, then Stop+Start.</summary>
-        public void OnDashboardSwitched(uint slot) => OnDashboardSwitched(slot, _plugin.TelemetrySender);
+        /// <summary>Slot-aware dashboard switch on the wheel lane: emits FF kind=4,
+        /// then the hot tier-def burst (or a Stop+Start when hot re-negotiation is off).</summary>
+        public void OnDashboardSwitched(uint slot)
+        {
+            OnDashboardSwitched(slot, _plugin.TelemetrySender);
+        }
 
         /// <summary>Switch a specific sender's dashboard to <paramref name="slot"/>
-        /// (FF kind=4 + Stop/Start). The wheel sender and the CM2 sender each switch
-        /// their own device independently.</summary>
-        public void OnDashboardSwitched(uint slot, TelemetrySender? sender)
+        /// (FF kind=4, then the hot burst or a Stop/Start). The wheel sender and the
+        /// CM2 sender each switch their own device independently.</summary>
+        /// <returns><c>false</c> when the switch never reached the wire, so a caller
+        /// holding a one-shot can retry rather than consume it.</returns>
+        public bool OnDashboardSwitched(uint slot, TelemetrySender? sender)
         {
-            if (sender == null || !sender.Enabled) return;
+            if (sender == null || !sender.Enabled) return false;
             bool isWheel = ReferenceEquals(sender, _plugin.TelemetrySender);
+            // Which follow-up runs is SwitchToProfile's call (hot burst vs Stop+Start),
+            // so don't name one here — this line used to say "Stop+Start" for both and
+            // read as evidence for a decision it doesn't make.
             MozaLog.Debug(
-                $"[AZOM] OnDashboardSwitched(slot={slot}, target={(isWheel ? "wheel" : "cm2")}): scheduling switch + Stop+Start");
+                $"[AZOM] OnDashboardSwitched(slot={slot}, target={(isWheel ? "wheel" : "cm2")}): scheduling switch");
             // Stage the target's settings first so the post-Start cold-start builds
             // tier-def from the right channels (wheel: ApplyTelemetrySettings; CM2:
             // EnsureCm2Pipeline re-applies its policy/resolver/mapping target).
@@ -799,10 +799,24 @@ namespace MozaPlugin.Telemetry
                 // (wire-neutral) so the downstream UI repaint shows the right mappings.
                 sender.ReResolveActiveDashboardMappings();
             }
-            else _plugin.EnsureCm2Pipeline();
-            // SwitchToProfile emits FF kind=4 then runs Stop+Start; profile already
+            else
+            {
+                // Reconcile the CM2 lane's staging before the switch — but that
+                // reconcile can also Stop() this very sender once its 12 s teardown
+                // dwell has elapsed, and the switch below would then bail with
+                // state=Idle. Re-check before committing.
+                _plugin.EnsureCm2Pipeline();
+                if (!sender.Enabled)
+                {
+                    MozaLog.Debug(
+                        $"[AZOM] OnDashboardSwitched(slot={slot}, target=cm2): CM2 pipeline " +
+                        "reconcile stopped the sender — skipping switch, a later reconcile retries");
+                    return false;
+                }
+            }
+            // SwitchToProfile emits FF kind=4 then bursts or restarts; profile already
             // staged so pass null to keep current.
-            sender.SwitchToProfile(slot, null);
+            return sender.SwitchToProfile(slot, null);
         }
 
         /// <summary>
@@ -839,23 +853,45 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Handler for <see cref="TelemetrySender.WheelInitiatedSwitch"/>: clears the
-        /// staged profile so the catalog-only synth rebuilds for the new dash. Does
-        /// NOT persist — wheel-side nav is transient.
+        /// Handler for the main (wheel) sender's
+        /// <see cref="TelemetrySender.WheelInitiatedSwitch"/>. Kept as a 1-arg
+        /// method so it can be used directly as the event delegate.
         /// </summary>
         public void OnWheelInitiatedSwitch(int slot)
+            => OnWheelInitiatedSwitch(slot, _plugin.TelemetrySender);
+
+        /// <summary>Handler for the CM2 sender's
+        /// <see cref="TelemetrySender.WheelInitiatedSwitch"/> — a switch made with
+        /// the dash's own buttons.</summary>
+        public void OnCm2InitiatedSwitch(int slot)
+            => OnWheelInitiatedSwitch(slot, _plugin.ActiveCm2Sender);
+
+        /// <summary>
+        /// Device-initiated dashboard switch on <paramref name="sender"/>'s lane:
+        /// clears the staged profile so the catalog-only synth rebuilds for the new
+        /// dash. The wheel lane does NOT persist — wheel-side nav is transient and
+        /// the saved preference is the user's intent. The CM2 lane DOES persist,
+        /// because <c>TickCm2DashboardReassert</c> re-asserts the saved name on the
+        /// next pipeline start and would otherwise drag the dash back off the
+        /// dashboard the user just selected on it.
+        /// </summary>
+        public void OnWheelInitiatedSwitch(int slot, TelemetrySender? sender)
         {
             try
             {
-                var sender = _plugin.TelemetrySender;
                 if (sender == null || !sender.Enabled) return;
+                bool isWheel = ReferenceEquals(sender, _plugin.TelemetrySender);
+                string lane = isWheel ? "wheel" : "cm2";
 
-                var state = _plugin.WheelStateForDiagnostics;
+                // This sender's OWN state — never WheelStateForDiagnostics, which is
+                // hardwired to the main sender and would resolve a CM2 slot against
+                // the wheel's dashboard list on a dual-display rig.
+                var state = sender.WheelState;
                 if (state == null || state.ConfigJsonList == null
                     || slot < 0 || slot >= state.ConfigJsonList.Count)
                 {
                     MozaLog.Warn(
-                        $"[AZOM] WheelInitiatedSwitch slot={slot}: cannot resolve dashboard name " +
+                        $"[AZOM] WheelInitiatedSwitch({lane}) slot={slot}: cannot resolve dashboard name " +
                         $"(state={(state == null ? "null" : "ok")}, " +
                         $"listCount={state?.ConfigJsonList?.Count ?? -1}). " +
                         $"Tier-def burst will use stale profile.");
@@ -865,7 +901,7 @@ namespace MozaPlugin.Telemetry
                 string newName = state.ConfigJsonList[slot];
                 if (string.IsNullOrEmpty(newName))
                 {
-                    MozaLog.Warn($"[AZOM] WheelInitiatedSwitch slot={slot}: configJsonList entry is empty");
+                    MozaLog.Warn($"[AZOM] WheelInitiatedSwitch({lane}) slot={slot}: configJsonList entry is empty");
                     return;
                 }
 
@@ -893,13 +929,22 @@ namespace MozaPlugin.Telemetry
                     sender.Profile = null;
 
                 MozaLog.Info(
-                    $"[AZOM] WheelInitiatedSwitch slot={slot} ('{newName}'): " +
-                    $"catalog-only — rebuilding synthesised profile from post-switch wheel catalog");
+                    $"[AZOM] WheelInitiatedSwitch({lane}) slot={slot} ('{newName}'): " +
+                    $"catalog-only — rebuilding synthesised profile from post-switch catalog");
+
+                // The CM2's saved selection is the one the re-assert reads, so a
+                // dash-side switch has to update it. The wheel's is left alone (see
+                // the method summary).
+                if (!isWheel)
+                {
+                    _plugin.ActiveCm2DashboardName = newName;
+                    _plugin.PersistSettings();
+                }
 
                 // UI dropdown reads sender.WheelReportedSlot directly when building
                 // the selection (not ActiveTelemetryProfileName), so the dropdown
-                // reflects the wheel's actual current dash without touching the
-                // persisted preference.
+                // reflects the device's actual current dash without touching the
+                // wheel's persisted preference.
                 _plugin.RaiseDashboardSelectionChangedInternal();
             }
             catch (Exception ex)

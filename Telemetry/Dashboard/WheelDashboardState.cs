@@ -211,6 +211,16 @@ namespace MozaPlugin.Telemetry.Dashboard
         public string DirName { get; set; } = "";
         public string Hash { get; set; } = "";
         public string Id { get; set; } = "";
+
+        /// <summary>Identity in the wheel's slot table (configJsonList); Title when
+        /// dirName is absent. Survives re-uploads, unlike <see cref="Id"/>.</summary>
+        [JsonIgnore]
+        public string SlotName => !string.IsNullOrEmpty(DirName) ? DirName : Title;
+
+        public bool MatchesName(string? name)
+            => !string.IsNullOrEmpty(name)
+               && (string.Equals(DirName, name, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(Title, name, StringComparison.OrdinalIgnoreCase));
         public string CreateTime { get; set; } = "";
         public string LastModified { get; set; } = "";
         public IReadOnlyList<string> PreviewImageFilePaths { get; set; } = Array.Empty<string>();

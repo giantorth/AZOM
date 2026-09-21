@@ -244,8 +244,9 @@ namespace MozaPlugin.Telemetry
         internal Func<Devices.WheelModelInfo?>? WheelModelInfoProvider { get; set; }
 
         // Wheel-reported current dashboard slot — ground truth, parsed from
-        // type-04 records on sess=0x02 b2h. See WheelSlotTracker for parsing
-        // and docs/protocol/dashboard-upload/wheel-pushed-slot.md.
+        // type-04 records on sess=0x02 b2h (or the device's kind=4 echo). See
+        // WheelSlotTracker and docs/protocol/tier-definition/handshake.md
+        // § In-game dashboard switch.
         public int WheelReportedSlot => _slotTracker.WheelReportedSlot;
 
         // Last slot host emitted FF kind=4 to. STATIC: survives plugin recycle
@@ -379,6 +380,10 @@ namespace MozaPlugin.Telemetry
         // the static defences would never notice on their own.
         private readonly Lifecycle.PostSwitchCatalogConvergence _postSwitchConvergence
             = new Lifecycle.PostSwitchCatalogConvergence();
+        // Set by WheelSlotTracker when the device echoes the kind=4 the watcher is
+        // armed for; cleared on every arm and on Stop(). Serial thread writes, tick
+        // thread reads.
+        private volatile bool _postSwitchKind4Confirmed;
 
         /// <summary>Drain window for queued kind=4 / one-shot frames before
         /// Stop's FlushPendingWrites discards the queue.</summary>
@@ -892,6 +897,13 @@ namespace MozaPlugin.Telemetry
         public uint UploadLastTotalSize => _uploader?.LastTotalSize ?? 0;
         /// <summary>Last XOR status byte from a wheel ack sub-msg.</summary>
         public byte UploadLastStatusByte => _uploader?.LastStatusByte ?? 0;
+        /// <summary>0..1 progress of the in-flight upload; 0 when idle. See
+        /// <see cref="Dashboard.WheelUploadCoordinator.UploadProgress"/>.</summary>
+        public double UploadProgress => _uploader?.UploadProgress ?? 0.0;
+        /// <summary>Monotonic count of chunks the wheel has acked. The transfer's
+        /// liveness signal — see
+        /// <see cref="Sessions.SessionRetransmitter.AckedChunkCount"/>.</summary>
+        public long UploadAckedChunkCount => Retransmitter.AckedChunkCount;
 
         /// <summary>
         /// Trigger a manual upload of <paramref name="content"/> to the wheel.
@@ -981,7 +993,15 @@ namespace MozaPlugin.Telemetry
                 sendAndTrackChunk: SendAndTrackChunk,
                 sendSessionOpen: _sessionLife.SendSessionOpen,
                 sendFileTransferActivate: _sessionLife.SendFileTransferActivate,
-                getRetransmitBacklog: () => Retransmitter.QueueSize);
+                getRetransmitBacklog: () => Retransmitter.QueueSize,
+                getAckedChunkCount: () => Retransmitter.AckedChunkCount,
+                getHeldRetransmitCount: () => Retransmitter.HeldRetransmitCount,
+                holdRetransmitSession: s => Retransmitter.HoldSession(s),
+                releaseRetransmitSession: s =>
+                {
+                    Retransmitter.ReleaseHold(s);
+                    Retransmitter.DropSession(s);
+                });
 
             // Single-line outcome log per upload attempt. Without this, a
             // silent failure (e.g. NoFtSession) only shows up as a Warn deep
@@ -990,6 +1010,12 @@ namespace MozaPlugin.Telemetry
             // default level) and Warn for everything else.
             _uploader.UploadCompleted += outcome =>
             {
+                // Hand the RPM strip back to the live LED pipeline. Fires from
+                // RunBackgroundUpload's finally on EVERY exit path, so it also
+                // covers the cases the tick-driven release can't reach — the
+                // sender going Idle mid-upload stops the tick that would
+                // otherwise notice.
+                Devices.Led.UploadProgressLedBar.Release();
                 string name = string.IsNullOrEmpty(_uploader.MzdashName) ? "dashboard" : _uploader.MzdashName;
                 switch (outcome)
                 {

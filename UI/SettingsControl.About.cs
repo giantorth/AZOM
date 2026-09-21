@@ -30,7 +30,7 @@ namespace MozaPlugin.UI
         // ── Diagnostics tab ─────────────────────────────────────────────
         // ===== About-tab link handlers =====
 
-        private const string AboutGitHubUrl  = "https://github.com/giantorth/moza-simhub-plugin";
+        private const string AboutGitHubUrl  = "https://github.com/giantorth/AZOM";
         private const string AboutDiscordUrl = "https://discord.gg/J4enw43e62";
         private const string AboutSponsorUrl = "https://github.com/sponsors/giantorth";
         private const string AboutKofiUrl    = "https://ko-fi.com/giantorth";
@@ -75,6 +75,9 @@ namespace MozaPlugin.UI
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("=== Plugin ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildPluginInfo());
+            sb.AppendLine();
+            sb.AppendLine("=== Control Mapper ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildControlMapper(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== USB detection ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));

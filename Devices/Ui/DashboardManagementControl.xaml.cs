@@ -824,15 +824,27 @@ namespace MozaPlugin.Devices.Ui
             // persist the CM2's selection, and emit FF kind=4 on the CM2 sender.
             if (IsCm2Target)
             {
-                var cm2State = _plugin.ActiveCm2Sender?.WheelState;
-                if (cm2State != null && idx >= 0 && idx < cm2State.ConfigJsonList.Count)
+                var cm2Sender = _plugin.ActiveCm2Sender;
+                var cm2State = cm2Sender?.WheelState;
+                int cm2Count = cm2State?.ConfigJsonList?.Count ?? 0;
+                if (cm2Sender == null || cm2State == null || idx < 0 || idx >= cm2Count)
                 {
-                    _plugin.ActiveCm2DashboardName = selected;
-                    _plugin.SaveSettings();
-                    _plugin.OnCm2DashboardSwitched((uint)idx);
-                    PopulateChannelMappingList();
-                    TelemetryMappingStatus.Text = $"CM2 → {selected}";
+                    // Previously fell through silently: nothing persisted, nothing
+                    // sent, no status — while the combo showed the new name. Say what
+                    // the lane's state actually is instead.
+                    TelemetryMappingStatus.Text = cm2Sender == null
+                        ? "CM2 pipeline not started"
+                        : $"CM2 dashboard list not available ({cm2Sender.Phase}, {cm2Count} listed)";
+                    return;
                 }
+                _plugin.ActiveCm2DashboardName = selected;
+                _plugin.SaveSettings();
+                bool cm2Switched = _plugin.OnCm2DashboardSwitched((uint)idx);
+                PopulateChannelMappingList();
+                TelemetryMappingStatus.Text = cm2Switched
+                    ? $"CM2 → {selected}"
+                    : $"CM2 → {selected} (deferred: {cm2Sender.Phase}" +
+                      (cm2Sender.IsInSilenceCooldown ? ", cooldown)" : ")");
                 return;
             }
 

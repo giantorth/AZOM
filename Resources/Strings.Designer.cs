@@ -400,7 +400,7 @@ namespace MozaPlugin.Resources
         // ----- ColorPickerDialog
         public static string Title_PickLedColor => Get("Title_PickLedColor");
         public static string Label_Palette => Get("Label_Palette");
-        public static string Label_Last => Get("Label_Last");
+        public static string Tooltip_SavedColor => Get("Tooltip_SavedColor");
         public static string Label_FineTuneRgb => Get("Label_FineTuneRgb");
         public static string Button_Cancel => Get("Button_Cancel");
         public static string Button_Ok => Get("Button_Ok");
@@ -572,6 +572,8 @@ namespace MozaPlugin.Resources
         public static string Subtitle_KnobColours => Get("Subtitle_KnobColours");
         public static string Label_KnobEditing => Get("Label_KnobEditing");
         public static string Button_FillRingWithSelected => Get("Button_FillRingWithSelected");
+        public static string Button_FillOddLeds => Get("Button_FillOddLeds");
+        public static string Button_FillEvenLeds => Get("Button_FillEvenLeds");
         public static string Button_CopyKnobToAll => Get("Button_CopyKnobToAll");
         public static string Section_SleepLight => Get("Section_SleepLight");
         public static string Subtitle_SleepLight => Get("Subtitle_SleepLight");
@@ -794,7 +796,6 @@ namespace MozaPlugin.Resources
         public static string StalkKind_ReleaseHeld => Get("StalkKind_ReleaseHeld");
         public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
-        public static string Option_ReleaseChannelPr => Get("Option_ReleaseChannelPr");
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
         public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
         public static string Label_EqSensitivity => Get("Label_EqSensitivity");
@@ -834,5 +835,23 @@ namespace MozaPlugin.Resources
         public static string Upload_StatusStopped => Get("Upload_StatusStopped");
         public static string Section_UploadSource => Get("Section_UploadSource");
         public static string Banner_LegacyLfeMigrated_Body => Get("Banner_LegacyLfeMigrated_Body");
+        public static string Button_TravelCalibration => Get("Button_TravelCalibration");
+        public static string Button_MotorCalibration => Get("Button_MotorCalibration");
+        public static string Hint_MBoosterTravelCal => Get("Hint_MBoosterTravelCal");
+        public static string Hint_MBoosterMotorCal => Get("Hint_MBoosterMotorCal");
+        public static string Hint_MBoosterCalRebooting => Get("Hint_MBoosterCalRebooting");
+        public static string Hint_MBoosterCalBusyElsewhere => Get("Hint_MBoosterCalBusyElsewhere");
+        public static string Status_CalibrationFailed => Get("Status_CalibrationFailed");
+        public static string SliderLabel_DampingPress => Get("SliderLabel_DampingPress");
+        public static string SliderLabel_DampingRelease => Get("SliderLabel_DampingRelease");
+        public static string Title_DjsonImport => Get("Title_DjsonImport");
+        public static string Button_ImportSimHubDash => Get("Button_ImportSimHubDash");
+        public static string Tooltip_ImportSimHubDash => Get("Tooltip_ImportSimHubDash");
+        public static string Button_PickDjson => Get("Button_PickDjson");
+        public static string Button_Convert => Get("Button_Convert");
+        public static string FileFilter_Djson => Get("FileFilter_Djson");
+        public static string Status_DjsonConvertFailed => Get("Status_DjsonConvertFailed");
+        public static string Status_DjsonHeavyLoss => Get("Status_DjsonHeavyLoss");
+        public static string Label_NodeLimit => Get("Label_NodeLimit");
     }
 }

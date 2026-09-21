@@ -172,3 +172,116 @@ which is exactly what a naïve "is Studio already running?" check would trip ove
   wheel firmware's `RS21-*` hardware strings come from.
 - There is **no `.mzdash` file association** registered, so shell-executing a dashboard path
   does not work; the exe must be invoked directly.
+
+## Embedded Qt resources — the authoritative `.mzdash` definitions
+
+Research date: 2026-09-11. Observed against `MOZA Dashboard Studio.exe` **1.0.6.14**.
+
+Studio carries its element and schema definitions as Qt resources compiled into the PE.
+`strings` finds the paths:
+
+```
+:/schema/dashboard_schema.json
+:/elementMetaProperty/meta_property_schema.json
+:/elementMetaProperty/idealDeviceInfoMap.json
+:/elementMetaProperty/prebindingLibraryMenuTree.json
+:/data/element/buttonTriggerAction.json
+```
+
+Extract them with [`tools/qt-rcc-extract.py`](../tools/qt-rcc-extract.py), which brute-force
+scans for zlib streams rather than parsing the resource tree (whose layout moves between Qt
+versions). It recovers ~230 blobs from Studio, including a copy of `Telemetry.json`.
+
+**These are MOZA's own definitions and outrank guesses made from sample dashboards**, but
+they are not a complete substitute for the shipped files — see the `Group.qml` note below.
+
+### Canvas geometry per display (`idealDeviceInfoMap.json`)
+
+| Display | `productType` | Canvas | Shape |
+|---|---|---|---|
+| VGS | `Display` | 480×480 | Round |
+| ESSENZA SCV12 | `W06 Display` | 847×480 | CircularTrapezoid |
+| FSR V2 | `W13 Display` | 847×480 | Rectangle |
+| Porsche Mission R | `W05 Display` | 1417×700 | Rectangle |
+| CS Pro | `W17 Display` | 780×248 | Rectangle |
+| KS Pro | `W18 Display` | 780×248 | Rectangle |
+| Mustang GTD | `W20 Display` | 780×248 | Rectangle |
+| W22 | `W22 Display` | 340×340 | Rectangle |
+| **CM2** | `S09 Display` | **1280×720** | Rectangle |
+
+Matching is by regex on the device's `[hwVersion][productType][networkId][deviceId]` string.
+Transcribed into [`Data/DjsonDisplayMap.json`](../Data/DjsonDisplayMap.json) and used by the
+`.djson` importer.
+
+The map is **not exhaustive**: PitHouse's own 47 factory dashboards in `bin/dashes` carry
+canvases of 1280×720 (14), 780×248 (11), 480×480 (9), 847×480 (8) and **1449×720 (5)** —
+that last size has no entry in MOZA's map. Treat the table as a lookup for known displays,
+not a closed set.
+
+### Element types
+
+`dashboard_schema.json` defines: `Window`, `Screen`, `Component`, `Text`, `Rectangle`, `Map`,
+`LinearGauge`, `Image`, `Group`, `Ellipse`, `DialGauge`, `CircularGauge`, `Slider`, `Video`,
+`Button`. The meta-property library adds `Chart`, `Radar`, `OutlinedText`, `Layer`, `ETS2ATS`.
+
+**The schema is looser and older than the shipped format.** It names the grouping element
+`Group.qml`, but every real dashboard — all 24 loaded on the wheel and all 47 factory ones —
+uses `Layer.qml`, and both `Layer.yaml` and `Group.yaml` exist in the element library. It
+also omits `borderStyle`, `macros`, `textEffect` and `innerShadow`, and types `fontColor` as
+a string where real files use a `{color,type}` object. **For emission, the shipped files are
+the better reference**; use the schema for the hard constraints it states:
+
+- `id` is an integer `0 ≤ id < 10000`, and the Window's `id` is const `0`
+- `binding.methods` must have **exactly 2** entries (137 of 1999 factory bindings have 1, so
+  the renderer tolerates fewer — but 2 is what to write)
+- binding keys match `^[a-zA-Z_][a-zA-Z0-9_\.]*$`
+- a binding value may be a plain string *or* a `METHOD_CHAINING` object
+- `required` on every node is only `id`, `name`, `type`
+
+Element types across the 47 factory dashboards, i.e. what the firmware demonstrably renders:
+`Text` 2416, `Rectangle` 708, `Image` 368, `Screen` 97, `LinearGauge` 69, `Layer` 52,
+`Ellipse` 37, **`DialGauge` 23**, `CircularGauge` 15, **`Map` 9**, **`Chart` 8**,
+**`Radar` 3**, `ETS2ATS` 1. Map and Radar are fed from the track-geometry / opponent-location
+channel space, not from per-element geometry.
+
+### Bindable properties
+
+`supportBinding` in the meta-property files is the definitive list — 207 dotted paths. Of
+note, because they are not obvious from sample dashboards:
+
+- **`effect.rotation` is bindable**, as are `effect.opacity`, `effect.blur*`, both shadows,
+  and `effect.blinkEnabled`/`blinkDelay`
+- all of `general.{x,y,width,height,visible,locked,backgroundColor,borderColor,borderWidth,borderRadius}`
+- every `borderStyle.*` entry
+- `circularGauge.{startAngle,sweepAngle,minimum,maximum,value,strokeThickness,gaugeColor,gaugeImage}`
+- `linearGauge.{minimum,maximum,value,gaugeColor,gaugeImage}` and `alternateStyle.*`
+- `image.src`, `text.{text,fontColor,fontSize,wrapText,strokeColor}`
+
+`text.fontFamily`, `text.horizontalAlignment` and `linearGauge.gaugeOrientation` are **not**
+bindable.
+
+### Enum spellings
+
+Getting these wrong writes an out-of-enum value that renders as the default with no error:
+
+| Property | Values | Default |
+|---|---|---|
+| `text.horizontalAlignment` | `AlignLeft`, `AlignCenter`, `AlignRight`, `AlignJustify` | `AlignLeft` |
+| `text.verticalAlignment` | `AlignTop`, `AlignCenter`, `AlignBottom` | `AlignTop` |
+| `linearGauge.gaugeAlignment` | `AlignLeft`, `AlignHCenter`, `AlignRight` — **no vertical spellings** | `AlignLeft` |
+| `linearGauge.gaugeOrientation` | `Horizontal`, `Vertical` | `Horizontal` |
+| `text.fontWeight` | 100…900 in steps of 100 | `500` |
+| any `*.type` on a colour | `SOLID`, `GRADIENT_LINEAR`, `GRADIENT_RADIAL`, `GRADIENT_ANGULAR`, `GRADIENT_DIAMOND` | `SOLID` |
+
+### Prebinding library — MOZA's own canonical bindings
+
+28 prebuilt widgets ship with a `defaultBinding`, which is the vendor's own answer for how
+each telemetry concept should be read and formatted. Channel picks worth knowing:
+`LiveDeltaToBest` → `v1/gameData/GAP`, `RemainingLaps` → `FuelLaps`, `LitersPerLaps` →
+`FuelConsumeLap`, `PersonalBestLapTime` → `BestLapTime` (MOZA reuses the session best rather
+than `AllTimeBest`), and `FuelPressure` → `OilPressure`, which looks like a vendor slip.
+
+Their numeric formatter is `((r=Number(_result))=>isNaN(r)?undefined:r.toFixed(n))()`.
+Some community dashboards instead carry a longer variant that splits on the decimal point —
+that one **truncates** where `toFixed` rounds, which is visible on a speed or temperature
+readout. Prefer the vendor form.

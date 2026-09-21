@@ -56,6 +56,7 @@ namespace MozaPlugin.Settings
         {
             TelemetryEnabledDefaultForNewWheels = true,
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
+            KnobColorAllBlackRepaired = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -152,16 +153,9 @@ namespace MozaPlugin.Settings
         public int[]? WheelRpmBlinkColors { get; set; }
         public int[]? DashRpmBlinkColors { get; set; }
 
-        // Per-knob LED ring colours (W17/W18 only). Write-only on the wire —
-        // persisted here so they survive restarts. Packed as R<<16 | G<<8 | B.
-        public int[]? WheelKnobBackgroundColors { get; set; }
-        public int[]? WheelKnobPrimaryColors { get; set; }
-
-        // Group 3 per-LED ring colors (up to 56 LEDs). Readable from wheel but persisted
-        // for profile switching. Packed as R<<16 | G<<8 | B.
-        public int[]? WheelKnobRingColors { get; set; }
-        private volatile int _wheelKnobRingBrightness = -1;
-        public int WheelKnobRingBrightness { get => _wheelKnobRingBrightness; set => _wheelKnobRingBrightness = value; }
+        // Last colour confirmed in the LED picker's CUSTOM dialog — the SAVED chip
+        // on every PaletteStrip. Packed R<<16|G<<8|B, -1 = none yet.
+        public int LastCustomLedColor { get; set; } = -1;
 
         // Connection enabled (persisted toggle)
         public bool ConnectionEnabled { get; set; } = true;
@@ -177,6 +171,15 @@ namespace MozaPlugin.Settings
         // seed when it arrives.
         public Dictionary<string, bool[]> MBoosterKnownPedals { get; set; }
             = new Dictionary<string, bool[]>(StringComparer.OrdinalIgnoreCase);
+
+        // Last-known host/remote locality of each pedal role per mBooster lane,
+        // indexed [throttle, brake, clutch] (0 unknown, 1 on the host unit, 2 on
+        // a chained unit), keyed like MBoosterKnownPedals. Locality rather than
+        // device ids: the same unit is 0x12 on USB and 0x19 routed. Seeds the
+        // role→unit map before the host's first heartbeat, the only live source
+        // (MBoosterDeviceController.RoleLocality).
+        public Dictionary<string, int[]> MBoosterKnownChainRoles { get; set; }
+            = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
 
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
@@ -341,6 +344,12 @@ namespace MozaPlugin.Settings
         // MozaPlugin.Init. Latched whether or not an orphan was found, so a user
         // who later picks the plugin LFE tab is never flipped back.
         public bool LegacyLfeDeviceMigrated { get; set; }
+
+        // One-shot marker for the repair that nulls saved knob palettes that are
+        // entirely black — laundered from an unseeded MozaData mirror by the old
+        // device-JSON capture / whole-array persist paths, not chosen by anyone.
+        // See ProfileCoordinator.RepairAllBlackKnobColorArrays.
+        public bool KnobColorAllBlackRepaired { get; set; }
 
         // An orphaned pre-1.6 haptics device was found and its settings have not
         // been carried into a per-model wheelbase device yet. Drives the one-time
@@ -645,6 +654,11 @@ namespace MozaPlugin.Settings
 
         // Download dashboards from the wheel when it reports them.
         public bool TelemetryDownloadDashboard { get; set; } = false;
+
+        // Node ceiling for the SimHub .djson importer's sub-dashboard page expansion.
+        // 0 = the converter's proven default. An oversized dashboard locks the wheel's
+        // firmware, so this is the knob for bisecting the real limit against hardware.
+        public int DjsonImportMaxNodes { get; set; } = 0;
 
         // Telemetry send rate in Hz
         public int TelemetrySendRateHz { get; set; } = 20;

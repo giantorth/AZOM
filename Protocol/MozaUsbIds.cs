@@ -21,6 +21,10 @@ namespace MozaPlugin.Protocol
         Ab9,
         MBooster,
         Stalks,
+        // S12 pedal vibration module (PID 0x002F) — three motor ports, nine
+        // concurrent effect slots per port. Reachable either on its own CDC port
+        // or through a wheelbase/hub pipe via the extended-id envelope.
+        PedalHaptics,
     }
 
     /// <summary>
@@ -52,6 +56,7 @@ namespace MozaPlugin.Protocol
         public const string PidShifterSgp      = "0x0023";
         public const string PidStalks          = "0x0024";
         public const string PidDashboardCm2    = "0x0025";
+        public const string PidPedalHaptics    = "0x002F";
 
         // Single source of truth. ushort key keeps lookups allocation-
         // free on the cache-refresh hot path in MozaPortDiscovery.
@@ -77,6 +82,7 @@ namespace MozaPlugin.Protocol
                 [0x0023] = new InventoryEntry(MozaDeviceCategory.Shifter,   "SGP shifter"),
                 [0x0024] = new InventoryEntry(MozaDeviceCategory.Stalks,    "MOZA Stalks"),
                 [0x0025] = new InventoryEntry(MozaDeviceCategory.Dashboard, "CM2 Racing Dash"),
+                [0x002F] = new InventoryEntry(MozaDeviceCategory.PedalHaptics, "S12 Pedal Vibration"),
                 [0x1000] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB9 active shifter"),
                 // AB6: AB9's sibling, same lane. Must stay in category Ab9, NOT
                 // Shifter — Shifter is the passive HGP/SGP family claimed by
@@ -147,6 +153,8 @@ namespace MozaPlugin.Protocol
         public static bool IsMBoosterPid(ushort pid)   => Categorize(pid) == MozaDeviceCategory.MBooster;
         public static bool IsStalksPid(string? pid)    => Categorize(pid) == MozaDeviceCategory.Stalks;
         public static bool IsStalksPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Stalks;
+        public static bool IsPedalHapticsPid(string? pid) => Categorize(pid) == MozaDeviceCategory.PedalHaptics;
+        public static bool IsPedalHapticsPid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.PedalHaptics;
 
         /// <summary>Short display name for the active-shifter lane, which the AB9
         /// and AB6 share. Returns the family label for an unknown/null PID —

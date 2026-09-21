@@ -102,6 +102,12 @@ namespace MozaPlugin.Devices
         public int IncrementWheelPollMisses() => Interlocked.Increment(ref _wheelPollMisses);
         public void ResetWheelPollMisses() => Interlocked.Exchange(ref _wheelPollMisses, 0);
 
+        // Bridged-dash liveness (0x14 replies on the primary pipe); same pattern as the wheel.
+        private int _dashPollMisses;
+        public int DashPollMisses => Volatile.Read(ref _dashPollMisses);
+        public int IncrementDashPollMisses() => Interlocked.Increment(ref _dashPollMisses);
+        public void ResetDashPollMisses() => Interlocked.Exchange(ref _dashPollMisses, 0);
+
         // Flips true when a wheel on a new-protocol-only id (0x17/0x15) ends up
         // classified old-protocol — a current-generation wheel answering like a
         // legacy one, which points at outdated firmware. Drives the
@@ -150,6 +156,7 @@ namespace MozaPlugin.Devices
             // this method used to leave latched across a reload.
             ResetBase();
             DashDetected = false;
+            ResetDashPollMisses();
             NewWheelDetected = false;
             OldWheelDetected = false;
             LastKnownWheelDeviceId = 0;
@@ -188,6 +195,7 @@ namespace MozaPlugin.Devices
             NewWheelDetected = false;
             OldWheelDetected = false;
             DashDetected = false;
+            ResetDashPollMisses();
             ResetWheelLedGroupMask();
             Group3ColorsRead = false;
             ResetWheelPollMisses();

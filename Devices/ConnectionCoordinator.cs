@@ -735,8 +735,11 @@ namespace MozaPlugin.Devices
 
             _hubManager.PendingResponses?.NoteResponse(r.Name);
             // A hub-relayed shifter's values route into whichever model resolved on
-            // this pipe (shared shifter-* command names).
-            if (!_data.TryUpdateShifter(_detectionState.ShifterModelForOwner(_hubManager.DeviceManager), r.Name, r.IntValue, r.ArrayValue))
+            // this pipe (shared shifter-* command names) and prime its write cache.
+            var shifterModel = _detectionState.ShifterModelForOwner(_hubManager.DeviceManager);
+            if (_data.TryUpdateShifter(shifterModel, r.Name, r.IntValue, r.ArrayValue))
+                _plugin.HardwareApplier.PrimeShifterCfgFromDevice(shifterModel, r.Name, r.IntValue, r.ArrayValue);
+            else
             {
                 _data.UpdateFromCommand(r.Name, r.IntValue);
                 if (r.ArrayValue != null)

@@ -85,6 +85,32 @@ path via `cm2-live-colors` / `cm2-live-bitmask`; the legacy path is unchanged.
 Earlier note (still true for legacy fw): a build that streamed group-`0x32` sub
 `0x0B` to dev `0x12` did nothing — that firmware ignores it.
 
+#### CM2 dashboard switching (bundle Z45VF4BC, hub-bridged, no wheelbase)
+
+- At session open the CM2 pushes exactly one type-04 slot record on sess `0x02`
+  (`04 <slot u32 LE> 00000000 <crc>`, slot in field A) carrying its booted slot; it pushes
+  **no** type-04 after a host switch.
+- It echoes the host's kind=4 FF record byte-identically on sess `0x02` within ~40 ms
+  (the record's bytes 5–8 are CRC32 of kind‖value, so every emit of slot N is identical).
+  The plugin consumes that echo as slot confirmation (`WheelSlotTracker.TryAbsorbKind4Echo`)
+  and stops post-switch convergence nudges on the CM2 lane once it is seen — each nudge
+  made the CM2 visibly reload its dashboard.
+- It ALSO emits kind=4 records the host never sent: in Z45VF4BC, `slot=2` ~4 s after each
+  host `slot=1` switch (three times) and once `slot=3` 1 s after the first of those, all
+  with page field 0 and no `b8` precursor (the W17's wheel-initiated signature). Whether
+  these announce a real dashboard change, a 1-based restatement of the host's slot, or
+  something else is unknown. The plugin logs them (`device kind=4 slot=N (not an echo…)`)
+  and does not follow them; a CM2 button switch is therefore still invisible to the plugin
+  (no type-04 follows either).
+- The CM2 is authoritative at boot: the reported slot becomes the saved selection and one
+  kind=4 to that same slot binds it (the display latches value frames only after a
+  host-initiated switch). A kind=4 to another slot only follows a user or car-profile choice.
+- It answers the `7E 00 00 14` presence probe with `80 41`; the plugin polls it every 5 s
+  as the bridged-dash liveness heartbeat (3 misses → `DashDetected` drops → the
+  `MarkDashDetected` cascade re-runs on re-attach).
+- Whether the S09 firmware indexes kind=4 slots 0-based like the W17 is not settled by this
+  bundle (the host switched slots, so the landing dashboard is unknown).
+
 ### CM1 Racing Dash — group `0x35` keyed value stream
 
 The CM1 is a base-bridged dash that does **not** speak tier-def. Like the FSR1 wheel
@@ -133,8 +159,10 @@ With the car parked (start of the capture) almost everything sits at 0, which is
 | Param read (init sweep) | `7E 03 0E 14 00 <reg_hi> <reg_lo>` | group `0x8E` (`7E 07 8E 41 <reg:3 echoed> <BE u32>`) |
 
 There is **no tier-def catalog** — the dash never advertises channels on group `0x43`
-(only the 1-byte ping). This absence is how the plugin distinguishes a CM1 from a real
-tier-def CM2 (see below).
+(only the 1-byte ping). The plugin does NOT use that absence to classify: a CM1 is
+latched only on a positive `0x8E` reply to the host's own register probe, and any CM2
+evidence (S09 display identity, `7c:23` catalog advertisement, parsed catalog) vetoes
+and reverses it (see § Discriminator below).
 
 **Param-manager register reads — group `0x0E` / `0x8E`**
 
@@ -166,10 +194,13 @@ identity/model string, so this is *not* a "CM1 vs CM2" name probe by itself. The
 round-address high banks (`0x0190+`, `0x0BB8+` = decimal 400 / 3000) are plausibly
 **firmware version / build / device-info** registers (e.g. `0x0BBC`=1, `0x0BBD`=62 could
 be a major/build pair), but nothing here is anchored to a known FW version, and there is
-no CM2 dump of the same registers to diff against. To turn any of these into a fast,
-positive CM1↔CM2 discriminator (replacing the ~25 s catalog-absence timeout), capture a
-**CM2** answering the same `0x0E` reads and diff the two snapshots — a register whose
-value differs by device type is the discriminator.
+no CM2 dump of the same registers to diff against. **Whether a CM2 answers these reads at
+all is unverified**: bundle Z45VF4BC (hub-bridged CM2, S09 Display) shows the CM2's own
+`0x0E` log emitting `[INFO]param_manage.c:340 Table 7, Param 6 Written: 2` — the same
+param-manager vocabulary as the CM1 — so a CM2 replying `0x8E` is plausible. The plugin
+therefore probes register `0x0001` (~1 Hz) only while no CM2 evidence exists, and counts
+the reply as CM1 proof only when it answers a probe the plugin itself just sent. A CM2
+capture answering the same reads would settle it.
 
 **Dashboard switching**
 
@@ -187,7 +218,11 @@ on dev `0x41`:
 [INFO]param_manage.c:344 Table 7, Param 6 Written: N
 ```
 
-so the plugin follows dash-initiated (button) switches with the FSR1 regex.
+so the plugin follows dash-initiated (button) switches with the FSR1 regex. The CM2 emits a
+byte-identical line (`param_manage.c:340`; on the indicator firmware Param 6 is its
+indicator mode and Param 8 its brightness, both written by the plugin's meter config), so
+the plugin routes this log by `DashIsCm1` — a mis-latched CM2 would otherwise drive the CM1
+page index from its own LED-mode writes.
 
 **Field semantics**
 
@@ -223,12 +258,26 @@ channels that simply read 0 in a parked capture).
 - `Telemetry/Display/Cm1DisplayDriver.cs` — standalone ~50 ms driver on the wheelbase connection,
   dash-lane stream slots 18-28 (disjoint from the wheel lane 0-8), so it runs concurrently
   with an FSR1/tier-def wheel screen.
-- **Discriminator** (`MozaPlugin.TickCm1Discriminator`): a bus-bridged dash first gets the
-  tier-def `_cm2Sender` with its engagement watchdog **suppressed**
-  (`TelemetrySender.SuppressDisplayWatchdog`); if no catalog arrives within ~25 s it is
-  latched as a CM1 (`DashIsCm1`, persisted per dash GUID), the tier-def sender is torn down,
-  and the CM1 driver takes over. A real CM2 (catalog arrives) is unaffected. Known-CM1 boots
-  start the CM1 driver immediately and never run the tier-def probe.
+- **Discriminator** (`DualDisplayCoordinator.TickCm1Discriminator`, ~5 s poll): a bus-bridged
+  dash first gets the tier-def `_cm2Sender` with its engagement watchdog **suppressed**
+  (`TelemetrySender.SuppressDisplayWatchdog`). Classification is positive-evidence only:
+  - **CM2 evidence** (sticky for the dash's presence cycle): display identity at `0x14`
+    matching a known CM2 model (`S09 Display`), a `7c:23` catalog advertisement from
+    `0x41`, or a parsed catalog. Any of these vetoes CM1 probing/latching and clears the
+    watchdog suppress. Session `fc:00` acks are recorded for diagnostics only — a CM1
+    acking a session open is unverified, so they must not veto.
+  - **CM1 evidence**: a `0x8E` reply from `0x41` within 1.5 s of the plugin's own
+    `0E 14 00 00 01` probe, in the documented shape (register echoed + u32). After a 5 s
+    settle the dash is latched CM1 (`DashIsCm1`, session-only, never persisted): the CM1
+    `device.json` is deployed, the speculative CM2 one removed, the tier-def sender torn
+    down and the CM1 driver started.
+  - **Un-latch**: CM2 evidence arriving while latched reverses it — CM1 driver stopped,
+    CM2 definition restored, CM1 definition removed, CM2 lane restarted. A dash detach
+    resets the cycle and the evidence but keeps the class as a hint until the re-attached
+    dash answers; a sender restart resets the probe cycle so a stale `0x8E` cannot carry
+    over.
+  - There is no absence-based timeout: "no catalog yet" never latches CM1 (bundle Z45VF4BC
+    was a real CM2 latched CM1 under the earlier logic).
 
 ### Group `0x32` / `0x33` (50 / 51) — Settings (legacy MDD / wheel-dash)
 

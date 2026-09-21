@@ -40,6 +40,15 @@ namespace MozaPlugin.Devices.Haptics
         // Engine-vib frequency slider cap (matches the UI slider's Maximum).
         // Older saved profiles may still carry larger values; clamp at use time.
         private const double MaxFreqHz = 200.0;
+        // Perceptibility floor on the RENDERED frequency. The redline-referenced
+        // model above drives audible → 0 with RPM, so idling lands in single-digit
+        // Hz — a slow wobble rather than a buzz. 20 Hz is the bottom of the
+        // ground-truth capture's measured range (rpm-fraction 0.2 at slider 100
+        // → period 3.18M); MBoosterEffectWorker floors the same shared model at
+        // MBoosterUiConstants.EngineFreqMinHz. Capped by the slider itself so a
+        // deliberately low setting still moves the pitch instead of flattening
+        // onto the floor.
+        private const double MinAudibleHz = 20.0;
         // Engine-pulse-pair emission rate (0x0B). Ground-truth capture shows
         // PitHouse holds this CONSTANT at ~48 Hz regardless of RPM or intensity
         // (median inter-pair 20.8 ms; flat across rpm-fraction 0.2..1.0 and
@@ -196,14 +205,17 @@ namespace MozaPlugin.Devices.Haptics
             uint period;
             if (rawActive)
             {
-                // audible = freqSlider × (rpm/maxRpm); slider is the redline
-                // frequency. period = FreqTickHz / audible. Fraction clamped
-                // to (0,1] so over-rev can't exceed the redline pitch and a
-                // missing MaxRpm falls back to the shared redline convention
-                // (see EngineVibrationMath.RedlineFraction — the same model
-                // MBoosterEffectWorker.UpdateEngineRequest uses for Engine).
+                // audible = freqSlider × (rpm/maxRpm), floored at MinAudibleHz;
+                // slider is the redline frequency. period = FreqTickHz / audible.
+                // Fraction clamped to (0,1] so over-rev can't exceed the redline
+                // pitch and a missing MaxRpm falls back to the shared redline
+                // convention (see EngineVibrationMath.RedlineFraction — the same
+                // model MBoosterEffectWorker.UpdateEngineRequest uses for Engine).
                 double fraction = EngineVibrationMath.RedlineFraction(rpm, maxRpm);
-                double p = FreqTickHz / (freqHz * fraction);
+                double audibleHz = freqHz * fraction;
+                double floorHz = Math.Min(MinAudibleHz, freqHz);
+                if (audibleHz < floorHz) audibleHz = floorHz;
+                double p = FreqTickHz / audibleHz;
                 if (p < MozaAb9DeviceManager.MinPeriodTicks) p = MozaAb9DeviceManager.MinPeriodTicks;
                 if (p > MozaAb9DeviceManager.MaxPeriodTicks) p = MozaAb9DeviceManager.MaxPeriodTicks;
                 period = (uint)p;

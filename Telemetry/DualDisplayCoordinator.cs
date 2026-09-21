@@ -5,6 +5,19 @@ using MozaPlugin.Devices.Extensions;
 
 namespace MozaPlugin.Telemetry
 {
+    /// <summary>Positive "this bridged dash is a CM2" evidence, OR-ed together per
+    /// dash-presence cycle. A CM1 never advertises a tier-def catalog and does not
+    /// carry the CM2 display identity; whether it acks session opens is unverified.</summary>
+    [Flags]
+    internal enum Cm2Evidence
+    {
+        None = 0,
+        DisplayModel = 1,
+        CatalogAdvert = 2,
+        CatalogCount = 4,
+        SessionAck = 8,
+    }
+
     /// <summary>
     /// Dual-display pipeline coordination: drives a CM2 dash on a dedicated
     /// tier-def sender whenever a CM2 is present (independent of the wheel —
@@ -146,7 +159,14 @@ namespace MozaPlugin.Telemetry
             bool shareBus = busCm2;
 
             if (_plugin._cm2Sender == null)
+            {
                 _plugin._cm2Sender = new TelemetrySender(conn);
+                // Follow switches made with the dash's OWN buttons. Subscribed here
+                // because this is the only construction site; -= sits next to the
+                // Dispose in End()/CleanupPartialInit.
+                _plugin._cm2Sender.WheelInitiatedSwitch +=
+                    _plugin.DashboardBindingCoordinator.OnCm2InitiatedSwitch;
+            }
             else if (_plugin._cm2Sender.StateIsIdle)
                 _plugin._cm2Sender.Rebind(conn); // no-op when already on this connection
 
@@ -171,6 +191,11 @@ namespace MozaPlugin.Telemetry
             cm2.SharesConnection = shareBus;
             cm2.StrictInboundFilter = shareBus;
             cm2.ProfileTelemetryEnabled = true;
+            // Mirror the setting onto this lane too — the main sender gets it in
+            // Init, and without this a settings-driven false would only reach the
+            // wheel. The coordinator's own default is true, so this is the override
+            // path, not the enable.
+            cm2.EnableHotRenegotiation = _plugin.Settings?.EnableHotRenegotiation ?? true;
             // CM2 channel mappings live under the dash device GUID + a fixed key,
             // independent of the wheel, so the CM2's catalog-synth applies its own.
             cm2.MappingPageGuid = MozaPlugin.Cm2PageGuid;
@@ -179,7 +204,7 @@ namespace MozaPlugin.Telemetry
             // advertises a tier-def catalog. Suppress the no-catalog engagement watchdog
             // so it doesn't loop restarts while TickCm1Discriminator decides. A USB dash
             // (0x0025) is always a real CM2 → never suppress.
-            cm2.SuppressDisplayWatchdog = busCm2 && !_plugin.DashIsCm1;
+            cm2.SuppressDisplayWatchdog = busCm2 && !_plugin.DashIsCm1 && !HasCm2Evidence;
 
             // A tier-def WHEEL sender sharing the same bus must also filter strictly.
             bool wheelTierDefOnBus = busCm2 && !_plugin.IsFsr1DisplayWheel
@@ -225,14 +250,10 @@ namespace MozaPlugin.Telemetry
                 // Fresh start: allow the saved-dashboard re-assert to fire once the
                 // CM2 advertises its dashboard list (PollStatus → TickCm2DashboardReassert).
                 _cm2ReassertAttempted = false;
-                // Re-anchored once this sender reaches Active (the discriminator times
-                // its CM1 decision from there, not from start — cold-start is long).
-                _discriminateSinceUtc = DateTime.MinValue;
-                // Fresh discrimination cycle — clear the param-read flag so a stale
-                // CM1 answer can't fast-latch a newly-attached CM2.
-                _dashParamReadAnswered = false;
-                _lastCm1ProbeUtc = DateTime.MinValue;
-                _cm1ProbeCount = 0;
+                _cm2ReassertAttempts = 0;
+                // Fresh discrimination cycle (re-anchored once this sender reaches
+                // Active); a stale CM1 answer can't fast-latch a newly-attached CM2.
+                ResetDiscriminationCycle();
                 System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                 {
                     try { cm2.Start(); }
@@ -243,21 +264,59 @@ namespace MozaPlugin.Telemetry
 
         // One-shot guard: re-assert the saved CM2 dashboard once per pipeline start.
         private bool _cm2ReassertAttempted;
+        // Attempts made in the current pipeline lifetime. The one-shot is only claimed
+        // once the kind=4 actually reaches the wire, so a sender that keeps refusing
+        // would otherwise be retried on every PollStatus tick forever; cap it so a
+        // pathological lane gives up instead of logging once per tick.
+        private int _cm2ReassertAttempts;
+        private const int Cm2ReassertMaxAttempts = 5;
 
         /// <summary>
-        /// PollStatus hook: once the CM2 sender advertises its dashboard list, switch
-        /// it to the user's saved selection (<see cref="MozaPlugin.ActiveCm2DashboardName"/>) so
-        /// the choice survives a pipeline restart — the CM2 analogue of the wheel's
-        /// TickPendingDashboardRetry. Fires at most once per CM2 (re)start.
+        /// PollStatus hook, once per CM2 (re)start, after the CM2 advertises its
+        /// dashboard list. The CM2 is authoritative: the slot it reports at session
+        /// open becomes the saved selection (<see cref="MozaPlugin.ActiveCm2DashboardName"/>)
+        /// and one kind=4 to that same slot binds it — the display latches value frames
+        /// only after a host-initiated switch (DashboardBindingCoordinator's
+        /// hostEverEngaged rule). Only when the CM2 reported no slot does the saved
+        /// name get re-asserted instead.
         /// </summary>
         internal void TickCm2DashboardReassert()
         {
             if (_cm2ReassertAttempted) return;
             var cm2 = _plugin._cm2Sender;
-            if (cm2 == null || !cm2.Enabled || cm2.FramesSent == 0) return;
+            if (cm2 == null || cm2.FramesSent == 0) return;
+            // Match what SendDashboardSwitch itself requires (Active, out of the
+            // post-emit cooldown) rather than the broader Enabled, so a sender still
+            // cold-starting is waited out silently instead of burning an attempt.
+            if (!cm2.IsActive || cm2.IsInSilenceCooldown) return;
 
             var list = cm2.WheelState?.ConfigJsonList;
             if (list == null || list.Count == 0) return; // not advertised yet — keep waiting
+
+            int reported = cm2.WheelReportedSlot;
+            if (reported >= 0 && reported < list.Count && !string.IsNullOrEmpty(list[reported]))
+            {
+                string booted = list[reported];
+                if (!string.Equals(_plugin.ActiveCm2DashboardName, booted, StringComparison.OrdinalIgnoreCase))
+                {
+                    _plugin.ActiveCm2DashboardName = booted;
+                    _plugin.PersistSettings();
+                    _plugin.RaiseDashboardSelectionChangedInternal();
+                    MozaLog.Info($"[AZOM] Adopted CM2's booted dashboard '{booted}' (slot {reported})");
+                }
+                if (_plugin.OnCm2DashboardSwitched((uint)reported))
+                {
+                    _cm2ReassertAttempted = true;
+                }
+                else if (++_cm2ReassertAttempts >= Cm2ReassertMaxAttempts)
+                {
+                    _cm2ReassertAttempted = true;
+                    MozaLog.Warn(
+                        $"[AZOM] CM2 binding kind=4 to slot {reported} gave up after " +
+                        $"{_cm2ReassertAttempts} attempts — the switch never reached the wire");
+                }
+                return;
+            }
 
             string saved = _plugin.ActiveCm2DashboardName;
             if (string.IsNullOrEmpty(saved)) { _cm2ReassertAttempted = true; return; }
@@ -269,11 +328,25 @@ namespace MozaPlugin.Telemetry
             }
             if (slot < 0) { _cm2ReassertAttempted = true; return; } // saved dash not on this CM2
 
-            _cm2ReassertAttempted = true; // claim before issuing — switch restarts the pipeline
-            if (cm2.WheelReportedSlot == slot) return; // already there
+            if (cm2.WheelReportedSlot == slot) { _cm2ReassertAttempted = true; return; } // already there
 
             MozaLog.Info($"[AZOM] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
-            _plugin.OnCm2DashboardSwitched((uint)slot);
+            // Claim the one-shot ONLY once the kind=4 is on the wire. SendDashboardSwitch
+            // suppresses when the sender isn't Active or is inside the post-emit cooldown;
+            // claiming up front burned the re-assert for the pipeline's whole lifetime and
+            // left the CM2 on whatever dashboard it booted on. On failure we fall through
+            // unclaimed and the next PollStatus tick retries.
+            if (_plugin.OnCm2DashboardSwitched((uint)slot))
+            {
+                _cm2ReassertAttempted = true;
+            }
+            else if (++_cm2ReassertAttempts >= Cm2ReassertMaxAttempts)
+            {
+                _cm2ReassertAttempted = true;
+                MozaLog.Warn(
+                    $"[AZOM] CM2 dashboard re-assert to '{saved}' (slot {slot}) gave up after " +
+                    $"{_cm2ReassertAttempts} attempts — the switch never reached the wire");
+            }
         }
 
         // CM1 discriminator anchor: when the dash became decidable — the _cm2Sender
@@ -282,34 +355,93 @@ namespace MozaPlugin.Telemetry
         // timed from here: a CM1 advertises no catalog AND emits no value frames, so
         // timing from FramesSent>0 (which never happens) wedged the discriminator.
         private DateTime _discriminateSinceUtc = DateTime.MinValue;
-        // Set when the dash answers the group-0x0E param-read probe with a 0x8E
-        // reply (MozaPlugin.OnMessageReceived) — the CM1-exclusive positive signal a
-        // tier-def CM2 never produces. The SOLE basis for latching CM1.
+        // Set when the dash answers OUR group-0x0E param-read probe with a 0x8E reply
+        // (MozaPlugin.OnMessageReceived → NoteDashParamReadAnswered). The SOLE basis
+        // for latching CM1.
         private volatile bool _dashParamReadAnswered;
-        private DateTime _lastCm1ProbeUtc = DateTime.MinValue;
-        // Probes issued in the current discrimination cycle — diagnostics only
-        // (DiagnosticsTextBuilder's "Dash class:" line); never a decision input.
+        // UtcNow.Ticks of the last probe (Interlocked: 64-bit on a 32-bit host).
+        // 0 = no probe outstanding, so an unsolicited 0x8E can never count.
+        private long _lastCm1ProbeUtcTicks;
+        private static readonly long Cm1ProbeAnswerWindowTicks = TimeSpan.FromMilliseconds(1500).Ticks;
+        // Probes issued in the current discrimination cycle — diagnostics only.
         private int _cm1ProbeCount;
         // Settle window after the positive 0x8E answer before latching CM1, long
         // enough that a slow tier-def CM2's catalog still arrives first and wins via
         // the CatalogCount check.
         private static readonly TimeSpan Cm1FastDecideAfter = TimeSpan.FromSeconds(5);
+        // Sender Active edge: a restart (Active → not) resets the cycle so a stale
+        // 0x8E answer / anchor can't fast-latch once the sender is back.
+        private bool _cm2WasActive;
 
-        /// <summary>Serial-read-thread hook: the dash answered the group-0x0E
-        /// param-read probe with a 0x8E reply.</summary>
-        internal void NoteDashParamReadAnswered() => _dashParamReadAnswered = true;
+        // Positive CM2 evidence since the bridged dash appeared. OR-ed in from the
+        // serial-read thread, cleared only when the dash leaves the bus — a CM2 lane
+        // restart does not forget it. Only the veto set blocks CM1: a CM1 acking a
+        // session open is unverified, so SessionAck is recorded for diagnostics only.
+        private const Cm2Evidence Cm2VetoEvidence =
+            Cm2Evidence.DisplayModel | Cm2Evidence.CatalogAdvert | Cm2Evidence.CatalogCount;
+        private int _cm2Evidence;
+
+        internal Cm2Evidence Cm2EvidenceFlags => (Cm2Evidence)System.Threading.Volatile.Read(ref _cm2Evidence);
+        internal bool HasCm2Evidence => (Cm2EvidenceFlags & Cm2VetoEvidence) != 0;
+
+        /// <summary>Serial-read-thread hook: positive CM2 evidence for the bridged dash.</summary>
+        internal void NoteCm2Evidence(Cm2Evidence e)
+        {
+            int bit = (int)e, prev;
+            do
+            {
+                prev = _cm2Evidence;
+                if ((prev & bit) == bit) return;
+            } while (System.Threading.Interlocked.CompareExchange(ref _cm2Evidence, prev | bit, prev) != prev);
+        }
+
+        /// <summary>Serial-read-thread hook: a group-0x8E frame from the dash. Counts
+        /// only as the answer to a probe sent within the last 1.5 s and only in the
+        /// documented CM1 reply shape.</summary>
+        internal void NoteDashParamReadAnswered(byte[] data)
+        {
+            long probe = System.Threading.Interlocked.Read(ref _lastCm1ProbeUtcTicks);
+            if (probe == 0) return;
+            if (DateTime.UtcNow.Ticks - probe > Cm1ProbeAnswerWindowTicks) return;
+            if (!IsCm1ParamReadReply(data)) return;
+            _dashParamReadAnswered = true;
+        }
+
+        /// <summary>Reply to <c>0E 14 00 00 01</c>: <c>8E 41 … &lt;reg 00 01 echoed&gt; … &lt;BE u32&gt;</c>,
+        /// ≥ 9 bytes. The register echo is rendered at both offsets in docs/tools, so
+        /// accept either; both require the probed register.</summary>
+        internal static bool IsCm1ParamReadReply(byte[] d) =>
+            d != null && d.Length >= 9 && d[0] == 0x8E && d[1] == 0x41
+            && ((d[2] == 0x00 && d[3] == 0x01) || (d[3] == 0x00 && d[4] == 0x01));
+
+        private void ResetDiscriminationCycle()
+        {
+            _discriminateSinceUtc = DateTime.MinValue;
+            _dashParamReadAnswered = false;
+            System.Threading.Interlocked.Exchange(ref _lastCm1ProbeUtcTicks, 0);
+            _cm1ProbeCount = 0;
+        }
 
         // ===== Discriminator state, for the diagnostics bundle =====
-        /// <summary>True once the bridged dash answered the CM1-exclusive 0x8E
-        /// param-read probe.</summary>
         internal bool DashParamReadAnswered => _dashParamReadAnswered;
-        /// <summary>Param-read probes issued in the current discrimination cycle.</summary>
         internal int Cm1ProbeCount => _cm1ProbeCount;
         /// <summary>How long the bridged dash has been decidable-but-unclassified, or
         /// null before the anchor is stamped (no dash, or sender still cold-starting).</summary>
         internal TimeSpan? DiscriminatingFor =>
             _discriminateSinceUtc == DateTime.MinValue
                 ? (TimeSpan?)null : DateTime.UtcNow - _discriminateSinceUtc;
+
+        /// <summary>One-line discriminator state for diagnostics and the latch logs.</summary>
+        internal string DescribeDiscriminator()
+        {
+            var ev = Cm2EvidenceFlags;
+            long last = System.Threading.Interlocked.Read(ref _lastCm1ProbeUtcTicks);
+            var forSpan = DiscriminatingFor;
+            return $"evidence={(ev == Cm2Evidence.None ? "none" : ev.ToString().Replace(", ", "|"))} " +
+                   $"0x8E={(_dashParamReadAnswered ? "yes" : "no")} probes={_cm1ProbeCount} " +
+                   $"lastProbe={(last == 0 ? "never" : $"{(DateTime.UtcNow.Ticks - last) / TimeSpan.TicksPerSecond}s")} " +
+                   $"deciding={(forSpan.HasValue ? $"{forSpan.Value.TotalSeconds:F0}s" : "not started")}";
+        }
 
         /// <summary>Start (or stop) the CM1 group-0x35 driver for a confirmed CM1 dash.
         /// Mirrors <see cref="StartFsr1DriverIfNeeded"/>.</summary>
@@ -328,63 +460,101 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        // One-shot per CM2 lane start; re-armed whenever the sender is not Active.
+        private bool _cm2HygieneDoneThisStart;
+
+        /// <summary>
+        /// PollStatus hook: on every CM2 lane (re)start reaching Active, re-probe the
+        /// display identity at 0x14 and re-push the meter LED config. Both otherwise
+        /// run only from first sight / profile apply, so a lane restart (watchdog
+        /// recovery, CM1 un-latch, dash power-cycle) left the meter out of telemetry
+        /// LED mode.
+        /// </summary>
+        internal void TickCm2LaneHygiene()
+        {
+            var cm2 = _plugin._cm2Sender;
+            if (cm2 == null || !cm2.IsActive) { _cm2HygieneDoneThisStart = false; return; }
+            if (_cm2HygieneDoneThisStart) return;
+            _cm2HygieneDoneThisStart = true;
+
+            bool busCm2 = _detectionState.DashDetected && !_plugin.DashboardUsbConnected
+                          && _plugin.Connection?.IsConnected == true;
+            if (busCm2 && !_plugin.DashIsCm1)
+            {
+                try { _plugin.DeviceManager.SendDisplayProbe(MozaProtocol.DeviceDash); } catch { }
+            }
+            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2 lane hygiene apply skipped: {ex.Message}"); }
+        }
+
         /// <summary>
         /// PollStatus hook: decide whether a bus-bridged dash is a CM1 (group-0x35)
-        /// rather than a tier-def CM2, using only POSITIVE evidence — by probing the
-        /// CM1-exclusive group-0x0E param register ~1 Hz. Two mutually-exclusive
-        /// outcomes: a tier-def catalog arrives → real CM2, drop the engagement-watchdog
-        /// suppress flag; or the dash answers the probe with a 0x8E reply → latch
-        /// DashIsCm1, tear down any _cm2Sender, hand off to the CM1 driver. Mere absence
-        /// of a catalog NEVER latches CM1 (see body).
+        /// rather than a tier-def CM2, on POSITIVE evidence only. CM2 evidence (display
+        /// identity, catalog advertisement, parsed catalog) is sticky for the dash's
+        /// presence cycle and vetoes probing and latching; while a dash is latched CM1,
+        /// the same evidence reverses the latch. CM1 is latched only when the dash
+        /// answers our group-0x0E param-read probe. Mere absence of a catalog NEVER
+        /// latches CM1 (see body).
         ///
-        /// The decision is anchored on the BUS DASH's own presence, not on a running
-        /// pipeline. A live tier-def _cm2Sender only accelerates it (its CatalogCount is
-        /// the "real CM2" fast path) — it is not a precondition. Gating identification on
-        /// the sender made classification depend on the dash telemetry-enable, so a
-        /// hub-only / wheel-less rig (which never starts that sender by default) never
-        /// probed and left a CM1 permanently wearing the speculative CM2 device
-        /// definition MarkDashDetected wrote (bundle MGXWJ3YH).
+        /// Anchored on the BUS DASH's own presence, not on a running pipeline: a live
+        /// tier-def _cm2Sender only accelerates the CM2 verdict (CatalogCount). Gating
+        /// on the sender made classification depend on the dash telemetry-enable, so a
+        /// hub-only / wheel-less rig never probed (bundle MGXWJ3YH).
         /// </summary>
         internal void TickCm1Discriminator()
         {
-            if (_plugin.DashIsCm1) { StartCm1DriverIfNeeded(); return; }
-
             // CM1 only applies to a bus-bridged dash; a USB dash (0x0025) is a real CM2.
             bool busCm2 = _detectionState.DashDetected && !_plugin.DashboardUsbConnected
                           && _plugin.Connection?.IsConnected == true;
             if (!busCm2)
             {
-                // No bridged dash to classify. Drop the cycle so a detach/re-attach
-                // starts clean and a stale 0x8E answer can't latch the next dash —
-                // self-healing here rather than in every DashDetected=false path.
-                _discriminateSinceUtc = DateTime.MinValue;
-                _dashParamReadAnswered = false;
-                _lastCm1ProbeUtc = DateTime.MinValue;
-                _cm1ProbeCount = 0;
+                // No bridged dash to classify. Drop the cycle and the evidence so a
+                // re-attach starts clean. DashIsCm1 is kept as the last-known class;
+                // evidence from the re-attached dash clears it if it was wrong.
+                ResetDiscriminationCycle();
+                System.Threading.Interlocked.Exchange(ref _cm2Evidence, 0);
+                _cm2WasActive = false;
                 return;
             }
 
             var cm2 = _plugin._cm2Sender;
-            if (cm2 != null && cm2.Enabled)
+            bool active = cm2 != null && cm2.IsActive;
+            // A sender restart (self-recovery, not a fresh EnsureCm2Pipeline start)
+            // resets the catalog; the cycle must restart with it.
+            if (_cm2WasActive && !active) ResetDiscriminationCycle();
+            _cm2WasActive = active;
+            if (cm2 != null && cm2.CatalogCount > 0) NoteCm2Evidence(Cm2Evidence.CatalogCount);
+
+            if (_plugin.DashIsCm1)
             {
-                if (cm2.CatalogCount > 0)
+                if (HasCm2Evidence)
                 {
-                    // Real tier-def CM2 — stop suppressing its engagement watchdog.
-                    if (cm2.SuppressDisplayWatchdog) cm2.SuppressDisplayWatchdog = false;
+                    UnlatchCm1("positive CM2 evidence while latched");
                     return;
                 }
+                StartCm1DriverIfNeeded();
+                return;
+            }
 
+            if (HasCm2Evidence)
+            {
+                // Real tier-def CM2 — never probe, never latch; stop suppressing its
+                // engagement watchdog.
+                if (cm2 != null && cm2.SuppressDisplayWatchdog) cm2.SuppressDisplayWatchdog = false;
+                return;
+            }
+
+            if (cm2 != null && cm2.Enabled)
+            {
                 // Wait for the sender to finish cold-start (reach Active) before deciding,
                 // then time from there. A CM1 advertises no catalog and emits no value
-                // frames, so the old `FramesSent == 0` gate never released and the
-                // discriminator stayed wedged here forever — the CM1 never engaged.
-                if (!cm2.IsActive) return;
+                // frames, so a FramesSent gate would never release.
+                if (!active) return;
             }
             else if (cm2 != null && cm2.StartInProgress)
             {
                 // A start waiting out its pre-open silence gate is still _state==Idle
-                // (so !Enabled): let it reach Active and decide via CatalogCount rather
-                // than anchoring the clock underneath an in-flight cold-start.
+                // (so !Enabled): let it reach Active first.
                 return;
             }
             // else: no tier-def sender for this dash and none in flight (the dash lane is
@@ -394,28 +564,19 @@ namespace MozaPlugin.Telemetry
 
             var elapsed = DateTime.UtcNow - _discriminateSinceUtc;
 
-            // CM1 is latched ONLY on the POSITIVE signal: the dash answered the
-            // group-0x0E param-read probe with a 0x8E reply (_dashParamReadAnswered).
-            // That register interface is CM1-exclusive — PitHouse sweeps ~49 of these
-            // registers on a CM1 at connect, and a tier-def CM2 implements none of
-            // them (verified across the whole capture set: FSR1_CM1.pcapng answers,
-            // every CM2 / wheel / base capture answers zero). So we re-probe ~1 Hz
-            // until either the dash answers (→ CM1) or its tier-def catalog arrives
-            // (→ CM2, handled by the CatalogCount check above).
-            //
-            // There is deliberately NO no-catalog timeout fallback. "No catalog yet"
-            // is NOT proof of a CM1 — it equally describes a CM2 whose catalog is
-            // merely slow or was starved — and that absence-based fallback is exactly
-            // what mislabeled a real CM2 as a CM1 (then persisted it globally). A
-            // genuine CM1 always announces itself via 0x8E, so absence-of-evidence
-            // must never latch. A dash that is neither (no catalog, no 0x8E) simply
-            // stays in discrimination — re-probed each tick — rather than being
-            // guessed into the wrong device class.
+            // CM1 is latched ONLY on the positive signal: the dash answered OUR
+            // group-0x0E param-read probe with a 0x8E reply. Absence of a catalog is
+            // never evidence — it equally describes a CM2 whose catalog is slow or was
+            // starved (that fallback mislabeled a real CM2 as CM1 and persisted it).
+            // Whether a CM2 can answer this probe is unverified (bundle Z45VF4BC shows
+            // its firmware runs the same param_manage.c), which is why the evidence
+            // veto above comes first.
             if (!_dashParamReadAnswered)
             {
-                if ((DateTime.UtcNow - _lastCm1ProbeUtc).TotalMilliseconds >= 1000)
+                long now = DateTime.UtcNow.Ticks;
+                if (now - System.Threading.Interlocked.Read(ref _lastCm1ProbeUtcTicks) >= TimeSpan.TicksPerSecond)
                 {
-                    _lastCm1ProbeUtc = DateTime.UtcNow;
+                    System.Threading.Interlocked.Exchange(ref _lastCm1ProbeUtcTicks, now);
                     _cm1ProbeCount++;
                     try { _plugin.DeviceManager.SendCm1ParamProbe(); } catch { }
                 }
@@ -423,8 +584,7 @@ namespace MozaPlugin.Telemetry
             }
 
             // Positive CM1 signal received. Latch after a short settle so a slow CM2
-            // whose catalog lands inside the window still wins via the CatalogCount
-            // check above.
+            // whose catalog lands inside the window still wins via the evidence veto.
             if (elapsed >= Cm1FastDecideAfter)
                 LatchDashAsCm1("answered param-read (0x8E) — positive CM1 signal "
                     + $"(settled {Cm1FastDecideAfter.TotalSeconds:F0}s)");
@@ -435,10 +595,16 @@ namespace MozaPlugin.Telemetry
         /// drop the speculative CM2 copy MarkDashDetected wrote before we could tell
         /// them apart (guarded against a real USB CM2), tear down the tier-def
         /// sender, and start the CM1 driver. The flag is session-only — re-derived
-        /// each boot by the discriminator — so there is nothing to persist here.</summary>
+        /// each boot by the discriminator — so there is nothing to persist here.
+        /// Reversed by <see cref="UnlatchCm1"/> when CM2 evidence appears.</summary>
         private void LatchDashAsCm1(string reason)
         {
-            MozaLog.Info($"[AZOM] Bridged dash → CM1 (group-0x35): {reason}; handing off to CM1 driver");
+            if (HasCm2Evidence)
+            {
+                MozaLog.Warn($"[AZOM] Refusing to latch bridged dash as CM1 ({reason}): {DescribeDiscriminator()}");
+                return;
+            }
+            MozaLog.Warn($"[AZOM] Bridged dash → CM1 (group-0x35): {reason}; {DescribeDiscriminator()}; handing off to CM1 driver");
             _plugin.DashIsCm1 = true;
 
             try
@@ -457,6 +623,28 @@ namespace MozaPlugin.Telemetry
                 _plugin.TelemetrySender.StrictInboundFilter = false;
             }
             StartCm1DriverIfNeeded();
+        }
+
+        /// <summary>Reverse <see cref="LatchDashAsCm1"/> once positive CM2 evidence
+        /// arrives for a dash latched CM1: stop the CM1 driver, restore the CM2 device
+        /// definition (dropping the CM1 one), and let EnsureCm2Pipeline restart the
+        /// CM2 lane (FramesSent is 0 after its Stop, so the fresh-start branch fires).
+        /// Poll thread only — same actor as the latch.</summary>
+        private void UnlatchCm1(string reason)
+        {
+            MozaLog.Warn($"[AZOM] Bridged dash CM1 latch cleared: {reason}; {DescribeDiscriminator()} — restoring CM2 pipeline");
+            if (_plugin._cm1Driver != null && _plugin._cm1Driver.IsRunning) { try { _plugin._cm1Driver.Stop(); } catch { } }
+            _plugin.DashIsCm1 = false;
+            ResetDiscriminationCycle();
+            try
+            {
+                string? pid = _plugin.Connection?.DiscoveredPid;
+                if (DeviceDefinitionDeployer.DeployDashboard(pid))
+                    _plugin.DeviceDefinitionDeployed = true;
+                if (DeviceDefinitionDeployer.RemoveCm1Dashboard())
+                    _plugin.DeviceDefinitionDeployed = true;
+            }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2 device-definition restore skipped: {ex.Message}"); }
         }
     }
 }
