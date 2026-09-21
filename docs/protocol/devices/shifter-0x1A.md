@@ -28,7 +28,7 @@ holds. Background: bundle `T3AAXZRX` (v1.6.0, 2026-09-17) reconnected its standa
 
 On its own USB port the two are told apart by **PID** (`0x001E` vs `0x0023`) and nothing else is
 needed. Behind a base/hub there is no PID, both answer at bus id `0x1A`, and the only measured
-discriminator is the generic device-type identity reply.
+discriminator is the **model-name string** — `0x1A` self-describes.
 
 ### The `0x51` settings block does NOT discriminate — measured on a relayed HGP
 
@@ -53,26 +53,46 @@ LEDs for; whether that is literally the same firmware image as the SGP is not es
 the settings surface is indistinguishable over the wire.
 
 **Consequence:** a brightness read is *not* an SGP identification. `DeviceProber` used to latch
-SGP on this reply, which is why this HGP was reported as an SGP; the model is now decided by the
-device-type reply below, and a brightness answer counts only as "a shifter on this pipe is
-answering settings reads".
+SGP on this reply, which is why this HGP was reported as an SGP; the model comes from the name
+below, and a brightness answer counts only as "a shifter on this pipe is answering settings
+reads".
 
-### Group `0x04` device-type — the one signal that differed
+### Group `0x07` model name — the discriminator
 
-Same bundle, request `7e 00 04 1a`, reply `84 a1 01 02 08 01`:
+Request `7e 01 07 1a 01` → reply `87 a1 01 <ASCII, NUL-terminated>`. Both models name themselves,
+and the leading token is the model. Group `0x08` (`7e 01 08 1a 01` → `88 a1 01 …`) carries a
+hardware version that splits the same way:
+
+| Device | model name (`0x07`) | hw version (`0x08`) | Bundles |
+|---|---|---|---|
+| HGP behind a base | `H Shifter # S00` | `RS21-S00-HW SH-C` | `TWV94SPY`, `WS761M92`, `NWS6EY7X` |
+| SGP behind a base | `S Shifter # S04` | `RS21-S04-HW SH-C` | `EK7MM2FM`, `ARE6993X`, `MSXCPB40` |
+
+Match the **leading token only**. The `# S0N` suffix begins with `S` on both, as does the
+hw-version's `RS21` prefix, so a substring search for "S" matches an HGP.
+`DeviceProber.ResolveRelayedShifterModelFromName` latches on the prefix; an unrecognised string
+leaves the pipe undecided and the probe running, rather than guessing.
+
+### Group `0x04` device-type — does NOT discriminate
+
+Request `7e 00 04 1a`, reply `84 a1 01 02 08 01` — **the same on both models**:
 
 | Device | dev-type (`01 02 [DT_2] [DT_3]`) | Source |
 |---|---|---|
 | HGP behind an R5 base | `01 02 08 01` | bundle `32ZD7KHW`, 2026-08-21 |
-| SGP behind a base/hub | **unmeasured** | — |
+| SGP behind an R5 base | `01 02 08 01` | bundle `EK7MM2FM`, 2026-09-20 |
 
 Format and per-device caveats: [`../identity/dev-type-table.md`](../identity/dev-type-table.md).
-`DeviceProber.HgpDeviceType` holds this value and latches HGP on a match, SGP on anything else.
-The relayed **SGP** value is still unknown, so "dev-type `08 01` ⇒ HGP" is a positive HGP match
-only — the SGP half is elimination, not measurement, and is tracked in
-[`../open-questions.md`](../open-questions.md) § Relayed HGP/SGP discriminator. A relayed shifter
-also answers a presence probe (`7e 00 00 1a` → `80 a1`), which says a shifter is attached but not
-which one.
+Until 2026-09-20 only the HGP value had been measured, so the plugin latched HGP on a match and
+SGP on anything else; since every relayed shifter returns the match, **every** relayed SGP was
+reported as an HGP in sequential mode — `EK7MM2FM` is that report, and the plugin then pushed the
+HGP profile block at the user's SGP. The reply is now logged as evidence and decides nothing. A
+relayed shifter also answers a presence probe (`7e 00 00 1a` → `80 a1`), which says a shifter is
+attached but not which one.
+
+**Do not use `shifter-type` / apply-mode as a discriminator** even though the measured HGPs read 0
+and the measured SGPs read 1. It is a user-writable setting, and v1.5.1 flipped some HGPs to 1 —
+which is exactly the population that most needs correct identification.
 
 A relayed pedal set at `0x19` answers the same identity groups as the wheel (see
 [`../identity/pedal-0x19.md`](../identity/pedal-0x19.md) § Parser routing), so `ProbeRelayedShifter`

@@ -43,6 +43,9 @@ All notable changes to the AZOM plugin are documented here.
   its own timer instead of riding SimHub's LED callback, so a pause in that callback no
   longer drops the wheel and dash back to their own lighting mid-session.
 
+- **A sequential shifter wired through the wheelbase is no longer reported as an H-pattern
+  one.** It is identified by the name it reports, the only reply that differs between them.
+
 - **A shifter on its own USB port stays connected.** Its keepalive stopped after the first
   answer, so the port was closed as dead and reopened every 35 seconds.
 

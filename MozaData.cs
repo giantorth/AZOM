@@ -669,14 +669,13 @@ namespace MozaPlugin
         }
         public readonly ShifterState ShifterHgp = new ShifterState();
         public readonly ShifterState ShifterSgp = new ShifterState();
-        // Relay-only scratch: the generic device-type identity reply (grp 0x04 →
-        // `01 02 XX 06`) from a base/hub-relayed shifter, used to tell HGP from SGP
-        // where the PID isn't visible. Model-agnostic — it's what RESOLVES the model.
+        // Relay-only scratch: the generic device-type identity reply (grp 0x04) from a
+        // base/hub-relayed shifter. Logged as evidence only — HGP and SGP both return
+        // `01 02 08 01`, so it cannot tell them apart.
         public volatile byte[] RelayShifterDeviceType = System.Array.Empty<byte>();
         // Relay-only scratch: model-name (grp 0x07) / hw-version (grp 0x08) replies from
-        // a base/hub-relayed shifter, if it answers those groups at all. Model-agnostic
-        // like RelayShifterDeviceType — logged by DeviceProber so a support bundle shows
-        // whether 0x1A self-describes; nothing depends on them yet.
+        // a base/hub-relayed shifter. Model-agnostic — the NAME is what RESOLVES the model
+        // where the PID isn't visible ("H Shifter # …" / "S Shifter # …").
         public volatile string RelayShifterModelName = string.Empty;
         public volatile string RelayShifterHwVersion = string.Empty;
 
