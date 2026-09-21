@@ -6,8 +6,8 @@ All notable changes to the AZOM plugin are documented here.
 
 ### Added
 
-- **Pedal haptics.** The S12 pedal vibration module shows up as its own SimHub ShakeIt
-  device, with nine effect channels each for throttle, brake and clutch.
+- **Pedal haptics support.** The new pedal vibration module shows up as its own SimHub ShakeIt
+  device per pedal.
 
 - **Convert a SimHub dashboard to MOZA format.** A Files tab button turns a `.djson` or
   `.simhubdash` into an uploadable `.mzdash` — widgets, images, fonts and formulas — and
@@ -19,12 +19,7 @@ All notable changes to the AZOM plugin are documented here.
 - **The Files tab's dashboard list is sorted.**
 
 - **The wheel's RPM bar shows upload progress.** While a dashboard is uploading, the LEDs
-  stop following telemetry and the RPM bar fills up as the transfer lands, with the LED at
-  the fill edge pulsing orange. The lights on either end of the bar stay out, so the fill spans
-  only the bar itself. Pausing the LEDs is deliberate: they and the upload share one link,
-  and the upload gets it for the duration. The bar clears and the LEDs go back to telemetry
-  when the upload finishes — or earlier, if it stops making progress, so a stuck transfer
-  never keeps the LEDs to itself.
+  stop following telemetry and the RPM bar fills up as the transfer lands.
 
 - **Knob rings can be filled on alternating LEDs.** A button beside "Fill ring" on the Knobs
   tab colours every other LED in the group that contains the selected one.
