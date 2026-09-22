@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using GameReaderCommon.Enums;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency;
@@ -40,6 +41,12 @@ namespace MozaPlugin.Integration
         private readonly int _pedalIndex;
         private readonly List<ChannelInformation> _channels;
 
+        // Rotation cursor per pedal. Static because SimHub rebuilds the provider
+        // whenever it re-creates an output manager, and the rotation has to
+        // survive that or every reload starts assigning at oscillator 1 again.
+        private static readonly int[] _nextChannel = new int[MozaPedalHapticsProtocol.PedalCount];
+
+
         public MozaPedalHapticsChannelsProvider(
             byte pedal = (byte)PedalHapticsPedal.Throttle)
         {
@@ -69,13 +76,58 @@ namespace MozaPlugin.Integration
 
         public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsReady == true;
 
-        public List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager) => _channels;
+        /// <summary>
+        /// The channel list SimHub sees — and deliberately not the same list in
+        /// both directions.
+        ///
+        /// Only two things in SimHub call this, and they are cleanly separated by
+        /// thread: the tone mixer (<c>MotorsWithFrequencyOutputManager.UpdateOutput</c>,
+        /// data thread, every tick) and the per-effect checkbox list
+        /// (<c>MotorsWithFrequencyOutputManagerEffectsChannelsModel.BuildOrUpdateModel</c>,
+        /// WPF thread, once when an effect's settings control is built). The 10 Hz
+        /// preview timer only calls <c>UpdateEffectsPreview</c> and never reaches
+        /// the mixer, so nothing drives output from the UI thread.
+        ///
+        /// So the mixer is handed all eight oscillators, and the UI is handed
+        /// none. Effects still get spread across the hardware — the routing is
+        /// decided in <see cref="LoadDefaultPlatformSettings"/> — but the user is
+        /// never shown a channel grid to fill in, which is the whole point: the
+        /// oscillator an effect lands on is an implementation detail.
+        ///
+        /// Internal code must use <c>_channels</c> directly, never this: it runs
+        /// on both threads and would otherwise see an empty list.
+        /// </summary>
+        public List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager)
+            => IsUiThread ? HiddenFromUi : _channels;
 
-        // Channels are allocated to hardware on demand, so leaving a new effect
-        // enabled on all of them would burn the whole pool on one effect.
+        private static readonly List<ChannelInformation> HiddenFromUi = new List<ChannelInformation>();
+
+        private static bool IsUiThread
+        {
+            get
+            {
+                try { return System.Windows.Application.Current?.Dispatcher?.CheckAccess() == true; }
+                catch { return false; }   // no WPF app (tests, headless) — treat as the mixer
+            }
+        }
+        // Never enabled by default: LoadDefaultPlatformSettings picks the one
+        // channel a new effect lands on, and this hook has no channel index to
+        // decide with. Returning true here is what makes SimHub tick every box
+        // on every effect and put them all on one oscillator.
         public ChannelActivation CreateDefaultActivationFor(FFBPlacement placement, MotorsWithFrequencyOutputManagerBase manager)
             => new ChannelActivation { IsEnabled = false };
 
+        /// <summary>
+        /// Called by SimHub when an effect is created — which is where the
+        /// round-robin lives. Each new effect is assigned the next oscillator and
+        /// wraps once all eight are spoken for, so effects spread across the
+        /// hardware's own mixer at their own frequencies instead of collapsing
+        /// into one tone, and the user never opens the channel list to do it.
+        ///
+        /// Sharing after a wrap is harmless: ShakeIt sums the effects on a
+        /// channel before the value reaches us, and the oscillators are
+        /// interchangeable.
+        /// </summary>
         public void LoadDefaultPlatformSettings(EffectsContainerBase effectsContainerBase, ShakeItProfile shakeItProfile)
         {
             // Corner placements mean nothing on a single pedal motor — collapse to
@@ -83,9 +135,9 @@ namespace MozaPlugin.Integration
             if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
                 effectsContainerBase.AggregationMode = "Mono";
 
-            // Seed one enabled channel so a new effect does something immediately
-            // without claiming every slot. The hook has no channel index, so the
-            // activations are written per placement here.
+            int channel = MozaPedalHapticsProtocol.RotateChannel(
+                Interlocked.Increment(ref _nextChannel[_pedalIndex]) - 1);
+
             var activation = effectsContainerBase.SettingsStore.GetSettings<DeviceChannelActivationSettings>();
             foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
             {
@@ -95,7 +147,7 @@ namespace MozaPlugin.Integration
                     activation.Channels[placement] = pca;
                 }
                 for (int ch = 0; ch < _channels.Count; ch++)
-                    pca.Channels[ch] = new ChannelActivation { IsEnabled = ch == 0 };
+                    pca.Channels[ch] = new ChannelActivation { IsEnabled = ch == channel };
             }
         }
 

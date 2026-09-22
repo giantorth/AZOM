@@ -170,80 +170,50 @@ CAPTURE = [
 
 # --- Encoder spot checks ----------------------------------------------------
 
-# --- Channel allocation + emission budget ----------------------------------
+# --- Channel model + emission budget ---------------------------------------
 # Keep in sync with MozaPedalHapticsProtocol. Each pedal is its own SimHub
-# device; its channels are routing destinations that the worker allocates onto
-# the eight interchangeable hardware slots, so there are deliberately more
-# channels than slots.
-SLOT_POOL = 8                         # slots 0..7, interchangeable
-ROAD_SLOT = 8                         # outside the pool
-GENERIC_CHANNELS = 16
-CHANNELS_PER_PEDAL = GENERIC_CHANNELS + 1
+# device exposing ONE channel, so nothing has to be configured per effect:
+# ShakeIt mixes every effect routed to that pedal and hands over one tone.
+CHANNELS_PER_PEDAL = 8                 # one per interchangeable hardware slot
 PEDALS = 3
+SLOT_FOR_CHANNEL = lambda ch: ch      # channel N drives slot N
+ROAD_SLOT = 8                         # not driven, takes a position not a tone
 TICK_MS = 20
 MAX_FRAMES_PER_TICK = 8
+STREAM_DURATION_MS = 500
 FRAME_BYTES = 17                      # extended envelope, the larger of the two
 LINK_BYTES_PER_SEC = 115200 / 10      # 8N1 = 10 bits per byte
 
 
-def allocate(active_channels):
-    """Mirror PedalHapticsEffectWorker: a channel takes the next free slot from
-    a rotating cursor and keeps it while active; past the pool it shares."""
-    users = [0] * SLOT_POOL
-    held = {}
-    cursor = 0
-    for ch in active_channels:
-        slot = None
-        for n in range(SLOT_POOL):
-            cand = (cursor + n) % SLOT_POOL
-            if users[cand] == 0:
-                slot = cand
-                break
-        if slot is None:
-            slot = cursor % SLOT_POOL
-        users[slot] += 1
-        held[ch] = slot
-        cursor = slot + 1
-    return held, users
 
 
-def worst_refresh_ms():
-    """Every slot of every pedal live at once — the ceiling the duration must cover."""
-    slots = PEDALS * (SLOT_POOL + 1)
-    return -(-slots // MAX_FRAMES_PER_TICK) * TICK_MS
-
-
-def peak_bytes_per_sec():
-    return MAX_FRAMES_PER_TICK * (1000 / TICK_MS) * FRAME_BYTES
+def rotate(n_effects):
+    """Mirror the provider: each effect created takes the next channel, wrapping."""
+    return [i % CHANNELS_PER_PEDAL for i in range(n_effects)]
 
 
 CHANNEL_CHECKS = [
-    ("eight active channels each get their own slot",
-     lambda: sorted(allocate(range(8))[0].values()), list(range(8))),
-    ("a ninth active channel shares rather than being dropped",
-     lambda: len(allocate(range(9))[0]), 9),
-    ("sharing wraps to slot 0 once the pool is full",
-     lambda: allocate(range(9))[0][8], 0),
-    ("seventeen active channels all keep an assignment",
-     lambda: len(allocate(range(17))[0]), 17),
-    ("no slot is left idle while any channel waits",
-     lambda: min(allocate(range(9))[1]) >= 1, True),
-    ("a lone channel does not always land on slot 0",
-     lambda: allocate([0, 1])[0][1], 1),
-    ("road texture sits outside the pool",
-     lambda: ROAD_SLOT >= SLOT_POOL, True),
-    ("more channels are offered than there are slots",
-     lambda: GENERIC_CHANNELS > SLOT_POOL, True),
-    # With every slot of every pedal live the round-robin must still revisit
-    # each one inside the duration, or effects lapse and restart audibly.
-    ("worst-case refresh stays inside the streamed duration",
-     lambda: worst_refresh_ms() < STREAM_DURATION_MS, True),
-    ("worst-case refresh has >= 2x duration margin",
-     lambda: STREAM_DURATION_MS / worst_refresh_ms() >= 2.0, True),
-    ("a realistic load (8 frames) is never throttled",
-     lambda: 8 <= MAX_FRAMES_PER_TICK, True),
+    ("channels match the interchangeable hardware slots",
+     lambda: CHANNELS_PER_PEDAL, 8),
+    ("channel N drives slot N",
+     lambda: [SLOT_FOR_CHANNEL(c) for c in range(CHANNELS_PER_PEDAL)],
+     list(range(CHANNELS_PER_PEDAL))),
+    ("road texture is not one of the ShakeIt channels",
+     lambda: ROAD_SLOT >= CHANNELS_PER_PEDAL, True),
+    ("eight effects each land on their own oscillator",
+     lambda: sorted(rotate(8)), list(range(8))),
+    ("a ninth effect wraps to the first oscillator",
+     lambda: rotate(9)[8], 0),
+    ("no effect is ever left unassigned",
+     lambda: len(rotate(20)), 20),
+    # Every oscillator of every pedal live at once still has to refresh inside
+    # the duration, or effects lapse and restart audibly.
+    ("worst-case refresh stays well inside the streamed duration",
+     lambda: -(-(PEDALS * CHANNELS_PER_PEDAL) // MAX_FRAMES_PER_TICK) * TICK_MS
+             < STREAM_DURATION_MS // 2, True),
     ("peak output stays under the link rate",
-     lambda: peak_bytes_per_sec() < LINK_BYTES_PER_SEC * 0.75, True),
+     lambda: MAX_FRAMES_PER_TICK * (1000 / TICK_MS) * FRAME_BYTES
+             < LINK_BYTES_PER_SEC * 0.75, True),
 ]
 
 # --- Encoder spot checks ----------------------------------------------------
@@ -272,6 +242,19 @@ def run(group, cases):
     return fails, len(cases)
 
 
+def run_values(group, cases):
+    print(f"== {group}")
+    fails = 0
+    for label, fn, expect in cases:
+        got = fn()
+        ok = got == expect
+        fails += 0 if ok else 1
+        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
+        if not ok:
+            print(f"        expected {expect}, got {got}")
+    return fails, len(cases)
+
+
 def main():
     fails = total = 0
     for group, cases in (("reference frames", REFERENCE),
@@ -280,25 +263,11 @@ def main():
         fails += f
         total += n
 
-    print("== channels and budget")
-    for label, fn, expect in CHANNEL_CHECKS:
-        got = fn()
-        ok = got == expect
-        fails += 0 if ok else 1
-        total += 1
-        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
-        if not ok:
-            print(f"        expected {expect}, got {got}")
-
-    print("== encoders")
-    for label, fn, expect in ENCODERS:
-        got = fn()
-        ok = got == expect
-        fails += 0 if ok else 1
-        total += 1
-        print(f"  {'PASS' if ok else 'FAIL'}  {label}")
-        if not ok:
-            print(f"        expected {expect}, got {got}")
+    for group, cases in (("channel model and budget", CHANNEL_CHECKS),
+                         ("encoders", ENCODERS)):
+        f, n = run_values(group, cases)
+        fails += f
+        total += n
 
     print(f"\n{total - fails}/{total} passed")
     return 1 if fails else 0
