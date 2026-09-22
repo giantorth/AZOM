@@ -24,6 +24,16 @@ holds. Background: bundle `T3AAXZRX` (v1.6.0, 2026-09-17) reconnected its standa
 35 s and re-applied five settings on each connect — six Table-9 commits per reconnect, about
 1,170 in a two-hour session.
 
+**A shifter that answers nothing is never written by that path.** A missing individual reply is
+treated as a dropped frame and released after a 15 s grace, but only once the device has answered
+at least one `0x51` read. A shifter that has answered none stays held indefinitely, because a
+write is an EEPROM commit aimed at values the host cannot see. Bundle `W3H1TH2S` (v1.6.1,
+2026-09-21) is the case: a standalone HGP on its own port ACKed all 74 presence probes and
+returned a **zero-length payload** to all 44 settings reads, and the earlier timeout pushed
+direction, paddle-sync and hid-mode into it anyway. The Shifter tab still writes on user action,
+so such a unit stays configurable by hand. A zero-length `d1`/`d2` reply is itself the signature
+of a shifter that is not healthy — every other bundle, standalone and relayed, answers with data.
+
 ## Telling HGP from SGP
 
 On its own USB port the two are told apart by **PID** (`0x001E` vs `0x0023`) and nothing else is
