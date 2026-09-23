@@ -743,6 +743,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Yêu cầu SimHub 9.12 trở lên — đang dùng thẻ LFE của plugin.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
+  <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Phát hiện cần số chủ động (AB9 / AB6)</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Biểu đồ</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Băng thông</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>

@@ -750,6 +750,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requires SimHub 9.12 or newer — using the plugin's LFE tab.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Device definition updated. Restart SimHub to apply.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon compatibility</value></data>
+  <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Active shifter detection (AB9 / AB6)</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graph</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandwidth</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>

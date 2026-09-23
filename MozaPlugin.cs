@@ -679,6 +679,41 @@ namespace MozaPlugin
 
         internal void ClearSettings() => _profileCoordinator.ClearSettings();
 
+        /// <summary>Switch the active-shifter lane on or off. Off releases a held
+        /// port; on lets the next reconnect tick claim it.</summary>
+        internal void SetAb9DetectionEnabled(bool enabled)
+        {
+            _settings.Ab9DetectionEnabled = enabled;
+            SaveSettings();
+            MozaLog.Info($"[AZOM/AB9] Active-shifter detection {(enabled ? "enabled" : "disabled")}");
+            if (enabled) return;
+
+            // Drop the latch first: the engine-vib worker and every apply path
+            // gate on it, so nothing refills the stream slot behind the silence.
+            DetectionState.Ab9Detected = false;
+            var ab9 = _ab9Manager;
+            if (ab9 == null || !ab9.IsConnected) return;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    // Without the silence the AB9 keeps buzzing until its ~10 s
+                    // keepalive timeout. Disconnect discards unsent frames, so let
+                    // the write thread drain them first.
+                    ab9.SendEngineSilence();
+                    Thread.Sleep(150);
+                    if (_settings.Ab9DetectionEnabled) return;
+                    ab9.Disconnect();
+                    _data.ResetAb9Probe();
+                    MozaLog.Info($"[AZOM/AB9] Released {ab9.ModelName} port");
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM/AB9] Release failed: {ex.Message}");
+                }
+            });
+        }
+
         internal void SetConnectionEnabled(bool enabled)
         {
             _settings.ConnectionEnabled = enabled;

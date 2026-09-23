@@ -4,7 +4,15 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.6.2]
 
+### Added
+
+- **Active shifter detection can be turned off.** An Options toggle stops the plugin
+  claiming the AB9 / AB6 port and releases it if already held.
+
 ### Fixed
+
+- **AB9 settings are no longer re-written on every connect.** They are read back first and
+  only what the profile changes is written.
 
 - **A shifter that never reports its settings is no longer written to.** Its stored values
   can't be read back, so the profile is held rather than committed blind to its EEPROM.

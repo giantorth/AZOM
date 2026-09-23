@@ -137,7 +137,7 @@ namespace MozaPlugin
             // Wine — it silently disabled every lane below on Linux.)
             bool deviceSourceLive =
                 Protocol.MozaPortDiscovery.Instance.IsAuthoritative;
-            if (deviceSourceLive && !_ab9Manager.IsConnected)
+            if (deviceSourceLive && _settings.Ab9DetectionEnabled && !_ab9Manager.IsConnected)
                 _connectionCoordinator?.TryConnectAb9();
 
             // Standalone-USB CM2 on its own port (0x0025) — same gate.

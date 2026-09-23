@@ -742,6 +742,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requer o SimHub 9.12 ou mais recente — está a ser usado o separador LFE do plug-in.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definição de dispositivo atualizada. Reinicie o SimHub para aplicar.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidade com Forza Horizon</value></data>
+  <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Detecção da alavanca de câmbio ativa (AB9 / AB6)</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Largura de banda</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>

@@ -246,7 +246,7 @@ namespace MozaPlugin.Devices
         /// <summary>Open the active shifter's dedicated CDC port (AB9 0x1000 / AB6 0x1002) and probe identity.</summary>
         internal void TryConnectAb9()
         {
-            if (_ab9Manager == null) return;
+            if (_ab9Manager == null || !_plugin.Settings.Ab9DetectionEnabled) return;
             if (_detectionState.Ab9Detected)
             {
                 // Connection dropped after a successful detection — clear so the
@@ -255,6 +255,12 @@ namespace MozaPlugin.Devices
             }
             if (_ab9Manager.TryConnect())
             {
+                // Detection was switched off while the port was opening.
+                if (!_plugin.Settings.Ab9DetectionEnabled)
+                {
+                    _ab9Manager.Disconnect();
+                    return;
+                }
                 _ab9Manager.SendIdentityProbe();
                 _ab9Manager.RequestAllStoredSettings();
                 // Once per connect so a diagnostics bundle carries the answer even

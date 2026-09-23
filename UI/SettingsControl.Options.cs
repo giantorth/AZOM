@@ -57,6 +57,12 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        private void Ab9DetectionCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _plugin.SetAb9DetectionEnabled(Ab9DetectionCheck.IsChecked == true);
+        }
+
         private void KeepaliveTimeoutSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
@@ -171,6 +177,7 @@ namespace MozaPlugin.UI
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
+                Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
                 SyncWheelbaseLfeSourceCombo();
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;

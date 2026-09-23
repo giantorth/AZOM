@@ -3633,6 +3633,11 @@
                                         <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
                                                   Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
                                     </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
+                                                  Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
+                                    </StackPanel>
                                     <Grid Margin="0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>

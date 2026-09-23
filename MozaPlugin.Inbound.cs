@@ -421,6 +421,9 @@ namespace MozaPlugin
         private void OnAb9MessageReceived(byte[] data)
         {
             if (IsShuttingDown) return;
+            // A frame still in flight when detection was switched off must not
+            // re-latch the device or push the profile.
+            if (_settings?.Ab9DetectionEnabled == false) return;
             if (data == null || data.Length < 2) return;
 
             // Filter firmware debug noise before parsing.
@@ -435,6 +438,10 @@ namespace MozaPlugin
             var r = result.Value;
             if (r.Name == null || !r.Name.StartsWith("ab9-", StringComparison.Ordinal))
                 return;
+
+            // Before the rising-edge apply, so a readback in this frame is already
+            // known when the profile is diffed against the device.
+            _ab9Manager.NoteReadback(r.Name, r.IntValue);
 
             bool rising = !DetectionState.Ab9Detected;
             _ab9Manager.MarkDetected();

@@ -742,6 +742,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα LFE του πρόσθετου.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
+  <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Ανίχνευση ενεργού επιλογέα ταχυτήτων (AB9 / AB6)</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Γράφημα</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Εύρος ζώνης</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>

@@ -138,7 +138,9 @@ namespace MozaPlugin.UI
                 ? Protocol.MozaUsbIds.ActiveShifterShortName(ab9Conn!.DiscoveredPid)
                 : "AB9/AB6");
             sb.Append(' ');
-            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port : "(disconnected)");
+            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
+                      : plugin.Settings?.Ab9DetectionEnabled == false ? "(detection disabled)"
+                      : "(disconnected)");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");

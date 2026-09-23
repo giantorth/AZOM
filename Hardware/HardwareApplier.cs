@@ -1702,21 +1702,22 @@ namespace MozaPlugin.Hardware
         /// is detected/connected. A profile with no Ab9 block applies factory
         /// defaults so the device follows the active per-game profile (reset
         /// semantics) instead of retaining the previously-applied profile's
-        /// settings.
+        /// settings. Only settings that differ from what the AB9 holds are written
+        /// (see the reconcile in <see cref="MozaAb9DeviceManager"/>).
         /// </summary>
         public void ApplyAb9ToHardware(MozaProfile? profile)
         {
             if (!_detectionState.Ab9Detected || _ab9Manager == null || !_ab9Manager.IsConnected) return;
 
             var ab9 = profile?.Ab9 ?? new Ab9Settings();
-            _ab9Manager.SendInputMode(ab9.InputMode);
-            _ab9Manager.SendMode(ab9.Mode);
-            _ab9Manager.SendSlider(Ab9Slider.MechanicalResistance, ab9.MechanicalResistance);
-            _ab9Manager.SendSlider(Ab9Slider.Spring,               ab9.Spring);
-            _ab9Manager.SendSlider(Ab9Slider.NaturalDamping,       ab9.NaturalDamping);
-            _ab9Manager.SendSlider(Ab9Slider.NaturalFriction,      ab9.NaturalFriction);
-            _ab9Manager.SendSlider(Ab9Slider.MaxTorqueLimit,       ab9.MaxTorqueLimit);
-            _ab9Manager.SendGearShiftVibrationIntensity(ab9.GearShiftVibrationIntensity);
+            _ab9Manager.ApplyInputModeIfChanged(ab9.InputMode);
+            _ab9Manager.ApplyModeIfChanged(ab9.Mode);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.MechanicalResistance, ab9.MechanicalResistance);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.Spring,               ab9.Spring);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.NaturalDamping,       ab9.NaturalDamping);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.NaturalFriction,      ab9.NaturalFriction);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.MaxTorqueLimit,       ab9.MaxTorqueLimit);
+            _ab9Manager.ApplyGearShiftVibrationIntensityIfChanged(ab9.GearShiftVibrationIntensity);
         }
 
         /// <summary>
