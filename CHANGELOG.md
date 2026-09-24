@@ -9,6 +9,9 @@ All notable changes to the AZOM plugin are documented here.
 - **Active shifter detection can be turned off.** An Options toggle stops the plugin
   claiming the AB9 / AB6 port and releases it if already held.
 
+- **Automatic channel selection for pedal haptics.** Effects output automatically per 
+  pedal without needing to assign channel slots.
+
 ### Fixed
 
 - **AB9 settings are no longer re-written on every connect.** They are read back first and
