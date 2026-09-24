@@ -130,6 +130,7 @@ namespace MozaPlugin.UI
                 var sigConnected = c.ConnectedAxes;
                 if (sigConnected != null)
                     for (int k = 0; k < sigConnected.Length; k++) sigBuilder.Append(sigConnected[k] ? '1' : '0');
+                sigBuilder.Append('|').Append(string.Join(",", MBoosterTabAxes(registry, c)));
                 sigBuilder.Append(';');
             }
             string rowsSignature = sigBuilder.ToString();
@@ -146,31 +147,21 @@ namespace MozaPlugin.UI
                 foreach (var c in devices)
                 {
                     if (!string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) continue;
-                    selectedDeviceStillPresent = true;
-                    int axisCount = c.AxisSlotCount;
-                    var connected = c.ConnectedAxes;
-                    bool selAxisKnownConnected = connected != null && _mboosterEffectPedalIndex < connected.Length
-                        ? connected[_mboosterEffectPedalIndex]
-                        : _mboosterEffectPedalIndex == 0;
-                    selectionValid = _mboosterEffectPedalIndex >= 0 && _mboosterEffectPedalIndex < axisCount && selAxisKnownConnected;
-                    if (!selectionValid && connected != null)
-                    {
-                        // The device's real wired axis just became known (the
-                        // "PD Linked" diagnostic landed) and it isn't the axis-0
-                        // placeholder we'd optimistically selected before that —
-                        // a standalone unit's sole pedal commonly reports on a
-                        // non-zero axis regardless of chain status (see
-                        // MBoosterDeviceController's ConnectedAxes doc comment).
-                        // Follow the SAME physical device onto whichever axis is
-                        // now known-connected instead of falling through to
-                        // devices[0] below, which would silently reassign the
-                        // user's selection to a different device a couple
-                        // seconds after they picked one at startup.
-                        for (int axis = 0; axis < connected.Length; axis++)
-                        {
-                            if (connected[axis]) { sameDeviceRetargetAxis = axis; break; }
-                        }
-                    }
+                    var listed = MBoosterTabAxes(registry, c);
+                    selectedDeviceStillPresent = listed.Count > 0;
+                    selectionValid = listed.Contains(_mboosterEffectPedalIndex);
+                    // The device's real wired axis just became known (the "PD
+                    // Linked" diagnostic landed) and it isn't the axis-0
+                    // placeholder we'd optimistically selected before that — a
+                    // standalone unit's sole pedal commonly reports on a
+                    // non-zero axis regardless of chain status (see
+                    // MBoosterDeviceController's ConnectedAxes doc comment) —
+                    // or the selected pedal moved to the Pedals tab once its
+                    // passive type landed. Follow the SAME physical device onto
+                    // its first listed pedal instead of falling through to
+                    // devices[0] below, which would silently reassign the
+                    // user's selection to a different device.
+                    if (!selectionValid && listed.Count > 0) sameDeviceRetargetAxis = listed[0];
                     break;
                 }
                 if (!selectionValid)
@@ -199,14 +190,14 @@ namespace MozaPlugin.UI
                         // logic above; fall back to axis 0 only when
                         // connectivity isn't known yet at all.
                         _mboosterSelectedIdentity = devices[0].Identity;
-                        var initialConnected = devices[0].ConnectedAxes;
                         int initialAxis = 0;
-                        if (initialConnected != null)
+                        foreach (var c in devices)
                         {
-                            for (int axis = 0; axis < initialConnected.Length; axis++)
-                            {
-                                if (initialConnected[axis]) { initialAxis = axis; break; }
-                            }
+                            var listed = MBoosterTabAxes(registry, c);
+                            if (listed.Count == 0) continue;
+                            _mboosterSelectedIdentity = c.Identity;
+                            initialAxis = listed[0];
+                            break;
                         }
                         _mboosterEffectPedalIndex = initialAxis;
                     }
@@ -221,13 +212,14 @@ namespace MozaPlugin.UI
                         var rowSettings = _plugin.GetOrCreateMBoosterSettings(c.Identity);
                         string deviceLabel = BuildMBoosterComboLabel(c);
                         var connectedAxes = c.ConnectedAxisIndices();
+                        var listedAxes = MBoosterTabAxes(registry, c);
 
                         // Only label rows "— Pedal N" when this device genuinely
-                        // hosts more than one wired pedal — not just because its
-                        // HID interface happens to expose 3 axes.
-                        bool multiplePedals = connectedAxes.Count > 1;
+                        // lists more than one pedal — not just because its HID
+                        // interface happens to expose 3 axes.
+                        bool multiplePedals = listedAxes.Count > 1;
                         int shown = 0;
-                        foreach (int axis in connectedAxes)
+                        foreach (int axis in listedAxes)
                         {
                             ++shown;
                             string label = multiplePedals
@@ -273,7 +265,7 @@ namespace MozaPlugin.UI
             }
 
             var selected = registry.FindByIdentity(_mboosterSelectedIdentity ?? "");
-            if (selected == null)
+            if (selected == null || MBoosterTabAxes(registry, selected).Count == 0)
             {
                 MBoosterDevicePanel.Visibility = Visibility.Collapsed;
                 return;
@@ -353,6 +345,16 @@ namespace MozaPlugin.UI
             _mboosterSeededProfileName = currentProfileName;
             _mboosterSeededIdentity = selected.Identity;
             _mboosterSeededSettings = s;
+        }
+
+        /// <summary>The pedals this tab lists for a device: every connected
+        /// one except the passive pedals the Pedals tab configures (see
+        /// MozaMBoosterRegistry.IsPedalsTabPassive).</summary>
+        private static List<int> MBoosterTabAxes(MozaMBoosterRegistry registry, MBoosterDeviceController c)
+        {
+            var axes = c.ConnectedAxisIndices();
+            axes.RemoveAll(a => registry.IsPedalsTabPassive(c, a));
+            return axes;
         }
 
         /// <summary>Click handler for a pedal row's label Button (see
@@ -531,6 +533,28 @@ namespace MozaPlugin.UI
                 if (row.RoleIndex == (int)role)
                     row.RoleIndex = (int)MBoosterRole.Disabled;
             }
+
+            // A Pedals-tab passive pedal has no row here. Disabling it hands
+            // it back to this tab (IsPedalsTabPassive needs a role), where
+            // the user can reassign it.
+            var registry = _plugin?.MBoosterRegistry;
+            if (registry == null) return;
+            bool changed = false;
+            foreach (var c in registry.Devices)
+            {
+                int n = c.AxisSlotCount;
+                for (int axis = 0; axis < n; axis++)
+                {
+                    if (string.Equals(c.Identity, keepIdentity, StringComparison.OrdinalIgnoreCase) && axis == keepAxisIndex)
+                        continue;
+                    if (!registry.IsPedalsTabPassive(c, axis) || c.RoleIndexForAxis(axis) != MBoosterDeviceController.RoleIndexOf(role))
+                        continue;
+                    SetMBoosterPedalRole(_plugin!.GetOrCreateMBoosterSettings(c.Identity),
+                        c.ConnectedAxisCount, n, axis, MBoosterRole.Disabled);
+                    changed = true;
+                }
+            }
+            if (changed) _plugin!.SaveSettings();
         }
 
         /// <summary>DisplayName edit callback — fires from MBoosterDeviceRow

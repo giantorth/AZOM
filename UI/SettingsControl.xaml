@@ -1680,7 +1680,7 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="100%"/>
                                     </Grid>
-                                    <Grid Margin="0,4">
+                                    <Grid x:Name="BrakeAngleRatioRow" Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>

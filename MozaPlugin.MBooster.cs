@@ -200,7 +200,7 @@ namespace MozaPlugin
         private static bool IsUntouchedPedalConfig(global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig c)
         {
             return c.Direction < 0 && c.Min < 0 && c.Max < 0
-                && c.CurveY == null && c.CurveX == null
+                && c.CurveY == null && c.CurveX == null && c.HardwareCurveY == null
                 && c.SensorOutputRatioPct < 0 && c.MaxThresholdKg < 0
                 && c.InputCurveY == null && c.InputCurveX == null
                 && c.DeadzoneKg < 0 && c.MaxForceKg < 0
@@ -299,6 +299,7 @@ namespace MozaPlugin
             Int("Max", () => into.Max, v => into.Max = v, from.Max);
             Arr("CurveY", () => into.CurveY, v => into.CurveY = v, from.CurveY);
             Arr("CurveX", () => into.CurveX, v => into.CurveX = v, from.CurveX);
+            Arr("HardwareCurveY", () => into.HardwareCurveY, v => into.HardwareCurveY = v, from.HardwareCurveY);
             Flt("SensorOutputRatioPct", () => into.SensorOutputRatioPct, v => into.SensorOutputRatioPct = v, from.SensorOutputRatioPct);
             Flt("MaxThresholdKg", () => into.MaxThresholdKg, v => into.MaxThresholdKg = v, from.MaxThresholdKg);
             Arr("InputCurveY", () => into.InputCurveY, v => into.InputCurveY = v, from.InputCurveY);

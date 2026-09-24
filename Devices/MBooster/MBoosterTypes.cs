@@ -529,6 +529,8 @@ namespace MozaPlugin.Devices.MBooster
         int Max { get; set; }
         float[]? CurveY { get; set; }
         float[]? CurveX { get; set; }
+        // Passive pedal's 5-point hardware output curve (Pedals tab).
+        float[]? HardwareCurveY { get; set; }
         // Sim Input Mapping
         float SensorOutputRatioPct { get; set; }
         float MaxThresholdKg { get; set; }
@@ -569,6 +571,7 @@ namespace MozaPlugin.Devices.MBooster
         public int Max { get; set; } = -1;
         public float[]? CurveY { get; set; } = null;   // 6-point output curve (host-side only)
         public float[]? CurveX { get; set; } = null;   // draggable node X (null = fixed breakpoints)
+        public float[]? HardwareCurveY { get; set; } = null; // see MBoosterDeviceSettings.HardwareCurveY
 
         // Sim Input Mapping (see MBoosterDeviceSettings for the field semantics).
         public float SensorOutputRatioPct { get; set; } = -1;
@@ -618,6 +621,7 @@ namespace MozaPlugin.Devices.MBooster
                 Max = Max,
                 CurveY = CurveY == null ? null : (float[])CurveY.Clone(),
                 CurveX = CurveX == null ? null : (float[])CurveX.Clone(),
+                HardwareCurveY = HardwareCurveY == null ? null : (float[])HardwareCurveY.Clone(),
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
@@ -799,6 +803,11 @@ namespace MozaPlugin.Devices.MBooster
         // (100/6 * k for k=1..6, last node at 100% — see
         // MozaMBoosterRegistry.DefaultCurveX).
         public float[]? CurveX { get; set; } = null;
+
+        // A PASSIVE pedal's 5-point output curve (Y at 20/40/60/80/100%),
+        // written to mbooster-{role}-y1..y5 — the same registers the Pedals
+        // tab writes for CRP pedals, and edited from that tab. Null = not set.
+        public float[]? HardwareCurveY { get; set; } = null;
 
         // Per-pedal calibration for the ADDITIONAL pedals on a chained mBooster
         // (axes 1+), keyed by HID axis index. Axis 0 (the master) keeps its
@@ -984,6 +993,7 @@ namespace MozaPlugin.Devices.MBooster
                 Max = Max,
                 CurveY = CurveY == null ? null : (float[])CurveY.Clone(),
                 CurveX = CurveX == null ? null : (float[])CurveX.Clone(),
+                HardwareCurveY = HardwareCurveY == null ? null : (float[])HardwareCurveY.Clone(),
                 SensorOutputRatioPct = SensorOutputRatioPct,
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),

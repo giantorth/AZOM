@@ -369,6 +369,35 @@ aggregates, and a passive pedal has them.
 **Inferred from the wire shape, not observed** — no capture of Pit House
 editing a passive pedal exists to confirm how it handles this.
 
+### Passive pedals are configured from the Pedals tab (bug report RCPWVWQ5)
+
+What a passive pedal does have — Direction, Range Start/End, the 5-point
+output curve and the pot calibration — is exactly the CRP pedal surface, so
+once the type verdict lands (`AxisTypesComplete`) a passive pedal with a
+role leaves the mBooster tab and appears as its role's group on the
+**Pedals** tab (`MozaMBoosterRegistry.IsPedalsTabPassive`; first passive
+pedal per role wins; never while plain CRP/SRP pedals hold the pedal slot).
+The active pedal stays on the mBooster tab. A passive pedal set to Disabled
+has no Pedals-tab group, so it stays on the mBooster tab to be reassigned.
+
+Storage stays the pedal's mBooster config (`Direction`/`Min`/`Max` plus
+`HardwareCurveY`), so the connect-time apply replays it and both USB and
+routed lanes work. Writes go through the controller to
+`TryCalibDeviceForAxis`, parked like every other calibration write:
+
+| Pedals-tab control | Wire |
+| ------------------ | ---- |
+| Reverse direction  | `mbooster-{role}-dir` |
+| Range start / end  | `mbooster-{role}-min` / `-max` (0–100 %, as `pedals-*`) |
+| Output curve       | `mbooster-{role}-y1..y5` (float, write group 36) |
+| Start calibration  | `mbooster-{role}-cal-start`, then `-cal-stop` after the countdown, **param 1** |
+
+The calibration uses the CRP pedals-bus param 1, not the `0x0000` Pit House
+sends for the motor sweep; no capture of a passive-pedal calibration on an
+mBooster exists. Sensor Ratio is hidden (brake-named singleton). The
+host-side Sim Input Mapping curve (`CurveY`) is not applied to these axes —
+it has no editor there, and the device-side curve replaces it.
+
 **The presence read (`mbooster-presence`) carries no chain information.**
 Three distinct topologies all returned raw `[00 02]`: a confirmed
 standalone 3-axis unit, a standalone 4-axis unit, and the 2-pedal-chain
@@ -2021,7 +2050,9 @@ rather than deleting it:
   breakpoints). Removed once it became clear the output curve is purely
   host-side (see above) — the confirmed capture evidence for these 15
   commands existing is not in question, only whether AZOM's output curve
-  should be sending them, and it turns out it shouldn't.
+  should be sending them, and it turns out it shouldn't. The write side is
+  back for one consumer: a passive pedal's Pedals-tab curve (see
+  [Passive pedals are configured from the Pedals tab](#passive-pedals-are-configured-from-the-pedals-tab-bug-report-rcpwvwq5)).
 - **`curve7`** (`0xAB` selectors `0x01`-`0x06`, cmdId shared with the
   entirely separate Deadzone/Max Force/Pedal-Feel-curve family at
   selectors `0x07`-`0x0E` above) — at the time, EXPERIMENTAL/unconfirmed:

@@ -17,6 +17,9 @@ All notable changes to the AZOM plugin are documented here.
 - **A shifter that never reports its settings is no longer written to.** Its stored values
   can't be read back, so the profile is held rather than committed blind to its EEPROM.
 
+- **Passive pedals on an mBooster moved to the Pedals tab.** A CRP2 throttle or clutch
+  wired to an mBooster gets the normal range, curve and calibration controls again.
+
 ## [1.6.1]
 
 ### Added

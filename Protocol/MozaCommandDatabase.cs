@@ -780,32 +780,29 @@ namespace MozaPlugin.Protocol
             // calibration; each costs a ~4.6s CDC outage followed by a full
             // identity re-probe and config re-push.
             AddCommand("mbooster-soft-reboot", "mbooster", 0xFF, 1, new byte[] { 2 }, 0, "int");
-            // The per-role 5-point output curve commands (cmdIds 14-29,
-            // mbooster-{throttle,brake,clutch}-y1..y5) lost their WRITE side —
-            // the Sim Input Mapping output curve is purely host-side, with no
-            // wire encoding at all; see docs/protocol/devices/mbooster.md
-            // "Sim Input Mapping" for the historical writeup. They are still
-            // registered READ-ONLY (write group 0xFF) because real Pit House
-            // reads all fifteen every cycle (`7e 05 23 12 0e 00 00 00 00` …),
-            // and RequestCalibrationReads has been asking for them by name
-            // since before the removal — with no entry those fifteen reads
-            // were silently dropped by SendRead. Note the non-contiguous y5
-            // ids (0x1B/0x1C/0x1D), which straddle angle-ratio at 0x1A.
-            AddCommand("mbooster-throttle-y1", "mbooster", 35, 0xFF, new byte[] { 0x0E }, 4, "float");
-            AddCommand("mbooster-throttle-y2", "mbooster", 35, 0xFF, new byte[] { 0x0F }, 4, "float");
-            AddCommand("mbooster-throttle-y3", "mbooster", 35, 0xFF, new byte[] { 0x10 }, 4, "float");
-            AddCommand("mbooster-throttle-y4", "mbooster", 35, 0xFF, new byte[] { 0x11 }, 4, "float");
-            AddCommand("mbooster-throttle-y5", "mbooster", 35, 0xFF, new byte[] { 0x1B }, 4, "float");
-            AddCommand("mbooster-brake-y1",    "mbooster", 35, 0xFF, new byte[] { 0x12 }, 4, "float");
-            AddCommand("mbooster-brake-y2",    "mbooster", 35, 0xFF, new byte[] { 0x13 }, 4, "float");
-            AddCommand("mbooster-brake-y3",    "mbooster", 35, 0xFF, new byte[] { 0x14 }, 4, "float");
-            AddCommand("mbooster-brake-y4",    "mbooster", 35, 0xFF, new byte[] { 0x15 }, 4, "float");
-            AddCommand("mbooster-brake-y5",    "mbooster", 35, 0xFF, new byte[] { 0x1C }, 4, "float");
-            AddCommand("mbooster-clutch-y1",   "mbooster", 35, 0xFF, new byte[] { 0x16 }, 4, "float");
-            AddCommand("mbooster-clutch-y2",   "mbooster", 35, 0xFF, new byte[] { 0x17 }, 4, "float");
-            AddCommand("mbooster-clutch-y3",   "mbooster", 35, 0xFF, new byte[] { 0x18 }, 4, "float");
-            AddCommand("mbooster-clutch-y4",   "mbooster", 35, 0xFF, new byte[] { 0x19 }, 4, "float");
-            AddCommand("mbooster-clutch-y5",   "mbooster", 35, 0xFF, new byte[] { 0x1D }, 4, "float");
+            // The per-role 5-point output curve (cmdIds 14-29,
+            // mbooster-{throttle,brake,clutch}-y1..y5) — byte-identical to
+            // pedals-*-y1..y5. The mBooster tab's Sim Input Mapping curve is
+            // host-side and never writes these; the Pedals tab writes them for
+            // a PASSIVE pedal an mBooster hosts, same as it does for CRP pedals.
+            // Real Pit House reads all fifteen every cycle. Note the
+            // non-contiguous y5 ids (0x1B/0x1C/0x1D), which straddle
+            // angle-ratio at 0x1A.
+            AddCommand("mbooster-throttle-y1", "mbooster", 35, 36, new byte[] { 0x0E }, 4, "float");
+            AddCommand("mbooster-throttle-y2", "mbooster", 35, 36, new byte[] { 0x0F }, 4, "float");
+            AddCommand("mbooster-throttle-y3", "mbooster", 35, 36, new byte[] { 0x10 }, 4, "float");
+            AddCommand("mbooster-throttle-y4", "mbooster", 35, 36, new byte[] { 0x11 }, 4, "float");
+            AddCommand("mbooster-throttle-y5", "mbooster", 35, 36, new byte[] { 0x1B }, 4, "float");
+            AddCommand("mbooster-brake-y1",    "mbooster", 35, 36, new byte[] { 0x12 }, 4, "float");
+            AddCommand("mbooster-brake-y2",    "mbooster", 35, 36, new byte[] { 0x13 }, 4, "float");
+            AddCommand("mbooster-brake-y3",    "mbooster", 35, 36, new byte[] { 0x14 }, 4, "float");
+            AddCommand("mbooster-brake-y4",    "mbooster", 35, 36, new byte[] { 0x15 }, 4, "float");
+            AddCommand("mbooster-brake-y5",    "mbooster", 35, 36, new byte[] { 0x1C }, 4, "float");
+            AddCommand("mbooster-clutch-y1",   "mbooster", 35, 36, new byte[] { 0x16 }, 4, "float");
+            AddCommand("mbooster-clutch-y2",   "mbooster", 35, 36, new byte[] { 0x17 }, 4, "float");
+            AddCommand("mbooster-clutch-y3",   "mbooster", 35, 36, new byte[] { 0x18 }, 4, "float");
+            AddCommand("mbooster-clutch-y4",   "mbooster", 35, 36, new byte[] { 0x19 }, 4, "float");
+            AddCommand("mbooster-clutch-y5",   "mbooster", 35, 36, new byte[] { 0x1D }, 4, "float");
             // Live outputs (read-only group 37) — fallback live-position source
             // if HID identity pairing fails on a particular unit.
             AddCommand("mbooster-throttle-output", "mbooster", 37, 0xFF, new byte[] { 1 }, 2, "int");

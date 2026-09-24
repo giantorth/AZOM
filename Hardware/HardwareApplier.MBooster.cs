@@ -106,6 +106,11 @@ namespace MozaPlugin.Hardware
                 // pushed here — purely host-side now, no wire command at
                 // all (see MozaMBoosterRegistry.EvaluateCurveArbitraryX and
                 // docs/protocol/devices/mbooster.md "Sim Input Mapping").
+                // HardwareCurveY is a passive pedal's Pedals-tab curve.
+                var hwCurve = cfg.HardwareCurveY;
+                if (hwCurve != null && hwCurve.Length == 5)
+                    for (int i = 0; i < 5; i++)
+                        controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", hwCurve[i], dev);
                 // Travel / End Stop / Natural Friction / Segmented Damping are
                 // load-cell + motor Pedal Feel features living on brake-named
                 // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no
