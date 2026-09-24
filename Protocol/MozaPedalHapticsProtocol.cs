@@ -124,42 +124,35 @@ namespace MozaPlugin.Protocol
         public const int SlotsPerPedal = 9;
 
         /// <summary>
-        /// Slots the plugin treats as an interchangeable pool: 0..7. Every one of
-        /// them takes the same duration/frequency/strength and, on hardware,
-        /// produces the same vibration — the firmware names them after game
-        /// events but synthesizes nothing from those names, so which slot an
-        /// effect lands on does not matter. That is what makes round-robin
-        /// allocation safe.
+        /// ShakeIt channels a pedal's device exposes, one per interchangeable
+        /// hardware oscillator (slots 0..7). They exist so each SimHub effect can
+        /// own a separate oscillator rather than being summed into one tone — the
+        /// firmware mixes the slots itself, at their own frequencies.
         ///
-        /// <see cref="PedalHapticsEffectSlot.RoadTexture"/> is deliberately
-        /// excluded: it takes a suspension position instead of a frequency and
-        /// cannot stand in for a tone.
+        /// The user never picks one: the provider assigns each new effect the
+        /// next channel in rotation when it is created, wrapping once all eight
+        /// are spoken for. Which slot an effect lands on does not matter, because
+        /// every slot produces the same vibration.
+        ///
+        /// <see cref="PedalHapticsEffectSlot.RoadTexture"/> (slot 8) is not one
+        /// of them: it takes a suspension position rather than a tone.
         /// </summary>
-        public const int SlotPoolSize = 8;
+        public const int ChannelsPerPedal = 8;
 
-        /// <summary>The one slot outside the pool.</summary>
+        /// <summary>The slot outside the tone set. Not driven from ShakeIt; see BuildRoadTextureFrame.</summary>
         public const byte RoadTextureSlot = (byte)PedalHapticsEffectSlot.RoadTexture;
 
-        /// <summary>
-        /// Generic ShakeIt channels offered per pedal. Deliberately larger than
-        /// <see cref="SlotPoolSize"/>: the user can build as many ShakeIt effects
-        /// as they like, and channels are routing destinations rather than
-        /// hardware, so the allocator packs whichever are live into the eight
-        /// real oscillators and shares them past that.
-        /// </summary>
-        public const int GenericChannelsPerPedal = 16;
+        /// <summary>Channel index to hardware slot — one to one, a channel IS an oscillator.</summary>
+        public static byte SlotForChannel(int channel)
+        {
+            if (channel < 0) return 0;
+            if (channel >= ChannelsPerPedal) return (byte)(ChannelsPerPedal - 1);
+            return (byte)channel;
+        }
 
-        /// <summary>Channels a pedal's device exposes: the generic pool plus Road Texture.</summary>
-        public const int ChannelsPerPedal = GenericChannelsPerPedal + 1;
-
-        /// <summary>Index of the Road Texture channel within a pedal's channel list.</summary>
-        public const int RoadTextureChannel = GenericChannelsPerPedal;
-
-        /// <summary>True for the one channel that drives <see cref="RoadTextureSlot"/> rather than the pool.</summary>
-        public static bool IsRoadTextureChannel(int channel) => channel == RoadTextureChannel;
-
-        /// <summary>Slot ids in the round-robin pool.</summary>
-        public static byte PoolSlot(int index) => (byte)(((index % SlotPoolSize) + SlotPoolSize) % SlotPoolSize);
+        /// <summary>Next channel in rotation, for auto-assigning a newly created effect.</summary>
+        public static int RotateChannel(int counter)
+            => ((counter % ChannelsPerPedal) + ChannelsPerPedal) % ChannelsPerPedal;
 
         /// <summary>Pedal label with a leading capital, for device and channel names.</summary>
         public static string PedalLabel(byte pedal) => pedal switch
@@ -170,14 +163,9 @@ namespace MozaPlugin.Protocol
             _ => "Pedal " + pedal,
         };
 
-        /// <summary>
-        /// ShakeIt channel name within one pedal's device. Generic channels are
-        /// numbered rather than named after the firmware's slot labels — those
-        /// labels promise behaviour the hardware does not deliver, and with
-        /// round-robin allocation a channel does not own a fixed slot anyway.
-        /// </summary>
-        public static string ChannelName(int channel)
-            => IsRoadTextureChannel(channel) ? "Road Texture" : "Effect " + (channel + 1);
+        /// <summary>Channel name. Numbered, because effects are placed on them
+        /// automatically and the number is not meant to mean anything.</summary>
+        public static string ChannelName(int channel) => "Oscillator " + (channel + 1);
 
         /// <summary>Accepted frequency band. Values outside it are clamped, not rejected.</summary>
         public const int MinFrequencyHz = 10;

@@ -71,6 +71,7 @@ namespace MozaPlugin.UI
                 ConnectionToggle.IsChecked = plugin.ConnectionEnabled;
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
+                Ab9DetectionCheck.IsChecked = plugin.Settings.Ab9DetectionEnabled;
                 SyncWheelbaseLfeSourceCombo();
                 SyncAutoStandbyCombo();
                 int kaSec = plugin.Settings.WheelKeepaliveTimeoutSec;

@@ -71,6 +71,34 @@ jobs:
           fail_on_unmatched_files: true
           files: ${{ env.ReleaseFileName }}
 
+      - name: Checkout unwrap tool
+        uses: actions/checkout@v5
+        with:
+          path: src
+          sparse-checkout: tools/unwrap_markdown.py
+          sparse-checkout-cone-mode: false
+
+      # GitHub and Discord render every newline as a break, so the
+      # hard-wrapped CHANGELOG text pasted as the body shows ragged.
+      - name: Unwrap release body
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.id')
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${id}" --jq '.body // ""' > body.md
+          python3 src/tools/unwrap_markdown.py < body.md > body.unwrapped.md
+          if cmp -s body.md body.unwrapped.md; then
+            echo "Release body already unwrapped."
+            exit 0
+          fi
+          jq -n --rawfile body body.unwrapped.md '{body: $body}' \
+            | gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${id}" --input - > /dev/null
+          echo "Release body unwrapped."
+
       - name: Repoint dev-latest shepherd release
         continue-on-error: true
         env:
@@ -96,6 +124,7 @@ jobs:
         env:
           DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
           DISCORD_DEV_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_RELEASE_ROLE_ID: ${{ vars.DISCORD_RELEASE_ROLE_ID }}
           TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -137,7 +166,7 @@ jobs:
             }')
 
           post_discord() {
-            local name="$1" url="$2"
+            local name="$1" url="$2" body="$3"
             if [ -z "$url" ]; then
               echo "$name: webhook not set, skipping."
               return 0
@@ -146,13 +175,13 @@ jobs:
             response_file=$(mktemp)
             http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
               -H "Content-Type: application/json" \
-              -X POST -d "$payload" "$url") || http_code="000"
+              -X POST -d "$body" "$url") || http_code="000"
             if [[ "$http_code" =~ ^2[0-9][0-9]$ ]]; then
               echo "$name: notification sent (HTTP $http_code)."
             else
               echo "::warning::$name: notification failed (HTTP $http_code)"
               echo "Payload:"
-              echo "$payload"
+              echo "$body"
               echo "Response body:"
               cat "$response_file" || true
               echo
@@ -160,5 +189,13 @@ jobs:
             rm -f "$response_file"
           }
 
-          post_discord "release channel" "${DISCORD_RELEASE_WEBHOOK_URL:-}"
-          post_discord "dev channel"     "${DISCORD_DEV_WEBHOOK_URL:-}"
+          # Role mentions only ping from `content`, never from an embed.
+          release_payload="$payload"
+          if [ -n "${DISCORD_RELEASE_ROLE_ID:-}" ]; then
+            release_payload=$(jq --arg role "$DISCORD_RELEASE_ROLE_ID" \
+              '. + {content: ("<@&" + $role + ">"), allowed_mentions: {roles: [$role]}}' \
+              <<<"$payload")
+          fi
+
+          post_discord "release channel" "${DISCORD_RELEASE_WEBHOOK_URL:-}" "$release_payload"
+          post_discord "dev channel"     "${DISCORD_DEV_WEBHOOK_URL:-}"     "$payload"

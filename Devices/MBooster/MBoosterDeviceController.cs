@@ -1028,6 +1028,38 @@ namespace MozaPlugin.Devices.MBooster
             lock (_statusLock) _statusRegs[$"{device:x2}:{name}"] = value;
         }
 
+        // Latest read-back / write-echo of each per-role output register
+        // (dir, min, max, y1..y5), keyed "<dev hex>:<command name>". Seeds the
+        // Pedals tab for a passive pedal the profile holds no override for.
+        private readonly System.Collections.Generic.Dictionary<string, int> _outputRegs =
+            new System.Collections.Generic.Dictionary<string, int>();
+
+        private static bool IsOutputRegister(string name)
+        {
+            if (!name.StartsWith("mbooster-", StringComparison.Ordinal)) return false;
+            int dash = name.LastIndexOf('-');
+            if (dash < 0) return false;
+            string field = name.Substring(dash + 1);
+            string role = name.Substring(9, dash - 9);
+            if (role != "throttle" && role != "brake" && role != "clutch") return false;
+            return field == "dir" || field == "min" || field == "max"
+                || (field.Length == 2 && field[0] == 'y' && field[1] >= '1' && field[1] <= '5');
+        }
+
+        private void StoreOutputRegister(byte device, string name, int value)
+        {
+            if (!IsOutputRegister(name)) return;
+            lock (_statusLock) _outputRegs[$"{device:x2}:{name}"] = value;
+        }
+
+        /// <summary>Device-reported value of a per-role output register on
+        /// <paramref name="device"/>, or -1 if it hasn't answered yet.</summary>
+        public int OutputRegisterValue(byte device, string name)
+        {
+            lock (_statusLock)
+                return _outputRegs.TryGetValue($"{device:x2}:{name}", out var v) ? v : -1;
+        }
+
         /// <summary>Snapshot of the status registers for the diagnostics dump,
         /// keyed "&lt;dev hex&gt;:&lt;command name&gt;".</summary>
         public System.Collections.Generic.Dictionary<string, int> StatusRegisters()
@@ -1332,6 +1364,7 @@ namespace MozaPlugin.Devices.MBooster
                     // 0xB4 / motor-locate status back through this branch, not
                     // the host arm below.
                     StoreStatusRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
+                    StoreOutputRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
                     StoreUnitIdentity((byte)unswapped, probe.Value.Name, probe.Value.ArrayValue);
                 }
                 // Log each distinct READ response once; write-echoes change with
@@ -1416,6 +1449,7 @@ namespace MozaPlugin.Devices.MBooster
                         DeviceReportedMaxThresholdKg =
                             (float)MozaMBoosterProtocol.DecodeThresholdKg(r.IntValue);
                     StoreStatusRegister(HostDeviceId, r.Name, r.IntValue);
+                    StoreOutputRegister(HostDeviceId, r.Name, r.IntValue);
                     StoreCalib(HostDeviceId, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
                     break;

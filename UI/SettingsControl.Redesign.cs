@@ -618,9 +618,12 @@ namespace MozaPlugin.UI
         private void PedalSelector_Brake_Click(object sender, RoutedEventArgs e) => SelectPedalGroup("brake");
         private void PedalSelector_Clutch_Click(object sender, RoutedEventArgs e) => SelectPedalGroup("clutch");
 
+        private string _pedalGroup = "throttle";
+
         private void SelectPedalGroup(string which)
         {
             if (ThrottlePedalGroup == null || BrakePedalGroup == null || ClutchPedalGroup == null) return;
+            _pedalGroup = which;
             ThrottlePedalGroup.Visibility = which == "throttle" ? Visibility.Visible : Visibility.Collapsed;
             BrakePedalGroup.Visibility    = which == "brake"    ? Visibility.Visible : Visibility.Collapsed;
             ClutchPedalGroup.Visibility   = which == "clutch"   ? Visibility.Visible : Visibility.Collapsed;

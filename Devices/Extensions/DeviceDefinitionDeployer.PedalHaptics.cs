@@ -18,8 +18,16 @@ namespace MozaPlugin.Devices.Extensions
         private static string PedalHapticsDeviceName(byte pedal)
             => "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel(pedal);
 
-        /// <summary>The single all-pedals device this replaced; removed on deploy.</summary>
-        private const string LegacyPedalHapticsDeviceName = "MOZA S12 Pedal Vibration";
+        /// <summary>
+        /// Single all-pedals devices this replaced, removed on deploy. Two names
+        /// because the device was renamed mid-development and a pre-release build
+        /// went out under each; neither can route anywhere now.
+        /// </summary>
+        private static readonly string[] LegacyPedalHapticsDeviceNames =
+        {
+            "MOZA S12 Pedal Vibration",
+            "MOZA Pedal Haptics",
+        };
 
         /// <summary>Product-render key under DeviceTemplates/Thumbnails, deployed as a thumbnail.png sidecar.</summary>
         private const string PedalHapticsThumbnailKey = "S12";
@@ -30,7 +38,7 @@ namespace MozaPlugin.Devices.Extensions
         /// otherwise-unchanged file. v3: one device per motor port, each with its
         /// own channel list, replacing the single 27-channel device.
         /// </summary>
-        private const int GeneratedPedalHapticsSchemaVersion = 3;
+        private const int GeneratedPedalHapticsSchemaVersion = 4;
 
         /// <summary>
         /// Write (or refresh) one definition per motor port, once a unit is
@@ -107,19 +115,22 @@ namespace MozaPlugin.Devices.Extensions
         /// </summary>
         private static void RemoveLegacyPedalHapticsDefinition()
         {
-            try
+            foreach (var name in LegacyPedalHapticsDeviceNames)
             {
-                var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    "DevicesDefinitions", "User", LegacyPedalHapticsDeviceName);
-                if (!File.Exists(Path.Combine(dir, "device.json"))) return;
+                try
+                {
+                    var dir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                        "DevicesDefinitions", "User", name);
+                    if (!File.Exists(Path.Combine(dir, "device.json"))) continue;
 
-                Directory.Delete(dir, recursive: true);
-                MozaLog.Info($"[AZOM] Removed the superseded '{LegacyPedalHapticsDeviceName}' definition "
-                           + "(replaced by one device per pedal; restart SimHub to drop the entry)");
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Warn($"[AZOM] Could not remove '{LegacyPedalHapticsDeviceName}': {ex.Message}");
+                    Directory.Delete(dir, recursive: true);
+                    MozaLog.Info($"[AZOM] Removed the superseded '{name}' definition "
+                               + "(replaced by one device per pedal; restart SimHub to drop the entry)");
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] Could not remove '{name}': {ex.Message}");
+                }
             }
         }
 

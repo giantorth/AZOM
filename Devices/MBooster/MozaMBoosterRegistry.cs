@@ -52,6 +52,7 @@ namespace MozaPlugin.Devices.MBooster
         private readonly Action<string, bool[]>? _onConnectivityResolved;
         private readonly Func<string, byte[]?>? _chainRolesSeedLookup;
         private readonly Action<string, byte[]>? _onChainRolesResolved;
+        private readonly Func<bool>? _pedalSlotDetected;
 
         // Highest merged position (0..100) each role has reached this session —
         // diagnostics-only, so a support bundle can prove whether pedal input
@@ -91,6 +92,69 @@ namespace MozaPlugin.Devices.MBooster
                 lock (_lock)
                     return _order.Any(c => c.IsRouted && c.HostDeviceId == MozaProtocol.DevicePedals);
             }
+        }
+
+        /// <summary>
+        /// Whether this axis is a PASSIVE pedal (no motor — e.g. a CRP2
+        /// throttle/clutch an mBooster hosts) that the Pedals tab configures
+        /// instead of the mBooster tab. Such a pedal has no Pedal Feel, effects
+        /// or motor calibration; what it does have — direction, range, the
+        /// 5-point output curve and the pot calibration — is the CRP pedal
+        /// surface. Requires the complete type verdict and a role; the first
+        /// passive pedal per role wins, so two lanes can't both claim one
+        /// Pedals-tab group. False while real CRP/SRP pedals own the pedal slot.
+        /// Lock-free: the HID path asks this per report.
+        /// </summary>
+        public bool IsPedalsTabPassive(MBoosterDeviceController c, int axisIndex)
+        {
+            if (c == null) return false;
+            int role = PassiveRoleIndex(c, axisIndex);
+            if (role < 0 || PedalSlotHoldsPlainPedals()) return false;
+            foreach (var d in _orderSnapshot)
+            {
+                int n = d.AxisSlotCount;
+                for (int a = 0; a < n; a++)
+                    if (PassiveRoleIndex(d, a) == role)
+                        return ReferenceEquals(d, c) && a == axisIndex;
+            }
+            return false;
+        }
+
+        /// <summary>Every <see cref="IsPedalsTabPassive"/> pedal, indexed by
+        /// role (0 Throttle, 1 Brake, 2 Clutch); null where no passive pedal
+        /// holds that role.</summary>
+        public (MBoosterDeviceController Controller, int Axis)?[] PedalsTabPassivePedals()
+        {
+            var result = new (MBoosterDeviceController, int)?[3];
+            if (PedalSlotHoldsPlainPedals()) return result;
+            foreach (var d in _orderSnapshot)
+            {
+                int n = d.AxisSlotCount;
+                for (int a = 0; a < n; a++)
+                {
+                    int role = PassiveRoleIndex(d, a);
+                    if (role >= 0 && result[role] == null) result[role] = (d, a);
+                }
+            }
+            return result;
+        }
+
+        // AnyRoutedPedalLane over the lock-free snapshot — the HID path calls this.
+        private bool PedalSlotHoldsPlainPedals()
+        {
+            if (!(_pedalSlotDetected?.Invoke() ?? false)) return false;
+            foreach (var c in _orderSnapshot)
+                if (c.IsRouted && c.HostDeviceId == MozaProtocol.DevicePedals) return false;
+            return true;
+        }
+
+        private static int PassiveRoleIndex(MBoosterDeviceController c, int axisIndex)
+        {
+            var types = c.AxisTypes;
+            if (types == null || !c.AxisTypesComplete) return -1;
+            if (axisIndex < 0 || axisIndex >= types.Length || types[axisIndex] != 2) return -1;
+            if (!c.IsAxisConnected(axisIndex)) return -1;
+            return c.RoleIndexForAxis(axisIndex);
         }
 
         /// <summary>Snapshot of all known controllers in enumeration order.</summary>
@@ -147,7 +211,8 @@ namespace MozaPlugin.Devices.MBooster
             Func<string, bool[]?>? connectivitySeedLookup = null,
             Action<string, bool[]>? onConnectivityResolved = null,
             Func<string, byte[]?>? chainRolesSeedLookup = null,
-            Action<string, byte[]>? onChainRolesResolved = null)
+            Action<string, byte[]>? onChainRolesResolved = null,
+            Func<bool>? pedalSlotDetected = null)
         {
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
@@ -159,6 +224,7 @@ namespace MozaPlugin.Devices.MBooster
             _onConnectivityResolved = onConnectivityResolved;
             _chainRolesSeedLookup = chainRolesSeedLookup;
             _onChainRolesResolved = onChainRolesResolved;
+            _pedalSlotDetected = pedalSlotDetected;
         }
 
         /// <summary>
@@ -589,7 +655,10 @@ namespace MozaPlugin.Devices.MBooster
                 // also mirrored to LastRawPercentPreCurve for legacy callers).
                 if (axisIndex < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[axisIndex] = posPct;
                 if (axisIndex == 0) c.LastRawPercentPreCurve = posPct;
-                if (cfg.CurveY != null && cfg.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount)
+                // A Pedals-tab passive pedal shapes on the device
+                // (HardwareCurveY); the host-side curve has no editor there.
+                if (cfg.CurveY != null && cfg.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount
+                    && !IsPedalsTabPassive(c, axisIndex))
                     posPct = EvaluateCurveArbitraryX(cfg.CurveX ?? DefaultCurveX, cfg.CurveY, posPct);
             }
             else

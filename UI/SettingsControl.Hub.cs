@@ -61,17 +61,21 @@ namespace MozaPlugin.UI
         private void ApplyPedalCurvePreset(string pedal, int[] curve, int[] dataArray,
             Slider[] sliders, TextBox[] labels)
         {
+            var passive = PassivePedalFor(pedal);
             using (_suppressor.Begin())
             {
                 for (int i = 0; i < 5; i++)
                 {
                     sliders[i].Value = curve[i];
                     labels[i].Text = $"{curve[i]}";
-                    dataArray[i] = curve[i];
+                    if (passive == null) dataArray[i] = curve[i];
                 }
             }
-            for (int i = 0; i < 5; i++)
-                _plugin.HardwareApplier.WriteFloatIfPedalsDetected($"pedals-{pedal}-y{i + 1}", curve[i]);
+            if (passive != null)
+                WritePassiveCurve(pedal, passive.Value, sliders);
+            else
+                for (int i = 0; i < 5; i++)
+                    _plugin.HardwareApplier.WriteFloatIfPedalsDetected($"pedals-{pedal}-y{i + 1}", curve[i]);
             _plugin.SaveSettings();
         }
 
@@ -94,53 +98,47 @@ namespace MozaPlugin.UI
         private void ClutchCurvePreset_Parabolic(object s, RoutedEventArgs e)   => ApplyPedalCurvePreset("clutch", PedalCurvePresets[3], _data.PedalsClutchCurve, _clutchCurveSliders!, _clutchCurveLabels!);
 
         // Throttle direction + range + curve sliders
-        private void ThrottleDirCheck_Click(object sender, RoutedEventArgs e) { if (_suppressEvents) return; int v = ThrottleDirCheck.IsChecked == true ? 1 : 0; _data.PedalsThrottleDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-dir", v); _plugin.SaveSettings(); }
-        private void ThrottleMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, ThrottleMinSlider, _data.PedalsThrottleMax, isMin: true, ThrottleMinValue, v => { _data.PedalsThrottleMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-min", v); });
-        private void ThrottleMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, ThrottleMaxSlider, _data.PedalsThrottleMin, isMin: false, ThrottleMaxValue, v => { _data.PedalsThrottleMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-max", v); });
-        private void ThrottleY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ThrottleY1Value, "", v => { _data.PedalsThrottleCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y1", v); });
-        private void ThrottleY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ThrottleY2Value, "", v => { _data.PedalsThrottleCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y2", v); });
-        private void ThrottleY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ThrottleY3Value, "", v => { _data.PedalsThrottleCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y3", v); });
-        private void ThrottleY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ThrottleY4Value, "", v => { _data.PedalsThrottleCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y4", v); });
-        private void ThrottleY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ThrottleY5Value, "", v => { _data.PedalsThrottleCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y5", v); });
+        private void ThrottleDirCheck_Click(object sender, RoutedEventArgs e) => PedalDirClick("throttle", ThrottleDirCheck, v => { _data.PedalsThrottleDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-dir", v); });
+        private void ThrottleMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("throttle", isMin: true, e.NewValue, ThrottleMinSlider, ThrottleMaxSlider, _data.PedalsThrottleMax, ThrottleMinValue, v => { _data.PedalsThrottleMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-min", v); });
+        private void ThrottleMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("throttle", isMin: false, e.NewValue, ThrottleMaxSlider, ThrottleMinSlider, _data.PedalsThrottleMin, ThrottleMaxValue, v => { _data.PedalsThrottleMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-max", v); });
+        private void ThrottleY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("throttle", e.NewValue, ThrottleY1Value, _throttleCurveSliders!, v => { _data.PedalsThrottleCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y1", v); });
+        private void ThrottleY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("throttle", e.NewValue, ThrottleY2Value, _throttleCurveSliders!, v => { _data.PedalsThrottleCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y2", v); });
+        private void ThrottleY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("throttle", e.NewValue, ThrottleY3Value, _throttleCurveSliders!, v => { _data.PedalsThrottleCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y3", v); });
+        private void ThrottleY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("throttle", e.NewValue, ThrottleY4Value, _throttleCurveSliders!, v => { _data.PedalsThrottleCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y4", v); });
+        private void ThrottleY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("throttle", e.NewValue, ThrottleY5Value, _throttleCurveSliders!, v => { _data.PedalsThrottleCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-throttle-y5", v); });
 
         // Throttle calibration
         private void ThrottleCalStartButton_Click(object sender, RoutedEventArgs e) =>
-            RunCalibrationCountdown(ThrottleCalStartButton, ThrottleCalStatus, Strings.Hint_CalibratePedal,
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-cal-start", 1),
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-throttle-cal-stop", 1));
+            StartPedalCalibration("throttle", ThrottleCalStartButton, ThrottleCalStatus);
 
         // Brake direction + range + curve sliders
-        private void BrakeDirCheck_Click(object sender, RoutedEventArgs e) { if (_suppressEvents) return; int v = BrakeDirCheck.IsChecked == true ? 1 : 0; _data.PedalsBrakeDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-dir", v); _plugin.SaveSettings(); }
+        private void BrakeDirCheck_Click(object sender, RoutedEventArgs e) => PedalDirClick("brake", BrakeDirCheck, v => { _data.PedalsBrakeDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-dir", v); });
         private void BrakeAngleRatioSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) { if (_suppressEvents) return; int v = (int)Math.Round(e.NewValue); BrakeAngleRatioValue.Text = $"{v}%"; _data.PedalsBrakeAngleRatio = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-angle-ratio", v); _plugin.SaveSettings(); }
-        private void BrakeMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, BrakeMinSlider, _data.PedalsBrakeMax, isMin: true, BrakeMinValue, v => { _data.PedalsBrakeMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-min", v); });
-        private void BrakeMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, BrakeMaxSlider, _data.PedalsBrakeMin, isMin: false, BrakeMaxValue, v => { _data.PedalsBrakeMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-max", v); });
-        private void BrakeY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, BrakeY1Value, "", v => { _data.PedalsBrakeCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y1", v); });
-        private void BrakeY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, BrakeY2Value, "", v => { _data.PedalsBrakeCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y2", v); });
-        private void BrakeY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, BrakeY3Value, "", v => { _data.PedalsBrakeCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y3", v); });
-        private void BrakeY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, BrakeY4Value, "", v => { _data.PedalsBrakeCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y4", v); });
-        private void BrakeY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, BrakeY5Value, "", v => { _data.PedalsBrakeCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y5", v); });
+        private void BrakeMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("brake", isMin: true, e.NewValue, BrakeMinSlider, BrakeMaxSlider, _data.PedalsBrakeMax, BrakeMinValue, v => { _data.PedalsBrakeMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-min", v); });
+        private void BrakeMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("brake", isMin: false, e.NewValue, BrakeMaxSlider, BrakeMinSlider, _data.PedalsBrakeMin, BrakeMaxValue, v => { _data.PedalsBrakeMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-max", v); });
+        private void BrakeY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("brake", e.NewValue, BrakeY1Value, _brakeCurveSliders!, v => { _data.PedalsBrakeCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y1", v); });
+        private void BrakeY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("brake", e.NewValue, BrakeY2Value, _brakeCurveSliders!, v => { _data.PedalsBrakeCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y2", v); });
+        private void BrakeY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("brake", e.NewValue, BrakeY3Value, _brakeCurveSliders!, v => { _data.PedalsBrakeCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y3", v); });
+        private void BrakeY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("brake", e.NewValue, BrakeY4Value, _brakeCurveSliders!, v => { _data.PedalsBrakeCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y4", v); });
+        private void BrakeY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("brake", e.NewValue, BrakeY5Value, _brakeCurveSliders!, v => { _data.PedalsBrakeCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-brake-y5", v); });
 
         // Brake calibration
         private void BrakeCalStartButton_Click(object sender, RoutedEventArgs e) =>
-            RunCalibrationCountdown(BrakeCalStartButton, BrakeCalStatus, Strings.Hint_CalibratePedal,
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-cal-start", 1),
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-brake-cal-stop", 1));
+            StartPedalCalibration("brake", BrakeCalStartButton, BrakeCalStatus);
 
         // Clutch direction + range + curve sliders
-        private void ClutchDirCheck_Click(object sender, RoutedEventArgs e) { if (_suppressEvents) return; int v = ClutchDirCheck.IsChecked == true ? 1 : 0; _data.PedalsClutchDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-dir", v); _plugin.SaveSettings(); }
-        private void ClutchMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, ClutchMinSlider, _data.PedalsClutchMax, isMin: true, ClutchMinValue, v => { _data.PedalsClutchMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-min", v); });
-        private void ClutchMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, ClutchMaxSlider, _data.PedalsClutchMin, isMin: false, ClutchMaxValue, v => { _data.PedalsClutchMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-max", v); });
-        private void ClutchY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ClutchY1Value, "", v => { _data.PedalsClutchCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y1", v); });
-        private void ClutchY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ClutchY2Value, "", v => { _data.PedalsClutchCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y2", v); });
-        private void ClutchY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ClutchY3Value, "", v => { _data.PedalsClutchCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y3", v); });
-        private void ClutchY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ClutchY4Value, "", v => { _data.PedalsClutchCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y4", v); });
-        private void ClutchY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, ClutchY5Value, "", v => { _data.PedalsClutchCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y5", v); });
+        private void ClutchDirCheck_Click(object sender, RoutedEventArgs e) => PedalDirClick("clutch", ClutchDirCheck, v => { _data.PedalsClutchDir = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-dir", v); });
+        private void ClutchMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("clutch", isMin: true, e.NewValue, ClutchMinSlider, ClutchMaxSlider, _data.PedalsClutchMax, ClutchMinValue, v => { _data.PedalsClutchMin = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-min", v); });
+        private void ClutchMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalRangeChanged("clutch", isMin: false, e.NewValue, ClutchMaxSlider, ClutchMinSlider, _data.PedalsClutchMin, ClutchMaxValue, v => { _data.PedalsClutchMax = v; _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-max", v); });
+        private void ClutchY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("clutch", e.NewValue, ClutchY1Value, _clutchCurveSliders!, v => { _data.PedalsClutchCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y1", v); });
+        private void ClutchY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("clutch", e.NewValue, ClutchY2Value, _clutchCurveSliders!, v => { _data.PedalsClutchCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y2", v); });
+        private void ClutchY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("clutch", e.NewValue, ClutchY3Value, _clutchCurveSliders!, v => { _data.PedalsClutchCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y3", v); });
+        private void ClutchY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("clutch", e.NewValue, ClutchY4Value, _clutchCurveSliders!, v => { _data.PedalsClutchCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y4", v); });
+        private void ClutchY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => PedalCurveChanged("clutch", e.NewValue, ClutchY5Value, _clutchCurveSliders!, v => { _data.PedalsClutchCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfPedalsDetected("pedals-clutch-y5", v); });
 
         // Clutch calibration
         private void ClutchCalStartButton_Click(object sender, RoutedEventArgs e) =>
-            RunCalibrationCountdown(ClutchCalStartButton, ClutchCalStatus, Strings.Hint_CalibratePedal,
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-cal-start", 1),
-                () => _plugin.HardwareApplier.WriteIfPedalsDetected("pedals-clutch-cal-stop", 1));
+            StartPedalCalibration("clutch", ClutchCalStartButton, ClutchCalStatus);
 
     }
 }

@@ -185,69 +185,57 @@ last-message repeat, not a per-effect trace.
 ## How the plugin uses this
 
 **One SimHub device per motor port** — `MOZA S12 Throttle`, `MOZA S12 Brake`,
-`MOZA S12 Clutch`. Each carries its own ShakeIt profile, effect defaults and
-channel list. Grouping all three into one device made the list unreadable and
-forced unrelated pedals to share one set of defaults.
+`MOZA S12 Clutch`, each with its own ShakeIt profile and effect defaults. A user
+assigns an effect to the pedal they want it on, and that is the whole setup.
 
-### Channels are routing destinations, not slots
+### Effects are assigned to oscillators automatically
 
-Each device exposes 16 generic channels plus Road Texture. That is deliberately
-more than the eight usable oscillators: a user can build as many ShakeIt effects
-as they like, so channels are places to route an effect to, and the worker maps
-whichever are live onto real slots.
+The channel grid is **not shown in SimHub**. Only two things call
+`IShakeItChannelsInfoProvider.GetChannels`, and they are separated by thread:
+the tone mixer (data thread, every tick) and the per-effect checkbox list (WPF
+thread, once when an effect's settings control is built). The 10 Hz preview timer
+only calls `UpdateEffectsPreview` and never reaches the mixer, so no output is
+ever driven from the UI thread. The provider therefore hands the mixer all eight
+oscillators and the UI none — the routing still happens, the user just never sees
+a grid to fill in. Internal code reads the real list directly; only SimHub's UI
+query gets the empty one.
 
-They are numbered rather than named after the firmware slot labels. Hardware
-testing confirmed **every slot produces the same vibration** — the ABS / Lockup /
-Gear Shift names describe nothing the firmware actually does — so naming channels
-after them promised behaviour that does not exist.
+Each device exposes eight ShakeIt channels, one per interchangeable hardware
+slot (0-7). Channel N drives slot N — that part is a plain address translation.
 
-### Allocation
+The round-robin sits above it and is what the user never sees: SimHub calls
+`LoadDefaultPlatformSettings` when an effect is created, and that hands the
+effect the next channel in rotation, wrapping after eight. So effects spread
+across the module's own mixer at their own frequencies instead of collapsing
+into one tone, and nobody opens the channel list to arrange it.
 
-A channel takes a slot when it goes active and keeps it until it goes silent, so
-a sustained effect never jumps oscillator mid-note. Slots come from a rotating
-cursor, so sharing spreads out instead of piling onto slot 0:
+Two properties worth keeping in mind:
 
-| Active channels | Result |
-|---|---|
-| 1-8 | one slot each, nothing shared |
-| 9+ | latecomers share a slot; gains sum (clamped), frequency is their gain-weighted mean |
+- **Assignment happens at creation, not at activation.** With more than eight
+  effects on a pedal, effects 1 and 9 permanently share slot 0 even if they are
+  the only two that ever run together and the rest sit idle. True "next free
+  oscillator at fire time" is not reachable: `UpdateOutput` only ever hands over
+  one already-mixed value per channel, so individual effects are invisible at
+  runtime.
+- **Sharing is harmless.** ShakeIt sums the effects on a channel before the
+  value arrives, and the slots are interchangeable.
 
-Sharing cannot be faithful — the hardware takes one tone per slot — but summing
-keeps both effects audible rather than silently dropping the quieter one.
-
-This is only sound because the slots are interchangeable. If a future firmware
-gives them distinct behaviour, the allocator has to go.
+Road Texture (slot 8) is not one of the eight. It takes a suspension position
+rather than a tone, so it cannot serve as a general output;
+`BuildRoadTextureFrame` is kept for when there is a telemetry source worth
+wiring to it.
 
 ### Emission budget
 
-In practice few channels are live at once and each is serviced every 20 ms tick.
-The budget below exists so the pathological case degrades instead of breaking:
-refreshing all 27 hardware slots every tick would be 1350 frames/s, roughly
-23 kB/s — more than a 115200 link carries, and far more than a routed unit's
-share of a pipe already streaming telemetry.
-
-Slots are serviced round-robin under a per-tick budget of 8 frames: up to eight
-behave as if there were no budget, and all 27 still refresh every 80 ms —
-comfortably inside the 500 ms streamed duration. Releases are never budgeted, so
-a motor is never left running because the budget ran out.
+Three pedals x eight oscillators is 24 addressable outputs, but only live ones
+are sent. Releases go out unbudgeted — a dropped disable leaves a motor buzzing
+for the rest of its duration — and live ones are refreshed round-robin under a
+per-tick frame budget of 8. Even with all 24 live that is a 60 ms refresh
+against a 500 ms duration, and a peak of about 6.8 kB/s.
 
 Frames go on the paced one-shot FIFO rather than latest-wins stream lanes: every
 frame addresses a different pedal+slot, so coalescing by lane would drop one
 slot's update in favour of another's.
-
-### Road Texture
-
-Kept as its own named channel, outside the pool, because it cannot stand in for
-a tone: its frequency field is a suspension position and the firmware makes
-texture from that position *changing*. ShakeIt's gain is the part that varies
-with an effect, so it drives the position; the reported frequency would sit still
-and produce nothing.
-
-A steady effect on this channel therefore produces little or nothing. That is the
-hardware's design, not a bug — but see the duration note above: a build that
-sent duration 0 here (as the written spec says) had users report this slot as the
-only one that did nothing, so the plugin now sends a non-zero duration like Pit
-House does.
 
 ### Keepalive is mandatory on a dedicated lane
 

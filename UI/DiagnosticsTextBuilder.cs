@@ -138,7 +138,9 @@ namespace MozaPlugin.UI
                 ? Protocol.MozaUsbIds.ActiveShifterShortName(ab9Conn!.DiscoveredPid)
                 : "AB9/AB6");
             sb.Append(' ');
-            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port : "(disconnected)");
+            sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
+                      : plugin.Settings?.Ab9DetectionEnabled == false ? "(detection disabled)"
+                      : "(disconnected)");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");
@@ -326,7 +328,7 @@ namespace MozaPlugin.UI
                     // explain, which is how a role mix-up stays hidden.
                     sb.AppendLine($"        axes={d.AxisCount}  connected={d.ConnectedAxisCount}  roles=[{string.Join(", ", roleParts)}]");
                 }
-                AppendMBoosterPedalConfig(sb, d, s);
+                AppendMBoosterPedalConfig(sb, registry, d, s);
                 AppendMBoosterStatusRegisters(sb, d);
                 // Routed chain: which chained ids announced themselves, and
                 // whether they went on to ANSWER — the pair that decides
@@ -393,7 +395,7 @@ namespace MozaPlugin.UI
         /// this is the only place a bundle records what the user configured.
         /// </summary>
         private static void AppendMBoosterPedalConfig(
-            StringBuilder sb, MBoosterDeviceController d, Devices.MBooster.MBoosterDeviceSettings? s)
+            StringBuilder sb, MozaMBoosterRegistry registry, MBoosterDeviceController d, Devices.MBooster.MBoosterDeviceSettings? s)
         {
             var types = d.AxisTypes;
             sb.AppendLine(
@@ -425,7 +427,8 @@ namespace MozaPlugin.UI
                 string where = loc != null && roleIdx >= 0 && roleIdx < loc.Length
                     ? MBoosterDeviceController.LocalityLabel(loc[roleIdx]) + (d.RoleLocalityIsSeed ? "(seed)" : "")
                     : "?";
-                sb.AppendLine($"        ax{a} {role}/{type}/{where} → dev 0x{dev:x2}");
+                string tab = registry.IsPedalsTabPassive(d, a) ? "  [Pedals tab]" : "";
+                sb.AppendLine($"        ax{a} {role}/{type}/{where} → dev 0x{dev:x2}{tab}");
                 var cfg = MozaMBoosterRegistry.PeekPedalConfig(s, a, d.SoleConnectedAxis());
                 if (cfg == null) { sb.AppendLine("             (no config row)"); continue; }
                 sb.AppendLine(
@@ -434,7 +437,8 @@ namespace MozaPlugin.UI
                     $"dir={(cfg.Direction < 0 ? "—" : cfg.Direction.ToString())} " +
                     $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())} " +
                     $"max={(cfg.Max < 0 ? "—" : cfg.Max.ToString())} " +
-                    $"outCurve={(cfg.CurveY != null ? "set" : "—")}");
+                    $"outCurve={(cfg.CurveY != null ? "set" : "—")} " +
+                    $"hwCurve={(cfg.HardwareCurveY != null ? "set" : "—")}");
                 sb.AppendLine(
                     $"             pedalFeel: deadzone={cfg.DeadzoneKg.ToString("F1", CultureInfo.InvariantCulture)}kg " +
                     $"maxForce={cfg.MaxForceKg.ToString("F0", CultureInfo.InvariantCulture)}kg " +

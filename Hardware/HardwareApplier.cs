@@ -513,7 +513,9 @@ namespace MozaPlugin.Hardware
         // Written"), so the profile is not pushed blind at detect. Detect ARMS a
         // reconcile: the per-model settings reads go out as before, and each readback
         // adopts the device value, then writes the profile's value for that one setting
-        // only if it differs. Later profile applies and tab writes share the cache.
+        // only if it differs. A shifter that answers no read at all is never written by
+        // this path at all — see ShifterConnectPending. Later profile applies and tab
+        // writes share the cache.
         // Static like the base cache: a plugin reload reconstructs the applier and
         // re-applies the profile, and must not re-write what the shifter already holds.
         private static readonly System.Collections.Generic.Dictionary<string, long> s_shifterCfgCache
@@ -523,11 +525,20 @@ namespace MozaPlugin.Hardware
             = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
         private static readonly System.Collections.Generic.Dictionary<ShifterModelKind, long> s_shifterArmedTicks
             = new System.Collections.Generic.Dictionary<ShifterModelKind, long>();
+        // Models whose shifter has delivered at least one parsed settings readback since
+        // it was armed. That is the evidence that makes the grace below safe to act on:
+        // one missing reply from a talking device is a dropped frame, whereas a device
+        // that has answered NOTHING must not be configured blind (see ShifterConnectPending).
+        private static readonly System.Collections.Generic.HashSet<ShifterModelKind> s_shifterAnsweredAny
+            = new System.Collections.Generic.HashSet<ShifterModelKind>();
+        // Edge guard so the "not answering" notice is logged once per arm, not per apply.
+        private static readonly System.Collections.Generic.HashSet<ShifterModelKind> s_shifterSilentLogged
+            = new System.Collections.Generic.HashSet<ShifterModelKind>();
         // Leaf lock: readbacks land on the serial read/dispatch threads, applies on the
         // UI/profile thread and the reconnect tick. No I/O under it.
         private static readonly object s_shifterCfgLock = new object();
-        // A readback still missing this long after detect is treated as never coming;
-        // the next profile apply then writes that setting unconditionally.
+        // How long a setting waits for its connect-time readback before the apply path
+        // may write it. Only ever acted on for a shifter that has answered something.
         private const double ShifterReadbackGraceMs = 15_000.0;
 
         private static readonly string[] s_hgpProfileCommands =
@@ -580,27 +591,57 @@ namespace MozaPlugin.Hardware
             lock (s_shifterCfgLock)
             {
                 s_shifterArmedTicks[model] = System.DateTime.UtcNow.Ticks;
+                // Fresh connect, fresh evidence — this shifter has to prove again that it
+                // answers before the grace below can release a blind write.
+                s_shifterAnsweredAny.Remove(model);
+                s_shifterSilentLogged.Remove(model);
                 foreach (var cmd in ShifterProfileCommands(model))
                     s_shifterConnectPending.Add(ShifterCfgKey(model, cmd));
             }
         }
 
         /// <summary>True while this setting's connect-time readback is still due, so the
-        /// apply path leaves the write to the reconcile. Expires after
-        /// <see cref="ShifterReadbackGraceMs"/> so an unanswered read can't starve the setting.</summary>
+        /// apply path leaves the write to the reconcile.
+        ///
+        /// <para>After <see cref="ShifterReadbackGraceMs"/> the setting is released — but
+        /// ONLY for a shifter that has answered at least one settings read. From a talking
+        /// device a single missing reply is a dropped frame and the profile should still
+        /// land. A shifter that has answered nothing at all stays pending forever: writing
+        /// to it is an EEPROM commit aimed at a device whose current values we cannot see,
+        /// and bundle <c>W3H1TH2S</c> (2026-09-21) is what that looks like — a standalone
+        /// HGP that returned a zero-length payload to all 44 reads and had three settings
+        /// pushed into it anyway once the old timeout elapsed. The Shifter tab still writes
+        /// on user action, so such a device remains configurable by hand.</para></summary>
         private static bool ShifterConnectPending(ShifterModelKind model, string command)
         {
             string key = ShifterCfgKey(model, command);
+            bool pending, logSilent = false;
             lock (s_shifterCfgLock)
             {
                 if (!s_shifterConnectPending.Contains(key)) return false;
-                if (s_shifterArmedTicks.TryGetValue(model, out var armed)
+
+                bool withinGrace = s_shifterArmedTicks.TryGetValue(model, out var armed)
                     && (System.DateTime.UtcNow.Ticks - armed)
-                       < (long)(ShifterReadbackGraceMs * System.TimeSpan.TicksPerMillisecond))
-                    return true;
-                s_shifterConnectPending.Remove(key);
-                return false;
+                       < (long)(ShifterReadbackGraceMs * System.TimeSpan.TicksPerMillisecond);
+                if (withinGrace) return true;
+
+                if (s_shifterAnsweredAny.Contains(model))
+                {
+                    s_shifterConnectPending.Remove(key);
+                    pending = false;
+                }
+                else
+                {
+                    logSilent = s_shifterSilentLogged.Add(model);
+                    pending = true;
+                }
             }
+
+            if (logSilent)
+                MozaLog.Info($"[AZOM] {model} shifter has not answered any settings read — " +
+                    "holding back its profile writes (a device whose stored values can't be " +
+                    "read is not written blind); the Shifter tab still applies changes on request");
+            return pending;
         }
 
         /// <summary>Shifter settings readback (serial read/dispatch thread). The device
@@ -626,6 +667,9 @@ namespace MozaPlugin.Hardware
             lock (s_shifterCfgLock)
             {
                 s_shifterCfgCache[key] = deviceValue;
+                // Proof this shifter reports its stored values, which is what lets the
+                // grace in ShifterConnectPending release any reply that goes missing.
+                s_shifterAnsweredAny.Add(model);
                 reconcile = s_shifterConnectPending.Remove(key);
             }
             if (!reconcile) return;
@@ -1658,21 +1702,22 @@ namespace MozaPlugin.Hardware
         /// is detected/connected. A profile with no Ab9 block applies factory
         /// defaults so the device follows the active per-game profile (reset
         /// semantics) instead of retaining the previously-applied profile's
-        /// settings.
+        /// settings. Only settings that differ from what the AB9 holds are written
+        /// (see the reconcile in <see cref="MozaAb9DeviceManager"/>).
         /// </summary>
         public void ApplyAb9ToHardware(MozaProfile? profile)
         {
             if (!_detectionState.Ab9Detected || _ab9Manager == null || !_ab9Manager.IsConnected) return;
 
             var ab9 = profile?.Ab9 ?? new Ab9Settings();
-            _ab9Manager.SendInputMode(ab9.InputMode);
-            _ab9Manager.SendMode(ab9.Mode);
-            _ab9Manager.SendSlider(Ab9Slider.MechanicalResistance, ab9.MechanicalResistance);
-            _ab9Manager.SendSlider(Ab9Slider.Spring,               ab9.Spring);
-            _ab9Manager.SendSlider(Ab9Slider.NaturalDamping,       ab9.NaturalDamping);
-            _ab9Manager.SendSlider(Ab9Slider.NaturalFriction,      ab9.NaturalFriction);
-            _ab9Manager.SendSlider(Ab9Slider.MaxTorqueLimit,       ab9.MaxTorqueLimit);
-            _ab9Manager.SendGearShiftVibrationIntensity(ab9.GearShiftVibrationIntensity);
+            _ab9Manager.ApplyInputModeIfChanged(ab9.InputMode);
+            _ab9Manager.ApplyModeIfChanged(ab9.Mode);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.MechanicalResistance, ab9.MechanicalResistance);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.Spring,               ab9.Spring);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.NaturalDamping,       ab9.NaturalDamping);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.NaturalFriction,      ab9.NaturalFriction);
+            _ab9Manager.ApplySliderIfChanged(Ab9Slider.MaxTorqueLimit,       ab9.MaxTorqueLimit);
+            _ab9Manager.ApplyGearShiftVibrationIntensityIfChanged(ab9.GearShiftVibrationIntensity);
         }
 
         /// <summary>

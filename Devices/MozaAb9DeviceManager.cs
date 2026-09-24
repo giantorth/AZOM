@@ -237,9 +237,12 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Push the mechanical layout (5+R / 6+R / 7+R / Sequential) to the AB9.
         /// Single 8-byte CDC frame on group 0x1F with cmdId D3 00 + mode byte.
+        /// User-initiated: always written. Profile applies use
+        /// <see cref="ApplyModeIfChanged"/>.
         /// </summary>
         public bool SendMode(Ab9Mode mode)
         {
+            NoteUserWrite("ab9-mode", (byte)mode);
             return WriteSliderRaw("ab9-mode", (byte)mode);
         }
 
@@ -247,29 +250,206 @@ namespace MozaPlugin.Devices
         // (7E 02 1F 12 5D <val> chk). See ab9-shifter.md § Mode/online toggle.
         public bool SendInputMode(Ab9InputMode mode)
         {
+            NoteUserWrite("ab9-input-mode", (byte)mode);
             return WriteSliderRaw("ab9-input-mode", (byte)mode);
         }
 
         /// <summary>
         /// Push a slider value (0..100, clamped) to the AB9. Returns false if
         /// the connection is dead or the slider is not in the command database.
+        /// User-initiated: always written. Profile applies use
+        /// <see cref="ApplySliderIfChanged"/>.
         /// </summary>
         public bool SendSlider(Ab9Slider slider, int value0to100)
         {
             if (!SliderCommands.TryGetValue(slider, out var commandName))
                 return false;
             byte clamped = (byte)Math.Max(0, Math.Min(100, value0to100));
+            NoteUserWrite(commandName, clamped);
             return WriteSliderRaw(commandName, clamped);
+        }
+
+        // ── Profile apply: write-on-change against the AB9's own readback ──
+        // Layout and slider writes are parameter-store commits ("Table 8, Param N
+        // Written"), and a profile apply runs on every AB9 connect, base connect
+        // and game switch. The connect read burst arms a reconcile: each readback
+        // adopts the device value and writes the profile's value only if it
+        // differs. An AB9 that answers no settings read is never written blind.
+        // Same policy as the HGP/SGP cache in HardwareApplier.
+        // Input mode and gear-shift intensity have no trusted readback (0x5D reads
+        // as an online flag; the shift rumble lives in the per-boot effect table),
+        // so they go out once per port session. Keyed to IoGeneration.
+
+        private static readonly Dictionary<string, string> ReadbackToWrite =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                { "ab9-mode-read",             "ab9-mode" },
+                { "ab9-mech-resistance-read",  "ab9-mech-resistance" },
+                { "ab9-spring-read",           "ab9-spring" },
+                { "ab9-natural-damping-read",  "ab9-natural-damping" },
+                { "ab9-natural-friction-read", "ab9-natural-friction" },
+                { "ab9-max-torque-limit-read", "ab9-max-torque-limit" },
+            };
+        private const string GearShiftVibKey = "ab9-gearshift-vib";
+        // How long a setting waits for its connect-time readback before a profile
+        // apply may write it. Only acted on once the AB9 has answered some read.
+        private const double ReadbackGraceMs = 15_000.0;
+
+        // Leaf lock: readbacks land on the serial dispatch thread, applies on the
+        // UI/profile thread. No I/O under it.
+        private readonly object _cfgLock = new object();
+        private readonly Dictionary<string, int> _cfgKnown = new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly HashSet<string> _cfgPending = new HashSet<string>(StringComparer.Ordinal);
+        // Latest profile value for a setting still awaiting its readback.
+        private readonly Dictionary<string, int> _cfgWanted = new Dictionary<string, int>(StringComparer.Ordinal);
+        private int _cfgGeneration = -1;
+        private long _cfgArmedTicks;
+        private bool _cfgAnsweredAny;
+        private bool _cfgSilentLogged;
+
+        public bool ApplyModeIfChanged(Ab9Mode mode) =>
+            ApplyIfChanged("ab9-mode", (byte)mode);
+
+        public bool ApplyInputModeIfChanged(Ab9InputMode mode) =>
+            ApplyIfChanged("ab9-input-mode", (byte)mode);
+
+        public bool ApplySliderIfChanged(Ab9Slider slider, int value0to100)
+        {
+            if (!SliderCommands.TryGetValue(slider, out var commandName))
+                return false;
+            return ApplyIfChanged(commandName, (byte)Math.Max(0, Math.Min(100, value0to100)));
+        }
+
+        public bool ApplyGearShiftVibrationIntensityIfChanged(int intensity0to100)
+        {
+            int v = Math.Max(0, Math.Min(100, intensity0to100));
+            return ApplyIfChanged(GearShiftVibKey, v);
+        }
+
+        /// <summary>Settings readback (serial dispatch thread). The device value is
+        /// ground truth: adopt it, and if this setting's connect-time reconcile is
+        /// outstanding, write the latest applied profile value iff it differs.</summary>
+        public void NoteReadback(string? readName, int value)
+        {
+            if (readName == null || value < 0) return;
+            if (!ReadbackToWrite.TryGetValue(readName, out var command)) return;
+            int? reconcile = null;
+            lock (_cfgLock)
+            {
+                SyncCfgGeneration();
+                _cfgKnown[command] = value;
+                _cfgAnsweredAny = true;
+                if (_cfgPending.Remove(command) && _cfgWanted.TryGetValue(command, out var wanted))
+                {
+                    _cfgWanted.Remove(command);
+                    if (wanted != value)
+                    {
+                        _cfgKnown[command] = wanted;
+                        reconcile = wanted;
+                    }
+                }
+            }
+            if (reconcile.HasValue)
+                WriteCfg(command, reconcile.Value);
+        }
+
+        // Arms the reconcile for a fresh port session. Called as the read burst
+        // goes out, so every pending setting has a readback on the way.
+        private void ArmCfgReconcile()
+        {
+            lock (_cfgLock)
+            {
+                ResetCfg(_connection.IoGeneration);
+                _cfgArmedTicks = DateTime.UtcNow.Ticks;
+                foreach (var command in ReadbackToWrite.Values)
+                    _cfgPending.Add(command);
+            }
+        }
+
+        private bool ApplyIfChanged(string command, int value)
+        {
+            if (!_connection.IsConnected) return false;
+            bool write, logSilent = false;
+            lock (_cfgLock)
+            {
+                SyncCfgGeneration();
+                if (_cfgPending.Contains(command))
+                {
+                    bool withinGrace = (DateTime.UtcNow.Ticks - _cfgArmedTicks)
+                        < (long)(ReadbackGraceMs * TimeSpan.TicksPerMillisecond);
+                    if (withinGrace || !_cfgAnsweredAny)
+                    {
+                        // The readback reconciles it; hold the latest profile value.
+                        _cfgWanted[command] = value;
+                        if (!withinGrace && !_cfgSilentLogged)
+                            logSilent = _cfgSilentLogged = true;
+                        write = false;
+                    }
+                    else
+                    {
+                        // A talking device dropped this one reply: fall through.
+                        _cfgPending.Remove(command);
+                        _cfgWanted.Remove(command);
+                        write = !_cfgKnown.TryGetValue(command, out var known) || known != value;
+                    }
+                }
+                else
+                {
+                    write = !_cfgKnown.TryGetValue(command, out var known) || known != value;
+                }
+                if (write) _cfgKnown[command] = value;
+            }
+            if (logSilent)
+                MozaLog.Info($"[AZOM/AB9] {_modelName} has not answered any settings read — " +
+                    "holding back its profile writes (a device whose stored values can't be " +
+                    "read is not written blind); the AB9 tab still applies changes on request");
+            return write && WriteCfg(command, value);
+        }
+
+        private void NoteUserWrite(string command, int value)
+        {
+            lock (_cfgLock)
+            {
+                SyncCfgGeneration();
+                _cfgKnown[command] = value;
+                _cfgPending.Remove(command);
+                _cfgWanted.Remove(command);
+            }
+        }
+
+        private bool WriteCfg(string command, int value) =>
+            command == GearShiftVibKey
+                ? SendGearShiftVibrationIntensityRaw(value)
+                : WriteSliderRaw(command, (byte)value);
+
+        // Caller holds _cfgLock.
+        private void SyncCfgGeneration()
+        {
+            int generation = _connection.IoGeneration;
+            if (generation != _cfgGeneration) ResetCfg(generation);
+        }
+
+        // Caller holds _cfgLock.
+        private void ResetCfg(int generation)
+        {
+            _cfgGeneration = generation;
+            _cfgKnown.Clear();
+            _cfgPending.Clear();
+            _cfgWanted.Clear();
+            _cfgAnsweredAny = false;
+            _cfgSilentLogged = false;
         }
 
         /// <summary>
         /// Issue a read for every stored slider so the panel can populate from
-        /// device state. Each read goes out as a separate one-shot frame and
-        /// shares the connection's 4 ms pacing with the identity probe.
+        /// device state, and arm the profile-apply reconcile against the replies.
+        /// Each read goes out as a separate one-shot frame and shares the
+        /// connection's 4 ms pacing with the identity probe.
         /// </summary>
         public void RequestAllStoredSettings()
         {
             if (!_connection.IsConnected) return;
+            ArmCfgReconcile();
             // Reads use group 0x1E with a single-byte cmd-id payload — distinct
             // from the 0x1F + 3-byte-payload write format. See ab9-shifter.md
             // "Read group is 0x1E" section. PitHouse polls these continuously at
@@ -815,13 +995,20 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Push the stored gear-shift-vibration intensity (0..100) to the AB9.
         /// Goes through the one-shot FIFO so it preserves order against the
-        /// other slider writes that follow in <c>ApplySavedAb9Settings</c>.
+        /// other slider writes of a profile apply. User-initiated: always written.
+        /// Profile applies use <see cref="ApplyGearShiftVibrationIntensityIfChanged"/>.
         /// </summary>
         public bool SendGearShiftVibrationIntensity(int intensity0to100)
         {
-            if (!_connection.IsConnected) return false;
             if (intensity0to100 < 0) intensity0to100 = 0;
             if (intensity0to100 > 100) intensity0to100 = 100;
+            NoteUserWrite(GearShiftVibKey, intensity0to100);
+            return SendGearShiftVibrationIntensityRaw(intensity0to100);
+        }
+
+        private bool SendGearShiftVibrationIntensityRaw(int intensity0to100)
+        {
+            if (!_connection.IsConnected) return false;
             ushort raw = (ushort)Math.Round(intensity0to100 / 100.0 * MaxGearShiftIntensityRaw);
 
             var frame = new byte[24];

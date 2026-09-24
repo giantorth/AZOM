@@ -211,6 +211,12 @@ namespace MozaPlugin.Settings
         public string LastHubDeviceId { get; set; } = "";
         public string LastBaseAuxDeviceId { get; set; } = "";
 
+        // Active-shifter (AB9 / AB6) lane. Off = the plugin never opens the
+        // shifter's port, and switching it off releases a port already held.
+        // Not the pre-1.6 DisableAb9Detection key, so a stale value from that
+        // retired toggle can't come back.
+        public bool Ab9DetectionEnabled { get; set; } = true;
+
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
 

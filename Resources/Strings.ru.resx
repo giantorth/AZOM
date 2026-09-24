@@ -743,6 +743,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Требуется SimHub 9.12 или новее — используется вкладка LFE плагина.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
+  <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Обнаружение активного переключателя передач (AB9 / AB6)</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
