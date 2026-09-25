@@ -2,26 +2,9 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [1.6.2]
+## [1.6.3]
 
-### Added
-
-- **Active shifter detection can be turned off.** An Options toggle stops the plugin
-  claiming the AB9 / AB6 port and releases it if already held.
-
-- **Automatic channel selection for pedal haptics.** Effects output automatically per 
-  pedal without needing to assign channel slots.
-
-### Fixed
-
-- **AB9 settings are no longer re-written on every connect.** They are read back first and
-  only what the profile changes is written.
-
-- **A shifter that never reports its settings is no longer written to.** Its stored values
-  can't be read back, so the profile is held rather than committed blind to its EEPROM.
-
-- **Passive pedals on an mBooster moved to the Pedals tab.** A CRP2 throttle or clutch
-  wired to an mBooster gets the normal range, curve and calibration controls again.
+## Fixed
 
 - **Wheel LEDs stay on SimHub while the wheel renegotiates its dashboard.** They no longer
   fall back to the wheel's own lighting during a dashboard switch or game-switch reload.
@@ -43,6 +26,28 @@ All notable changes to the AZOM plugin are documented here.
 
 - **ES rims return to SimHub lighting after an idle gap.** The wake-up that puts them in
   telemetry mode is repeated when lit frames resume.
+
+
+## [1.6.2]
+
+### Added
+
+- **Active shifter detection can be turned off.** An Options toggle stops the plugin
+  claiming the AB9 / AB6 port and releases it if already held.
+
+- **Automatic channel selection for pedal haptics.** Effects output automatically per 
+  pedal without needing to assign channel slots.
+
+### Fixed
+
+- **AB9 settings are no longer re-written on every connect.** They are read back first and
+  only what the profile changes is written.
+
+- **A shifter that never reports its settings is no longer written to.** Its stored values
+  can't be read back, so the profile is held rather than committed blind to its EEPROM.
+
+- **Passive pedals on an mBooster moved to the Pedals tab.** A CRP2 throttle or clutch
+  wired to an mBooster gets the normal range, curve and calibration controls again.
 
 ## [1.6.1]
 
