@@ -222,3 +222,28 @@ path uses cmd `0x1F [G] FF [N]` to persist a per-LED color in EEPROM (see
 [`../devices/wheel-0x17.md` § Extended LED Group Architecture](../devices/wheel-0x17.md)).
 The two pipelines coexist: static colors render in idle mode; live colors
 override while a frame is feeding the bitmask.
+
+### Live ownership and the keepalive
+
+The firmware renders a group's live frame only while its bitmask keeps arriving. About
+**1000 ms** after the last `0x1A [G]` write it drops live ownership and the group falls back
+to its stored render: the static palette or the idle effect. Measured on the CS Pro knob
+ring, where a 1.0 s re-feed plus ~98 ms of host jitter reverted the ring about 0.7 times a
+second. Hosts therefore re-feed an unchanged frame well inside that window.
+
+Plugin behaviour (`Devices/Led/MozaLedDeviceManager.cs`, `TickKeepalive`):
+
+- Re-feeds each section every 0.75 s from its own timer, not from SimHub's `Display()`,
+  so a stalled SimHub LED pipeline does not stall the feed.
+- Holds a section while a game is active, while it is lit, or for `WheelKeepaliveTimeoutSec`
+  (default 45 s) since it last changed. Knobs key the hold on SimHub still driving the
+  encoder channel. Past that, a steadily dark section is released to the wheel.
+- During catalog negotiation it re-feeds the bitmask alone. That the bitmask by itself holds
+  ownership is inferred from the rule above, not separately captured.
+- An out-of-band static write (`0x1F`, `0x27`) repaints the frame buffer. The plugin marks the
+  section for resend and re-feeds on the next keepalive tick rather than waiting for SimHub.
+
+Old-protocol ES rims have no windowed bitmask: they enter telemetry mode on an all-on then
+all-off pulse of `wheel-old-send-telemetry` (`0x3FF`, `0`). The plugin repeats that pulse before
+a lit frame whenever the feed lapsed past 1000 ms. Whether an ES actually leaves telemetry
+mode when unfed is **unverified**; the threshold is borrowed from the new-protocol rims.

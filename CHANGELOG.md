@@ -23,6 +23,27 @@ All notable changes to the AZOM plugin are documented here.
 - **Passive pedals on an mBooster moved to the Pedals tab.** A CRP2 throttle or clutch
   wired to an mBooster gets the normal range, curve and calibration controls again.
 
+- **Wheel LEDs stay on SimHub while the wheel renegotiates its dashboard.** They no longer
+  fall back to the wheel's own lighting during a dashboard switch or game-switch reload.
+
+- **Switching games no longer rewrites every wheel LED setting.** Only what the new game's
+  profile actually changes is written.
+
+- **The sleep-light colour you pick survives a game switch.** An older saved colour was being
+  written over it on every profile apply.
+
+- **Wheel LEDs repaint straight after a profile apply.** They no longer show the stored colours
+  until SimHub's next frame.
+
+- **Base ambient LEDs hold when SimHub's LED output pauses.** Their refresh now runs on its own
+  timer, like the wheel and dash.
+
+- **The Clear LEDs action keeps the LEDs off.** The plugin no longer relit the frame it had just
+  cleared, and the knob rings are cleared too.
+
+- **ES rims return to SimHub lighting after an idle gap.** The wake-up that puts them in
+  telemetry mode is repeated when lit frames resume.
+
 ## [1.6.1]
 
 ### Added

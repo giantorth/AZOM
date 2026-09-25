@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Threading;
 using BA63Driver.Interfaces;
 using BA63Driver.Mapper;
 using SerialDash;
@@ -60,21 +62,57 @@ namespace MozaPlugin.Devices.Led
 
         // Whether we last sent live telemetry. Used to fire a single
         // bitmask=0 release frame on the active→idle transition so the
-        // device-side standby animation can take back over.
-        private bool _wasActive;
+        // device-side standby animation can take back over. Read by the keepalive
+        // timer, written on SimHub's LED thread.
+        private volatile bool _wasActive;
 
         // Latched while this pipeline is standing down for a dashboard upload,
         // so the resume edge can drop the per-strip change detection.
-        private bool _uploadPaused;
+        private volatile bool _uploadPaused;
 
         // LED-bitmask keepalive: the base firmware blanks its strip LEDs if the
         // bitmask isn't refreshed within a few seconds, even when unchanged — the
         // R25 capture sends the bitmask every frame (colors only on change). Re-send
-        // the last bitmask at 1 Hz when the value is static, matching the dash/wheel
-        // keepalive. Active path only — the idle-release path below stays quiet so
-        // the firmware standby animation resumes.
-        private DateTime _lastSendTime = DateTime.MinValue;
+        // the last bitmask at 1 Hz, from the plugin's LED keepalive timer rather than
+        // Display() so it survives SimHub's LED pipeline going quiet (the wheel and
+        // dash drivers moved for the same reason, bundle 2X7HPMMS). Active path only
+        // — the idle-release path below stays quiet so the firmware standby
+        // animation resumes. UTC ticks (0 = never) behind Interlocked.
+        private long _lastSendUtcTicks;
+        private long _lastLitUtcTicks;
         private const double KeepaliveIntervalSeconds = 1.0;
+        // Default hold past the last lit bit when the page has no explicit
+        // WheelKeepaliveTimeoutSec, matching the wheel and dash drivers.
+        private const int KeepaliveHoldSeconds = 45;
+
+        // Serialises Display() and TickKeepalive() so a replayed bitmask can't land
+        // between a strip's colour chunks and the new bitmask that lights them.
+        // Display() takes it; the keepalive only TryEnters.
+        private readonly object _emitLock = new object();
+
+        // Every live driver, so the keepalive timer can reach them. SimHub may keep
+        // one per base definition; each re-checks IsConnected() itself.
+        private static readonly List<MozaBaseLedDeviceManager> s_instances = new List<MozaBaseLedDeviceManager>();
+        private static readonly object s_instancesLock = new object();
+
+        public MozaBaseLedDeviceManager()
+        {
+            lock (s_instancesLock) s_instances.Add(this);
+        }
+
+        /// <summary>Drive every registered driver's keepalive. Called from the plugin's
+        /// LED keepalive timer.</summary>
+        internal static void TickKeepaliveAll()
+        {
+            MozaBaseLedDeviceManager[] snapshot;
+            lock (s_instancesLock)
+            {
+                if (s_instances.Count == 0) return;
+                snapshot = s_instances.ToArray();
+            }
+            foreach (var inst in snapshot)
+                inst.TickKeepalive();
+        }
 
         public LedModuleSettings LedModuleSettings { get; set; } = null!;
 
@@ -111,7 +149,8 @@ namespace MozaPlugin.Devices.Led
                 _lastColorHash[0] = 0;
                 _lastColorHash[1] = 0;
                 _wasActive = false;
-                _lastSendTime = DateTime.MinValue;
+                Interlocked.Exchange(ref _lastSendUtcTicks, 0L);
+                Interlocked.Exchange(ref _lastLitUtcTicks, 0L);
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -151,7 +190,10 @@ namespace MozaPlugin.Devices.Led
 
         public object GetDriverInstance() => this;
 
-        public void Close() { }
+        public void Close()
+        {
+            lock (s_instancesLock) s_instances.Remove(this);
+        }
 
         public void ResetDetection() { }
 
@@ -207,6 +249,9 @@ namespace MozaPlugin.Devices.Led
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
 
+            // Released in the finally below; taken just before the send region.
+            bool emitLockHeld = false;
+
             try
             {
                 var ledColors = leds?.Invoke() ?? Array.Empty<Color>();
@@ -255,12 +300,14 @@ namespace MozaPlugin.Devices.Led
                     _uploadPaused = true;
                     return;
                 }
+                Monitor.Enter(_emitLock, ref emitLockHeld);
+
                 if (_uploadPaused)
                 {
                     _uploadPaused = false;
                     _lastBitmask[0] = _lastBitmask[1] = -1;
                     _lastColorHash[0] = _lastColorHash[1] = 0;
-                    _lastSendTime = DateTime.MinValue;
+                    Interlocked.Exchange(ref _lastSendUtcTicks, 0L);
                     _wasActive = false;
                 }
 
@@ -293,30 +340,85 @@ namespace MozaPlugin.Devices.Led
                 if (brightness > 1) brightness = 1;
 
                 // Walk both physical strips in parallel — same pattern, just
-                // different SimHub source slice and target command suffix.
-                // keepaliveDue is computed once and shared so both strips refresh
-                // on the same 1 Hz tick; _lastSendTime advances only when a bitmask
-                // actually went out (change or keepalive), so a continuously moving
-                // value never triggers a redundant keepalive frame.
-                var now = DateTime.UtcNow;
-                bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
+                // different SimHub source slice and target command suffix. A bitmask
+                // goes out here only on change; the unchanged refresh is the keepalive
+                // timer's job (TickKeepalive), which the send stamp below paces.
                 bool sent0 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
-                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip);
                 bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: ledsPerStrip,
-                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip);
+                long nowTicks = DateTime.UtcNow.Ticks;
                 if (sent0 || sent1)
-                    _lastSendTime = now;
+                    Interlocked.Exchange(ref _lastSendUtcTicks, nowTicks);
+                if (_lastBitmask[0] > 0 || _lastBitmask[1] > 0)
+                    Interlocked.Exchange(ref _lastLitUtcTicks, nowTicks);
             }
             finally
             {
+                if (emitLockHeld) Monitor.Exit(_emitLock);
                 AfterDisplay?.Invoke(this, EventArgs.Empty);
             }
         }
 
-        // Returns true if a bitmask frame was sent for this strip (change or
-        // keepalive) so the caller can advance the shared keepalive timer.
+        /// <summary>
+        /// Re-send each strip's last bitmask at 1 Hz from the LED keepalive timer, so
+        /// the strips hold when SimHub's LED pipeline goes quiet. Same hold rules as the
+        /// wheel and dash: while a game is active, while a strip is lit, or within the
+        /// hold since the last lit bit; otherwise the firmware takes the strips back.
+        /// Nothing after the idle-release frame: <c>_wasActive</c> is false then.
+        /// </summary>
+        internal void TickKeepalive()
+        {
+            if (MozaPlugin.IsShuttingDown) return;
+
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.Data.IsConnected || !plugin.IsBaseAmbientLedSupported) return;
+            if (!IsConnected()) return;
+            // Upload stand-down: only Display() clears _uploadPaused and re-arms the
+            // caches, so the timer stays quiet until a real frame comes back.
+            if (UploadProgressLedBar.IsStandDownActive || _uploadPaused) return;
+            if (!_wasActive) return;
+
+            long nowTicks = DateTime.UtcNow.Ticks;
+            if (!DueAfter(nowTicks, Interlocked.Read(ref _lastSendUtcTicks), KeepaliveIntervalSeconds)) return;
+
+            int b0 = _lastBitmask[0], b1 = _lastBitmask[1];
+            if (b0 < 0 && b1 < 0) return;
+            int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? KeepaliveHoldSeconds;
+            bool lit = b0 > 0 || b1 > 0;
+            if (!plugin.IsGameActive && !lit
+                && !WithinHold(nowTicks, Interlocked.Read(ref _lastLitUtcTicks), holdSec))
+                return;
+
+            if (!Monitor.TryEnter(_emitLock)) return;
+            try
+            {
+                if (!_wasActive) return;
+                b0 = _lastBitmask[0];
+                b1 = _lastBitmask[1];
+                if (b0 >= 0) SendBitmask(plugin, 0, b0);
+                if (b1 >= 0) SendBitmask(plugin, 1, b1);
+                Interlocked.Exchange(ref _lastSendUtcTicks, nowTicks);
+            }
+            finally
+            {
+                Monitor.Exit(_emitLock);
+            }
+        }
+
+        // Still inside the hold window measured from a UTC-ticks stamp. 0 ticks = never.
+        private static bool WithinHold(long nowTicks, long stampTicks, int holdSec)
+            => holdSec > 0 && stampTicks != 0
+               && (nowTicks - stampTicks) < holdSec * TimeSpan.TicksPerSecond;
+
+        // True once `seconds` have elapsed since a stamp. Never-sent (0 ticks) is due.
+        private static bool DueAfter(long nowTicks, long lastTicks, double seconds)
+            => lastTicks == 0 || (nowTicks - lastTicks) >= (long)(seconds * TimeSpan.TicksPerSecond);
+
+        // Returns true if a bitmask frame was sent for this strip, so the caller can
+        // advance the shared keepalive clock.
         private bool ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
-            int stripIndex, int sourceOffset, int ledsPerStrip, bool keepaliveDue)
+            int stripIndex, int sourceOffset, int ledsPerStrip)
         {
             // Materialise this strip's colors with brightness applied. Source
             // array may be shorter than expected — pad with black so the
@@ -354,7 +456,7 @@ namespace MozaPlugin.Devices.Led
                 _lastColorHash[stripIndex] = colorHash;
             }
 
-            if (bitmaskChanged || keepaliveDue)
+            if (bitmaskChanged)
             {
                 SendBitmask(plugin, stripIndex, bitmask);
                 _lastBitmask[stripIndex] = bitmask;

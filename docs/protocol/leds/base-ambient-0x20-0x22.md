@@ -550,6 +550,11 @@ Measured from the R16 Ultra capture (strip-0 `0x1B` inter-frame gaps):
 - Colors (`0x1A`): on palette change only.
 - The idle keepalive keeps sending `0x00`; it does **not** go silent. Going
   silent is what hands the strip back to the firmware standby animation.
+- Plugin: `MozaBaseLedDeviceManager` sends the bitmask on change from `Display()`
+  and the 1 Hz refresh from the LED keepalive timer, so a stalled SimHub LED
+  pipeline no longer lets the strip go stale. The refresh follows the wheel's hold
+  rules (game active, lit, or within `WheelKeepaliveTimeoutSec` of the last lit
+  bit) and stops after the idle-release frame.
 
 #### Open: non-contiguous masks on strip 1
 
