@@ -796,4 +796,10 @@ Id : {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Couleur enregistrée</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>REMPLIR LES LED IMPAIRES</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>REMPLIR LES LED PAIRES</value></data>
+  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Wine masque les entrées MOZA au plugin</value></data>
+  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} n'est pas exposé à SimHub en tant que périphérique HID brut : les entrées volant, pédales et boutons sont donc absentes. « Corriger » ajoute {1} à la liste EnableHidraw de Wine pour ce préfixe.</value></data>
+  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Impossible d'écrire dans le registre ({0}). Ajoutez {1} manuellement à EnableHidraw sous HKLM\System\CurrentControlSet\Services\winebus.</value></data>
+  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Paramètre HID de Wine mis à jour</value></data>
+  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Fermez SimHub et tous les autres programmes de ce préfixe Wine, puis relancez SimHub. Wine n'applique la modification qu'au démarrage suivant.</value></data>
+  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Corriger</value></data>
 </root>

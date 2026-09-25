@@ -796,4 +796,10 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>已保存的颜色</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>填充奇数 LED</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>填充偶数 LED</value></data>
+  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Wine 正在向插件隐藏 MOZA 输入</value></data>
+  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} 未以原始 HID 设备的形式提供给 SimHub，因此缺少方向盘、踏板和按键输入。点击“修复”会将 {1} 添加到此前缀的 Wine EnableHidraw 列表中。</value></data>
+  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>无法写入注册表（{0}）。请手动将 {1} 添加到 HKLM\System\CurrentControlSet\Services\winebus 下的 EnableHidraw。</value></data>
+  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Wine HID 设置已更新</value></data>
+  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>关闭 SimHub 以及此 Wine 前缀中的所有其他程序，然后重新启动 SimHub。Wine 仅在全新启动时应用此更改。</value></data>
+  <data name="Button_FixWineHidraw" xml:space="preserve"><value>修复</value></data>
 </root>

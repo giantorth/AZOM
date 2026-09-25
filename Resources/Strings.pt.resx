@@ -795,4 +795,10 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Cor salva</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>PREENCHER LEDS ÍMPARES</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>PREENCHER LEDS PARES</value></data>
+  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>O Wine está a ocultar as entradas MOZA do plugin</value></data>
+  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} não é exposto ao SimHub como dispositivo HID raw, por isso faltam as entradas de volante, pedais e botões. «Corrigir» adiciona {1} à lista EnableHidraw do Wine para este prefixo.</value></data>
+  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Não foi possível escrever no registo ({0}). Adicione {1} manualmente a EnableHidraw em HKLM\System\CurrentControlSet\Services\winebus.</value></data>
+  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Definição HID do Wine atualizada</value></data>
+  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Feche o SimHub e todos os outros programas neste prefixo Wine e depois inicie novamente o SimHub. O Wine só aplica a alteração num novo arranque.</value></data>
+  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Corrigir</value></data>
 </root>

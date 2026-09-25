@@ -795,4 +795,10 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Αποθηκευμένο χρώμα</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>ΓΕΜΙΣΜΑ ΜΟΝΩΝ LED</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>ΓΕΜΙΣΜΑ ΖΥΓΩΝ LED</value></data>
+  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Το Wine κρύβει τις εισόδους MOZA από το πρόσθετο</value></data>
+  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>Η συσκευή {0} δεν εκτίθεται στο SimHub ως raw HID συσκευή, οπότε λείπουν οι είσοδοι τιμονιού, πεντάλ και κουμπιών. Η «Διόρθωση» προσθέτει το {1} στη λίστα EnableHidraw του Wine για αυτό το prefix.</value></data>
+  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Δεν ήταν δυνατή η εγγραφή στο μητρώο ({0}). Προσθέστε χειροκίνητα το {1} στο EnableHidraw στο HKLM\System\CurrentControlSet\Services\winebus.</value></data>
+  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Η ρύθμιση HID του Wine ενημερώθηκε</value></data>
+  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Κλείστε το SimHub και κάθε άλλο πρόγραμμα σε αυτό το Wine prefix και έπειτα ξεκινήστε ξανά το SimHub. Το Wine εφαρμόζει την αλλαγή μόνο σε νέα εκκίνηση.</value></data>
+  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Διόρθωση</value></data>
 </root>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using MozaPlugin.Devices;
@@ -102,6 +103,16 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
             if (Protocol.WineHost.IsWine)
                 sb.AppendLine($"Native exec:    {(Protocol.WineNativeExec.Available ? "available" : "UNAVAILABLE (no cold-start warm-up)")}  last: {Protocol.WineNativeExec.LastRun}");
+            var hidraw = Protocol.WineHidrawAdvisor.Evaluate(plugin.HidReader, plugin.StartupUtc, DateTime.UtcNow);
+            if (hidraw != Protocol.WineHidrawStatus.None)
+            {
+                string Pids(IEnumerable<ushort> pids) => string.Join(",", pids.Select(p => $"0x{p:X4}"));
+                sb.AppendLine($"Wine HID:       {hidraw.State}  hidraw=[{Pids(hidraw.Hidraw.Keys)}] open=[{Pids(hidraw.OpenPids)}] " +
+                              $"dead=[{Pids(hidraw.DeadPids)}] missing=[{Pids(hidraw.MissingPids)}]");
+                sb.AppendLine($"winebus:        {hidraw.Winebus}");
+                if (Protocol.WineHidrawAdvisor.LastFixError.Length > 0)
+                    sb.AppendLine($"                last fix failed: {Protocol.WineHidrawAdvisor.LastFixError}");
+            }
 
             if (ports.Count == 0)
             {

@@ -38,6 +38,12 @@ namespace MozaPlugin.UI
         // a current-generation wheel answering like a legacy one, i.e. outdated
         // firmware. Remediation: update wheel/base firmware in MOZA Pit House.
         WheelFirmwareOutdated,
+        // Wine/Linux: a MOZA hidraw device never reached the HID reader and
+        // winebus's EnableHidraw lacks its vid:pid — Fix button writes it.
+        WineHidrawMissing,
+        // EnableHidraw was written this session; every program in the prefix
+        // must close so the wineserver restarts and winebus re-reads it.
+        WineHidrawRestart,
     }
 
     /// <summary>
@@ -59,6 +65,9 @@ namespace MozaPlugin.UI
         /// participate in equality.
         /// </summary>
         public bool ShowRestartButton => Kind == StatusHintKind.DeviceDefinitionDeployed;
+
+        /// <summary>Drives the "Fix" button (writes winebus EnableHidraw).</summary>
+        public bool ShowWineHidrawFixButton => Kind == StatusHintKind.WineHidrawMissing;
 
         public StatusHint(StatusHintKind kind, string title, string body, string? relatedModel = null)
         {

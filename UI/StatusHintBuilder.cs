@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
@@ -120,6 +121,27 @@ namespace MozaPlugin.UI
                     Strings.Banner_WheelFwOutdated_Title,
                     string.Format(Strings.Banner_WheelFwOutdated_BodyFmt, subject),
                     relatedModel: string.IsNullOrEmpty(advisoryModel) ? null : advisoryModel));
+            }
+
+            // Rule 1e: Wine/Linux HID — a MOZA device the kernel exposes as hidraw
+            // never reached the HID reader (steering / pedal / button inputs dead
+            // while serial works). Not gated on IsConnected: pedals-only rigs too.
+            var hidraw = WineHidrawAdvisor.Evaluate(plugin.HidReader, plugin.StartupUtc, nowUtc);
+            if (hidraw.State == WineHidrawState.MissingEntries)
+            {
+                string devices = string.Join(", ", hidraw.MissingPids.Select(hidraw.DeviceName));
+                string entries = string.Join(", ", hidraw.MissingPids.Select(WineHidrawAdvisor.Entry));
+                string body = string.Format(Strings.Banner_WineHidraw_BodyFmt, devices, entries);
+                if (WineHidrawAdvisor.LastFixError.Length > 0)
+                    body += " " + string.Format(Strings.Banner_WineHidraw_FixFailedFmt, WineHidrawAdvisor.LastFixError, entries);
+                list.Add(new StatusHint(StatusHintKind.WineHidrawMissing, Strings.Banner_WineHidraw_Title, body));
+            }
+            else if (hidraw.State == WineHidrawState.PendingRestart)
+            {
+                list.Add(new StatusHint(
+                    StatusHintKind.WineHidrawRestart,
+                    Strings.Banner_WineHidrawRestart_Title,
+                    Strings.Banner_WineHidrawRestart_Body));
             }
 
             // Rule 2: DeviceDefinitionDeployed (existing behaviour, kept verbatim)

@@ -85,6 +85,32 @@ namespace MozaPlugin.Protocol
         // Live HidStreams so Dispose can force-close silent devices' blocked reads.
         private readonly object _streamsLock = new object();
         private readonly List<HidStream> _liveStreams = new List<HidStream>();
+        // PID of each live stream, for the Wine hidraw check (WineHidrawAdvisor).
+        private readonly Dictionary<HidStream, ushort> _livePids = new Dictionary<HidStream, ushort>();
+
+        /// <summary>PIDs of the MOZA HID devices currently open and being read.</summary>
+        public ushort[] OpenPidsSnapshot()
+        {
+            lock (_streamsLock) return _livePids.Values.Distinct().ToArray();
+        }
+
+        private void TrackStream(HidStream stream, ushort pid)
+        {
+            lock (_streamsLock)
+            {
+                _liveStreams.Add(stream);
+                _livePids[stream] = pid;
+            }
+        }
+
+        private void UntrackStream(HidStream stream)
+        {
+            lock (_streamsLock)
+            {
+                _liveStreams.Remove(stream);
+                _livePids.Remove(stream);
+            }
+        }
 
         public MozaHidReader(MozaData data)
         {
@@ -196,7 +222,7 @@ namespace MozaPlugin.Protocol
                     {
                         openCount++;
                         // Register so Dispose() can force-close on shutdown.
-                        lock (_streamsLock) _liveStreams.Add(stream);
+                        TrackStream(stream, (ushort)device.ProductID);
                         openPaths.Add(DevicePathOf(device));
                         if (deviceClass == MozaHidClass.Stalks) _data.IsStalksConnected = true;
 
@@ -215,7 +241,7 @@ namespace MozaPlugin.Protocol
                     }
                     catch
                     {
-                        lock (_streamsLock) _liveStreams.Remove(stream);
+                        UntrackStream(stream);
                         try { stream.Dispose(); } catch { }
                         throw;
                     }
@@ -331,6 +357,25 @@ namespace MozaPlugin.Protocol
         /// controller"), so no regex pattern matched and the steering / pedal /
         /// handbrake bars stayed blank.
         /// </summary>
+        /// <summary>Whether the reader consumes this PID's HID (unknown PIDs
+        /// admitted for forward-compat; AB9 / shifter / dashboard skipped).</summary>
+        internal static bool ReadsPid(ushort pid)
+        {
+            switch (MozaUsbIds.Categorize(pid))
+            {
+                case MozaDeviceCategory.Wheelbase:
+                case MozaDeviceCategory.Pedals:
+                case MozaDeviceCategory.Handbrake:
+                case MozaDeviceCategory.Hub:
+                case MozaDeviceCategory.Stalks:
+                case MozaDeviceCategory.MBooster:
+                case MozaDeviceCategory.Unknown:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)> FindMozaDevices()
         {
             var result = new List<(HidDevice, Dictionary<uint, (int, int)>, MozaHidClass, string)>();
@@ -348,18 +393,9 @@ namespace MozaPlugin.Protocol
                     if (dev.VendorID != MozaPortDiscovery.MozaVid) continue;
 
                     ushort pid = (ushort)dev.ProductID;
+                    if (!ReadsPid(pid)) continue;
                     var category = MozaUsbIds.Categorize(pid);
-
                     bool isMBooster = category == MozaDeviceCategory.MBooster;
-                    bool isStandard =
-                        category == MozaDeviceCategory.Wheelbase ||
-                        category == MozaDeviceCategory.Pedals    ||
-                        category == MozaDeviceCategory.Handbrake ||
-                        category == MozaDeviceCategory.Hub       ||
-                        category == MozaDeviceCategory.Stalks    ||
-                        category == MozaDeviceCategory.Unknown;  // forward-compat for new PIDs
-
-                    if (!isMBooster && !isStandard) continue;
 
                     var usages = new Dictionary<uint, (int min, int max)>();
                     // Usages the filter below rejects, logged so a support bundle
@@ -462,7 +498,7 @@ namespace MozaPlugin.Protocol
             {
                 if (released) return;
                 released = true;
-                lock (_streamsLock) _liveStreams.Remove(stream);
+                UntrackStream(stream);
                 try { stream.Dispose(); } catch { }
             }
             try

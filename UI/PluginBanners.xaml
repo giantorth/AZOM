@@ -55,6 +55,22 @@
                                     </Style>
                                 </Button.Style>
                             </Button>
+                            <!-- Wine hidraw fix: writes winebus EnableHidraw entries
+                                 (WineHidrawAdvisor.TryApplyFix). -->
+                            <Button Content="{x:Static res:Strings.Button_FixWineHidraw}"
+                                    Click="HintWineHidrawFix_Click"
+                                    HorizontalAlignment="Left" Margin="0,8,0,0">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource MozaButton}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowWineHidrawFixButton}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                         </StackPanel>
                     </Border>
                 </DataTemplate>

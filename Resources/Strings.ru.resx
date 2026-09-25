@@ -796,4 +796,10 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Сохранённый цвет</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>ЗАПОЛНИТЬ НЕЧЁТНЫЕ LED</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>ЗАПОЛНИТЬ ЧЁТНЫЕ LED</value></data>
+  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Wine скрывает входы MOZA от плагина</value></data>
+  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} не предоставляется SimHub как raw HID-устройство, поэтому входы руля, педалей и кнопок отсутствуют. «Исправить» добавит {1} в список EnableHidraw Wine для этого префикса.</value></data>
+  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Не удалось записать в реестр ({0}). Добавьте {1} в EnableHidraw в разделе HKLM\System\CurrentControlSet\Services\winebus вручную.</value></data>
+  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Настройка HID в Wine обновлена</value></data>
+  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Закройте SimHub и все остальные программы в этом префиксе Wine, затем снова запустите SimHub. Wine применяет изменение только при новом запуске.</value></data>
+  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Исправить</value></data>
 </root>

@@ -114,6 +114,19 @@ namespace MozaPlugin.UI
             if (!ok && button != null) button.IsEnabled = true;
         }
 
+        private void HintWineHidrawFix_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null) button.IsEnabled = false;
+            var plugin = MozaPlugin.Instance;
+            var status = plugin == null
+                ? Protocol.WineHidrawStatus.None
+                : Protocol.WineHidrawAdvisor.Evaluate(plugin.HidReader, plugin.StartupUtc, DateTime.UtcNow);
+            bool ok = status.MissingPids.Count > 0 && Protocol.WineHidrawAdvisor.TryApplyFix(status.MissingPids);
+            if (!ok && button != null) button.IsEnabled = true;
+            RefreshHints();
+        }
+
         // ===== 2. Update banner =====
 
         private void RefreshUpdateBanner()
