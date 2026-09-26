@@ -50,11 +50,11 @@ base detection was ambiguous.
 PID `0x1002` is the **AB6** active shifter, from a user diagnostics bundle
 whose host enumerated it alongside an R21 (`0x0000`). The device names
 itself: its HID product string is `MOZA AB6 FFB Base`, so the PID↔device
-mapping is confirmed the same way `0x0006` is. What is *not* yet verified
-is the CDC protocol — it is registered in category `Ab9` and driven by that
-lane on the assumption of AB9 parity, and no AB6 capture exists (the
-reporter had active-shifter detection disabled, so the port was never
-opened). See [`ab9-shifter.md`](ab9-shifter.md) § AB6 sibling.
+mapping is confirmed the same way `0x0006` is. It is registered in category
+`Ab9`; bundles `5KHRJ6NF` / `NFZZA32E` confirm the AB9 identity probe, `0x1E` reads and
+FFB alloc handshake all answer on it; whether the AB9 shifter settings
+do anything on it is unverified. See
+[`ab9-shifter.md`](ab9-shifter.md) § AB6 sibling.
 PID `0x0020` is verified as the Universal HUB from a user diagnostics
 bundle: the host enumerates only the hub's CDC composite (no wheelbase
 PID), so any wheel attached behind the hub (e.g. KS Pro) reaches the

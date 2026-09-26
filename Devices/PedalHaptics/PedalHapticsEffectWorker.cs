@@ -162,10 +162,12 @@ namespace MozaPlugin.Devices.PedalHaptics
             }
 
             // Then refresh the live ones, round-robin under the frame budget so
-            // no one channel monopolises it.
+            // no one channel monopolises it. Scan from a snapshot: _cursor moves
+            // inside the loop, and indexing off it would skip and repeat channels.
+            int start = _cursor;
             for (int n = 0; n < total && budget > 0; n++)
             {
-                int i = (_cursor + n) % total;
+                int i = (start + n) % total;
                 int p = i / Channels;
                 int ch = i % Channels;
                 if (IsSilent(p, ch, now, shuttingDown)) continue;

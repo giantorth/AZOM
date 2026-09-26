@@ -1,14 +1,14 @@
 {
   "deviceName": "WheelSetup",
   "presetName": "",
-  "version": "2.2.2.0",
+  "version": "2.3.0.4",
   "deviceSettings": {
     "ButtonCount": 5,
     "ButtonOffset": 1,
     "EncoderTopCount": 0,
     "EncoderBottomCount": 0,
     "TelemetryCount": 0,
-    "RPMCount": 9,
+    "RPMCount": 10,
     "SelectedIllustration": 0,
     "VID": "346E",
     "PID": "0000",
@@ -731,8 +731,8 @@
             0.0,
             0.0
           ],
-          "Index": 1,
-          "LEDCount": 9,
+          "Index": 0,
+          "LEDCount": 10,
           "PositionCount": 1,
           "LedsPerDetent": 1,
           "EncoderOffset": 0,

@@ -250,6 +250,14 @@ namespace MozaPlugin.Devices.Led
         private int _lastButtonBitmask = -1;
         private int _lastKnobBitmask = -1;
 
+        // Set by InvalidateLiveCache when an out-of-band write repainted a section: the
+        // next Display() frame for it goes out even if unchanged. The cached frame is
+        // kept, so the keepalive can repaint meanwhile. 0/1 via Volatile/Interlocked.
+        private int _rpmResend;
+        private int _btnResend;
+        private int _knobResend;
+        private int _flagResend;
+
         // Keepalive. _lastSendUtcTicks = last "any live send" (per-model FPS throttle).
         //
         // Every stamp below is UTC ticks (0 = never) behind Interlocked, not DateTime:
@@ -291,6 +299,8 @@ namespace MozaPlugin.Devices.Led
         // added (+98 ms observed), reverting the knob ring to stored colours ~0.7x/s.
         // Must satisfy: interval + jitter < 1000 ms.
         private const double KeepaliveIntervalSeconds = 0.75;
+        // The 1000 ms ownership lapse above, as a threshold for "the feed stopped".
+        private const double LiveOwnershipTimeoutMs = 1000.0;
         // Default per-section hold (seconds) when the wheel page has no explicit
         // WheelKeepaliveTimeoutSec; the Options slider overrides it. 0 = no hold.
         private const double KeepaliveHoldSeconds = 45.0;
@@ -446,6 +456,10 @@ namespace MozaPlugin.Devices.Led
             Interlocked.Exchange(ref _btnFedUtcTicks, 0L);
             Interlocked.Exchange(ref _knobDrivenUtcTicks, 0L);
             Interlocked.Exchange(ref _knobFedUtcTicks, 0L);
+            Volatile.Write(ref _rpmResend, 0);
+            Volatile.Write(ref _btnResend, 0);
+            Volatile.Write(ref _knobResend, 0);
+            Volatile.Write(ref _flagResend, 0);
             _ledsAwake = false;
             _uploadPaused = false;
         }
@@ -532,31 +546,33 @@ namespace MozaPlugin.Devices.Led
         }
 
         /// <summary>
-        /// Drop the cached "last-sent" state for one or more LED groups so the next
+        /// Mark one or more LED groups as repainted out-of-band, so the next
         /// <see cref="Display"/> frame re-sends instead of being deduplicated against
-        /// the cache. Callers: anything that writes to the wheel's LED registers
-        /// outside the live pipeline (HardwareApplier.WriteKnobColors / WriteKnobRingColors
-        /// / WriteColorArray for LED commands, UI swatch handlers that fire
-        /// WriteColorIfWheelDetected). Without this, after a static write blanks the
-        /// wheel back to stock colours, the live pipeline waits up to a keepalive
-        /// interval before re-asserting (which the user sees as a flicker).
+        /// the cache, and the keepalive repaints on its next tick. Callers: anything
+        /// that writes to the wheel's LED registers outside the live pipeline
+        /// (HardwareApplier static colour writes, UI swatch handlers, mode switches).
+        ///
+        /// <para>The cached frame is kept, not dropped: it is what the keepalive
+        /// replays. Without it the section goes unfed until SimHub produces a new frame,
+        /// so with SimHub's LED pipeline quiet the wheel would lose live ownership and
+        /// fall back to its stored palette.</para>
         /// </summary>
         internal void InvalidateLiveCache(LedKind kind)
         {
             if ((kind & LedKind.Rpm) != 0)
             {
-                _lastLeds = null;
-                _lastRpmBitmask = -1;
+                Volatile.Write(ref _rpmResend, 1);
+                Interlocked.Exchange(ref _rpmFedUtcTicks, 0L);
             }
             if ((kind & LedKind.Button) != 0)
             {
-                _lastButtons = null;
-                _lastButtonBitmask = -1;
+                Volatile.Write(ref _btnResend, 1);
+                Interlocked.Exchange(ref _btnFedUtcTicks, 0L);
             }
             if ((kind & LedKind.Knob) != 0)
             {
-                _lastKnobs = null;
-                _lastKnobBitmask = -1;
+                Volatile.Write(ref _knobResend, 1);
+                Interlocked.Exchange(ref _knobFedUtcTicks, 0L);
                 _lastKnobRawColors = null;
                 Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, 0L);
                 _knobStaticHoldReleased = false;
@@ -567,7 +583,37 @@ namespace MozaPlugin.Devices.Led
             }
             if ((kind & LedKind.Flag) != 0)
             {
-                _lastFlagColorsPrimed = false;
+                Volatile.Write(ref _flagResend, 1);
+            }
+        }
+
+        /// <summary>Record an out-of-band clear on every registered driver. See
+        /// <see cref="NoteCleared"/>.</summary>
+        internal static void NoteClearedAny()
+        {
+            MozaLedDeviceManager[] snapshot;
+            lock (s_instancesLock)
+                snapshot = s_instances.ToArray();
+            foreach (var inst in snapshot)
+                inst.NoteCleared();
+        }
+
+        /// <summary>
+        /// The wheel was just cleared outside the live pipeline (RPM/buttons all-off,
+        /// knobs released). Make the caches describe that, so the keepalive doesn't
+        /// replay the lit frame the clear removed and a lit SimHub frame re-engages
+        /// through the normal change check.
+        /// </summary>
+        private void NoteCleared()
+        {
+            lock (_emitLock)
+            {
+                if (_lastLeds != null) _lastLeds = new Color[_lastLeds.Length];
+                if (_lastRpmBitmask >= 0) _lastRpmBitmask = 0;
+                if (_lastButtons != null) _lastButtons = new Color[_lastButtons.Length];
+                if (_lastButtonBitmask >= 0) _lastButtonBitmask = 0;
+                _lastKnobs = null;
+                _lastKnobBitmask = -1;
             }
         }
 
@@ -803,12 +849,9 @@ namespace MozaPlugin.Devices.Led
                 if (ledColors.Length == 0 && buttonColors.Length == 0 && encoderColors.Length == 0)
                     return;
 
-                // ES wheel wake-up: flash all LEDs on then off to enter telemetry mode
                 if (!_ledsAwake && isOldWheel)
                 {
-                    _ledsAwake = true;
-                    plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0x3FF);
-                    plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0);
+                    SendEsWake(plugin);
                     MozaLog.Debug("[AZOM] ES wheel LED wake-up sent");
                 }
 
@@ -861,7 +904,8 @@ namespace MozaPlugin.Devices.Led
                         plugin.WheelLedAppliedBrightnessRpm, plugin.WheelLedMasterBrightness));
 
                 // --- RPM LEDs ---
-                bool rpmChanged = !ColorsEqual(rpmColors, _lastLeds);
+                bool rpmResend = Volatile.Read(ref _rpmResend) != 0;
+                bool rpmChanged = rpmResend || !ColorsEqual(rpmColors, _lastLeds);
                 // forceRefresh resends only when something is lit: an all-off frame
                 // is sent once via rpmChanged (lit->off) and then left quiet, so
                 // forceRefresh can't re-flood the wheel with all-black frames at idle.
@@ -869,6 +913,7 @@ namespace MozaPlugin.Devices.Led
 
                 if (shouldSendRpm)
                 {
+                    if (rpmResend) Volatile.Write(ref _rpmResend, 0);
                     _lastLeds = (Color[])rpmColors.Clone();
                     Interlocked.Exchange(ref _rpmChangedUtcTicks, DateTime.UtcNow.Ticks);
 
@@ -902,7 +947,7 @@ namespace MozaPlugin.Devices.Led
                         // single-display rim — never the bus-CM2 contention case the
                         // stream lane exists for — so it gains nothing from streaming.
                         SendColorChunks(plugin, rpmColors, count, "wheel-telemetry-rpm-colors");
-                        if (bitmask != _lastRpmBitmask)
+                        if (rpmResend || bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
@@ -921,7 +966,7 @@ namespace MozaPlugin.Devices.Led
                         // every colour ahead of the bitmask that lights it.
                         SendColorChunks(plugin, rpmColors, count, "wheel-telemetry-rpm-colors");
 
-                        if (bitmask != _lastRpmBitmask)
+                        if (rpmResend || bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             // 8-byte active+window form, matching PitHouse on every wheel
@@ -940,7 +985,17 @@ namespace MozaPlugin.Devices.Led
                         // an ES rim is single-display, so it needs no stream-lane
                         // protection, and lane parity keeps the wake-pulse OFF from
                         // landing after the lit bitmask and blanking the rim.
-                        if (bitmask != _lastRpmBitmask)
+                        //
+                        // A feed that lapsed past the ownership window may have dropped the
+                        // rim out of telemetry mode, and only the wake pulse re-enters it —
+                        // so repeat it before the next lit frame. Unverified on ES firmware:
+                        // the lapse threshold is the one measured on new-protocol rims.
+                        if (bitmask != 0 && MsSince(Interlocked.Read(ref _lastSendUtcTicks)) > LiveOwnershipTimeoutMs)
+                        {
+                            SendEsWake(plugin);
+                            _lastRpmBitmask = -1;
+                        }
+                        if (rpmResend || bitmask != _lastRpmBitmask)
                         {
                             _lastRpmBitmask = bitmask;
                             plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", bitmask);
@@ -957,11 +1012,13 @@ namespace MozaPlugin.Devices.Led
                 // gate on dash detection so writes only fire once that sub-device answers.
                 if (hasFlagLeds && plugin.IsDashDetected && ledColors.Length >= flagLeft + rpmN + 3)
                 {
+                    bool flagResend = Volatile.Read(ref _flagResend) != 0;
+                    if (flagResend) Volatile.Write(ref _flagResend, 0);
                     for (int i = 0; i < MozaDeviceConstants.FlagLedCount; i++)
                     {
                         int srcIdx = i < 3 ? i : rpmN + i;  // 0,1,2, rpmN+3, rpmN+4, rpmN+5
                         var c = ledColors[srcIdx];
-                        bool changed = !_lastFlagColorsPrimed || _lastFlagColors[i] != c;
+                        bool changed = !_lastFlagColorsPrimed || flagResend || _lastFlagColors[i] != c;
                         if (changed || (forceRefresh && (c.R | c.G | c.B) != 0))
                         {
                             _lastFlagColors[i] = c;
@@ -1031,11 +1088,13 @@ namespace MozaPlugin.Devices.Led
                         ZoneCompensated(buttonsBrightness,
                             plugin.WheelLedAppliedBrightnessButtons, plugin.WheelLedMasterBrightness));
 
-                    bool buttonsChanged = !ColorsEqual(buttonColors, _lastButtons);
+                    bool btnResend = Volatile.Read(ref _btnResend) != 0;
+                    bool buttonsChanged = btnResend || !ColorsEqual(buttonColors, _lastButtons);
                     bool shouldSendButtons = !ledThrottled && (buttonsChanged || (forceRefresh && AnyLit(buttonColors)));
 
                     if (shouldSendButtons)
                     {
+                        if (btnResend) Volatile.Write(ref _btnResend, 0);
                         _lastButtons = (Color[])buttonColors.Clone();
                         Interlocked.Exchange(ref _btnChangedUtcTicks, DateTime.UtcNow.Ticks);
 
@@ -1052,7 +1111,7 @@ namespace MozaPlugin.Devices.Led
 
                         SendColorChunks(plugin, buttonColors, buttonCount, "wheel-telemetry-button-colors", buttonMap);
 
-                        if (buttonBitmask != _lastButtonBitmask)
+                        if (btnResend || buttonBitmask != _lastButtonBitmask)
                         {
                             _lastButtonBitmask = buttonBitmask;
                             // 8-byte form: active_mask(u32 LE) + window_mask(u32 LE).
@@ -1195,11 +1254,13 @@ namespace MozaPlugin.Devices.Led
                     }
                     else if (knobsActive && !_knobStaticHoldReleased)
                     {
-                        bool knobsChanged = !ColorsEqual(knobColors, _lastKnobs);
+                        bool knobResend = Volatile.Read(ref _knobResend) != 0;
+                        bool knobsChanged = knobResend || !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = !ledThrottled && (knobsChanged || (forceRefresh && AnyLit(knobColors)));
 
                         if (shouldSendKnobs)
                         {
+                            if (knobResend) Volatile.Write(ref _knobResend, 0);
                             _lastKnobs = (Color[])knobColors.Clone();
 
                             SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors");
@@ -1298,9 +1359,11 @@ namespace MozaPlugin.Devices.Led
             // it does is the safe direction.
             if (UploadProgressLedBar.IsStandDownActive || _uploadPaused) return;
 
-            // Catalog negotiation saturates the half-duplex link; hold off exactly as the
-            // live path does so inbound catalog chunks aren't dropped.
-            if (plugin.TelemetrySender?.WheelInCatalogNegotiation == true) return;
+            // Catalog negotiation saturates the half-duplex link, so re-feed with the
+            // bitmask alone — it is what holds ownership, at a few bytes a second.
+            // Going silent would let a steady frame lapse for the whole negotiation,
+            // which can run for tens of seconds after a dashboard switch.
+            bool bitmaskOnly = plugin.TelemetrySender?.WheelInCatalogNegotiation == true;
 
             bool isOldWheel = plugin.IsOldWheelDetected;
             bool isNewWheel = !isOldWheel && plugin.IsNewWheelDetected;
@@ -1362,23 +1425,27 @@ namespace MozaPlugin.Devices.Led
 
                 if (rpmDue && leds != null)
                 {
+                    // Read before the stamp below: an ES rim whose feed lapsed needs the
+                    // wake pulse again (see the old-wheel branch in Display()).
+                    bool esLapsed = isOldWheel
+                        && MsSince(Interlocked.Read(ref _lastSendUtcTicks)) > LiveOwnershipTimeoutMs;
                     Interlocked.Exchange(ref _rpmFedUtcTicks, kaNow);
                     Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
-                    ResendRpmFlags(plugin, leds, isNewWheel, isOldWheel);
+                    ResendRpmFlags(plugin, leds, isNewWheel, isOldWheel, bitmaskOnly, esLapsed);
                     NoteLiveSend();
                 }
                 if (btnDue && buttons != null)
                 {
                     Interlocked.Exchange(ref _btnFedUtcTicks, kaNow);
                     Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
-                    ResendButtons(plugin, buttons);
+                    ResendButtons(plugin, buttons, bitmaskOnly);
                     NoteLiveSend();
                 }
                 if (knobDue && knobs != null && modelInfo != null)
                 {
                     Interlocked.Exchange(ref _knobFedUtcTicks, kaNow);
                     Interlocked.Exchange(ref _lastSendUtcTicks, kaNow);
-                    ResendKnobs(plugin, knobs, modelInfo);
+                    ResendKnobs(plugin, knobs, modelInfo, bitmaskOnly);
                     NoteLiveSend();
                 }
             }
@@ -1401,8 +1468,11 @@ namespace MozaPlugin.Devices.Led
 
         /// <summary>Re-feed the last RPM (and flag) frame — colour + bitmask — to keep
         /// the firmware rendering it. <paramref name="leds"/> is the caller's cache
-        /// snapshot, so a concurrent Display() re-assignment can't null it mid-call.</summary>
-        private void ResendRpmFlags(MozaPlugin plugin, Color[] leds, bool isNewWheel, bool isOldWheel)
+        /// snapshot, so a concurrent Display() re-assignment can't null it mid-call.
+        /// <paramref name="bitmaskOnly"/> skips the colour writes (the frame buffer still
+        /// holds them); <paramref name="esLapsed"/> repeats the ES wake pulse.</summary>
+        private void ResendRpmFlags(MozaPlugin plugin, Color[] leds, bool isNewWheel, bool isOldWheel,
+                                    bool bitmaskOnly, bool esLapsed)
         {
             var modelInfo = plugin.WheelModelInfo;
             int rpmN = modelInfo?.RpmLedCount ?? MozaDeviceConstants.RpmLedCount;
@@ -1410,7 +1480,8 @@ namespace MozaPlugin.Devices.Led
 
             if (isNewWheel)
             {
-                SendColorChunks(plugin, leds, count, "wheel-telemetry-rpm-colors");
+                if (!bitmaskOnly)
+                    SendColorChunks(plugin, leds, count, "wheel-telemetry-rpm-colors");
                 if (_lastRpmBitmask >= 0)
                     plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
                         BuildWindowedBitmaskBytes(_lastRpmBitmask, (1 << rpmN) - 1));
@@ -1418,7 +1489,7 @@ namespace MozaPlugin.Devices.Led
                 // Flag colours stay on the one-shot lane (low-rate, change-gated, and
                 // also driven by MozaDashLedDeviceManager — keep a single lane to avoid
                 // a two-driver desync).
-                if (modelInfo?.HasFlagLeds == true && plugin.IsDashDetected && _lastFlagColorsPrimed)
+                if (!bitmaskOnly && modelInfo?.HasFlagLeds == true && plugin.IsDashDetected && _lastFlagColorsPrimed)
                     for (int i = 0; i < MozaDeviceConstants.FlagLedCount; i++)
                     {
                         var c = _lastFlagColors[i];
@@ -1427,18 +1498,21 @@ namespace MozaPlugin.Devices.Led
             }
             else if (isOldWheel)
             {
+                if (esLapsed && _lastRpmBitmask > 0)
+                    SendEsWake(plugin);
                 if (_lastRpmBitmask >= 0)
                     plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", _lastRpmBitmask);
             }
         }
 
         /// <summary>Re-feed the last button frame — colour + bitmask (new-protocol wheels).</summary>
-        private void ResendButtons(MozaPlugin plugin, Color[] buttons)
+        private void ResendButtons(MozaPlugin plugin, Color[] buttons, bool bitmaskOnly)
         {
             var modelInfo = plugin.WheelModelInfo;
             if (modelInfo == null) return;
             int count = Math.Min(buttons.Length, modelInfo.ButtonLedCount);
-            SendColorChunks(plugin, buttons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap);
+            if (!bitmaskOnly)
+                SendColorChunks(plugin, buttons, count, "wheel-telemetry-button-colors", modelInfo.ButtonLedMap);
             if (_lastButtonBitmask >= 0)
                 plugin.DeviceManager.WriteArray("wheel-send-buttons-telemetry",
                     BuildWindowedBitmaskBytes(_lastButtonBitmask, modelInfo.ButtonWindowMask));
@@ -1446,13 +1520,24 @@ namespace MozaPlugin.Devices.Led
 
         /// <summary>Re-feed the last knob frame — colour + bitmask (active=window, so an
         /// all-black "off" renders dark instead of reverting to EEPROM).</summary>
-        private void ResendKnobs(MozaPlugin plugin, Color[] knobs, WheelModelInfo modelInfo)
+        private void ResendKnobs(MozaPlugin plugin, Color[] knobs, WheelModelInfo modelInfo, bool bitmaskOnly)
         {
             int count = Math.Min(knobs.Length, modelInfo.KnobCount);
-            SendColorChunks(plugin, knobs, count, "wheel-telemetry-knob-colors");
+            if (!bitmaskOnly)
+                SendColorChunks(plugin, knobs, count, "wheel-telemetry-knob-colors");
             if (_lastKnobBitmask >= 0)
                 plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
                     BuildWindowedBitmaskBytes(_lastKnobBitmask, (1 << modelInfo.KnobCount) - 1));
+        }
+
+        /// <summary>ES rims enter telemetry mode on an all-on→off pulse of the old
+        /// bitmask. Stamps the send clock so the lapse checks don't re-fire at once.</summary>
+        private void SendEsWake(MozaPlugin plugin)
+        {
+            _ledsAwake = true;
+            plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0x3FF);
+            plugin.DeviceManager.WriteSetting("wheel-old-send-telemetry", 0);
+            Interlocked.Exchange(ref _lastSendUtcTicks, DateTime.UtcNow.Ticks);
         }
 
         /// <summary>

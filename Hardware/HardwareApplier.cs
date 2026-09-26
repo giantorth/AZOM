@@ -48,16 +48,20 @@ namespace MozaPlugin.Hardware
         // writes these once. So: only write a persistent setting when its value
         // actually changed since the last write to THIS wheel. Keyed by MCU UID
         // so a genuinely different wheel (hot-swap) re-writes its config once.
-        private readonly System.Collections.Generic.Dictionary<string, long> _wheelCfgCache
+        //
+        // STATIC, like the base cache below and for the same reason: this applier is
+        // rebuilt on every SimHub game-switch reload, and an empty cache would re-write
+        // every wheel LED mode and static colour on each switch, over the live frames.
+        private static readonly System.Collections.Generic.Dictionary<string, long> s_wheelCfgCache
             = new System.Collections.Generic.Dictionary<string, long>();
-        private byte[] _wheelCfgCacheUid = System.Array.Empty<byte>();
-        // Leaf lock guarding _wheelCfgCache/_wheelCfgCacheUid only. Three threads reach
+        private static byte[] s_wheelCfgCacheUid = System.Array.Empty<byte>();
+        // Leaf lock guarding s_wheelCfgCache/s_wheelCfgCacheUid only. Three threads reach
         // them — the detection/UI thread via ApplyWheelToHardware, the UI thread via the
         // WriteIf* handlers, and the coalescing flush timer's ThreadPool callback. Every
         // critical section is a dictionary get/set with no I/O and no nesting; device
         // writes always happen after the lock is released.
-        private readonly object _wheelCfgCacheLock = new object();
-        // Guarded by _wheelCfgCacheLock, all keyed like _wheelCfgCache:
+        private static readonly object s_wheelCfgCacheLock = new object();
+        // Guarded by s_wheelCfgCacheLock, all keyed like s_wheelCfgCache:
         //  · LastWriteTicks — when we last actually issued a write, so a readback that
         //    contradicts the cache can tell "the wheel really diverged" from "our write
         //    is still in flight".
@@ -65,18 +69,18 @@ namespace MozaPlugin.Hardware
         //    suppressed the write, so a divergence can be re-asserted.
         //  · ReassertCount — bounded so a register the wheel refuses to accept can't turn
         //    the ~80 s parity-poll readback into an endless flash-write loop.
-        private readonly System.Collections.Generic.Dictionary<string, long> _wheelCfgLastWriteTicks
+        private static readonly System.Collections.Generic.Dictionary<string, long> s_wheelCfgLastWriteTicks
             = new System.Collections.Generic.Dictionary<string, long>(System.StringComparer.Ordinal);
-        private readonly System.Collections.Generic.Dictionary<string, long> _wheelCfgDesired
+        private static readonly System.Collections.Generic.Dictionary<string, long> s_wheelCfgDesired
             = new System.Collections.Generic.Dictionary<string, long>(System.StringComparer.Ordinal);
-        private readonly System.Collections.Generic.Dictionary<string, int> _wheelCfgReassertCount
+        private static readonly System.Collections.Generic.Dictionary<string, int> s_wheelCfgReassertCount
             = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.Ordinal);
         private const double WheelCfgAdoptQuietMs = 1500.0;
         private const int WheelCfgMaxReasserts = 3;
 
         private void SyncWheelCfgCache()
         {
-            lock (_wheelCfgCacheLock) SyncWheelCfgCacheLocked();
+            lock (s_wheelCfgCacheLock) SyncWheelCfgCacheLocked();
         }
 
         private void SyncWheelCfgCacheLocked()
@@ -90,18 +94,18 @@ namespace MozaPlugin.Hardware
             // apply had already written. Only a change between two KNOWN uids is a
             // genuine hot-swap. Adopt the uid the first time we learn it.
             if (uid.Length == 0) return;
-            if (_wheelCfgCacheUid.Length == 0) { _wheelCfgCacheUid = (byte[])uid.Clone(); return; }
+            if (s_wheelCfgCacheUid.Length == 0) { s_wheelCfgCacheUid = (byte[])uid.Clone(); return; }
 
-            bool same = uid.Length == _wheelCfgCacheUid.Length;
+            bool same = uid.Length == s_wheelCfgCacheUid.Length;
             for (int i = 0; same && i < uid.Length; i++)
-                if (uid[i] != _wheelCfgCacheUid[i]) same = false;
+                if (uid[i] != s_wheelCfgCacheUid[i]) same = false;
             if (!same)
             {
-                _wheelCfgCache.Clear();
-                _wheelCfgLastWriteTicks.Clear();
-                _wheelCfgDesired.Clear();
-                _wheelCfgReassertCount.Clear();
-                _wheelCfgCacheUid = (byte[])uid.Clone();
+                s_wheelCfgCache.Clear();
+                s_wheelCfgLastWriteTicks.Clear();
+                s_wheelCfgDesired.Clear();
+                s_wheelCfgReassertCount.Clear();
+                s_wheelCfgCacheUid = (byte[])uid.Clone();
             }
         }
 
@@ -110,14 +114,14 @@ namespace MozaPlugin.Hardware
         /// change worth a flash write. Returns false to skip a redundant re-write.</summary>
         private bool WheelCfgChanged(string key, long value)
         {
-            lock (_wheelCfgCacheLock)
+            lock (s_wheelCfgCacheLock)
             {
                 // Record the intent even when the write is suppressed — that's what
                 // PrimeWheelCfgFromDevice re-asserts after adopting a contradicting readback.
-                _wheelCfgDesired[key] = value;
-                if (_wheelCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
-                _wheelCfgCache[key] = value;
-                _wheelCfgLastWriteTicks[key] = System.DateTime.UtcNow.Ticks;
+                s_wheelCfgDesired[key] = value;
+                if (s_wheelCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
+                s_wheelCfgCache[key] = value;
+                s_wheelCfgLastWriteTicks[key] = System.DateTime.UtcNow.Ticks;
                 return true;
             }
         }
@@ -127,10 +131,10 @@ namespace MozaPlugin.Hardware
         /// when the key has never been seen.</summary>
         internal (long? Cached, long? Desired) WheelCfgDiag(string key)
         {
-            lock (_wheelCfgCacheLock)
+            lock (s_wheelCfgCacheLock)
             {
-                long? cached = _wheelCfgCache.TryGetValue(key, out var c) ? c : (long?)null;
-                long? desired = _wheelCfgDesired.TryGetValue(key, out var d) ? d : (long?)null;
+                long? cached = s_wheelCfgCache.TryGetValue(key, out var c) ? c : (long?)null;
+                long? desired = s_wheelCfgDesired.TryGetValue(key, out var d) ? d : (long?)null;
                 return (cached, desired);
             }
         }
@@ -141,8 +145,8 @@ namespace MozaPlugin.Hardware
         /// make the writer's own gate return false.</summary>
         private bool WheelCfgDiffers(string key, long value)
         {
-            lock (_wheelCfgCacheLock)
-                return !(_wheelCfgCache.TryGetValue(key, out var prev) && prev == value);
+            lock (s_wheelCfgCacheLock)
+                return !(s_wheelCfgCache.TryGetValue(key, out var prev) && prev == value);
         }
 
         /// <summary>
@@ -174,35 +178,35 @@ namespace MozaPlugin.Hardware
         {
             long desired = 0;
             bool reassert = false;
-            lock (_wheelCfgCacheLock)
+            lock (s_wheelCfgCacheLock)
             {
                 SyncWheelCfgCacheLocked();
-                if (!_wheelCfgCache.TryGetValue(key, out var cached))
+                if (!s_wheelCfgCache.TryGetValue(key, out var cached))
                 {
-                    _wheelCfgCache[key] = deviceValue;
+                    s_wheelCfgCache[key] = deviceValue;
                     return;
                 }
                 if (cached == deviceValue)
                 {
                     // Converged — clear the retry budget so a genuinely new divergence
                     // later gets its full allowance.
-                    _wheelCfgReassertCount.Remove(key);
+                    s_wheelCfgReassertCount.Remove(key);
                     return;
                 }
 
                 // Don't fight a write that hasn't had time to land.
-                if (_wheelCfgLastWriteTicks.TryGetValue(key, out var lastWrite)
+                if (s_wheelCfgLastWriteTicks.TryGetValue(key, out var lastWrite)
                     && (System.DateTime.UtcNow.Ticks - lastWrite)
                        < (long)(WheelCfgAdoptQuietMs * System.TimeSpan.TicksPerMillisecond))
                     return;
 
-                _wheelCfgCache[key] = deviceValue;
-                _wheelCfgReassertCount.TryGetValue(key, out int tries);
+                s_wheelCfgCache[key] = deviceValue;
+                s_wheelCfgReassertCount.TryGetValue(key, out int tries);
                 if (tries < WheelCfgMaxReasserts
-                    && _wheelCfgDesired.TryGetValue(key, out desired)
+                    && s_wheelCfgDesired.TryGetValue(key, out desired)
                     && desired != deviceValue)
                 {
-                    _wheelCfgReassertCount[key] = tries + 1;
+                    s_wheelCfgReassertCount[key] = tries + 1;
                     reassert = true;
                 }
             }
@@ -836,7 +840,10 @@ namespace MozaPlugin.Hardware
                     _data.WheelButtonDefaultDuringTelemetry[i] = buttonDefaults[i];
             }
             _data.MirrorPackedColors(flagColors, _data.WheelFlagColors);
-            if (idleColor != null && idleColor.Length > 0)
+            // The sleep bundle owns the idle colour (the UI writes only there); the
+            // legacy per-game field is a stale capture, used only when the bundle has none.
+            bool bundleHasSleepColor = sleepColor != null && sleepColor.Length > 0;
+            if (!bundleHasSleepColor && idleColor != null && idleColor.Length > 0)
             {
                 var rgb = MozaProfile.UnpackColor(idleColor[0]);
                 _data.WheelIdleColor[0] = rgb[0];
@@ -1029,7 +1036,7 @@ namespace MozaPlugin.Hardware
                 if (btnColChg || btnDefChg) WriteButtonStaticColors(buttonColors, model);
                 if (_detectionState.DashDetected && WheelCfgChangedArr("dash-flag-color", flagColors))
                     WriteColorArray(flagColors, "dash-flag-color", 6);
-                if (idleColor != null && idleColor.Length > 0 && hasSleepLight)
+                if (!bundleHasSleepColor && idleColor != null && idleColor.Length > 0 && hasSleepLight)
                 {
                     var rgb = MozaProfile.UnpackColor(idleColor[0]);
                     if (WheelCfgChangedForApply("wheel-idle-color", ((long)rgb[0] << 16) | ((long)rgb[1] << 8) | rgb[2]))
@@ -1074,7 +1081,10 @@ namespace MozaPlugin.Hardware
                 if (rpmDisp  >= 0 && WheelCfgChangedForApply("wheel-set-rpm-display-mode", rpmDisp))   _deviceManager.WriteSetting("wheel-set-rpm-display-mode", rpmDisp);
                 if (esRpmBri >= 0 && WheelCfgChangedForApply("wheel-old-rpm-brightness", esRpmBri))    _deviceManager.WriteSetting("wheel-old-rpm-brightness", esRpmBri);
                 if (WheelCfgChangedArr("wheel-old-rpm-color", esRpmColors))
+                {
                     WriteColorArray(esRpmColors, "wheel-old-rpm-color", 10);
+                    MozaLedDeviceManager.InvalidateLiveCacheAny(LedKind.Rpm);
+                }
             }
 
             // Display-rotation mode (0=off, 1=smooth, 2=immediate). Session-0x02
@@ -2439,8 +2449,15 @@ namespace MozaPlugin.Hardware
                 MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, rpmWindow));
             _deviceManager.WriteArray("wheel-send-buttons-telemetry",
                 MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, modelInfo?.ButtonWindowMask ?? 0));
+            // Knobs: active=0/window=0 hands the rings back to their stored colours.
+            if (_detectionState.NewWheelDetected && (modelInfo?.KnobCount ?? 0) > 0)
+                _deviceManager.WriteArray("wheel-send-knob-telemetry",
+                    MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, 0));
             _deviceManager.WriteSetting("wheel-old-send-telemetry", 0);
             _deviceManager.WriteSetting("dash-send-telemetry", 0);
+            // The live pipeline's caches must agree with what the wheel now shows, or the
+            // keepalive replays the frame this just cleared.
+            MozaLedDeviceManager.NoteClearedAny();
         }
     }
 }

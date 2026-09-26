@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using HidSharp;
-using HidSharp.Reports;
-using HidSharp.Reports.Input;
 
 namespace MozaPlugin.Protocol
 {
@@ -85,6 +83,32 @@ namespace MozaPlugin.Protocol
         // Live HidStreams so Dispose can force-close silent devices' blocked reads.
         private readonly object _streamsLock = new object();
         private readonly List<HidStream> _liveStreams = new List<HidStream>();
+        // PID of each live stream, for the Wine HID diagnostics (WineHidDiagnostics).
+        private readonly Dictionary<HidStream, ushort> _livePids = new Dictionary<HidStream, ushort>();
+
+        /// <summary>PIDs of the MOZA HID devices currently open and being read.</summary>
+        public ushort[] OpenPidsSnapshot()
+        {
+            lock (_streamsLock) return _livePids.Values.Distinct().ToArray();
+        }
+
+        private void TrackStream(HidStream stream, ushort pid)
+        {
+            lock (_streamsLock)
+            {
+                _liveStreams.Add(stream);
+                _livePids[stream] = pid;
+            }
+        }
+
+        private void UntrackStream(HidStream stream)
+        {
+            lock (_streamsLock)
+            {
+                _liveStreams.Remove(stream);
+                _livePids.Remove(stream);
+            }
+        }
 
         public MozaHidReader(MozaData data)
         {
@@ -196,7 +220,7 @@ namespace MozaPlugin.Protocol
                     {
                         openCount++;
                         // Register so Dispose() can force-close on shutdown.
-                        lock (_streamsLock) _liveStreams.Add(stream);
+                        TrackStream(stream, (ushort)device.ProductID);
                         openPaths.Add(DevicePathOf(device));
                         if (deviceClass == MozaHidClass.Stalks) _data.IsStalksConnected = true;
 
@@ -215,7 +239,7 @@ namespace MozaPlugin.Protocol
                     }
                     catch
                     {
-                        lock (_streamsLock) _liveStreams.Remove(stream);
+                        UntrackStream(stream);
                         try { stream.Dispose(); } catch { }
                         throw;
                     }
@@ -331,6 +355,25 @@ namespace MozaPlugin.Protocol
         /// controller"), so no regex pattern matched and the steering / pedal /
         /// handbrake bars stayed blank.
         /// </summary>
+        /// <summary>Whether the reader consumes this PID's HID (unknown PIDs
+        /// admitted for forward-compat; AB9 / shifter / dashboard skipped).</summary>
+        internal static bool ReadsPid(ushort pid)
+        {
+            switch (MozaUsbIds.Categorize(pid))
+            {
+                case MozaDeviceCategory.Wheelbase:
+                case MozaDeviceCategory.Pedals:
+                case MozaDeviceCategory.Handbrake:
+                case MozaDeviceCategory.Hub:
+                case MozaDeviceCategory.Stalks:
+                case MozaDeviceCategory.MBooster:
+                case MozaDeviceCategory.Unknown:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)> FindMozaDevices()
         {
             var result = new List<(HidDevice, Dictionary<uint, (int, int)>, MozaHidClass, string)>();
@@ -348,47 +391,37 @@ namespace MozaPlugin.Protocol
                     if (dev.VendorID != MozaPortDiscovery.MozaVid) continue;
 
                     ushort pid = (ushort)dev.ProductID;
+                    if (!ReadsPid(pid)) continue;
                     var category = MozaUsbIds.Categorize(pid);
-
                     bool isMBooster = category == MozaDeviceCategory.MBooster;
-                    bool isStandard =
-                        category == MozaDeviceCategory.Wheelbase ||
-                        category == MozaDeviceCategory.Pedals    ||
-                        category == MozaDeviceCategory.Handbrake ||
-                        category == MozaDeviceCategory.Hub       ||
-                        category == MozaDeviceCategory.Stalks    ||
-                        category == MozaDeviceCategory.Unknown;  // forward-compat for new PIDs
-
-                    if (!isMBooster && !isStandard) continue;
 
                     var usages = new Dictionary<uint, (int min, int max)>();
                     // Usages the filter below rejects, logged so a support bundle
                     // shows axes the plugin ignored (e.g. Wine renaming an axis to
                     // a Simulation-page usage) instead of just omitting them.
                     var dropped = new HashSet<uint>();
-                    var descriptor = dev.GetReportDescriptor();
-                    foreach (var item in descriptor.DeviceItems)
+                    void Consider(uint usage, int min, int max)
                     {
-                        foreach (var report in item.InputReports)
-                        {
-                            foreach (var dataItem in report.DataItems)
-                            {
-                                foreach (uint usage in dataItem.Usages.GetAllValues())
-                                {
-                                    // For mBooster we want EVERY GenericDesktop axis
-                                    // (page 0x0001, usages 0x30..0x37) — the doc
-                                    // doesn't pin a specific axis, so we accept the
-                                    // first one that streams data at runtime.
-                                    bool isAxis = (usage >> 16) == 0x0001 && (usage & 0xFFFF) >= 0x30 && (usage & 0xFFFF) <= 0x37;
-                                    bool isButton = (usage >> 16) == 0x0009;
-                                    bool tracked = Array.IndexOf(TrackedUsages, usage) >= 0;
-                                    if (tracked || isButton || (isMBooster && isAxis))
-                                        usages[usage] = (dataItem.LogicalMinimum, dataItem.LogicalMaximum);
-                                    else
-                                        dropped.Add(usage);
-                                }
-                            }
-                        }
+                        // For mBooster we want EVERY GenericDesktop axis
+                        // (page 0x0001, usages 0x30..0x37) — the doc
+                        // doesn't pin a specific axis, so we accept the
+                        // first one that streams data at runtime.
+                        bool isAxis = (usage >> 16) == 0x0001 && (usage & 0xFFFF) >= 0x30 && (usage & 0xFFFF) <= 0x37;
+                        bool isButton = (usage >> 16) == 0x0009;
+                        bool tracked = Array.IndexOf(TrackedUsages, usage) >= 0;
+                        if (tracked || isButton || (isMBooster && isAxis))
+                            usages[usage] = (min, max);
+                        else
+                            dropped.Add(usage);
+                    }
+
+                    using (var layout = HidInputLayout.Open(dev.DevicePath ?? ""))
+                    {
+                        foreach (var v in layout.Values)
+                            Consider(v.FullUsage, v.LogicalMin, v.LogicalMax);
+                        foreach (var b in layout.Buttons)
+                            for (int u = b.UsageMin; u <= b.UsageMax; u++)
+                                Consider(((uint)b.UsagePage << 16) | (uint)u, 0, 1);
                     }
                     if (dropped.Count > 0)
                         MozaLog.Debug(
@@ -420,7 +453,13 @@ namespace MozaPlugin.Protocol
                         result.Add((dev, usages, kind, identity));
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    string pid = "?";
+                    try { pid = dev.ProductID.ToString("X4"); } catch { }
+                    MozaLog.DebugIfChanged($"hid-find-{pid}",
+                        $"[AZOM] HID PID {pid} skipped: {ex.GetType().Name}: {ex.Message}");
+                }
             }
 
             return result;
@@ -462,292 +501,321 @@ namespace MozaPlugin.Protocol
             {
                 if (released) return;
                 released = true;
-                lock (_streamsLock) _liveStreams.Remove(stream);
+                UntrackStream(stream);
                 try { stream.Dispose(); } catch { }
             }
             try
             {
-                var descriptor = device.GetReportDescriptor();
-                // Find the DeviceItem that contains our tracked usages
-                DeviceItem? targetItem = null;
-                foreach (var item in descriptor.DeviceItems)
+                using (var layout = HidInputLayout.Open(device.DevicePath ?? ""))
                 {
-                    foreach (var report in item.InputReports)
-                    {
-                        foreach (var dataItem in report.DataItems)
-                        {
-                            if (dataItem.Usages.GetAllValues().Any(u => usages.ContainsKey(u)))
-                            {
-                                targetItem = item;
-                                break;
-                            }
-                        }
-                        if (targetItem != null) break;
-                    }
-                    if (targetItem != null) break;
-                }
+                    // Tracked axes, and the button runs (page 0x09) grouped per
+                    // collection + report: HidP_GetUsages returns every pressed
+                    // usage of a page in one call, so one query per group.
+                    var fields = layout.Values.Where(v => usages.ContainsKey(v.FullUsage)).ToArray();
+                    var buttonGroups = layout.Buttons
+                        .Where(b => b.UsagePage == 0x0009)
+                        .GroupBy(b => (b.LinkCollection, b.ReportId))
+                        .Select(g => new ButtonGroup(g.First(), g.SelectMany(b => Enumerable.Range(b.UsageMin, b.UsageMax - b.UsageMin + 1))
+                                                              .Select(u => (ushort)u)
+                                                              .Where(u => usages.ContainsKey(0x00090000u | u))))
+                        .Where(g => g.Usages.Length > 0)
+                        .ToArray();
 
-                if (targetItem == null)
-                {
+                    if (fields.Length == 0 && buttonGroups.Length == 0)
+                    {
+                        if (kind == MozaHidClass.MBooster)
+                            MozaLog.Warn($"[AZOM/mBooster] {identity}: no input field carries a tracked usage — HID read never started for this device.");
+                        return;
+                    }
+
+                    // Cache steering axis range if this device has it
+                    if (usages.ContainsKey(UsageX))
+                    {
+                        _data.SteeringAngleRawMin = usages[UsageX].min;
+                        _data.SteeringAngleRawMax = usages[UsageX].max;
+                    }
+
+                    // Diagnostic-only counters for the mBooster HID pipeline —
+                    // every step here (report decode failure, no changed usages,
+                    // an untracked usage firing) previously failed completely
+                    // silently, which made a stuck-at-zero position bar
+                    // impossible to root-cause from logs alone.
+                    long mbReceivedCount = 0;
+                    long mbParseFailCount = 0;
+                    long mbChangeCount = 0;
+
+                    // Stable axis order for an mBooster chain host: sort this
+                    // device's GenericDesktop axis usages (0x30..0x37) ascending and
+                    // map each to an index. Axis 0 = the master unit, 1 = 2nd
+                    // chained device, etc. (the "deterministic order" the registry
+                    // routes on). Computed once per device open.
+                    Dictionary<uint, int>? mBoosterAxisIndex = null;
+                    string mBoosterContainerId = "";
                     if (kind == MozaHidClass.MBooster)
-                        MozaLog.Warn($"[AZOM/mBooster] {identity}: no DeviceItem contains any tracked usage — HID read never started for this device.");
-                    return;
-                }
-
-                // Cache steering axis range if this device has it
-                if (usages.ContainsKey(UsageX))
-                {
-                    _data.SteeringAngleRawMin = usages[UsageX].min;
-                    _data.SteeringAngleRawMax = usages[UsageX].max;
-                }
-
-                stream.ReadTimeout = Timeout.Infinite;
-                var parser = targetItem.CreateDeviceItemInputParser();
-                var receiver = descriptor.CreateHidDeviceInputReceiver();
-                var buffer = new byte[descriptor.MaxInputReportLength];
-                var stopped = new ManualResetEventSlim(false);
-
-                // Diagnostic-only counters for the mBooster HID pipeline —
-                // every step here (report parse failure, no changed usages,
-                // an untracked usage firing) previously failed completely
-                // silently, which made a stuck-at-zero position bar
-                // impossible to root-cause from logs alone.
-                long mbReceivedCount = 0;
-                long mbParseFailCount = 0;
-                long mbChangeCount = 0;
-
-                // Stable axis order for an mBooster chain host: sort this
-                // device's GenericDesktop axis usages (0x30..0x37) ascending and
-                // map each to an index. Axis 0 = the master unit, 1 = 2nd
-                // chained device, etc. (the "deterministic order" the registry
-                // routes on). Computed once per device open.
-                Dictionary<uint, int>? mBoosterAxisIndex = null;
-                string mBoosterContainerId = "";
-                if (kind == MozaHidClass.MBooster)
-                {
-                    var axisUsages = usages.Keys
-                        .Where(u => (u >> 16) == 0x0001 && (u & 0xFFFF) >= 0x30 && (u & 0xFFFF) <= 0x37)
-                        .OrderBy(u => u)
-                        .ToList();
-                    mBoosterAxisIndex = new Dictionary<uint, int>(axisUsages.Count);
-                    for (int ai = 0; ai < axisUsages.Count; ai++)
-                        mBoosterAxisIndex[axisUsages[ai]] = ai;
-                    // Container ID (same across this device's HID + CDC interfaces)
-                    // so the registry can pair this axis stream to its CDC lane.
-                    try { mBoosterContainerId = MozaPortDiscovery.Instance.GetHidContainerId(device.DevicePath ?? ""); }
-                    catch { }
-                    if (mBoosterContainerId.Length == 0)
                     {
-                        // No Container ID: Wine has no Enum\HID registry at all,
-                        // and some Windows driver stacks omit the value. The USB
-                        // serial is the same on both interfaces of one device and
-                        // is what the sysfs source publishes as the CDC-side
-                        // ContainerId, so it pairs them. On Windows this is a
-                        // harmless no-op — a serial never matches a Container GUID.
-                        try { mBoosterContainerId = device.GetSerialNumber() ?? ""; }
+                        var axisUsages = usages.Keys
+                            .Where(u => (u >> 16) == 0x0001 && (u & 0xFFFF) >= 0x30 && (u & 0xFFFF) <= 0x37)
+                            .OrderBy(u => u)
+                            .ToList();
+                        mBoosterAxisIndex = new Dictionary<uint, int>(axisUsages.Count);
+                        for (int ai = 0; ai < axisUsages.Count; ai++)
+                            mBoosterAxisIndex[axisUsages[ai]] = ai;
+                        // Container ID (same across this device's HID + CDC interfaces)
+                        // so the registry can pair this axis stream to its CDC lane.
+                        try { mBoosterContainerId = MozaPortDiscovery.Instance.GetHidContainerId(device.DevicePath ?? ""); }
                         catch { }
+                        if (mBoosterContainerId.Length == 0)
+                        {
+                            // No Container ID: Wine has no Enum\HID registry at all,
+                            // and some Windows driver stacks omit the value. The USB
+                            // serial is the same on both interfaces of one device and
+                            // is what the sysfs source publishes as the CDC-side
+                            // ContainerId, so it pairs them. On Windows this is a
+                            // harmless no-op — a serial never matches a Container GUID.
+                            try { mBoosterContainerId = device.GetSerialNumber() ?? ""; }
+                            catch { }
+                        }
+                        MozaLog.Debug($"[AZOM/mBooster] {identity}: {axisUsages.Count} axis/axes " +
+                            $"[{string.Join(", ", axisUsages.Select(u => $"0x{u & 0xFFFF:X2}"))}] container='{mBoosterContainerId}'");
                     }
-                    MozaLog.Debug($"[AZOM/mBooster] {identity}: {axisUsages.Count} axis/axes " +
-                        $"[{string.Join(", ", axisUsages.Select(u => $"0x{u & 0xFFFF:X2}"))}] container='{mBoosterContainerId}'");
-                }
 
-                // changedIndex → usage is fixed by the report descriptor; caching
-                // it avoids a LINQ enumerator per changed value per report (the
-                // steering axis changes continuously at report rate).
-                var usageByChangedIndex = new Dictionary<int, uint>();
-
-                receiver.Received += (sender, e) =>
-                {
-                    try
+                    // Routes one changed usage value into MozaData / the events.
+                    void Dispatch(uint usage, int logical)
                     {
                         if (kind == MozaHidClass.MBooster)
                         {
-                            long n = System.Threading.Interlocked.Increment(ref mbReceivedCount);
-                            if (n == 1 || n % 500 == 0)
-                                MozaLog.Debug($"[AZOM/mBooster] {identity}: Received event #{n}");
+                            long n = System.Threading.Interlocked.Increment(ref mbChangeCount);
+                            if (n <= 20 || n % 200 == 0)
+                                MozaLog.Debug(
+                                    $"[AZOM/mBooster] {identity}: changed usage 0x{usage:X8} " +
+                                    $"raw={logical} tracked={usages.ContainsKey(usage)}");
                         }
-                        while (receiver.TryRead(buffer, 0, out Report report))
+
+                        if (usage == 0 || !usages.ContainsKey(usage)) return;
+
+                        if (usage == UsageX)
                         {
-                            if (!parser.TryParseReport(buffer, 0, report))
+                            _data.SteeringAngleRaw = logical;
+                        }
+                        else if ((usage >> 16) == 0x0009)
+                        {
+                            // mBooster Pedals don't share the wheel button surface
+                            // — never route their button reports into the wheel's
+                            // button-state table or the handbrake's pressed flag.
+                            if (kind == MozaHidClass.MBooster) return;
+
+                            bool pressed = logical != 0;
+
+                            // MOZA Stalks buttons ride their own surface so they
+                            // never collide with wheel button indices — route to
+                            // StalksButtonStates and raise an edge event on change.
+                            if (kind == MozaHidClass.Stalks)
                             {
-                                if (kind == MozaHidClass.MBooster)
+                                int stalkIndex = (int)(usage & 0xFFFF) - 1;
+                                if (stalkIndex >= 0 && stalkIndex < MozaData.MaxStalksButtons)
                                 {
-                                    long n = System.Threading.Interlocked.Increment(ref mbParseFailCount);
-                                    if (n == 1 || n % 500 == 0)
-                                        MozaLog.Debug($"[AZOM/mBooster] {identity}: TryParseReport failed #{n}");
+                                    if (_data.StalksButtonStates[stalkIndex] != pressed)
+                                    {
+                                        _data.StalksButtonStates[stalkIndex] = pressed;
+                                        if (stalkIndex >= _data.StalksButtonCount)
+                                            _data.StalksButtonCount = stalkIndex + 1;
+                                        try { StalksButtonChanged?.Invoke(stalkIndex, pressed); } catch { }
+                                    }
                                 }
-                                continue;
+                                return;
                             }
 
-                            while (parser.HasChanged)
+                            if (isHandbrake)
                             {
-                                int changedIndex = parser.GetNextChangedIndex();
-                                var value = parser.GetValue(changedIndex);
-                                if (!usageByChangedIndex.TryGetValue(changedIndex, out uint usage))
+                                _data.HandbrakeButtonPressed = pressed;
+                            }
+                            else
+                            {
+                                int buttonIndex = (int)(usage & 0xFFFF) - 1;
+                                if (buttonIndex == 120)
                                 {
-                                    usage = value.Usages.FirstOrDefault();
-                                    usageByChangedIndex[changedIndex] = usage;
+                                    _data.HandbrakeButtonPressed = pressed;
                                 }
-
+                                else if (buttonIndex >= 0 && buttonIndex < MozaData.MaxButtons)
+                                {
+                                    _data.ButtonStates[buttonIndex] = pressed;
+                                    if (buttonIndex >= _data.ButtonCount)
+                                        _data.ButtonCount = buttonIndex + 1;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            var range = usages[usage];
+                            if (range.max > range.min)
+                            {
                                 if (kind == MozaHidClass.MBooster)
                                 {
-                                    long n = System.Threading.Interlocked.Increment(ref mbChangeCount);
-                                    if (n <= 20 || n % 200 == 0)
-                                        MozaLog.Debug(
-                                            $"[AZOM/mBooster] {identity}: changed usage 0x{usage:X8} " +
-                                            $"raw={value.GetLogicalValue()} tracked={usages.ContainsKey(usage)}");
+                                    // mBooster axes route via the registry — never directly into
+                                    // MozaData. A chain host reports EVERY hosted pedal as its own
+                                    // GenericDesktop axis on one report, so we emit ALL of them
+                                    // (each tagged with its stable index) rather than only the
+                                    // first; the registry routes each axis to throttle/brake/clutch
+                                    // by its per-axis role and merges across lanes first-wins.
+                                    double normalized01 = (logical - range.min) / (double)(range.max - range.min);
+                                    if (normalized01 < 0) normalized01 = 0;
+                                    if (normalized01 > 1) normalized01 = 1;
+                                    int axisIndex = (mBoosterAxisIndex != null && mBoosterAxisIndex.TryGetValue(usage, out var ai)) ? ai : 0;
+                                    try { MBoosterAxisChanged?.Invoke(identity, mBoosterContainerId, axisIndex, normalized01); }
+                                    catch (Exception ex) { MozaLog.Debug($"[AZOM] mBooster axis handler: {ex.Message}"); }
+                                    return;
                                 }
 
-                                if (usage == 0 || !usages.ContainsKey(usage)) continue;
+                                int pct = NormalizePct(logical, range.min, range.max);
 
-                                if (usage == UsageX)
+                                if (kind == MozaHidClass.Pedals)
                                 {
-                                    _data.SteeringAngleRaw = value.GetLogicalValue();
+                                    // Standalone pedal HID exposes only Rx/Ry/Rz; these
+                                    // are throttle/brake/clutch (NOT paddles), confirmed
+                                    // on CRP2 hardware (axis order matches the base's
+                                    // throttle<brake<clutch usage ordering).
+                                    switch (usage)
+                                    {
+                                        case UsageRx: _data.ThrottlePosition = pct; break;
+                                        case UsageRy: _data.BrakePosition    = pct; break;
+                                        case UsageRz: _data.ClutchPosition   = pct; break;
+                                    }
+                                    return;
                                 }
-                                else if ((usage >> 16) == 0x0009)
+
+                                switch (usage)
                                 {
-                                    // mBooster Pedals don't share the wheel button surface
-                                    // — never route their button reports into the wheel's
-                                    // button-state table or the handbrake's pressed flag.
-                                    if (kind == MozaHidClass.MBooster) continue;
-
-                                    bool pressed = value.GetLogicalValue() != 0;
-
-                                    // MOZA Stalks buttons ride their own surface so they
-                                    // never collide with wheel button indices — route to
-                                    // StalksButtonStates and raise an edge event on change.
-                                    if (kind == MozaHidClass.Stalks)
-                                    {
-                                        int stalkIndex = (int)(usage & 0xFFFF) - 1;
-                                        if (stalkIndex >= 0 && stalkIndex < MozaData.MaxStalksButtons)
-                                        {
-                                            if (_data.StalksButtonStates[stalkIndex] != pressed)
-                                            {
-                                                _data.StalksButtonStates[stalkIndex] = pressed;
-                                                if (stalkIndex >= _data.StalksButtonCount)
-                                                    _data.StalksButtonCount = stalkIndex + 1;
-                                                try { StalksButtonChanged?.Invoke(stalkIndex, pressed); } catch { }
-                                            }
-                                        }
-                                        continue;
-                                    }
-
-                                    if (isHandbrake)
-                                    {
-                                        _data.HandbrakeButtonPressed = pressed;
-                                    }
-                                    else
-                                    {
-                                        int buttonIndex = (int)(usage & 0xFFFF) - 1;
-                                        if (buttonIndex == 120)
-                                        {
-                                            _data.HandbrakeButtonPressed = pressed;
-                                        }
-                                        else if (buttonIndex >= 0 && buttonIndex < MozaData.MaxButtons)
-                                        {
-                                            _data.ButtonStates[buttonIndex] = pressed;
-                                            if (buttonIndex >= _data.ButtonCount)
-                                                _data.ButtonCount = buttonIndex + 1;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    var range = usages[usage];
-                                    if (range.max > range.min)
-                                    {
-                                        if (kind == MozaHidClass.MBooster)
-                                        {
-                                            // mBooster axes route via the registry — never directly into
-                                            // MozaData. A chain host reports EVERY hosted pedal as its own
-                                            // GenericDesktop axis on one report, so we emit ALL of them
-                                            // (each tagged with its stable index) rather than only the
-                                            // first; the registry routes each axis to throttle/brake/clutch
-                                            // by its per-axis role and merges across lanes first-wins.
-                                            double raw = value.GetLogicalValue();
-                                            double normalized01 = (raw - range.min) / (double)(range.max - range.min);
-                                            if (normalized01 < 0) normalized01 = 0;
-                                            if (normalized01 > 1) normalized01 = 1;
-                                            int axisIndex = (mBoosterAxisIndex != null && mBoosterAxisIndex.TryGetValue(usage, out var ai)) ? ai : 0;
-                                            try { MBoosterAxisChanged?.Invoke(identity, mBoosterContainerId, axisIndex, normalized01); }
-                                            catch (Exception ex) { MozaLog.Debug($"[AZOM] mBooster axis handler: {ex.Message}"); }
-                                            continue;
-                                        }
-
-                                        int pct = NormalizePct(value.GetLogicalValue(), range.min, range.max);
-
-                                        if (kind == MozaHidClass.Pedals)
-                                        {
-                                            // Standalone pedal HID exposes only Rx/Ry/Rz; these
-                                            // are throttle/brake/clutch (NOT paddles), confirmed
-                                            // on CRP2 hardware (axis order matches the base's
-                                            // throttle<brake<clutch usage ordering).
-                                            switch (usage)
-                                            {
-                                                case UsageRx: _data.ThrottlePosition = pct; break;
-                                                case UsageRy: _data.BrakePosition    = pct; break;
-                                                case UsageRz: _data.ClutchPosition   = pct; break;
-                                            }
-                                            continue;
-                                        }
-
-                                        switch (usage)
-                                        {
-                                            case UsageY:      _data.CombinedPaddlePosition = pct; break;
-                                            case UsageZ:      _data.ThrottlePosition       = pct; break;
-                                            case UsageRx:     _data.RightPaddlePosition    = pct; break;
-                                            case UsageRy:     _data.LeftPaddlePosition     = pct; break;
-                                            case UsageRz:     _data.BrakePosition          = pct; break;
-                                            case UsageSlider: _data.ClutchPosition         = pct; break;
-                                            case UsageSimThr: _data.ClutchPosition         = pct; break;
-                                            case UsageDial:   _data.HandbrakePosition      = pct; break;
-                                            case UsageSimRud: _data.HandbrakePosition      = pct; break;
-                                        }
-                                    }
+                                    case UsageY:      _data.CombinedPaddlePosition = pct; break;
+                                    case UsageZ:      _data.ThrottlePosition       = pct; break;
+                                    case UsageRx:     _data.RightPaddlePosition    = pct; break;
+                                    case UsageRy:     _data.LeftPaddlePosition     = pct; break;
+                                    case UsageRz:     _data.BrakePosition          = pct; break;
+                                    case UsageSlider: _data.ClutchPosition         = pct; break;
+                                    case UsageSimThr: _data.ClutchPosition         = pct; break;
+                                    case UsageDial:   _data.HandbrakePosition      = pct; break;
+                                    case UsageSimRud: _data.HandbrakePosition      = pct; break;
                                 }
                             }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        long n = System.Threading.Interlocked.Increment(ref _hidParseErrorCount);
-                        // Log first, then every 1000th error to avoid spam.
-                        if (n == 1 || n % 1000 == 0)
-                            MozaLog.Debug($"[AZOM] HID parse error #{n}: {ex.Message}");
-                    }
-                };
-                receiver.Stopped += (sender, e) =>
-                {
-                    try { stopped.Set(); } catch (ObjectDisposedException) { }
-                };
 
-                try
-                {
-                    receiver.Start(stream);
+                    // Last dispatched value per field / button; the first report
+                    // dispatches everything so state from a previous open is overwritten.
+                    var lastValues = new int[fields.Length];
+                    var seenValues = new bool[fields.Length];
+                    var pressedBuf = new ushort[Math.Max(1, layout.MaxPressed(0x0009))];
+                    var buffer = new byte[layout.InputReportLength];
+
+                    stream.ReadTimeout = Timeout.Infinite;
                     MozaLog.Debug(
                         $"[AZOM] HID device opened: {device.GetFriendlyName()} " +
                         $"(VID {device.VendorID:X4} PID {device.ProductID:X4}, " +
                         $"usages: {string.Join(", ", usages.Keys.Select(u => $"0x{u:X8}"))})");
 
-                    while (!_stop && !stopped.Wait(250)) { }
-                }
-                finally
-                {
-                    // De-register + dispose here so Stopped fires while `stopped` is still alive.
-                    Release();
-                    // Give receiver a chance to drain Stopped before disposing the event.
-                    try { stopped.Wait(500); } catch { }
-                    stopped.Dispose();
+                    // Blocks until a report arrives; Dispose / the re-enumerate path
+                    // close the stream, which throws out of Read and ends the loop.
+                    while (!_stop)
+                    {
+                        int n = stream.Read(buffer, 0, buffer.Length);
+                        if (n <= 0) continue;
+                        if (n < buffer.Length) Array.Clear(buffer, n, buffer.Length - n);
+
+                        try
+                        {
+                            if (kind == MozaHidClass.MBooster)
+                            {
+                                long r = System.Threading.Interlocked.Increment(ref mbReceivedCount);
+                                if (r == 1 || r % 500 == 0)
+                                    MozaLog.Debug($"[AZOM/mBooster] {identity}: Received report #{r}");
+                            }
+
+                            byte reportId = buffer[0];
+                            for (int i = 0; i < fields.Length; i++)
+                            {
+                                if (fields[i].ReportId != reportId) continue;
+                                if (!layout.TryGetValue(fields[i], buffer, out int value))
+                                {
+                                    if (kind == MozaHidClass.MBooster)
+                                    {
+                                        long f = System.Threading.Interlocked.Increment(ref mbParseFailCount);
+                                        if (f == 1 || f % 500 == 0)
+                                            MozaLog.Debug($"[AZOM/mBooster] {identity}: HidP_GetUsageValue failed #{f}");
+                                    }
+                                    continue;
+                                }
+                                if (seenValues[i] && lastValues[i] == value) continue;
+                                seenValues[i] = true;
+                                lastValues[i] = value;
+                                Dispatch(fields[i].FullUsage, value);
+                            }
+
+                            foreach (var group in buttonGroups)
+                            {
+                                if (group.Field.ReportId != reportId) continue;
+                                int count = layout.GetPressed(group.Field, buffer, pressedBuf);
+                                if (count < 0) continue;
+                                group.Apply(pressedBuf, count, (usage, pressed) => Dispatch(0x00090000u | usage, pressed ? 1 : 0));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            long e = System.Threading.Interlocked.Increment(ref _hidParseErrorCount);
+                            // Log first, then every 1000th error to avoid spam.
+                            if (e == 1 || e % 1000 == 0)
+                                MozaLog.Debug($"[AZOM] HID parse error #{e}: {ex.Message}");
+                        }
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[AZOM] HID device read error ({device.GetFriendlyName()}): {ex.Message}");
+                // A closed stream on shutdown / re-enumerate is the normal exit.
+                if (!_stop)
+                    MozaLog.Debug($"[AZOM] HID device read error ({device.GetFriendlyName()}): {ex.Message}");
             }
             finally
             {
-                // Covers the early returns / throws before receiver.Start.
                 Release();
+            }
+        }
+
+        /// <summary>
+        /// One page-0x09 button run (a link collection within one report) and
+        /// the last state of each of its tracked buttons.
+        /// </summary>
+        private sealed class ButtonGroup
+        {
+            public readonly HidButtonField Field;
+            public readonly ushort[] Usages;
+            private readonly Dictionary<ushort, int> _index;
+            private readonly bool[] _state;
+            private readonly bool[] _now;
+            private bool _seen;
+
+            public ButtonGroup(HidButtonField field, IEnumerable<ushort> usages)
+            {
+                Field = field;
+                Usages = usages.Distinct().OrderBy(u => u).ToArray();
+                _index = new Dictionary<ushort, int>(Usages.Length);
+                for (int i = 0; i < Usages.Length; i++) _index[Usages[i]] = i;
+                _state = new bool[Usages.Length];
+                _now = new bool[Usages.Length];
+            }
+
+            /// <summary>Calls <paramref name="changed"/> for every button whose state
+            /// differs from the last report (all of them on the first).</summary>
+            public void Apply(ushort[] pressed, int count, Action<ushort, bool> changed)
+            {
+                Array.Clear(_now, 0, _now.Length);
+                for (int i = 0; i < count; i++)
+                    if (_index.TryGetValue(pressed[i], out int idx)) _now[idx] = true;
+                for (int i = 0; i < Usages.Length; i++)
+                {
+                    if (_seen && _state[i] == _now[i]) continue;
+                    _state[i] = _now[i];
+                    changed(Usages[i], _now[i]);
+                }
+                _seen = true;
             }
         }
 
