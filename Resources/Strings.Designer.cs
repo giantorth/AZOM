@@ -611,12 +611,6 @@ namespace MozaPlugin.Resources
         public static string Banner_WheelFwOutdated_Title => Get("Banner_WheelFwOutdated_Title");
         public static string Banner_WheelFwOutdated_BodyFmt => Get("Banner_WheelFwOutdated_BodyFmt");
         public static string Banner_WheelFwOutdated_GenericSubject => Get("Banner_WheelFwOutdated_GenericSubject");
-        public static string Banner_WineHidraw_Title => Get("Banner_WineHidraw_Title");
-        public static string Banner_WineHidraw_BodyFmt => Get("Banner_WineHidraw_BodyFmt");
-        public static string Banner_WineHidraw_FixFailedFmt => Get("Banner_WineHidraw_FixFailedFmt");
-        public static string Banner_WineHidrawRestart_Title => Get("Banner_WineHidrawRestart_Title");
-        public static string Banner_WineHidrawRestart_Body => Get("Banner_WineHidrawRestart_Body");
-        public static string Button_FixWineHidraw => Get("Button_FixWineHidraw");
         public static string Banner_ProfileNotAdded_TitleFmt => Get("Banner_ProfileNotAdded_TitleFmt");
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
         public static string Banner_ProfileNotAddedBase_Body => Get("Banner_ProfileNotAddedBase_Body");

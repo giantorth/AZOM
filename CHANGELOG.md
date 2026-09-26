@@ -27,6 +27,9 @@ All notable changes to the AZOM plugin are documented here.
 - **ES rims return to SimHub lighting after an idle gap.** The wake-up that puts them in
   telemetry mode is repeated when lit frames resume.
 
+- **Wheel, pedal and button inputs read again on newer Wine.** Inputs are now decoded through
+  the system HID parser, which handles devices the previous parser rejected.
+
 
 ## [1.6.2]
 

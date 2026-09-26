@@ -103,15 +103,12 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
             if (Protocol.WineHost.IsWine)
                 sb.AppendLine($"Native exec:    {(Protocol.WineNativeExec.Available ? "available" : "UNAVAILABLE (no cold-start warm-up)")}  last: {Protocol.WineNativeExec.LastRun}");
-            var hidraw = Protocol.WineHidrawAdvisor.Evaluate(plugin.HidReader, plugin.StartupUtc, DateTime.UtcNow);
-            if (hidraw != Protocol.WineHidrawStatus.None)
+            var hid = Protocol.WineHidDiagnostics.Capture(plugin.HidReader);
+            if (hid != null)
             {
                 string Pids(IEnumerable<ushort> pids) => string.Join(",", pids.Select(p => $"0x{p:X4}"));
-                sb.AppendLine($"Wine HID:       {hidraw.State}  hidraw=[{Pids(hidraw.Hidraw.Keys)}] open=[{Pids(hidraw.OpenPids)}] " +
-                              $"dead=[{Pids(hidraw.DeadPids)}] missing=[{Pids(hidraw.MissingPids)}]");
-                sb.AppendLine($"winebus:        {hidraw.Winebus}");
-                if (Protocol.WineHidrawAdvisor.LastFixError.Length > 0)
-                    sb.AppendLine($"                last fix failed: {Protocol.WineHidrawAdvisor.LastFixError}");
+                sb.AppendLine($"Wine HID:       hidraw=[{Pids(hid.Hidraw.Keys)}] open=[{Pids(hid.OpenPids)}] dead=[{Pids(hid.DeadPids)}]");
+                sb.AppendLine($"winebus:        {hid.Winebus}");
             }
 
             if (ports.Count == 0)

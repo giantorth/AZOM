@@ -801,10 +801,4 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Lagret farge</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>FYLL ULIKE LED-ER</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>FYLL LIKE LED-ER</value></data>
-  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Wine skjuler MOZA-inndata for utvidelsen</value></data>
-  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} er ikke eksponert for SimHub som en rå HID-enhet, så ratt-, pedal- og knappeinndata mangler. «Fiks» legger {1} til i Wines EnableHidraw-liste for dette prefikset.</value></data>
-  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Kunne ikke skrive til registeret ({0}). Legg {1} til i EnableHidraw under HKLM\System\CurrentControlSet\Services\winebus manuelt.</value></data>
-  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Wine HID-innstilling oppdatert</value></data>
-  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Lukk SimHub og alle andre programmer i dette Wine-prefikset, og start deretter SimHub på nytt. Wine tar bare i bruk endringen ved en ny oppstart.</value></data>
-  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Fiks</value></data>
 </root>

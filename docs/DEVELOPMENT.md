@@ -343,7 +343,7 @@ On host **sleep/resume** the wheel firmware power-cycles and silently tears down
 - `MozaCommandDatabase` — 200+ command definitions (identity probes, settings, LED matrices, AB9/CM2/mBooster blocks).
 - `MozaResponseParser` — bit-7 toggle + nibble-swap + wildcard matching; `busHint` disambiguates shared dev id 0x12 (base main vs AB9 vs mBooster); unwraps display sub-device identity; silently drops session control frames.
 - `MozaProtocol` — constants + the two checksum helpers. Production code uses `CalculateWireChecksum()` (raw sum + `count(0x7E in body) × 0x7E`) on both send and verify — see [`docs/protocol/wire/checksum.md`](protocol/wire/checksum.md). Also `WheelEchoPrefixes`/`IsWheelEcho` for write-echo keepalive detection.
-- `MozaHidReader` — HidSharp-based physical-input reader (steering/pedals/paddles/handbrake/buttons) enumerated by VID 0x346E + PID category; powers UI live-input bars and the `AZOM.*` input properties with no game running; mBooster axes route through the registry.
+- `MozaHidReader` — physical-input reader (steering/pedals/paddles/handbrake/buttons) enumerated by VID 0x346E + PID category; powers UI live-input bars and the `AZOM.*` input properties with no game running; mBooster axes route through the registry. HidSharp enumerates and reads the stream; reports are decoded by `HidInputLayout` through `hid.dll` (`HidP_*` on the OS preparsed data), not HidSharp's report descriptor, which HidSharp can't reconstruct for some Wine-exposed devices. `tools/wine-hid-enum` runs both against a prefix's devices.
 
 ### Device management (`Devices/`, root managers)
 

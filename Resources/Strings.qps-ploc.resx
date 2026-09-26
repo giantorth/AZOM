@@ -786,10 +786,4 @@
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Buried bone!</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>YAP ODD!!</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>YAP EVEN!!</value></data>
-  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Grrr Wuff!</value></data>
-  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} Snarf Bork Arf Wuff! {1} Yip Awoo!</value></data>
-  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Grrr ({0})! {1} Bork Snarf!</value></data>
-  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Awoo Yip!</value></data>
-  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Snarf Bork Arf Wuff Snarf Yip Awoo!</value></data>
-  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Wuff!</value></data>
 </root>

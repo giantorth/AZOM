@@ -803,10 +803,4 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Saved color</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>FILL ODD LEDS</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>FILL EVEN LEDS</value></data>
-  <data name="Banner_WineHidraw_Title" xml:space="preserve"><value>Wine is hiding MOZA inputs from the plugin</value></data>
-  <data name="Banner_WineHidraw_BodyFmt" xml:space="preserve"><value>{0} is not exposed to SimHub as a raw HID device, so steering, pedal and button inputs are missing. Fix adds {1} to Wine's EnableHidraw list for this prefix.</value></data>
-  <data name="Banner_WineHidraw_FixFailedFmt" xml:space="preserve"><value>Could not write the registry ({0}). Add {1} to EnableHidraw under HKLM\System\CurrentControlSet\Services\winebus manually.</value></data>
-  <data name="Banner_WineHidrawRestart_Title" xml:space="preserve"><value>Wine HID setting updated</value></data>
-  <data name="Banner_WineHidrawRestart_Body" xml:space="preserve"><value>Close SimHub and every other program in this Wine prefix, then start SimHub again. Wine only applies the change on a fresh start.</value></data>
-  <data name="Button_FixWineHidraw" xml:space="preserve"><value>Fix</value></data>
 </root>
