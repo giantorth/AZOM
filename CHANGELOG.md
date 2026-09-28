@@ -30,6 +30,12 @@ All notable changes to the AZOM plugin are documented here.
 - **Wheel, pedal and button inputs read again on newer Wine.** Inputs are now decoded through
   the system HID parser, which handles devices the previous parser rejected.
 
+- **mBooster Sim Input Mapping can have a deadzone.** Its first node now drags vertically too;
+  at 0 it holds the output at zero up to that point.
+
+- **The mBooster Pedal Feel graph scales to Max Force.** A light setting no longer sits
+  squashed at the bottom of a 200 kg axis.
+
 
 ## [1.6.2]
 

@@ -1523,6 +1523,13 @@ on the pedal's own unit (`MotorDeviceForRole` — see
   every other preset) topped out around 86% instead of reaching 100%.
   `MozaPlugin.FixMBoosterCurveArraysSeventhsBug` is a one-shot migration
   that repairs any profile that saved one of the old preset shapes.
+  **Output deadzone** (bug report 6SWSMJX0): the first node drags on both
+  axes (middle nodes are Y-only, the last is free). Dropping it to Y=0 and
+  dragging it right holds output at 0 up to that input — the only
+  sim-output deadzone AZOM has; the reporter found Pedal Feel's Deadzone
+  changes the motor feel but not the reported value. The evaluator
+  clamps spline control points to 0–100, so the curve stays inside 0–100
+  and a flat run at 0 doesn't dip negative (editor: `ClampSplineToPlot`).
 
 Both hardware calibrations use the shared `-1` "not yet set / no override"
 sentinel, so a fresh profile never overwrites what is already on the
@@ -1662,9 +1669,13 @@ is capture-confirmed.
 absolute force.** Its Y *is* Max Force (`0x0E`) — there is no other
 selector left for it to be — so on a Y axis normalized to the
 Deadzone→Max Force span, that point is 100% by definition and could never
-move. AZOM therefore plots this curve in kg: `YMax` = the role's own Max
-Force ceiling (200kg Brake, 20kg Throttle/Clutch, set in
-`UpdateMBoosterConfigVisibilityForRole`), the `(0,0)` point sits at
+move. AZOM therefore plots this curve in kg: `YMax` follows the current
+Max Force (or Deadzone, if higher) × 1.25, rounded up to 4 × {1,2,5,10,20,25,50}
+so the kg axis labels stay whole, capped at the role's Max Force ceiling
+(`SettingsControl.UpdateMBoosterFeelAxis`). It is held while the curve is
+being dragged (the top-point drag writes Max Force) and re-fit on
+`MozaCurveEditor.DragCompleted`. A fixed ceiling axis (200kg) squashed a
+40kg curve into the bottom fifth of the plot (bug report 6SWSMJX0). The `(0,0)` point sits at
 `DeadzoneKg` and the `(100,100)` point at `MaxForceKg`, both bound to
 their sliders (`MozaCurveEditor.SpanLow`/`SpanHigh`, the latter two-way so
 the drag writes the slider). The 6 interior nodes are **still stored** as

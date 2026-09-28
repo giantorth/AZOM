@@ -117,10 +117,9 @@ namespace MozaControls
         public bool LockLastNodeX { get => (bool)GetValue(LockLastNodeXProperty); set => SetValue(LockLastNodeXProperty, value); }
 
         // When true (with AllowHorizontalDrag), only the FIRST and LAST nodes
-        // may move horizontally — every node in between is Y-only. The first
-        // node is additionally locked in Y (X-only movement), since its sole
-        // role is to mark where the curve's usable input range begins; the
-        // last node keeps moving on both axes. Dragging either endpoint
+        // may move horizontally — every node in between is Y-only. Both
+        // endpoints move on both axes: the first node at Y=0 dragged right is
+        // an output deadzone (bug report 6SWSMJX0). Dragging either endpoint
         // horizontally rescales all the in-between nodes' X in proportion to
         // their old position between the two (old) endpoints, so the curve's
         // shape (relative node spacing) is preserved rather than left behind.
@@ -132,6 +131,26 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool EndpointsOnlyDraggableInX { get => (bool)GetValue(EndpointsOnlyDraggableInXProperty); set => SetValue(EndpointsOnlyDraggableInXProperty, value); }
+
+        // When true, every spline control point is clamped to YMin..YMax, so
+        // (convex hull) the drawn curve never leaves the plot vertically — a
+        // flat run of nodes at 0 stays flat instead of dipping below the axis.
+        // Must match the evaluator of whatever consumes the curve: the Sim
+        // Input Mapping curve's is MozaMBoosterRegistry.EvaluateCurveArbitraryX,
+        // which applies the same clamp. Off by default — hardware-evaluated
+        // curves keep their unclamped drawing.
+        public static readonly DependencyProperty ClampSplineToPlotProperty =
+            DependencyProperty.Register(nameof(ClampSplineToPlot), typeof(bool), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public bool ClampSplineToPlot { get => (bool)GetValue(ClampSplineToPlotProperty); set => SetValue(ClampSplineToPlotProperty, value); }
+
+        // True while a node or the end anchor is being dragged. Owners that
+        // rescale the axis from a value the drag itself writes (Pedal Feel:
+        // YMax from Max Force) wait for DragCompleted, else the axis moves
+        // under the pointer mid-gesture.
+        public bool IsDragging => _dragNode >= 0 || _dragEndAnchor;
+        public event EventHandler? DragCompleted;
 
         // When true, a node's Y is ALSO clamped between its immediate
         // neighbours' current Y (index-adjacent, same convention as the
@@ -664,7 +683,7 @@ namespace MozaControls
                 _canvas.MouseLeftButtonDown += OnMouseDown;
                 _canvas.MouseMove += OnMouseMove;
                 _canvas.MouseLeftButtonUp += OnMouseUp;
-                _canvas.LostMouseCapture += (_, __) => { _dragNode = -1; _dragEndAnchor = false; };
+                _canvas.LostMouseCapture += (_, __) => EndDrag();
             }
         }
 
@@ -701,15 +720,24 @@ namespace MozaControls
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
             if ((_dragNode < 0 && !_dragEndAnchor) || _canvas == null) return;
-            if (e.LeftButton != MouseButtonState.Pressed) { _dragNode = -1; _dragEndAnchor = false; _canvas.ReleaseMouseCapture(); return; }
+            if (e.LeftButton != MouseButtonState.Pressed) { _canvas.ReleaseMouseCapture(); EndDrag(); return; }
             ApplyDrag(e.GetPosition(_canvas));
         }
 
         private void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
             if (_canvas != null && _canvas.IsMouseCaptured) _canvas.ReleaseMouseCapture();
+            EndDrag();
+        }
+
+        // Every path out of a drag lands here (mouse-up, lost capture, button
+        // released outside the canvas); raises DragCompleted once per gesture.
+        private void EndDrag()
+        {
+            bool was = IsDragging;
             _dragNode = -1;
             _dragEndAnchor = false;
+            if (was) DragCompleted?.Invoke(this, EventArgs.Empty);
         }
 
         private int FindClosestNode(Point p)
@@ -775,15 +803,12 @@ namespace MozaControls
             int lastNode = ClampedNodeCount() - 1;
             bool isEndpoint = _dragNode == 0 || _dragNode == lastNode;
 
-            // Vertical drag — locked for the first node when
-            // EndpointsOnlyDraggableInX is set (see its doc comment): that
-            // node moves horizontally only. A collapsed span (Max Force
-            // dragged down onto Deadzone) has no Y to place a node at, so it
-            // skips the vertical half too and leaves horizontal drag working.
+            // Vertical drag. A collapsed span (Max Force dragged down onto
+            // Deadzone) has no Y to place a node at, so it skips the vertical
+            // half and leaves horizontal drag working.
             bool span = SpanMode;
             double spanRange = span ? SpanRange : 0;
-            bool canDragY = !(EndpointsOnlyDraggableInX && _dragNode == 0)
-                            && (!span || spanRange > 0);
+            bool canDragY = !span || spanRange > 0;
             if (canDragY)
             {
                 // Node values are stored in axis units, or as a percentage of
@@ -1102,8 +1127,16 @@ namespace MozaControls
                 Point p1 = allPts[i + 1];
                 Point p2 = allPts[i + 2];
                 Point p3 = allPts[i + 3];
-                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
-                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
+                double c1y = p1.Y + (p2.Y - p0.Y) / 6.0;
+                double c2y = p2.Y - (p3.Y - p1.Y) / 6.0;
+                if (ClampSplineToPlot)
+                {
+                    double top = PadTop, bottom = PadTop + plotH;
+                    c1y = Math.Max(top, Math.Min(bottom, c1y));
+                    c2y = Math.Max(top, Math.Min(bottom, c2y));
+                }
+                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, c1y);
+                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, c2y);
                 fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
                 segments[i] = (p1, c1, c2, p2);
             }

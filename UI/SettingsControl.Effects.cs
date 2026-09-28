@@ -232,6 +232,40 @@ namespace MozaPlugin.UI
             RefreshMBoosterCalUi();
         }
 
+        // Pedal Feel axis maxima as 4 × step, so the 5 Y labels stay whole kg.
+        private static readonly double[] MBoosterFeelAxisSteps = { 1, 2, 5, 10, 20, 25, 50 };
+
+        /// <summary>
+        /// Pedal Feel plots absolute kg. Scale its Y axis to the current Max
+        /// Force (or Deadzone, if higher) plus headroom for dragging the
+        /// top-right point up, capped at this pedal's Max Force ceiling — a
+        /// fixed ceiling axis squashed a 40kg curve into the bottom fifth of a
+        /// 200kg plot (bug report 6SWSMJX0). Skipped mid-drag: the drag writes
+        /// Max Force, so rescaling would move the axis under the pointer; the
+        /// editor's DragCompleted reruns it.
+        /// </summary>
+        private void UpdateMBoosterFeelAxis()
+        {
+            var editor = MBoosterInputCurveEditor;
+            // Null during InitializeComponent (the sliders' ValueChanged can
+            // run before later-declared elements exist).
+            if (editor == null || editor.IsDragging
+                || MBoosterMaxForceSlider == null || MBoosterDeadzoneSlider == null) return;
+            double ceiling = MBoosterMaxForceSlider.Maximum;
+            double target = Math.Max(MBoosterMaxForceSlider.Value, MBoosterDeadzoneSlider.Value) * 1.25;
+            double yMax = ceiling;
+            foreach (double step in MBoosterFeelAxisSteps)
+            {
+                if (4 * step >= target) { yMax = Math.Min(ceiling, 4 * step); break; }
+            }
+            if (yMax <= 0) yMax = Math.Max(1, ceiling);
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            editor.YMax = yMax;
+            editor.YAxisLabels = string.Join(",",
+                yMax.ToString("0.#", inv), (yMax * 0.75).ToString("0.#", inv),
+                (yMax * 0.5).ToString("0.#", inv), (yMax * 0.25).ToString("0.#", inv), "0");
+        }
+
         /// <summary>
         /// Show the load-cell-only Sim Input controls (Sensor Output Ratio + Max
         /// Threshold) only when the selected pedal is a BRAKE — a throttle/clutch
@@ -279,13 +313,9 @@ namespace MozaPlugin.UI
                 MBoosterMaxForceSlider.Maximum = mfMax;
                 MBoosterDeadzoneSlider.Minimum = dzMin;
                 MBoosterDeadzoneSlider.Maximum = dzMax;
-                // Pedal Feel's curve plots absolute force, so its Y ceiling is
-                // this role's own Max Force ceiling (200kg Brake / 20kg
-                // Throttle-Clutch) — otherwise a light pedal's whole curve would
-                // sit squashed against the bottom of a 200kg axis. Inside the
-                // suppressor too: SpanHigh is bound TwoWay to the Max Force
-                // slider, so the editor can push a value back the same way.
-                MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+                // Inside the suppressor too: SpanHigh is bound TwoWay to the
+                // Max Force slider, so the editor can push a value back.
+                UpdateMBoosterFeelAxis();
             }
 
             // Effects list is role-scoped too: ABS, Lockup, Threshold, and
@@ -344,7 +374,7 @@ namespace MozaPlugin.UI
                 MBoosterMaxForceSlider.Maximum = MBoosterUiConstants.ActiveMaxForceMaxKg;
                 MBoosterDeadzoneSlider.Minimum = MBoosterUiConstants.ActiveDeadzoneMinKg;
                 MBoosterDeadzoneSlider.Maximum = MBoosterUiConstants.ActiveDeadzoneMaxKg;
-                MBoosterInputCurveEditor.YMax = MBoosterMaxForceSlider.Maximum;
+                UpdateMBoosterFeelAxis();
             }
 
             // Seed every control to its default once. The curve editors take no

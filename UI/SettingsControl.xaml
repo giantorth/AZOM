@@ -2132,7 +2132,8 @@
                                         <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               AllowHorizontalDrag="True"
-                                                              EndpointsOnlyDraggableInX="True"/>
+                                                              EndpointsOnlyDraggableInX="True"
+                                                              ClampSplineToPlot="True"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>

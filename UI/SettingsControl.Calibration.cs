@@ -428,6 +428,8 @@ namespace MozaPlugin.UI
         // like the other mBooster sliders).
         private void MBoosterDeadzoneSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            // View-only, so it also follows suppressed seeds.
+            UpdateMBoosterFeelAxis();
             if (_suppressEvents) return;
             double v = Math.Round(e.NewValue, 1);
             SetValueText(MBoosterDeadzoneValue, v.ToString("F1"));
@@ -448,7 +450,9 @@ namespace MozaPlugin.UI
         // 5VR5AQ8Y) — not clamped to Max Threshold on the wire. See
         // MBoosterDeviceController.PushFeelCurveResync and
         // PushMBoosterFeelCurve.
-        private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateMBoosterFeelAxis();
             OnIntSliderChanged(e.NewValue, MBoosterMaxForceValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -456,6 +460,7 @@ namespace MozaPlugin.UI
                 s.MaxForceKg = v;
                 PushMBoosterFeelCurve(s);
             });
+        }
 
         // Sensor Output Ratio — blend between the mBooster's angle sensor
         // (0%) and its load cell (100%). Live-pushes on every drag, same as

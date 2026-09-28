@@ -731,8 +731,12 @@ namespace MozaPlugin.Devices.MBooster
             double p3x = px[p3i], p3y = py[p3i];
             if (p2x <= p1x) return p1y; // degenerate (equal X) — shouldn't happen given drag clamping
 
-            double c1x = p1x + (p2x - p0x) / 6.0, c1y = p1y + (p2y - p0y) / 6.0;
-            double c2x = p2x - (p3x - p1x) / 6.0, c2y = p2y - (p3y - p1y) / 6.0;
+            // Control Y clamped to 0-100 so (convex hull) the output never
+            // leaves 0-100 — a first node at Y=0 is then a true flat deadzone
+            // instead of dipping negative. MozaCurveEditor.ClampSplineToPlot
+            // draws the same thing.
+            double c1x = p1x + (p2x - p0x) / 6.0, c1y = Math.Max(0, Math.Min(100, p1y + (p2y - p0y) / 6.0));
+            double c2x = p2x - (p3x - p1x) / 6.0, c2y = Math.Max(0, Math.Min(100, p2y - (p3y - p1y) / 6.0));
 
             double lo = 0, hi = 1;
             for (int iter = 0; iter < 24; iter++)
