@@ -432,6 +432,21 @@ proves a role is assigned to an axis with no pedal while a wired axis
 holds the same role, that provably-stale assignment is cleared across
 all profiles (logged one-time heal).
 
+The active/passive type lines are persisted the same way
+(`MBoosterKnownPedalTypes`, written when a complete block is read) and
+seed `MBoosterDeviceController.TabAxisTypes` — **tab placement only**
+(which pedals the Pedals tab lists vs the mBooster tab). Routing, chain
+detection and effects still wait for the live block (`AxisTypes` /
+`AxisTypesComplete`), since a stale seed there would flash config into
+the wrong unit. Without the seed the mBooster tab showed a passive
+pedal for ~30 s after connect, then switched pedals under the user.
+
+Both tabs are also read-only until the lane's settings entry is final:
+its serial has resolved (re-keying the transport-keyed placeholder), or
+10 s have passed since detection without one
+(`MozaPlugin.IsMBoosterSettingsResolved`). An edit on the placeholder
+only survives the re-key as a merge conflict.
+
 The HID interface exposes 3–4 axes regardless of how many pedals are
 wired, and a sole pedal reports on its **role's** axis (brake → Ry =
 axis 1), not axis 0. The host `0x12` retains calibration registers for
@@ -2481,6 +2496,31 @@ rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 | `<p>_machinelimit_min` / `_max`                  | `TravelStartMm` / `TravelEndMm`                         | **inferred**, see below                                                                |
 | `<p>_softlimit_hardness_press` / `_release`      | `EndstopFrontStiffness` / `EndstopEndStiffness`         | **inferred**, see below                                                                |
 | `brake_press_combine`                            | `SensorOutputRatioPct`                                  | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
+| `<p>_forcelimit_min` / `_max`                    | `DeadzoneKg` / `MaxForceKg`                             | kg; see "Pedal Feel keys" below                                                        |
+| `<p>_forces_curve[0..5]`                         | `InputCurveY` (% of Deadzone→Max Force)                 | 7 kg values; `[6]` is the Max Force point                                              |
+| `<p>_stroke_curve[0..5]`                         | `InputCurveX` (% of travel)                             | **inferred**; mm inside `machinelimit_min..max`                                        |
+| `<p>_damping_press` / `_release` (+ `_switch`)   | `DampingPressPct` / `DampingReleasePct`                 | **inferred**; switched off → 0%                                                        |
+| `<p>_damping_[release_]segment{1,2}_position`    | `SegmentedDamping.Divider{1,2}{Pressed,Released}`       | **inferred**; un-prefixed-direction pair = Pressed                                     |
+| `<p>_damping_{press,release}_segment{1..3}_value`| `SegmentedDamping.Seg{1..3}{Pressed,Released}`          | **inferred**                                                                           |
+| `<p>_damping_switch`                             | `SegmentedDamping.DampingEnabled`                       | **inferred**                                                                           |
+| `<p>_friction_press` (+ `_switch`)               | `NaturalFrictionPct` / `NaturalFrictionEnabled`         | **inferred**; one value drives both `0xAE` selectors — a differing `_release` is noted |
+| `<p>_gforce_switch/_max_pedal_movement/_response_speed` | `GForce.Enabled/.MaxTravelMm/.ResponseSpeedPct`  | same controls as Pit House's UI                                                        |
+
+The motor-only rows (Pedal Feel, damping, friction, G-Force) are skipped for a
+passive target — the hardware apply never writes them from a passive pedal.
+
+### Pedal Feel keys
+
+The sample Brake preset holds `brake_forcelimit_min: 11`,
+`brake_forcelimit_max: 47`, `brake_forces_curve` =
+`[16.14, 21.28, 26.43, 31.57, 36.71, 41.86, 47.00]` — exactly
+`11 + k/7 × 36` for k = 1..7 — and `brake_stroke_curve` =
+`[36.40 … 43.57]`, exactly `k/7` of its `machinelimit` range
+(34.97–45.0 mm) for k = 1..6. The same k/7 is the Pedal Feel wire default
+on both axes (see [Pedal Feel default curve shape](#pedal-feel-default-curve-shape-and-node-x-domain--revised-mbooster-deadzone-slider-does-nothing-report)),
+so these are Deadzone, Max Force and the 6 node Y (kg) / X (mm) positions.
+The Y nodes are converted to % of the preset's own Deadzone→Max Force span,
+X to % of its own travel range — the fractions the wire carries.
 
 Values are clamped to the plugin's own slider bounds (`MBoosterUiConstants`)
 on import, and the travel pair additionally honours `TravelMinGapMm` /
@@ -2524,8 +2564,6 @@ with `*` in the import wizard's change list:
 
 ### Not imported — no plugin surface
 
-`<p>_damping_*` (including the 3-segment `_segment{1,2,3}_{position,value}`
-curve), `<p>_friction_*`, `<p>_forcelimit_min/max`, `<p>_gforce_*`,
 `<p>_motor_vibration_*` (PitHouse's own motor test; `_balance` has no
 counterpart at all), and the device-wide `force_max_coef`, `pressure_weight`,
 `enter_sleep_time`, `game_mode`. The un-prefixed `machinelimit_*`,

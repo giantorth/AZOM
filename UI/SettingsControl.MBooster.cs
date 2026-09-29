@@ -64,6 +64,15 @@ namespace MozaPlugin.UI
         // edits keep writing against — the previously-seeded profile/device.
         private string? _mboosterSeededProfileName;
         private string? _mboosterSeededIdentity;
+        // Pedal (axis) last seeded. The selection moves on its own when a
+        // passive pedal's type lands after connect; the page must reseed then
+        // or it shows that pedal's values while edits go to the new one.
+        private int _mboosterSeededPedalIndex = -1;
+
+        // How long after detection a lane's serial may take before its
+        // transport-keyed settings are taken as final (serial resolves in ~2s;
+        // a unit that never answers keeps that key for good).
+        private static readonly TimeSpan MBoosterSerialWait = TimeSpan.FromSeconds(10);
 
         // The exact MBoosterDeviceSettings INSTANCE last seeded from — not
         // just a string identity check, because MozaPlugin
@@ -166,6 +175,7 @@ namespace MozaPlugin.UI
                 }
                 if (!selectionValid)
                 {
+                    StopMBoosterPedalTests();
                     if (selectedDeviceStillPresent)
                         _mboosterEffectPedalIndex = sameDeviceRetargetAxis;
                     else
@@ -298,6 +308,16 @@ namespace MozaPlugin.UI
             UpdateMBoosterEffectPassiveState();
             UpdateMBoosterConfigVisibilityForRole();
 
+            // Read-only until the lane's settings entry is final — before the
+            // serial resolves, GetOrCreateMBoosterSettings hands out a
+            // transport-keyed placeholder, and edits made to it only survive
+            // the re-key as merge conflicts. Not seeded either, so the
+            // placeholder's defaults never show as if they were saved values.
+            bool settingsResolved = _plugin != null && _plugin.IsMBoosterSettingsResolved(selected, MBoosterSerialWait);
+            MBoosterDevicePanel.IsEnabled = settingsResolved;
+            MBoosterDeviceRowsList.IsEnabled = settingsResolved;
+            if (!settingsResolved) return;
+
             // Re-seed when the active profile or the selected device changed
             // since the last seed, OR the settings object itself is a
             // different instance than last time (see _mboosterSeededSettings)
@@ -309,6 +329,7 @@ namespace MozaPlugin.UI
             var currentProfileName = _plugin.Settings?.ProfileStore?.CurrentProfile?.Name;
             if (!string.Equals(currentProfileName, _mboosterSeededProfileName, StringComparison.Ordinal)
                 || !string.Equals(selected.Identity, _mboosterSeededIdentity, StringComparison.OrdinalIgnoreCase)
+                || _mboosterEffectPedalIndex != _mboosterSeededPedalIndex
                 || !ReferenceEquals(s, _mboosterSeededSettings))
                 _mboosterUiSeeded = false;
 
@@ -344,6 +365,7 @@ namespace MozaPlugin.UI
             _mboosterUiSeeded = true;
             _mboosterSeededProfileName = currentProfileName;
             _mboosterSeededIdentity = selected.Identity;
+            _mboosterSeededPedalIndex = _mboosterEffectPedalIndex;
             _mboosterSeededSettings = s;
         }
 
@@ -368,22 +390,13 @@ namespace MozaPlugin.UI
             OnMBoosterDeviceRowSelected(row.Identity, row.AxisIndex);
         }
 
-        /// <summary>Row selection logic — fires when a pedal row's label Button
-        /// is clicked. Selects BOTH the physical device AND the specific pedal
-        /// (axis) on it in one step, replacing what the old MBoosterDeviceCombo_Changed
-        /// (device only) + MBoosterEffectPedalCombo_SelectionChanged (pedal only)
-        /// used to do separately.</summary>
-        private void OnMBoosterDeviceRowSelected(string identity, int axisIndex)
+        /// <summary>Stop any sustained Engine/ABS/Traction Control/Wheel Spin/
+        /// Gear Shift/Road Texture/Lockup/Threshold/Brake Fade/G-Force/custom
+        /// test on the currently selected pedal. Call before the selection
+        /// moves off it — otherwise it keeps buzzing with no visible toggle
+        /// left to turn it off (the new pedal's reseed clears the toggles).</summary>
+        private void StopMBoosterPedalTests()
         {
-            if (_suppressEvents) return;
-            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
-                && axisIndex == _mboosterEffectPedalIndex)
-                return;
-            // Stop any sustained Engine/ABS/Traction Control/Wheel Spin/
-            // Gear Shift/Road Texture/Lockup/Threshold/Brake Fade test on
-            // the pedal we're navigating away from — otherwise it keeps
-            // buzzing with no visible toggle left to turn it off (the new
-            // pedal's tab reseeds its own, unrelated toggle state).
             if (MBoosterEngineTestToggle.IsChecked == true)
                 CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
             if (MBoosterAbsTestToggle.IsChecked == true)
@@ -405,6 +418,20 @@ namespace MozaPlugin.UI
             if (MBoosterGForceTestToggle.IsChecked == true)
                 CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
             StopAllCustomEffectTests();
+        }
+
+        /// <summary>Row selection logic — fires when a pedal row's label Button
+        /// is clicked. Selects BOTH the physical device AND the specific pedal
+        /// (axis) on it in one step, replacing what the old MBoosterDeviceCombo_Changed
+        /// (device only) + MBoosterEffectPedalCombo_SelectionChanged (pedal only)
+        /// used to do separately.</summary>
+        private void OnMBoosterDeviceRowSelected(string identity, int axisIndex)
+        {
+            if (_suppressEvents) return;
+            if (string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
+                && axisIndex == _mboosterEffectPedalIndex)
+                return;
+            StopMBoosterPedalTests();
             _mboosterSelectedIdentity = identity;
             _mboosterEffectPedalIndex = axisIndex;
             _mboosterUiSeeded = false;

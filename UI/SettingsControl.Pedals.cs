@@ -135,12 +135,24 @@ namespace MozaPlugin.UI
             PedalSelectorBrake.Visibility = brake ? Visibility.Visible : Visibility.Collapsed;
             PedalSelectorClutch.Visibility = clutch ? Visibility.Visible : Visibility.Collapsed;
             BrakeAngleRatioRow.Visibility = passive ? Visibility.Collapsed : Visibility.Visible;
+            // A passive pedal's group edits its mBooster's settings entry —
+            // read-only until that entry is final, same as the mBooster tab.
+            ThrottlePedalGroup.IsEnabled = PassiveGroupEditable(0, passive);
+            BrakePedalGroup.IsEnabled = PassiveGroupEditable(1, passive);
+            ClutchPedalGroup.IsEnabled = PassiveGroupEditable(2, passive);
 
             bool selectedAvailable = _pedalGroup == "throttle" ? throttle
                                    : _pedalGroup == "brake" ? brake
                                    : clutch;
             if (!selectedAvailable)
                 SelectPedalGroup(throttle ? "throttle" : brake ? "brake" : "clutch");
+        }
+
+        private bool PassiveGroupEditable(int role, bool passive)
+        {
+            if (!passive) return true;
+            var t = _passivePedals[role];
+            return t != null && _plugin.IsMBoosterSettingsResolved(t.Value.Controller, MBoosterSerialWait);
         }
 
         /// <summary>

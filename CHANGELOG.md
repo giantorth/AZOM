@@ -36,6 +36,18 @@ All notable changes to the AZOM plugin are documented here.
 - **The mBooster Pedal Feel graph scales to Max Force.** A light setting no longer sits
   squashed at the bottom of a 200 kg axis.
 
+- **The mBooster page shows the right pedal's settings after startup.** When a passive pedal
+  moved to the Pedals tab, the page switched pedals but kept showing the old one's values.
+
+- **mBooster passive pedals land on the Pedals tab straight away.** Their type is remembered
+  from the last session instead of waiting ~30 s for the pedal to report it.
+
+- **PitHouse pedal presets import Pedal Feel, damping, friction and G-Force.** Deadzone, Max
+  Force and the feel curve now come across instead of being skipped.
+
+- **mBooster settings are read-only until the pedal has identified.** Edits made in the first
+  seconds after connect could be overridden by the saved values.
+
 
 ## [1.6.2]
 

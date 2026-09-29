@@ -349,6 +349,9 @@ namespace MozaPlugin.UI
         private void ShowMBoosterDemoPanels()
         {
             MBoosterDevicePanel.Visibility = Visibility.Visible;
+            // A real lane's resolve guard may have left these disabled.
+            MBoosterDevicePanel.IsEnabled = true;
+            MBoosterDeviceRowsList.IsEnabled = true;
             MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
             MBoosterBrakeOnlyPanel.Visibility = Visibility.Visible;

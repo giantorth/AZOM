@@ -52,6 +52,8 @@ namespace MozaPlugin.Devices.MBooster
         private readonly Action<string, bool[]>? _onConnectivityResolved;
         private readonly Func<string, byte[]?>? _chainRolesSeedLookup;
         private readonly Action<string, byte[]>? _onChainRolesResolved;
+        private readonly Func<string, byte[]?>? _axisTypesSeedLookup;
+        private readonly Action<string, byte[]>? _onAxisTypesResolved;
         private readonly Func<bool>? _pedalSlotDetected;
 
         // Highest merged position (0..100) each role has reached this session —
@@ -150,8 +152,9 @@ namespace MozaPlugin.Devices.MBooster
 
         private static int PassiveRoleIndex(MBoosterDeviceController c, int axisIndex)
         {
-            var types = c.AxisTypes;
-            if (types == null || !c.AxisTypesComplete) return -1;
+            // Tab placement, so last session's seed counts until live types land.
+            var types = c.TabAxisTypes;
+            if (types == null) return -1;
             if (axisIndex < 0 || axisIndex >= types.Length || types[axisIndex] != 2) return -1;
             if (!c.IsAxisConnected(axisIndex)) return -1;
             return c.RoleIndexForAxis(axisIndex);
@@ -212,7 +215,9 @@ namespace MozaPlugin.Devices.MBooster
             Action<string, bool[]>? onConnectivityResolved = null,
             Func<string, byte[]?>? chainRolesSeedLookup = null,
             Action<string, byte[]>? onChainRolesResolved = null,
-            Func<bool>? pedalSlotDetected = null)
+            Func<bool>? pedalSlotDetected = null,
+            Func<string, byte[]?>? axisTypesSeedLookup = null,
+            Action<string, byte[]>? onAxisTypesResolved = null)
         {
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
@@ -225,6 +230,8 @@ namespace MozaPlugin.Devices.MBooster
             _chainRolesSeedLookup = chainRolesSeedLookup;
             _onChainRolesResolved = onChainRolesResolved;
             _pedalSlotDetected = pedalSlotDetected;
+            _axisTypesSeedLookup = axisTypesSeedLookup;
+            _onAxisTypesResolved = onAxisTypesResolved;
         }
 
         /// <summary>
@@ -295,6 +302,13 @@ namespace MozaPlugin.Devices.MBooster
                         try { _onChainRolesResolved?.Invoke(c.Identity, loc); }
                         catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnChainRolesResolved: {ex.Message}"); }
                     };
+                    // And the active/passive types — the seed for the NEXT
+                    // controller's tab placement.
+                    c.AxisTypesResolved += types =>
+                    {
+                        try { _onAxisTypesResolved?.Invoke(c.Identity, types); }
+                        catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnAxisTypesResolved: {ex.Message}"); }
+                    };
                     c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                     // Arm phantom-axis protection immediately from the persisted
                     // last-known connectivity (live diagnostic overrides later).
@@ -302,6 +316,8 @@ namespace MozaPlugin.Devices.MBooster
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
                     try { c.SeedChainRoles(_chainRolesSeedLookup?.Invoke(kvp.Key)); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Chain-roles seed: {ex.Message}"); }
+                    try { c.SeedAxisTypes(_axisTypesSeedLookup?.Invoke(kvp.Key)); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Pedal-types seed: {ex.Message}"); }
                     _byIdentity[kvp.Key] = c;
                     _order.Add(c);
                     (added ??= new List<MBoosterDeviceController>()).Add(c);
@@ -433,11 +449,18 @@ namespace MozaPlugin.Devices.MBooster
                     try { _onChainRolesResolved?.Invoke(c.Identity, loc); }
                     catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnChainRolesResolved: {ex.Message}"); }
                 };
+                c.AxisTypesResolved += types =>
+                {
+                    try { _onAxisTypesResolved?.Invoke(c.Identity, types); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnAxisTypesResolved: {ex.Message}"); }
+                };
                 c.RoutingResolved += _ => OnControllerRoutingResolved(c);
                 try { c.SeedConnectedAxes(_connectivitySeedLookup?.Invoke(c.Identity)); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Connectivity seed: {ex.Message}"); }
                 try { c.SeedChainRoles(_chainRolesSeedLookup?.Invoke(c.Identity)); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Chain-roles seed: {ex.Message}"); }
+                try { c.SeedAxisTypes(_axisTypesSeedLookup?.Invoke(c.Identity)); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Pedal-types seed: {ex.Message}"); }
                 _byIdentity[c.Identity] = c;
                 _order.Add(c);
                 _orderSnapshot = _order.ToArray();

@@ -361,6 +361,7 @@ namespace MozaPlugin
                     // connectivity already arrived.
                     controller.SeedConnectedAxes(LookupMBoosterKnownPedals(identity));
                     controller.SeedChainRoles(LookupMBoosterKnownChainRoles(identity));
+                    controller.SeedAxisTypes(LookupMBoosterKnownPedalTypes(identity));
                     _hardwareApplier.ApplyMBoosterToHardware(controller, settings);
                 }
             }
@@ -419,19 +420,77 @@ namespace MozaPlugin
                 {
                     var cache = _settings?.MBoosterKnownChainRoles;
                     if (cache == null) return;
-                    changed |= StoreKnownChainRoles(cache, identity, v);
-                    if (serialKey != null) changed |= StoreKnownChainRoles(cache, serialKey, v);
+                    changed |= StoreKnownInts(cache, identity, v);
+                    if (serialKey != null) changed |= StoreKnownInts(cache, serialKey, v);
                 }
                 if (changed) SaveSettings();
             }
             catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] chain-roles persist for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
         }
 
-        private static bool StoreKnownChainRoles(Dictionary<string, int[]> cache, string key, int[] locality)
+        private static bool StoreKnownInts(Dictionary<string, int[]> cache, string key, int[] values)
         {
-            if (cache.TryGetValue(key, out var old) && old != null && old.SequenceEqual(locality)) return false;
-            cache[key] = (int[])locality.Clone();
+            if (cache.TryGetValue(key, out var old) && old != null && old.SequenceEqual(values)) return false;
+            cache[key] = (int[])values.Clone();
             return true;
+        }
+
+        /// <summary>Persisted last-known active/passive types for a lane — same
+        /// two-key lookup as <see cref="LookupMBoosterKnownPedals"/>. Null when
+        /// never seen.</summary>
+        private byte[]? LookupMBoosterKnownPedalTypes(string identity)
+        {
+            var cache = _settings?.MBoosterKnownPedalTypes;
+            if (cache == null || string.IsNullOrEmpty(identity)) return null;
+            string key = _mboosterSerialByIdentity.TryGetValue(identity, out var serialKey) ? serialKey : identity;
+            int[]? v;
+            lock (_mboosterSettingsLock)
+            {
+                if ((!cache.TryGetValue(key, out v) || v == null)
+                    && (!cache.TryGetValue(identity, out v) || v == null))
+                    return null;
+            }
+            var b = new byte[v.Length];
+            for (int i = 0; i < v.Length; i++) b[i] = (byte)v[i];
+            return b;
+        }
+
+        /// <summary>Live active/passive types from a complete diagnostic block —
+        /// persisted under both keys, like chain roles. Runs on the connection
+        /// read thread, on change.</summary>
+        private void OnMBoosterAxisTypesResolved(string identity, byte[] types)
+        {
+            if (IsShuttingDown || string.IsNullOrEmpty(identity) || types == null || types.Length == 0) return;
+            try
+            {
+                var v = new int[types.Length];
+                for (int i = 0; i < v.Length; i++) v[i] = types[i];
+                bool changed = false;
+                string? serialKey = _mboosterSerialByIdentity.TryGetValue(identity, out var sk) ? sk : null;
+                lock (_mboosterSettingsLock)
+                {
+                    var cache = _settings?.MBoosterKnownPedalTypes;
+                    if (cache == null) return;
+                    changed |= StoreKnownInts(cache, identity, v);
+                    if (serialKey != null) changed |= StoreKnownInts(cache, serialKey, v);
+                }
+                if (changed) SaveSettings();
+            }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] pedal-types persist for {MBoosterDeviceController.ShortIdentity(identity)}: {ex.Message}"); }
+        }
+
+        /// <summary>
+        /// Whether a lane's settings entry is final: its serial has resolved
+        /// (so the transport-keyed placeholder has been re-keyed/merged), or it
+        /// has been detected for <paramref name="serialWait"/> without one — a
+        /// unit that never answers the serial read keeps its transport key for
+        /// good. Edits made before this land on a placeholder.
+        /// </summary>
+        internal bool IsMBoosterSettingsResolved(MBoosterDeviceController c, TimeSpan serialWait)
+        {
+            if (c == null) return false;
+            if (_mboosterSerialByIdentity.ContainsKey(c.Identity)) return true;
+            return c.Detected && DateTime.UtcNow - c.DetectedAtUtc >= serialWait;
         }
 
         /// <summary>

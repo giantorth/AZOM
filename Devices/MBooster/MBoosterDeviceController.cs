@@ -131,6 +131,40 @@ namespace MozaPlugin.Devices.MBooster
         private volatile byte[]? _axisTypes;
         public byte[]? AxisTypes => _axisTypes;
 
+        // Last session's types (persisted by the plugin), for UI tab placement
+        // only until this session's diagnostic completes — it streams ~30s
+        // after connect. Routing, chain detection and effects never read it.
+        private volatile byte[]? _seededAxisTypes;
+
+        /// <summary>Types for deciding which tab lists a pedal: live once
+        /// <see cref="AxisTypesComplete"/>, else the persisted seed. Not for
+        /// routing — see <see cref="AxisTypes"/>.</summary>
+        public byte[]? TabAxisTypes => AxisTypesComplete ? _axisTypes : _seededAxisTypes;
+
+        /// <summary>Seed <see cref="TabAxisTypes"/> from the persisted
+        /// last-known value. May replace an earlier seed (the serial-keyed entry
+        /// lands after the transport-keyed one); no-op once live types are in.</summary>
+        public void SeedAxisTypes(byte[]? types)
+        {
+            if (types == null || types.Length == 0 || AxisTypesComplete) return;
+            _seededAxisTypes = (byte[])types.Clone();
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} seeded pedal types from cache: {AxisTypesSignature(types)} (live diagnostic will confirm/override)");
+        }
+
+        private static string AxisTypesSignature(byte[] types)
+        {
+            var sb = new StringBuilder();
+            for (int r = 0; r < 3 && r < types.Length; r++)
+            {
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(RoleName(r)).Append('=')
+                  .Append(types[r] == 1 ? "active" : types[r] == 2 ? "passive" : "none");
+            }
+            return sb.ToString();
+        }
+
+        private string _lastAxisTypesResolved = "";
+
         // Which of the 3 diagnostic slots (T/B/C) have had a "<Pedal> pedal
         // is …" line parsed this session. Distinct from _axisTypes having a
         // non-zero entry: a pedal reported "not connected !" is type 0, so the
@@ -272,6 +306,8 @@ namespace MozaPlugin.Devices.MBooster
         private string _serialPartB = "";
 
         public bool Detected => _detected;
+        /// <summary>When the latest detection edge fired (see <see cref="MarkDetected"/>).</summary>
+        public DateTime DetectedAtUtc { get; private set; }
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
 
@@ -366,6 +402,13 @@ namespace MozaPlugin.Devices.MBooster
         /// seeded ahead of the first heartbeat (~1 min).
         /// </summary>
         public event Action<byte[]>? ChainRolesResolved;
+
+        /// <summary>
+        /// Fired when a complete active/passive type block is read — axis-indexed
+        /// (0 none, 1 active, 2 passive). LIVE data only, on change. The plugin
+        /// persists it as the next controller's <see cref="SeedAxisTypes"/>.
+        /// </summary>
+        public event Action<byte[]>? AxisTypesResolved;
 
         /// <summary>
         /// Fired when the active/passive pedal-type diagnostic settles (or
@@ -1690,6 +1733,17 @@ namespace MozaPlugin.Devices.MBooster
                 }
                 RecomputeChainRoleMap();
             }
+            var types = _axisTypes;
+            if (types != null && AxisTypesComplete)
+            {
+                string typeSig = string.Join(",", types);
+                if (typeSig != _lastAxisTypesResolved)
+                {
+                    _lastAxisTypesResolved = typeSig;
+                    try { AxisTypesResolved?.Invoke((byte[])types.Clone()); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] AxisTypesResolved handler: {ex.Message}"); }
+                }
+            }
             LogRoutingDecision();
         }
 
@@ -1870,6 +1924,7 @@ namespace MozaPlugin.Devices.MBooster
         public void MarkDetected()
         {
             if (_detected) return;
+            DetectedAtUtc = DateTime.UtcNow;
             _detected = true;
             MozaLog.Debug($"[AZOM/mBooster] Detected {ShortIdentity(Identity)}");
             try { DetectedRisingEdge?.Invoke(); }
