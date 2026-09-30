@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup><Compile Include="../../MozaPlugin.LedCompatibility.cs" Link="MozaPlugin.LedCompatibility.cs" /></ItemGroup>
+</Project>
