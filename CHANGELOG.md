@@ -57,6 +57,9 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster passive pedals land on the Pedals tab straight away.** Their type is remembered
   from the last session instead of waiting ~30 s for the pedal to report it.
 
+- **PitHouse mBooster presets import the travel, force and feel curve PitHouse shows.** Newer
+  presets store these twice, and the importer read the older copy.
+
 - **PitHouse pedal presets import Pedal Feel, damping, friction and G-Force.** Deadzone, Max
   Force and the feel curve now come across instead of being skipped.
 

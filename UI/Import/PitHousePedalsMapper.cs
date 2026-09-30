@@ -472,6 +472,28 @@ namespace MozaPlugin.UI.Import
 
             private string Key(string suffix) => _prefix + "_" + suffix;
 
+            // Pit House's own preset import reads the _v128 travel / force /
+            // curve keys when present (its "MBoost - 导入预设 - v128…" range
+            // checks) and the plain key otherwise; the two can differ (a user's
+            // 3.8–28.3 mm profile carried 3.8–19.8 in the plain key). The plain
+            // key is then listed as superseded, once.
+            private readonly HashSet<string> _superseded = new HashSet<string>(StringComparer.Ordinal);
+            private string Pick(string plain, params string[] v128)
+            {
+                foreach (var v in v128)
+                {
+                    var t = _dp[Key(v)];
+                    if (t == null || t.Type == JTokenType.Null) continue;
+                    if (_superseded.Add(plain))
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(plain), $"superseded by {Key(v)}");
+                    return v;
+                }
+                return plain;
+            }
+
+            private string TravelMinKey() => Pick("machinelimit_min", "machinelimit_min_v128");
+            private string TravelMaxKey() => Pick("machinelimit_max", "machinelimit_max_v128");
+
             private JToken? Token(string suffix)
             {
                 _plan.ConsideredKeys.Add(Key(suffix));
@@ -591,13 +613,14 @@ namespace MozaPlugin.UI.Import
 
             /// <summary>
             /// machinelimit_min/max → TravelStartMm/TravelEndMm as one row, so
-            /// the pair stays inside the range slider's own min/max gap. Unit
-            /// mapping (raw value = mm) is inferred, not captured.
+            /// the pair stays inside the range slider's own min/max gap. Values
+            /// are mm: Pit House stores the pedal's 0x84/0x85 read-back under
+            /// these keys on the same 0–53.5 mm scale the plugin writes.
             /// </summary>
             public void TravelRange()
             {
-                var lo = Num("machinelimit_min");
-                var hi = Num("machinelimit_max");
+                var lo = Num(TravelMinKey());
+                var hi = Num(TravelMaxKey());
                 if (lo == null && hi == null) return;
 
                 // Half a pair is only usable when the other end already has a
@@ -622,7 +645,7 @@ namespace MozaPlugin.UI.Import
                 string newDisplay = $"{start.ToString("F1", CultureInfo.InvariantCulture)}–{end.ToString("F1", CultureInfo.InvariantCulture)} mm";
 
                 float s = start, e = end;
-                Add("Travel start–end (mm) *", oldDisplay, newDisplay,
+                Add("Travel start–end (mm)", oldDisplay, newDisplay,
                     c => { c.TravelStartMm = s; c.TravelEndMm = e; });
             }
 
@@ -637,9 +660,10 @@ namespace MozaPlugin.UI.Import
             public void PedalFeel()
             {
                 int n = MBoosterUiConstants.PedalFeelNodeCount;
-                var dzRaw = Num("forcelimit_min");
-                var mfRaw = Num("forcelimit_max");
-                var forces = NumArray("forces_curve");
+                var dzRaw = Num(Pick("forcelimit_min", "forcelimit_min_v128"));
+                var mfRaw = Num(Pick("forcelimit_max", "forcelimit_max_v128"));
+                string forcesKey = Pick("forces_curve", "forces_curve_cache_v128", "forces_curve_v128_cache");
+                var forces = NumArray(forcesKey);
                 if (mfRaw == null && forces != null && forces.Length == n + 1) mfRaw = forces[n];
 
                 MBoosterUiConstants.ForceRanges(true,
@@ -667,7 +691,7 @@ namespace MozaPlugin.UI.Import
                 {
                     if (!dz.HasValue || !mf.HasValue || mf.Value <= dz.Value)
                     {
-                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key("forces_curve"), "needs forcelimit_min < forcelimit_max");
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(forcesKey), "needs forcelimit_min < forcelimit_max");
                     }
                     else
                     {
@@ -687,14 +711,15 @@ namespace MozaPlugin.UI.Import
                     }
                 }
 
-                var stroke = NumArray("stroke_curve");
+                string strokeKey = Pick("stroke_curve", "stroke_curve_cache_v128", "stroke_curve_v128_cache");
+                var stroke = NumArray(strokeKey);
                 if (stroke != null && stroke.Length >= n)
                 {
-                    var tLo = Num("machinelimit_min");
-                    var tHi = Num("machinelimit_max");
+                    var tLo = Num(TravelMinKey());
+                    var tHi = Num(TravelMaxKey());
                     if (tLo == null || tHi == null || tHi.Value <= tLo.Value)
                     {
-                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key("stroke_curve"), "needs machinelimit_min < machinelimit_max");
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(strokeKey), "needs machinelimit_min < machinelimit_max");
                     }
                     else
                     {

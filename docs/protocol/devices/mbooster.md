@@ -2635,12 +2635,12 @@ rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 | `<p>_wheel_slip_switch/_amp/_freq`               | `WheelSpin.*`                                           | plugin's range (30–80 Hz) is narrower than PitHouse's                                  |
 | `<p>_gear_shift_vibration_switch/_amp/_freq`     | `GearShift.*`                                           | plugin's `VibrateOnNeutral`/`DebounceMs` have no PitHouse counterpart                  |
 | `<p>_road_texture_switch/_intensity/_smoothness` | `RoadTexture.*`                                         |                                                                                        |
-| `<p>_machinelimit_min` / `_max`                  | `TravelStartMm` / `TravelEndMm`                         | **inferred**, see below                                                                |
+| `<p>_machinelimit_min` / `_max` (`_v128` first)  | `TravelStartMm` / `TravelEndMm`                         | mm, same 0–53.5 scale as `0x84`/`0x85`; see "`_v128` keys" below                       |
 | `<p>_softlimit_hardness_press` / `_release`      | `EndstopFrontStiffness` / `EndstopEndStiffness`         | **inferred**, see below                                                                |
 | `brake_press_combine`                            | `SensorOutputRatioPct`                                  | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
-| `<p>_forcelimit_min` / `_max`                    | `DeadzoneKg` / `MaxForceKg`                             | kg; see "Pedal Feel keys" below                                                        |
-| `<p>_forces_curve[0..5]`                         | `InputCurveY` (% of Deadzone→Max Force)                 | 7 kg values; `[6]` is the Max Force point                                              |
-| `<p>_stroke_curve[0..5]`                         | `InputCurveX` (% of travel)                             | **inferred**; mm inside `machinelimit_min..max`                                        |
+| `<p>_forcelimit_min` / `_max` (`_v128` first)    | `DeadzoneKg` / `MaxForceKg`                             | kg; see "Pedal Feel keys" below                                                        |
+| `<p>_forces_curve[0..5]` (or `_forces_curve_cache_v128`) | `InputCurveY` (% of Deadzone→Max Force)         | 7 kg values; `[6]` is the Max Force point                                              |
+| `<p>_stroke_curve[0..5]` (or `_stroke_curve_cache_v128`) | `InputCurveX` (% of travel)                     | mm inside `machinelimit_min..max`                                                      |
 | `<p>_damping_press` / `_release` (+ `_switch`)   | `DampingPressPct` / `DampingReleasePct`                 | **inferred**; switched off → 0%                                                        |
 | `<p>_damping_[release_]segment{1,2}_position`    | `SegmentedDamping.Divider{1,2}{Pressed,Released}`       | **inferred**; un-prefixed-direction pair = Pressed                                     |
 | `<p>_damping_{press,release}_segment{1..3}_value`| `SegmentedDamping.Seg{1..3}{Pressed,Released}`          | **inferred**                                                                           |
@@ -2688,14 +2688,30 @@ under "Not imported" with their reason rather than guessed at. A capture of
 PitHouse writing `mbooster-<p>-min`/`-max` after a known slider value would
 settle it.
 
-### The three inferred mappings
+### `_v128` keys
+
+Pit House 1.4.1.13 presets carry a second copy of the travel / force / curve
+family: `<p>_machinelimit_{min,max}_v128`, `<p>_forcelimit_{min,max}_v128`,
+`<p>_stroke_curve_cache_v128`, `<p>_forces_curve_cache_v128` (the exe also
+names `*_curve_v128_cache`). Pit House's own preset import validates and
+applies these (log strings `MBoost - 导入预设 - v128…`: out-of-range clamped,
+force start/end reversed or too close corrected, travel too short / out of
+range corrected). The two copies can disagree: a user's GT3 profile showed
+3.8–28.3 mm (the `_v128` pair) while the plain keys held 3.8–19.82, and force
+6–45 kg vs 7–72. The importer takes `_v128` when present and lists the plain key
+as superseded; older presets without it fall back to the plain keys.
+
+Travel values are **mm**: Pit House's `LocalParameters/MBoost/<uid>.json`
+stores the pedal's `0x84`/`0x85` read-back under `brake_machinelimit_*`, e.g.
+19.81994382022472 = raw `0x5ed7` × 53.5 / 65536 exactly. The curve caches fit
+their own `_v128` ranges at k/7 (stroke 7.3…24.8 in 3.8–28.3; forces
+11.57…45.0 in 6–45).
+
+### The inferred mappings
 
 These are read from value range, **not** from a wire capture, and are marked
 with `*` in the import wizard's change list:
 
-- `machinelimit_min/max` → travel in **mm**. Samples are 34.97/45.0 and
-  35.99/46.69, sitting inside the plugin's own 3.8–49.7 mm Start/End of Travel
-  slider (itself reverse-engineered from PitHouse captures of that control).
 - `softlimit_hardness_press/release` → End Stop Stiffness. Samples are `3`,
   inside the confirmed 1–10 range; press↔front / release↔end is the natural
   pairing.
