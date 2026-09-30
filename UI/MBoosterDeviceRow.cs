@@ -31,26 +31,18 @@ namespace MozaPlugin.UI
     /// THIS row's (identity, axisIndex) pair — <c>MBoosterDeviceSettings.Role</c>
     /// for a standalone pedal, or <c>AxisRoles[axisIndex]</c> for one pedal of
     /// a chain — so every row's combo is always live (no more disabled state).
-    /// Role uniqueness (no two rows sharing Throttle/Brake/Clutch) is
-    /// enforced by the caller (SettingsControl.xaml.cs), not this class.
+    /// Two rows may share a role, as Pit House allows.
     /// </summary>
     internal sealed class MBoosterDeviceRow : INotifyPropertyChanged
     {
         private readonly Action<string, int, MBoosterRole> _onRoleChanged;
-        private readonly Action<string, string> _onDisplayNameChanged;
 
         public string Identity { get; }
         public int AxisIndex { get; }
 
         private string _label;
-        /// <summary>Precomputed "{DisplayName} — {ShortIdentity} (COMn)[ —
-        /// Pedal N]" text for the row's Button — settable (unlike the rest of
-        /// this row's originally-immutable fields) so a DisplayName edit can
-        /// update it immediately without waiting for the next 500ms refresh
-        /// tick, since DisplayName isn't part of RefreshMBoosterTab's
-        /// rowsSignature. See SettingsControl.xaml.cs's
-        /// OnMBoosterDeviceRowDisplayNameChanged and the RefreshMBoosterTab
-        /// resync branch, both of which recompute and set this.</summary>
+        /// <summary>Precomputed "{ShortIdentity} (COMn)[ — Pedal N]" text for
+        /// the row's Button.</summary>
         public string Label
         {
             get => _label;
@@ -64,18 +56,14 @@ namespace MozaPlugin.UI
         }
 
         public MBoosterDeviceRow(string identity, int axisIndex, string label, bool isSelected, MBoosterRole role,
-            string displayName,
-            Action<string, int, MBoosterRole> onRoleChanged,
-            Action<string, string> onDisplayNameChanged)
+            Action<string, int, MBoosterRole> onRoleChanged)
         {
             Identity = identity ?? "";
             AxisIndex = axisIndex;
             _label = label ?? "";
             _isSelected = isSelected;
             _roleIndex = (int)role;
-            _displayName = displayName ?? "";
             _onRoleChanged = onRoleChanged ?? throw new ArgumentNullException(nameof(onRoleChanged));
-            _onDisplayNameChanged = onDisplayNameChanged ?? throw new ArgumentNullException(nameof(onDisplayNameChanged));
         }
 
         private bool _isSelected;
@@ -108,26 +96,6 @@ namespace MozaPlugin.UI
                 Raise(nameof(RoleIndex));
                 if (value >= 0 && value <= 3)
                     _onRoleChanged(Identity, AxisIndex, (MBoosterRole)value);
-            }
-        }
-
-        private string _displayName;
-        /// <summary>User-editable free-text name (optional — helps tell two
-        /// mBoosters with the same role apart), bound TwoWay to a TextBox
-        /// shown only for the selected row (see the DataTemplate) — this is
-        /// per-DEVICE, not per-pedal-axis, so every row sharing this row's
-        /// Identity gets the same value; the callback recomputes and reapplies
-        /// Label on all of them, not just this one.</summary>
-        public string DisplayName
-        {
-            get => _displayName;
-            set
-            {
-                value ??= "";
-                if (_displayName == value) return;
-                _displayName = value;
-                Raise(nameof(DisplayName));
-                _onDisplayNameChanged(Identity, value);
             }
         }
 

@@ -609,8 +609,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Последнее нажатие: кнопка {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Загрузить настройки ETS2/ATS по умолчанию</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Пересинхронизировать стеклоочистители и свет</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Отображаемое имя</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Необязательно — помогает различать два mBooster с одинаковой ролью в списке устройств выше.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Пользовательские эффекты (экспериментально)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// экспериментально — пользовательская вибрация на основе формул SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Экспериментально — каждый пользовательский эффект заставляет мотор вибрировать, используя указанное вами свойство SimHub или формулу NCalc. Все пользовательские эффекты (и встроенный эффект Engine) используют один канал, поэтому одновременно мотором может управлять только один; побеждает последний обработанный активный эффект. Частота/интенсивность работают как ползунки Engine.</value></data>

@@ -159,7 +159,7 @@ namespace MozaPlugin
         {
             return s.Role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled
                 && s.AxisRoles == null
-                && string.IsNullOrEmpty(s.DisplayName)
+                && s.SleepMinutes < 0
                 && IsUntouchedPedalConfig(s)
                 && PedalRowsAllUntouched(s);
         }
@@ -243,10 +243,9 @@ namespace MozaPlugin
             if (into.AxisRoles == null) into.AxisRoles = from.AxisRoles;
             else if (from.AxisRoles != null) conflicts.Add("AxisRoles");
 
-            if (string.IsNullOrEmpty(into.DisplayName)) into.DisplayName = from.DisplayName;
-            else if (!string.IsNullOrEmpty(from.DisplayName)
-                     && !string.Equals(from.DisplayName, into.DisplayName, StringComparison.Ordinal))
-                conflicts.Add("DisplayName");
+            if (into.SleepMinutes < 0) into.SleepMinutes = from.SleepMinutes;
+            else if (from.SleepMinutes >= 0 && from.SleepMinutes != into.SleepMinutes)
+                conflicts.Add("SleepMinutes");
 
             MergeMBoosterPedalConfig(from, into, conflicts, "");
 

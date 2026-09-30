@@ -608,8 +608,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Τελευταίο πάτημα: κουμπί {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Φόρτωση προεπιλογών ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Επανασυγχρονισμός υαλοκαθαριστήρων &amp; φώτων</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Όνομα εμφάνισης</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Προαιρετικό — βοηθά να ξεχωρίσετε δύο mBooster με τον ίδιο ρόλο στη λίστα συσκευών παραπάνω.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Προσαρμοσμένα εφέ (Πειραματικό)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// πειραματικό — δόνηση καθορισμένη από τον χρήστη μέσω τύπων SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Πειραματικό — κάθε προσαρμοσμένο εφέ δονεί το μοτέρ χρησιμοποιώντας μια ιδιότητα SimHub ή τύπο NCalc που παρέχετε. Όλα τα προσαρμοσμένα εφέ (και το ενσωματωμένο εφέ Engine) μοιράζονται ένα κανάλι, οπότε μόνο ένα μπορεί να οδηγεί το μοτέρ κάθε φορά· κερδίζει το πιο πρόσφατα επεξεργασμένο ενεργό εφέ. Η συχνότητα/ένταση συμπεριφέρονται όπως τα ρυθμιστικά του Engine.</value></data>

@@ -404,20 +404,56 @@ namespace MozaPlugin.UI
             if (_suppressEvents) return;
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
-            s.TravelStartMm = (float)MBoosterTravelRangeSlider.LowValue;
-            s.TravelEndMm = (float)MBoosterTravelRangeSlider.HighValue;
-            // Travel is a physical setting on every pedal mode — push to THIS
-            // pedal's own mBooster unit (device 0x12 host / 0x1d / 0x1e chain).
-            float startMm = s.TravelStartMm, endMm = s.TravelEndMm;
-            QueueMBoosterPedalFeelPush("travel", (c, dev) =>
-            {
-                c.SendIntWrite("mbooster-brake-travel-start",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(startMm), dev);
-                c.SendIntWrite("mbooster-brake-travel-end",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(endMm), dev);
-            });
+            float startMm = (float)MBoosterTravelRangeSlider.LowValue;
+            float endMm = (float)MBoosterTravelRangeSlider.HighValue;
+            bool startChanged = startMm != s.TravelStartMm, endChanged = endMm != s.TravelEndMm;
+            s.TravelStartMm = startMm;
+            s.TravelEndMm = endMm;
             _plugin.SaveSettings();
+            if (!startChanged && !endChanged) return;
+
+            // Pit House (moza-simulator bridge, 2026-09-29): a start change
+            // is 0x84 alone, an end change 0x85 alone, each followed by the
+            // full feel curve with every X. Ends moved within one coalesced
+            // drag accumulate per unit.
+            var controller = CurrentMBoosterController();
+            if (controller == null) return;
+            if (!controller.OwnsSingletonRegisters(_mboosterEffectPedalIndex)) return;
+            if (!TryMBoosterCalibDevice(controller, _mboosterEffectPedalIndex, out byte dev)) return;
+            lock (_mboosterTravelDirty)
+            {
+                _mboosterTravelDirty.TryGetValue(dev, out var d);
+                _mboosterTravelDirty[dev] = (d.Start || startChanged, d.End || endChanged);
+            }
+            bool feelSet = s.DeadzoneKg >= 0 || s.MaxForceKg >= 0
+                || (s.InputCurveY != null && s.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
+                || (s.InputCurveX != null && s.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount);
+            double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
+            double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
+            float[]? curveY = s.InputCurveY, curveX = s.InputCurveX;
+            controller.QueueCalibWrite($"{dev:x2}:travel", () =>
+            {
+                (bool Start, bool End) dirty;
+                lock (_mboosterTravelDirty)
+                {
+                    _mboosterTravelDirty.TryGetValue(dev, out dirty);
+                    _mboosterTravelDirty.Remove(dev);
+                }
+                if (dirty.Start)
+                    controller.SendIntWrite("mbooster-brake-travel-start",
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(startMm), dev);
+                if (dirty.End)
+                    controller.SendIntWrite("mbooster-brake-travel-end",
+                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(endMm), dev);
+                // Never push default feel values over the unit's own.
+                if (feelSet)
+                    controller.PushFeelCurveResync(dz, mf, curveY, curveX, dev, allX: true);
+            });
         }
+
+        // Travel ends changed since the last flushed push, per unit.
+        private readonly Dictionary<byte, (bool Start, bool End)> _mboosterTravelDirty =
+            new Dictionary<byte, (bool Start, bool End)>();
 
         // Deadzone at the start of pedal travel (0..37kg Brake) — CONFIRMED real
         // hardware calibration (mbooster-brake-deadzone, cmdId 0xAB selector

@@ -1117,9 +1117,8 @@ namespace MozaPlugin.Devices.MBooster
         ///
         /// Without the exclusion, a lane that grew from one pedal to several
         /// while Role said "Brake" handed BOTH axis 0 (honoring Role, above)
-        /// and axis 1 (positional default) the Brake role. Two pedals claiming
-        /// one role is never a valid state — the UI enforces that on every
-        /// explicit assignment (ClearDuplicateMBoosterRoleAssignments) — and it
+        /// and axis 1 (positional default) the Brake role. A DEFAULT must never
+        /// put two pedals on one role (a user may, as in Pit House) — it
         /// broke both halves of the pedal pipeline: the second pedal's position
         /// was dropped as a collision (see LogCollisionOnce), and because
         /// MBoosterEffectWorker.TargetDevice addresses frames by ROLE, both

@@ -109,9 +109,7 @@ namespace MozaPlugin.UI.Import
                 var axes = c.ConnectedAxisIndices();
                 var types = c.AxisTypes;
 
-                string deviceLabel = string.IsNullOrWhiteSpace(s.DisplayName)
-                    ? $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})"
-                    : $"{s.DisplayName} — {MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
+                string deviceLabel = $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
 
                 bool multiplePedals = axes.Count > 1;
                 int shown = 0;
@@ -125,11 +123,10 @@ namespace MozaPlugin.UI.Import
                     bool passive = types != null && axis < types.Length && types[axis] == 2;
 
                     // Row prefix leads with the role so a diff list reads
-                    // "Brake · ABS"; the device name disambiguates two pedals
-                    // that somehow share a role.
+                    // "Brake · ABS"; the pedal number disambiguates two pedals
+                    // sharing a role.
                     string rowPrefix = RoleName(role);
-                    if (!string.IsNullOrWhiteSpace(s.DisplayName)) rowPrefix += " — " + s.DisplayName;
-                    else if (multiplePedals) rowPrefix += $" — {string.Format(global::MozaPlugin.Resources.Strings.Label_PedalAxis, shown)}";
+                    if (multiplePedals) rowPrefix += $" — {string.Format(global::MozaPlugin.Resources.Strings.Label_PedalAxis, shown)}";
 
                     targets.Add(new MBoosterImportTarget(
                         c, axis, role, $"{pedalPart} · {RoleName(role)}", rowPrefix, passive));
@@ -618,8 +615,6 @@ namespace MozaPlugin.UI.Import
                 // can never land somewhere the UI couldn't produce.
                 if (end - start < MBoosterUiConstants.TravelMinGapMm)
                     end = Math.Min(MBoosterUiConstants.TravelMaxMm, start + MBoosterUiConstants.TravelMinGapMm);
-                if (end - start > MBoosterUiConstants.TravelMaxGapMm)
-                    end = start + MBoosterUiConstants.TravelMaxGapMm;
 
                 string oldDisplay = _read.TravelStartMm < 0 || _read.TravelEndMm < 0
                     ? "(unset)"

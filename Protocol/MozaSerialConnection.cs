@@ -1015,7 +1015,10 @@ namespace MozaPlugin.Protocol
                 try { MessageReceived?.Invoke(data); }
                 catch (Exception ex)
                 {
-                    MozaLog.Error($"[AZOM] Inbound handler threw: {ex.Message}");
+                    var site = ex.TargetSite;
+                    MozaLog.Error($"[AZOM] Inbound handler threw: {ex.Message} "
+                        + $"(in {site?.DeclaringType?.Name}.{site?.Name}, frame {BitConverter.ToString(data)})");
+                    MozaLog.Debug($"[AZOM] Inbound handler stack: {ex.StackTrace}");
                 }
             }
         }

@@ -609,8 +609,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Zuletzt gedrückt: Taste {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>ETS2/ATS-Standard laden</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Wischer &amp; Licht neu abgleichen</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Anzeigename</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Optional – hilft, zwei mBooster mit derselben Rolle in der Geräteliste oben zu unterscheiden.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Benutzerdefinierte Effekte (Experimentell)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// experimentell – benutzerdefinierte Vibration über SimHub/NCalc-Formeln</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Experimentell – jeder benutzerdefinierte Effekt lässt den Motor mit einer von Ihnen angegebenen SimHub-Eigenschaft oder NCalc-Formel vibrieren. Alle benutzerdefinierten Effekte (und der eingebaute Engine-Effekt) teilen sich einen Kanal, sodass nur einer den Motor gleichzeitig ansteuern kann; der zuletzt verarbeitete aktive Effekt gewinnt. Frequenz/Intensität verhalten sich wie die Engine-Schieberegler.</value></data>

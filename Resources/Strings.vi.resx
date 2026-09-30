@@ -609,8 +609,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Lần nhấn cuối: nút {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Tải mặc định ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Đồng bộ lại gạt mưa và đèn</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Tên hiển thị</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Tùy chọn — giúp phân biệt hai mBooster có cùng vai trò trong danh sách thiết bị ở trên.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Hiệu ứng tùy chỉnh (Thử nghiệm)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// thử nghiệm — rung do người dùng định nghĩa bằng công thức SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Thử nghiệm — mỗi hiệu ứng tùy chỉnh làm rung động cơ bằng thuộc tính SimHub hoặc công thức NCalc mà bạn cung cấp. Tất cả hiệu ứng tùy chỉnh (và hiệu ứng Engine tích hợp) dùng chung một kênh, nên tại một thời điểm chỉ một hiệu ứng có thể điều khiển động cơ; hiệu ứng đang hoạt động được xử lý gần nhất sẽ thắng. Tần số/Cường độ hoạt động như thanh trượt của Engine.</value></data>

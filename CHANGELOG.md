@@ -4,6 +4,21 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.6.3]
 
+## Added
+
+- **mBooster auto-sleep timeout.** Off, or 1 minute to 5 hours, set on the host pedal.
+
+## Changed
+
+- **mBooster pedals can share a role, as in Pit House.** Picking a role another pedal holds no
+  longer clears it from that pedal.
+
+- **mBooster Travel start and end can be set any distance apart.** The end no longer stops
+  32 mm past the start.
+
+- **The mBooster pedal display-name field is removed.** It only appeared on the selected row and
+  had no useful effect.
+
 ## Fixed
 
 - **Wheel LEDs stay on SimHub while the wheel renegotiates its dashboard.** They no longer
@@ -44,6 +59,12 @@ All notable changes to the AZOM plugin are documented here.
 
 - **PitHouse pedal presets import Pedal Feel, damping, friction and G-Force.** Deadzone, Max
   Force and the feel curve now come across instead of being skipped.
+
+- **Changing an mBooster pedal's role sets it on the pedal.** The role is written to the unit the
+  way Pit House does, which also repairs a chain whose pedals had swapped.
+
+- **mBooster error reports are acknowledged, as Pit House does.** A unit no longer repeats the
+  same error once a second for the whole session.
 
 - **mBooster settings are read-only until the pedal has identified.** Edits made in the first
   seconds after connect could be overridden by the saved values.

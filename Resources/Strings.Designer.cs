@@ -218,8 +218,6 @@ namespace MozaPlugin.Resources
         public static string Subtitle_MBoosterPedals => Get("Subtitle_MBoosterPedals");
         public static string SliderLabel_Device => Get("SliderLabel_Device");
         public static string SliderLabel_Role => Get("SliderLabel_Role");
-        public static string SliderLabel_DisplayName => Get("SliderLabel_DisplayName");
-        public static string Hint_MBoosterDisplayName => Get("Hint_MBoosterDisplayName");
         public static string Option_Disabled => Get("Option_Disabled");
         public static string Option_Throttle => Get("Option_Throttle");
         public static string Option_Brake => Get("Option_Brake");

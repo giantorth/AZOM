@@ -288,25 +288,14 @@ namespace MozaPlugin.UI
                     d.Detected      ? "detected"
                     : d.IsConnected ? "connected (probing)"
                                     : "disconnected";
-                string roleStr;
-                string dispNameStr;
                 var s = d.CurrentSettings;
-                if (s != null)
-                {
-                    roleStr     = s.Role.ToString();
-                    dispNameStr = string.IsNullOrEmpty(s.DisplayName) ? "—" : s.DisplayName;
-                }
-                else
-                {
-                    roleStr = "(no settings row)";
-                    dispNameStr = "—";
-                }
+                string roleStr = s != null ? s.Role.ToString() : "(no settings row)";
                 string livePort = d.Connection?.LastPortName ?? "";
                 string port = string.IsNullOrEmpty(livePort) ? d.PortName : livePort;
                 sb.AppendLine(
                     $"  [{i}] {port,-6}  role={roleStr,-8}  state={state}  " +
                     $"hidPos={d.LastHidPosition.ToString("F3", CultureInfo.InvariantCulture)}  " +
-                    $"name='{dispNameStr}'  id={id}");
+                    $"sleep={(s == null || s.SleepMinutes < 0 ? "—" : s.SleepMinutes.ToString())}  id={id}");
                 // Device-reported identity (learned over the Moza wire) — confirms
                 // the serial-interrogation path on real hardware + shows the chain size.
                 string serialStr = string.IsNullOrEmpty(d.Serial) ? "—" : Redact(d.Serial!);
@@ -362,14 +351,11 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// The group-35 status registers real Pit House polls that AZOM had no
-        /// names for. Only 0xB4 has a decoded meaning — the pedal's
-        /// calibration-mode state (2 = normal, 0 = mid travel calibration),
-        /// which is why a travel calibration MUST be followed by a soft reboot.
-        /// The rest (0x0D, 0x21-0x24) read as per-unit constants in every
-        /// capture so far and are printed raw so the next bundle from a
-        /// different topology can settle what they mean, instead of the values
-        /// being guessed at. See docs/protocol/devices/mbooster.md.
+        /// The group-35 status registers real Pit House polls: 0xB4 (sleep
+        /// minutes), 0x21-0x23 (channel role map), and 0x0D/0x24, which read as
+        /// per-unit constants in every capture so far and are printed raw so a
+        /// bundle from a different topology can settle what they mean. See
+        /// docs/protocol/devices/mbooster.md.
         /// </summary>
         private static void AppendMBoosterStatusRegisters(StringBuilder sb, MBoosterDeviceController d)
         {

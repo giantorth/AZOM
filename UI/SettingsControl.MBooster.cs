@@ -244,7 +244,7 @@ namespace MozaPlugin.UI
                             bool isSelected = string.Equals(c.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                                 && axis == _mboosterEffectPedalIndex;
                             _mboosterDeviceRows.Add(new MBoosterDeviceRow(c.Identity, axis, label, isSelected, role,
-                                rowSettings.DisplayName, OnMBoosterDeviceRowRoleChanged, OnMBoosterDeviceRowDisplayNameChanged));
+                                OnMBoosterDeviceRowRoleChanged));
                         }
                     }
                     MBoosterDeviceRowsList.ItemsSource = _mboosterDeviceRows;
@@ -263,13 +263,6 @@ namespace MozaPlugin.UI
                         row.RoleIndex = (int)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.ResolveAxisRole(rowSettings, row.AxisIndex, connectedAxisCount);
                         row.IsSelected = string.Equals(row.Identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)
                             && row.AxisIndex == _mboosterEffectPedalIndex;
-                        // DisplayName is per-profile like every other mBooster
-                        // setting, so a profile switch can change it without
-                        // changing rowsSignature (which only tracks physical
-                        // connectivity). The setter no-ops unless the value
-                        // actually differs, and OnMBoosterDeviceRowDisplayNameChanged
-                        // recomputes Label when it fires.
-                        row.DisplayName = rowSettings.DisplayName;
                     }
                 }
             }
@@ -333,7 +326,12 @@ namespace MozaPlugin.UI
                 || !ReferenceEquals(s, _mboosterSeededSettings))
                 _mboosterUiSeeded = false;
 
-            if (_mboosterUiSeeded) return;
+            if (_mboosterUiSeeded)
+            {
+                // The host's 0xB4 read-back can land after the seed.
+                if (s.SleepMinutes < 0) SeedMBoosterSleep(s, selected);
+                return;
+            }
             // Diagnostic trail for the "curve values wrong until profile
             // reload" bug — logs exactly what this seed pass is about to push
             // into the curve editors, timestamped, so it can be correlated
@@ -361,6 +359,7 @@ namespace MozaPlugin.UI
                 MBoosterBrakeFadeTestToggle.IsChecked = false;
                 SeedMBoosterConfigControls(PeekMBoosterEffectTarget());
             }
+            SeedMBoosterSleep(s, selected);
             PopulateMBoosterCustomEffectsList(PeekMBoosterEffectTarget());
             _mboosterUiSeeded = true;
             _mboosterSeededProfileName = currentProfileName;
@@ -476,10 +475,8 @@ namespace MozaPlugin.UI
 
         /// <summary>Role-combo callback for <see cref="MBoosterDeviceRow"/> — edits
         /// THAT row's pedal Role regardless of which row is currently selected.
-        /// Enforces "only one pedal may occupy a role": assigning a non-Disabled
-        /// role clears it off any OTHER pedal that already held it (a physical
-        /// pedal can only be one thing, so two rows both claiming Brake is
-        /// always a mistake, not a valid state).</summary>
+        /// Two pedals may share a role, as Pit House allows: only the edited
+        /// pedal is written.</summary>
         private void OnMBoosterDeviceRowRoleChanged(string identity, int axisIndex, MBoosterRole role)
         {
             if (_suppressEvents) return;
@@ -488,10 +485,13 @@ namespace MozaPlugin.UI
             var controller = _plugin.MBoosterRegistry?.FindByIdentity(identity);
             int axisCount = controller?.AxisSlotCount ?? 1;
             int connectedAxisCount = controller?.ConnectedAxisCount ?? 1;
+            // A motor pedal's role lives on its unit (register 0x22) — write it
+            // there too, as Pit House does. Before the setting changes: the
+            // unit is found from the axis's current role.
+            if (role != MBoosterRole.Disabled)
+                controller?.WritePedalRole(axisIndex, MBoosterDeviceController.RoleIndexOf(role));
             SetMBoosterPedalRole(s, connectedAxisCount, axisCount, axisIndex, role);
             _plugin.SaveSettings();
-            if (role != MBoosterRole.Disabled)
-                ClearDuplicateMBoosterRoleAssignments(identity, axisIndex, role);
             // Max Force/Deadzone bounds follow the pedal's hardware (active
             // 0-200kg / 0-37kg, passive 4-20kg / 0-8kg) — a pedal whose type
             // verdict changed may still carry a stored value outside its
@@ -543,81 +543,37 @@ namespace MozaPlugin.UI
             }
         }
 
-        /// <summary>Bumps every OTHER known pedal row currently showing
-        /// <paramref name="role"/> to Disabled — setting a row's RoleIndex
-        /// recurses into <see cref="OnMBoosterDeviceRowRoleChanged"/>, which
-        /// persists it through the same Role/AxisRoles write path (and won't
-        /// recurse further, since Disabled never triggers another clear
-        /// pass). Only considers rows already built (<see cref="_mboosterDeviceRows"/>)
-        /// — a pedal not yet known to the UI can't visibly collide with one
-        /// that is.</summary>
-        private void ClearDuplicateMBoosterRoleAssignments(string keepIdentity, int keepAxisIndex, MBoosterRole role)
+        // Auto-sleep timeout, 0 = off. Lane-wide: stored on the device
+        // settings and written to the host unit only.
+        private void MBoosterSleepSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            foreach (var row in _mboosterDeviceRows)
+            if (_suppressEvents) return;
+            int v = (int)Math.Round(e.NewValue);
+            SetMBoosterSleepText(v);
+            var s = CurrentMBoosterSettings();
+            if (s == null) return;
+            s.SleepMinutes = v;
+            var c = CurrentMBoosterController();
+            if (c != null && c.IsConnected)
             {
-                if (string.Equals(row.Identity, keepIdentity, StringComparison.OrdinalIgnoreCase) && row.AxisIndex == keepAxisIndex)
-                    continue;
-                if (row.RoleIndex == (int)role)
-                    row.RoleIndex = (int)MBoosterRole.Disabled;
+                byte dev = c.HostDeviceId;
+                c.QueueCalibWrite($"{dev:x2}:mbooster-sleep-minutes",
+                    () => c.SendIntWrite("mbooster-sleep-minutes", v, dev));
             }
-
-            // A Pedals-tab passive pedal has no row here. Disabling it hands
-            // it back to this tab (IsPedalsTabPassive needs a role), where
-            // the user can reassign it.
-            var registry = _plugin?.MBoosterRegistry;
-            if (registry == null) return;
-            bool changed = false;
-            foreach (var c in registry.Devices)
-            {
-                int n = c.AxisSlotCount;
-                for (int axis = 0; axis < n; axis++)
-                {
-                    if (string.Equals(c.Identity, keepIdentity, StringComparison.OrdinalIgnoreCase) && axis == keepAxisIndex)
-                        continue;
-                    if (!registry.IsPedalsTabPassive(c, axis) || c.RoleIndexForAxis(axis) != MBoosterDeviceController.RoleIndexOf(role))
-                        continue;
-                    SetMBoosterPedalRole(_plugin!.GetOrCreateMBoosterSettings(c.Identity),
-                        c.ConnectedAxisCount, n, axis, MBoosterRole.Disabled);
-                    changed = true;
-                }
-            }
-            if (changed) _plugin!.SaveSettings();
+            _plugin.SaveSettings();
         }
 
-        /// <summary>DisplayName edit callback — fires from MBoosterDeviceRow
-        /// .DisplayName's setter (only when the value actually changes), both
-        /// for a genuine user edit (the TwoWay-bound TextBox shown for the
-        /// selected row) and RefreshMBoosterTab's per-tick resync (e.g. after
-        /// a profile switch changes the saved name). Persists the value and
-        /// recomputes every row sharing this identity's Label immediately —
-        /// Label isn't part of rowsSignature, so RefreshMBoosterTab wouldn't
-        /// otherwise notice a DisplayName change until some other signature
-        /// field happened to change too.</summary>
-        private void OnMBoosterDeviceRowDisplayNameChanged(string identity, string newDisplayName)
+        private void SetMBoosterSleepText(int minutes) =>
+            SetValueText(MBoosterSleepValue, minutes == 0 ? Strings.Option_Off : minutes.ToString());
+
+        /// <summary>Show the saved sleep timeout, else the host unit's own
+        /// read-back (0 until it has answered).</summary>
+        private void SeedMBoosterSleep(MBoosterDeviceSettings s, MBoosterDeviceController? c)
         {
-            if (_plugin == null) return;
-            var s = _plugin.GetOrCreateMBoosterSettings(identity);
-            s.DisplayName = newDisplayName ?? "";
-            _plugin.SaveSettings();
-
-            var controller = _plugin.MBoosterRegistry?.FindByIdentity(identity);
-            if (controller == null) return;
-            string deviceLabel = BuildMBoosterComboLabel(controller);
-
-            int matchCount = 0;
-            foreach (var row in _mboosterDeviceRows)
-                if (string.Equals(row.Identity, identity, StringComparison.OrdinalIgnoreCase)) matchCount++;
-            bool multiplePedals = matchCount > 1;
-
-            int shown = 0;
-            foreach (var row in _mboosterDeviceRows)
-            {
-                if (!string.Equals(row.Identity, identity, StringComparison.OrdinalIgnoreCase)) continue;
-                ++shown;
-                row.Label = multiplePedals
-                    ? $"{deviceLabel} — {string.Format(Strings.Label_PedalAxis, shown)}"
-                    : deviceLabel;
-            }
+            int v = s.SleepMinutes >= 0 ? s.SleepMinutes : c?.SleepMinutesReadback ?? -1;
+            v = Math.Max(0, Math.Min((int)MBoosterSleepSlider.Maximum, v));
+            using (_suppressor.Begin()) MBoosterSleepSlider.Value = v;
+            SetMBoosterSleepText(v);
         }
 
         private MBoosterDeviceSettings? CurrentMBoosterSettings()
@@ -797,7 +753,7 @@ namespace MozaPlugin.UI
             float ts = fx?.TravelStartMm ?? -1;
             MBoosterTravelRangeSlider.LowValue = ts >= 0 ? ts : MBoosterUiConstants.TravelMinMm;
             float te = fx?.TravelEndMm ?? -1;
-            MBoosterTravelRangeSlider.HighValue = te >= 0 ? te : MBoosterUiConstants.TravelMinMm + MBoosterUiConstants.TravelMaxGapMm;
+            MBoosterTravelRangeSlider.HighValue = te >= 0 ? te : MBoosterUiConstants.TravelDefaultEndMm;
             float ef = fx?.EndstopFrontStiffness ?? -1;
             MBoosterEndstopFrontSlider.Value = ef >= 0 ? ef : 1;
             SetValueText(MBoosterEndstopFrontValue, MBoosterEndstopFrontSlider.Value.ToString("F0"));
@@ -849,18 +805,9 @@ namespace MozaPlugin.UI
             return _plugin?.MBoosterRegistry?.FindByIdentity(_mboosterSelectedIdentity ?? "");
         }
 
-        /// <summary>
-        /// Device combo label: port/identity, prefixed with the user's
-        /// DisplayName when set — the whole point of that field is telling
-        /// two same-role mBoosters apart in this exact list. See
-        /// MBoosterDeviceSettings.DisplayName.
-        /// </summary>
-        private string BuildMBoosterComboLabel(MBoosterDeviceController c)
-        {
-            string baseLabel = $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
-            var name = _plugin?.GetOrCreateMBoosterSettings(c.Identity)?.DisplayName;
-            return string.IsNullOrWhiteSpace(name) ? baseLabel : $"{name} — {baseLabel}";
-        }
+        /// <summary>Device row label: short identity and port.</summary>
+        private static string BuildMBoosterComboLabel(MBoosterDeviceController c)
+            => $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
 
     }
 }

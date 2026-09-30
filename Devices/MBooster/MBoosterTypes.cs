@@ -16,7 +16,8 @@ namespace MozaPlugin.Devices.MBooster
         public const float TravelMinMm = 3.8f;
         public const float TravelMaxMm = 49.7f;
         public const float TravelMinGapMm = 3.8f;
-        public const float TravelMaxGapMm = 32.1f;
+        // Slider position shown while no Travel End is stored.
+        public const float TravelDefaultEndMm = 35.9f;
 
         // Pedal Feel Max Force/Deadzone bounds follow the pedal's HARDWARE,
         // not the role assigned to it. Any mBooster pedal can be set to
@@ -963,9 +964,9 @@ namespace MozaPlugin.Devices.MBooster
         // docs/protocol/devices/mbooster.md "Segmented Damping".
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
-        // Friendly display label the user can edit (defaults to "mBooster"
-        // with a serial-tail fallback). Survives reconnects with the dict key.
-        public string DisplayName { get; set; } = "";
+        // Auto-sleep timeout in minutes (0 = off, 1..300), register 0xB4 on
+        // the host unit. -1 = no override.
+        public int SleepMinutes { get; set; } = -1;
 
         public MBoosterDeviceSettings Clone()
         {
@@ -1009,7 +1010,7 @@ namespace MozaPlugin.Devices.MBooster
                 DampingPressPct = DampingPressPct,
                 DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
-                DisplayName = DisplayName,
+                SleepMinutes = SleepMinutes,
             };
         }
     }
