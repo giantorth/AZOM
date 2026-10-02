@@ -60,6 +60,9 @@ All notable changes to the AZOM plugin are documented here.
 - **PitHouse mBooster presets import the travel, force and feel curve PitHouse shows.** Newer
   presets store these twice, and the importer read the older copy.
 
+- **The mBooster page shows imported values straight away.** It kept showing the pre-import
+  settings until you switched pedals or profiles, though the pedal already had the new ones.
+
 - **PitHouse pedal presets import Pedal Feel, damping, friction and G-Force.** Deadzone, Max
   Force and the feel curve now come across instead of being skipped.
 
