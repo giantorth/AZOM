@@ -108,12 +108,24 @@ would be zero. Release the bitmask to zero only on explicit teardown
 `window` bit is set renders **dark**, not its stored colours (W17, bundle
 K72KZZ44: `07/0F` held knob 4 black for 4 min). Plugin implementation: the
 knob block in `Devices/Led/MozaLedDeviceManager.cs` Display() sends
-`active = window` = the knobs that lit within the keepalive hold, so a black
-owned knob renders dark and a knob SimHub doesn't drive is left out of the
-window entirely and keeps its stored colours (bundles DX44K56M, RKYDB91K;
-`09/09` in BN8GNWGG lit the two undriven knobs). A never-lit knob is never
-claimed — holding it dark at startup clobbered its stored colours for the
-first ~3 s (BN8GNWGG). The keepalive re-emits the last mask.
+`active = window` = the knobs that have lit during the current encoders
+stream, so an effect's "off" stays dark while it runs and a knob no effect
+drives keeps its stored colours (bundles DX44K56M, RKYDB91K; `09/09` in
+BN8GNWGG lit the two undriven knobs). SimHub alpha-blends the encoders channel
+over black, so "assigned but off" and "unassigned" are the same colour; only
+the stream tells them apart — and the stream is one array for all knobs, so a
+pulsing effect on knobs 1/4 kept knobs 2/3 owned and dark after their effect
+ended (CJRWG63Z). The Individual-LEDs layer (`rawState`, built over
+`Color.Transparent`) keeps alpha, so a knob it draws is owned only while its
+slot is opaque: transparent punches through on that frame, opaque black stays
+dark (4RHC90MK: Individual-LEDs knobs 1/4 arrive opaque black in their off
+phase, undriven knobs transparent). The encoders channel gets the same rule by
+re-reading it through `LedModuleSettings.EncodersDriver.GetResult(100,
+Color.Transparent)`; the stream latch is only the fallback when that API isn't
+reachable. When the stream ends the ring is released with
+`0/0` at once (the first `Display()` without the encoders channel, or 300 ms
+after SimHub stops calling `Display()`), and the next stream claims only the
+knobs it lights.
 
 **Button color chunk** (`wheel-telemetry-button-colors`):
 
