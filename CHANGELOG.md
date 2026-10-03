@@ -21,6 +21,9 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **Knobs can now be skipped in SimHub LED effects.** A skipped knob keeps its own colours
+  instead of going dark.
+
 - **Wheel LEDs stay on SimHub while the wheel renegotiates its dashboard.** They no longer
   fall back to the wheel's own lighting during a dashboard switch or game-switch reload.
 

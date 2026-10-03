@@ -104,9 +104,16 @@ must hold the bitmask sticky across mid-session black frames: keep
 streaming colour chunks (so the firmware buffer renders the actual
 black frame), but suppress the bitmask write when its current value
 would be zero. Release the bitmask to zero only on explicit teardown
-(disconnect, mode switch). Plugin implementation: the knob block in
-`Devices/Led/MozaLedDeviceManager.cs` Display() gates the `1A 03` write on
-`knobBitmask != 0`; the keepalive re-emits the last non-zero value.
+(disconnect, mode switch). A knob whose `active` bit is clear while its
+`window` bit is set renders **dark**, not its stored colours (W17, bundle
+K72KZZ44: `07/0F` held knob 4 black for 4 min). Plugin implementation: the
+knob block in `Devices/Led/MozaLedDeviceManager.cs` Display() sends
+`active = window` = the knobs that lit within the keepalive hold, so a black
+owned knob renders dark and a knob SimHub doesn't drive is left out of the
+window entirely and keeps its stored colours (bundles DX44K56M, RKYDB91K;
+`09/09` in BN8GNWGG lit the two undriven knobs). A never-lit knob is never
+claimed — holding it dark at startup clobbered its stored colours for the
+first ~3 s (BN8GNWGG). The keepalive re-emits the last mask.
 
 **Button color chunk** (`wheel-telemetry-button-colors`):
 

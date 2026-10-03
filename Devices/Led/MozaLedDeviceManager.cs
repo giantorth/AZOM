@@ -130,7 +130,7 @@ namespace MozaPlugin.Devices.Led
         /// registered driver matches the attached wheel. Ages are seconds; -1 = never.
         /// </summary>
         internal static (int HoldSec, double SrcQuietSec, double RpmFedSec, double BtnFedSec,
-                         double KnobFedSec, int Skips)? LiveKeepaliveSnapshot()
+                         double KnobFedSec, int Skips, int KnobActiveMask)? LiveKeepaliveSnapshot()
         {
             MozaLedDeviceManager[] snapshot;
             lock (s_instancesLock)
@@ -149,7 +149,8 @@ namespace MozaPlugin.Devices.Led
                         AgeSeconds(now, Interlocked.Read(ref inst._rpmFedUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._btnFedUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._knobFedUtcTicks)),
-                        Volatile.Read(ref inst._keepaliveSkips));
+                        Volatile.Read(ref inst._keepaliveSkips),
+                        Volatile.Read(ref inst._lastKnobBitmask));
             }
             return null;
         }
@@ -226,24 +227,20 @@ namespace MozaPlugin.Devices.Led
         private long _lastKnobColorChangeUtcTicks;
         private bool _knobStaticHoldReleased;
 
-        // Unassigned-encoders detection. The generated device.json enables
-        // LogicalExtraSection for every wheel with knob LEDs, so SimHub hands back a
-        // full-length encoders array whether or not the user assigned anything to it —
-        // an unconfigured KS/CS Pro yields KnobCount blacks, indistinguishable from an
-        // effect sitting in its "off" state on any single frame. They differ over time:
-        // an effect lights, an unassigned channel never does. _knobChannelEverLit
-        // latches on the first lit frame (after which every pre-existing hold/release
-        // rule applies unchanged); _knobBlackSinceUtc stamps the start of the current
-        // unbroken black run so a channel that has never lit can be handed back to the
-        // wheel's stored palette instead of being pinned dark (bundle TMS4EP8B).
-        private bool _knobChannelEverLit;
-        private DateTime _knobBlackSinceUtc = DateTime.MinValue;
-        // How long an encoders channel that has NEVER lit may stay black before the live
-        // pipeline releases the rings. Covers an effect that starts in its off state
-        // (which lights well inside this) without leaving an unassigned channel dark for
-        // the session. Applies once per connection: after the release, only a genuinely
-        // lit frame re-claims the rings.
-        private const double KnobUnassignedGraceSeconds = 4.0;
+        // Per-knob ownership. The generated device.json enables LogicalExtraSection for
+        // every wheel with knob LEDs, so SimHub hands back a full-length encoders array
+        // whether or not anything is assigned to each knob — an unassigned knob is a
+        // permanent black slot, indistinguishable on one frame from an effect in its
+        // "off" state. They differ over time: an effect lights, an unassigned knob never
+        // does. A knob is in the active/window mask only while it has lit within the
+        // keepalive hold; a knob that has never lit is never claimed, so knobs outside
+        // the mask render the wheel's stored per-position colours instead of being
+        // pinned dark (bundles TMS4EP8B, DX44K56M, RKYDB91K, BN8GNWGG). UTC ticks,
+        // 0 = never; touched only on SimHub's LED thread and in ResetCachedLedState.
+        private readonly long[] _knobLastLitUtcTicks = new long[MozaData.WheelKnobMax];
+        // Floor on the per-knob release, so a blinking effect never drops a knob between
+        // blinks when the keepalive hold is set very short.
+        private const double KnobReleaseFloorSeconds = 4.0;
 
         // Per-component bitmask tracking (avoid redundant bitmask sends)
         private int _lastRpmBitmask = -1;
@@ -276,7 +273,7 @@ namespace MozaPlugin.Devices.Led
         //     window since the content last CHANGED (_rpm/_btnChangedUtc). A steadily-
         //     black section ages out and reverts; their "off" is just dark, no hold needed.
         //   • Knobs — SimHub STOPS the encoder channel when the knob effect halts, and the
-        //     knob "off" must be fed (active=window) to render dark instead of reverting to
+        //     knob "off" must be fed (owned knobs in active) to render dark instead of reverting to
         //     the ring's stored colours. So engaged = within the hold window since SimHub
         //     last drove the channel (_knobDrivenUtc, stamped every frame the channel is
         //     present, lit or black). Keyed on CHANGE it would time out a steady-off-but-
@@ -448,8 +445,7 @@ namespace MozaPlugin.Devices.Led
             _knobStaticHoldReleased = false;
             // Detection-loss / reload re-opens the grace window: the next connection
             // may be a differently-configured wheel or profile.
-            _knobChannelEverLit = false;
-            _knobBlackSinceUtc = DateTime.MinValue;
+            Array.Clear(_knobLastLitUtcTicks, 0, _knobLastLitUtcTicks.Length);
             Interlocked.Exchange(ref _rpmChangedUtcTicks, 0L);
             Interlocked.Exchange(ref _rpmFedUtcTicks, 0L);
             Interlocked.Exchange(ref _btnChangedUtcTicks, 0L);
@@ -576,9 +572,9 @@ namespace MozaPlugin.Devices.Led
                 _lastKnobRawColors = null;
                 Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, 0L);
                 _knobStaticHoldReleased = false;
-                // _knobChannelEverLit / _knobBlackSinceUtc deliberately survive: this
-                // runs when a STATIC write just repainted the rings, which is exactly
-                // when an unassigned encoders channel must not re-claim them with black.
+                // Per-knob ownership deliberately survives: this runs when a STATIC
+                // write just repainted the rings, which is exactly when unassigned
+                // knobs must not be re-claimed with black.
                 // Only ResetCachedLedState (detection loss / reload) re-opens the window.
             }
             if ((kind & LedKind.Flag) != 0)
@@ -1157,6 +1153,15 @@ namespace MozaPlugin.Devices.Led
                         knobColors = encoderColors;
                     }
 
+                    // Ownership keys on the unscaled colours: SimHub passes a transient 0
+                    // brightness during scene transitions, which must not age knobs out.
+                    int knobLitMask = 0;
+                    for (int i = 0; i < Math.Min(knobColors.Length, knobCount); i++)
+                    {
+                        if (knobColors[i].R > 0 || knobColors[i].G > 0 || knobColors[i].B > 0)
+                            knobLitMask |= (1 << i);
+                    }
+
                     // Per-frame brightness (SimHub's encoders/knob LED-brightness slider).
                     knobColors = ScaleColorsForBrightness(
                         knobColors,
@@ -1173,12 +1178,9 @@ namespace MozaPlugin.Devices.Led
 
 
                     // We're in this block because SimHub is feeding the knob channel, so
-                    // own/drive the knobs every frame — including when the very first frame
-                    // is all-black (an effect that starts in its "off" state). The old gate
-                    // (knobBitmask != 0 || _lastKnobBitmask > 0) required a lit frame first,
-                    // so a start-in-off animation was ignored until it lit once. The explicit
-                    // release paths (Default-during-telemetry toggle / static-hold timeout /
-                    // never-lit grace window) are what hand the ring back to its stored colours.
+                    // drive the owned knobs every frame. The explicit release paths
+                    // (Default-during-telemetry toggle / static-hold timeout / no owned
+                    // knob left) are what hand the ring back to its stored colours.
                     bool knobsActive = true;
 
                     // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
@@ -1189,23 +1191,18 @@ namespace MozaPlugin.Devices.Led
                     // don't immediately re-engage on the very next identical frame.
                     var nowUtc = DateTime.UtcNow;
 
-                    // Track the current unbroken black run so an encoders channel that
-                    // has never lit can be told from an effect that is momentarily off.
-                    // A single lit frame latches _knobChannelEverLit for the rest of the
-                    // connection, after which knobsUnassigned is permanently false and
-                    // the release rules below behave exactly as before.
-                    if (knobBitmask != 0)
+                    // Owned knobs: lit within the keepalive hold. See _knobLastLitUtcTicks.
+                    long nowTicks = nowUtc.Ticks;
+                    int knobHoldSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
+                    long knobReleaseTicks = (long)(Math.Max(knobHoldSec, KnobReleaseFloorSeconds) * TimeSpan.TicksPerSecond);
+                    int knobOwnedMask = 0;
+                    for (int i = 0; i < knobCount && i < _knobLastLitUtcTicks.Length; i++)
                     {
-                        _knobChannelEverLit = true;
-                        _knobBlackSinceUtc = DateTime.MinValue;
+                        if ((knobLitMask & (1 << i)) != 0) _knobLastLitUtcTicks[i] = nowTicks;
+                        long litTicks = _knobLastLitUtcTicks[i];
+                        if (litTicks != 0 && nowTicks - litTicks < knobReleaseTicks)
+                            knobOwnedMask |= (1 << i);
                     }
-                    else if (_knobBlackSinceUtc == DateTime.MinValue)
-                    {
-                        _knobBlackSinceUtc = nowUtc;
-                    }
-                    bool knobsUnassigned = !_knobChannelEverLit
-                        && _knobBlackSinceUtc != DateTime.MinValue
-                        && (nowUtc - _knobBlackSinceUtc).TotalSeconds >= KnobUnassignedGraceSeconds;
 
                     int knobStaticTimeoutMs = plugin.Data.WheelKnobStaticTimeoutMs;
                     if (!ColorsEqual(knobColors, _lastKnobRawColors))
@@ -1223,9 +1220,8 @@ namespace MozaPlugin.Devices.Led
                     // colours. Three independent triggers:
                     //   • "Default during telemetry" toggle + the frame is fully off.
                     //   • Static-hold timeout above.
-                    //   • The encoders channel has never lit and its opening black run
-                    //     outlived the grace window — nothing is assigned to it, so
-                    //     driving it means pinning the rings dark for the session.
+                    //   • No owned knob left — nothing lit within the hold (or ever), so
+                    //     driving means pinning the rings dark.
                     // These knobs store a separate colour per rotation position, so the only
                     // correct "show original" is to stop driving them entirely. A non-zero
                     // window leaves telemetry owning the knobs (all-off → dark), and sending
@@ -1233,7 +1229,7 @@ namespace MozaPlugin.Devices.Led
                     // _lastKnobs/_lastKnobBitmask so the keepalive below doesn't re-claim the
                     // knobs; a returning (or changed) frame re-engages through the normal path.
                     bool releaseForOff = plugin.Data.WheelKnobDefaultDuringTelemetry && knobBitmask == 0;
-                    if (releaseForOff || knobStaticTimedOut || knobsUnassigned)
+                    if (releaseForOff || knobStaticTimedOut || knobOwnedMask == 0)
                     {
                         // Hand the ring back to its stored colours. Only emit the release
                         // frame (active=0/window=0) if we currently OWN the knobs; if we
@@ -1256,7 +1252,8 @@ namespace MozaPlugin.Devices.Led
                     {
                         bool knobResend = Volatile.Read(ref _knobResend) != 0;
                         bool knobsChanged = knobResend || !ColorsEqual(knobColors, _lastKnobs);
-                        bool shouldSendKnobs = !ledThrottled && (knobsChanged || (forceRefresh && AnyLit(knobColors)));
+                        bool shouldSendKnobs = !ledThrottled
+                            && (knobsChanged || knobOwnedMask != _lastKnobBitmask || (forceRefresh && AnyLit(knobColors)));
 
                         if (shouldSendKnobs)
                         {
@@ -1265,17 +1262,17 @@ namespace MozaPlugin.Devices.Led
 
                             SendColorChunks(plugin, knobColors, count, "wheel-telemetry-knob-colors");
 
-                            int windowMask = (1 << knobCount) - 1;
                             // The CS Pro re-renders the knob ring ONLY on a bitmask write — a
                             // colour-only frame updates the buffer but is never shown (verified
                             // across three bundles: the animation's all-black "off" carries no
                             // bitmask change, so without this it's silently dropped and the ring
                             // keeps the last lit frame). So send the mask on EVERY colour frame to
-                            // latch it. Telemetry owns ALL knobs (active=window); per-knob on/off
-                            // is carried by the COLOURS (black = off). Never active=0 or a partial
-                            // mask — that reverts un-owned knobs to their EEPROM defaults.
-                            _lastKnobBitmask = windowMask;
-                            plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry", BuildWindowedBitmaskBytes(windowMask, windowMask));
+                            // latch it. active = window = the OWNED knobs: an owned knob's on/off
+                            // is carried by its colour (black = dark). An un-owned knob must leave
+                            // the window too — clearing only its active bit renders it dark on the
+                            // W17 (bundle K72KZZ44: 07/0F held knob 4 black).
+                            _lastKnobBitmask = knobOwnedMask;
+                            plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry", BuildWindowedBitmaskBytes(knobOwnedMask, knobOwnedMask));
                             anySent = true;
                         }
                     }
@@ -1328,7 +1325,7 @@ namespace MozaPlugin.Devices.Led
         /// feeding and the group reverts to its stored/idle render. So re-feed each
         /// section's last frame (colour + bitmask) at ~1 Hz while it's CURRENTLY LIT
         /// (hold the lit frame indefinitely) OR within the hold window since it last
-        /// CHANGED (render an "off" — knobs store active=window so it goes dark — for
+        /// CHANGED (render an "off" — owned knobs stay in active so they go dark — for
         /// the hold, then let it revert). Keying on content (lit / recent change) rather
         /// than "SimHub is sending the channel" is what lets a steadily-black section
         /// time out: after an effect halt SimHub keeps sending black RPM/buttons but
@@ -1518,8 +1515,8 @@ namespace MozaPlugin.Devices.Led
                     BuildWindowedBitmaskBytes(_lastButtonBitmask, modelInfo.ButtonWindowMask));
         }
 
-        /// <summary>Re-feed the last knob frame — colour + bitmask (active=window, so an
-        /// all-black "off" renders dark instead of reverting to EEPROM).</summary>
+        /// <summary>Re-feed the last knob frame — colour + bitmask (active = window = owned knobs, so
+        /// an owned knob's black "off" renders dark instead of reverting to EEPROM).</summary>
         private void ResendKnobs(MozaPlugin plugin, Color[] knobs, WheelModelInfo modelInfo, bool bitmaskOnly)
         {
             int count = Math.Min(knobs.Length, modelInfo.KnobCount);
@@ -1527,7 +1524,7 @@ namespace MozaPlugin.Devices.Led
                 SendColorChunks(plugin, knobs, count, "wheel-telemetry-knob-colors");
             if (_lastKnobBitmask >= 0)
                 plugin.DeviceManager.WriteArray("wheel-send-knob-telemetry",
-                    BuildWindowedBitmaskBytes(_lastKnobBitmask, (1 << modelInfo.KnobCount) - 1));
+                    BuildWindowedBitmaskBytes(_lastKnobBitmask, _lastKnobBitmask));
         }
 
         /// <summary>ES rims enter telemetry mode on an all-on→off pulse of the old

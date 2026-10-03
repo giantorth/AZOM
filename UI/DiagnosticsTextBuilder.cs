@@ -659,7 +659,8 @@ namespace MozaPlugin.UI
                 sb.AppendLine();
                 sb.Append($"LED keepalive:  hold={ka.Value.HoldSec}s srcQuiet={Secs(ka.Value.SrcQuietSec)} "
                           + $"fed rpm={Secs(ka.Value.RpmFedSec)} btn={Secs(ka.Value.BtnFedSec)} "
-                          + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips}");
+                          + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips} "
+                          + $"knobActive={(ka.Value.KnobActiveMask < 0 ? "—" : $"0x{ka.Value.KnobActiveMask:X2}")}");
             }
             return sb.ToString();
         }
