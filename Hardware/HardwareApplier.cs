@@ -2037,12 +2037,16 @@ namespace MozaPlugin.Hardware
             // back to Static, the mode-change handler in
             // MozaWheelSettingsControl re-pushes the stored palette so the
             // EEPROM catches up with anything edited during SimHub mode.
+            //
+            // Knobs are exempt: their static colours (27 [knob] 00 / 1F 03 01 [N])
+            // are separate registers from the live frame buffer (19 03), and in
+            // SimHub mode every knob outside the live mask renders them — the same
+            // reason WriteKnobColors / WriteKnobRingColors write in any mode.
             int? groupMode = kind switch
             {
                 LedKind.Rpm    => _data.WheelTelemetryMode,
                 LedKind.Button => _data.WheelButtonsLedMode,
-                LedKind.Knob   => _data.WheelKnobLedMode,
-                _ => (int?)null,  // Flag / None / combined: no mode tracking, write through
+                _ => (int?)null,  // Knob / Flag / None / combined: write through
             };
             if (groupMode == 1)
             {

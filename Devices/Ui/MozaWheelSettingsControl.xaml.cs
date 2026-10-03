@@ -151,9 +151,9 @@ namespace MozaPlugin.Devices.Ui
             }
             else if (ReferenceEquals(selected, KnobsTab))
             {
+                // No SimHub-mode gate: these are the stored colours, not the live
+                // frame buffer, and knobs outside the live mask render them.
                 groupLabel = "Knobs";
-                groupMode = _data.WheelKnobLedMode;
-                if (groupMode == 1) goto skipReadByMode;
                 int knobs = Math.Min(info.KnobCount, 5);
                 for (int k = 1; k <= knobs; k++)
                     cmds.Add($"wheel-knob{k}-active-color");
