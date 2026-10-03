@@ -137,6 +137,28 @@ namespace MozaPlugin.Devices
         /// send/subscribe on it but never manage its lifecycle.</summary>
         public MozaSerialConnection Connection => _connection;
 
+        /// <summary>Live LED lane of this pipe.</summary>
+        public LedFrameScheduler Leds => _connection.Leds;
+
+        /// <summary>Resolve a live-LED zone layout from command names (all addressed to
+        /// the colour command's device), or null if any name is unknown.</summary>
+        public LedZoneLayout? BuildLedLayout(string colorCommand, byte[] ledIndex,
+            string[] maskCommands, LedMaskEncoding[] maskEncodings,
+            bool offViaMask, bool maskWithColors, bool sparseColors, int lapseMs)
+        {
+            var color = MozaCommandDatabase.Get(colorCommand);
+            if (color == null) return null;
+            var masks = new MozaCommand[maskCommands.Length];
+            for (int i = 0; i < masks.Length; i++)
+            {
+                var m = MozaCommandDatabase.Get(maskCommands[i]);
+                if (m == null) return null;
+                masks[i] = m;
+            }
+            return new LedZoneLayout(color, GetDeviceId(color.DeviceType), ledIndex, masks, maskEncodings,
+                offViaMask, maskWithColors, sparseColors, lapseMs);
+        }
+
         // Valid wheel device IDs to try: 0x17 (DeviceWheel), 0x15 (DeviceWheel15)
         // and 0x13 (DeviceBase, the old-protocol / ES bus). 0x15 and 0x17 are two
         // of the three wheel-identity ids in docs/how-to-query-device-type.md.

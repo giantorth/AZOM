@@ -51,13 +51,11 @@ namespace MozaPlugin.Protocol
         // members), so a named member at 18..28 would alias a CM2 value slot.
         // See the slot-layout comment + StreamSlotCount below.
         //
-        // WHEEL live LED writes (RPM/button/knob colours + bitmasks) are NOT here:
-        // they stay on the paced one-shot FIFO. Streaming them emitted the whole set
-        // in <1 ms host-side with nothing discarded (measured), but the rim drops
-        // unpaced bursts — losing frames, which reads as laggy / off-time animation
-        // and knob rings reverting to stored colours. The FIFO's 4 ms spacing is what
-        // the rim needs, and its ordering keeps each colour ahead of its bitmask.
-        // Only the CM2 dash (its own USB pipe, or the bus lane) streams.
+        // WHEEL and base-ambient live LED writes are NOT here: they ride the paced
+        // LedFrameScheduler (Leds). Streaming them emitted the whole set in <1 ms and
+        // the rim lost frames; the one-shot FIFO kept every frame and fell seconds
+        // behind (bundle M3D9WHJE). Only the CM2 dash (its own USB pipe, or the bus
+        // lane) streams.
         //
         // CM2 per-LED RPM indicator colours (0B 00) — up to 10 discrete writes per
         // frame (the SyncRpmColors amplifier); one slot each bounds them. Ordered
@@ -151,8 +149,8 @@ namespace MozaPlugin.Protocol
         //   18..28 — a SECOND tier-def pipeline at slot-base 18 (a bus-attached CM2
         //            dash sharing this connection). See TelemetrySender.StreamSlotBase.
         //   29..40 — LED lanes (CM2 dash RPM colours + bitmask + flag colours). Wheel
-        //            live LED writes are NOT here — they stay on the paced one-shot
-        //            FIFO (the rim drops unpaced bursts). See the LED StreamKind members.
+        //            live LED writes are NOT here — they ride the paced LedFrameScheduler.
+        //            See the LED StreamKind members.
         //   41..43 — wheelbase LFE lanes (the three summed host-rendered oscillator
         //            streams: engine id1, ABS id2, Osc0 id0).
         //   44..45 — mBooster chained-axis motor lanes (axes 1/2; axis 0 is slot 17).
@@ -344,6 +342,10 @@ namespace MozaPlugin.Protocol
         private readonly ConcurrentQueue<byte[]> _oneShotQueue = new ConcurrentQueue<byte[]>();
         // Stream lane: per-kind latest-wins slots, unpaced. SendStream overwrites pending values.
         private readonly byte[]?[] _streamSlots = new byte[StreamSlotCount][];
+
+        /// <summary>Live LED lane: latest-state zones pulled through the one-shot pacing
+        /// gate, alternating with the FIFO. See <see cref="LedFrameScheduler"/>.</summary>
+        public LedFrameScheduler Leds { get; } = new LedFrameScheduler();
         private readonly WriteBudget _budget = new WriteBudget();
         private int _framesDropped;
         private int _checksumFailures;
@@ -873,6 +875,7 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            Leds.Reset();
 
             _port = port;
             port.DiscardInBuffer();
@@ -964,6 +967,7 @@ namespace MozaPlugin.Protocol
             // slipped in before _running went false would otherwise sit here.
             while (_priorityQueue.TryDequeue(out _)) { }
             while (_oneShotQueue.TryDequeue(out _)) { }
+            Leds.Reset();
         }
 
         private void DrainRxQueue()
@@ -1070,13 +1074,15 @@ namespace MozaPlugin.Protocol
         // unlocked _port.Write there (SerialPort is not thread-safe).
         private volatile bool _flushRequested;
 
-        /// <summary>Drop priority + one-shot FIFOs + all stream slots + the OS write buffer (Stop button halts the wheel instantly).</summary>
+        /// <summary>Drop priority + one-shot FIFOs + all stream slots + LED zones + the OS write buffer (Stop button halts the wheel instantly).</summary>
         public void FlushPendingWrites()
         {
             while (_priorityQueue.TryDequeue(out _)) { }
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            // The OS-buffer discard may eat LED frames already counted as sent.
+            Leds.Reset();
             // Defer the OS-buffer discard to the write thread (see _flushRequested).
             _flushRequested = true;
         }
@@ -1145,6 +1151,7 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            Leds.Reset();
             try { Disconnected?.Invoke(); } catch (Exception dex)
             {
                 MozaLog.Debug($"[AZOM] Disconnected handler: {dex.Message}");
@@ -1647,6 +1654,8 @@ namespace MozaPlugin.Protocol
             long lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp() - stopwatchFreq;
             long lastBudgetWarnTs = 0;
             bool lastWasOneShot = false;
+            // Paced-lane turn: true = the LED lane goes next when the FIFO also has work.
+            bool preferLed = true;
 
             while (_running && gen == Volatile.Read(ref _ioGeneration))
             {
@@ -1684,11 +1693,46 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                // 1) One-shot FIFO with 4 ms inter-write pacing (bases drop unpaced bursts).
-                //    WriteBudget extends the gate under bandwidth pressure.
-                if (gen == Volatile.Read(ref _ioGeneration)
+                // 1) Paced lane: the one-shot FIFO and the live LED zones share the 4 ms
+                //    inter-write gate (boxflat's timing; bases drop unpaced settings
+                //    bursts, and the rim lost frames when a whole LED set went out
+                //    back-to-back). WriteBudget extends the gate under bandwidth
+                //    pressure. When both have work they alternate, so neither starves.
+                bool ledReady = Leds.MayHaveWork;
+                bool takeLed = ledReady && (preferLed || _oneShotQueue.IsEmpty);
+                if (takeLed && gen == Volatile.Read(ref _ioGeneration))
+                {
+                    // Gate first, build after: the frame reflects the LED state at the
+                    // moment it can actually go out.
+                    long now = System.Diagnostics.Stopwatch.GetTimestamp();
+                    int budgetExtraMs = _budget.RecommendOneShotDelayMs(LedFrameScheduler.NominalFrameBytes);
+                    int baseGapMs = 0;
+                    if (lastWasOneShot)
+                    {
+                        long sinceTicks = now - lastWriteTs;
+                        if (sinceTicks < fourMsTicks)
+                            baseGapMs = (int)((fourMsTicks - sinceTicks) * 1000 / stopwatchFreq);
+                    }
+                    int sleepMs = Math.Max(baseGapMs, budgetExtraMs);
+                    if (sleepMs > 0) Thread.Sleep(sleepMs);
+
+                    var ledMsg = Leds.TryTakeFrame();
+                    if (ledMsg != null)
+                    {
+                        if (WriteFrame(ledMsg, ref stuffBuf, MozaProtocol.StuffedFrameSize(ledMsg)) > 0)
+                        {
+                            writeCount++;
+                            lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
+                            lastWasOneShot = true;
+                        }
+                        preferLed = false;
+                        didWork = true;
+                    }
+                }
+                else if (gen == Volatile.Read(ref _ioGeneration)
                     && _oneShotQueue.TryDequeue(out var msg))
                 {
+                    preferLed = true;
                     long now = System.Diagnostics.Stopwatch.GetTimestamp();
                     int stuffedSize = MozaProtocol.StuffedFrameSize(msg);
                     int budgetExtraMs = _budget.RecommendOneShotDelayMs(stuffedSize);

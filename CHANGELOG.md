@@ -21,6 +21,9 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **Wheel and base LEDs no longer lag behind the game.** Busy LED effects used to queue up and
+  replay seconds late; the LEDs now always show the latest frame.
+
 - **Knobs can now be skipped in SimHub LED effects.** A skipped knob keeps its own colours
   instead of going dark.
 

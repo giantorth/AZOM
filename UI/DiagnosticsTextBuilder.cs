@@ -662,6 +662,18 @@ namespace MozaPlugin.UI
                           + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips} "
                           + $"knobActive={(ka.Value.KnobActiveMask < 0 ? "—" : $"0x{ka.Value.KnobActiveMask:X2}")}");
             }
+
+            // LED lane: frames / colour entries / bitmasks written per zone, and how long
+            // the zone's latest change waited for a write slot (last / max).
+            var lane = plugin.DeviceManager?.Leds?.Snapshot();
+            if (lane != null && lane.Count > 0)
+            {
+                sb.AppendLine();
+                sb.Append("LED lane:      ");
+                foreach (var z in lane)
+                    sb.Append($" {z.Zone} f={z.Frames} c={z.ColorEntries} m={z.Masks} "
+                              + $"wait={z.LastWaitMs:F0}/{z.MaxWaitMs:F0}ms");
+            }
             return sb.ToString();
         }
 

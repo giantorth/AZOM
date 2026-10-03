@@ -3,6 +3,7 @@ using MozaPlugin.Devices;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Led;
 using MozaPlugin.Devices.Extensions;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Hardware
 {
@@ -2460,7 +2461,12 @@ namespace MozaPlugin.Hardware
             _deviceManager.WriteSetting("wheel-old-send-telemetry", 0);
             _deviceManager.WriteSetting("dash-send-telemetry", 0);
             // The live pipeline's caches must agree with what the wheel now shows, or the
-            // keepalive replays the frame this just cleared.
+            // keepalive replays the frame this just cleared — and the LED lane must not
+            // re-light it with work it still had pending.
+            var leds = _deviceManager.Leds;
+            leds.MarkCleared(LedZone.WheelRpm, 0, rpmWindow);
+            leds.MarkCleared(LedZone.WheelButtons, 0, modelInfo?.ButtonWindowMask ?? 0);
+            leds.MarkCleared(LedZone.WheelKnobs, 0, 0);
             MozaLedDeviceManager.NoteClearedAny();
         }
     }

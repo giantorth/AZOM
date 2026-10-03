@@ -169,11 +169,16 @@ Chunks per group:
 | Button (`0x19 01`) | 14 (VGS) / 8 (CS V2.1, CS Pro) / varies | 3 chunks (last padded) |
 | Knob (`0x19 03`) | 4 (CS Pro) / 5 (KS Pro) | 1 chunk (last padded) |
 
-**Padding rule:** unused entries within a chunk MUST use index `0xFF`. Zero
-padding (`00 00 00 00`) is interpreted as "set LED 0 to black" by firmware,
-causing button 0 to flicker on every frame. See
-[`Devices/Led/MozaLedDeviceManager.cs:472`](../../../Devices/Led/MozaLedDeviceManager.cs)
-(`SendColorChunks`).
+**No padding:** a chunk carries only real LED entries and is short when it has
+fewer than 5 — the wheel frames on the length byte. Zero padding (`00 00 00 00`)
+reads as "set LED 0 to black" (button 0 flicker), and an index-`0xFF` filler
+corrupts the button-input matrix on stricter firmware (issue #100). PitHouse
+emits neither.
+
+Each entry names its own LED index, so a chunk need not cover a contiguous
+range. The plugin relies on that to write only changed LEDs (see
+[Plugin write path](#plugin-write-path)); PitHouse has not been captured
+sending a sparse chunk, so that shape is plugin-originated.
 
 ### Bitmask format
 
@@ -193,6 +198,46 @@ Selects which LEDs are currently lit. The plugin emits the **8-byte
   in the chunk write.
 
 Plugin sends the bitmask only when it changes, regardless of color-chunk cadence.
+
+### Plugin write path
+
+Live wheel and base-ambient LED writes go through `LedFrameScheduler`
+([`Protocol/LedFrameScheduler.cs`](../../../Protocol/LedFrameScheduler.cs)), not
+a queue. The LED drivers publish the colours + bitmask each zone (RPM, buttons,
+knobs, base strip 0/1) should show; the write loop pulls one frame per 4 ms
+paced slot, alternating with the one-shot FIFO, and builds it from the state at
+that moment diffed against what was last written. A burst of SimHub frames
+collapses to the latest one.
+
+The previous FIFO path kept every frame: on a KS Pro + R25 (bundle M3D9WHJE)
+the paced lane ran pinned at ~243 frames/s for the whole capture while SimHub
+produced more, so the wheel replayed seconds-old LED states and its bitmask
+keepalive arrived late enough to drop back to the idle effect.
+
+Per zone:
+
+| Zone | Dark LED | Colour writes | Bitmask |
+|------|----------|---------------|---------|
+| RPM | bitmask only | changed LEDs that are lit | on change |
+| RPM, bare "CS" | black colour | whole set on any change | on change, plus `41 FD DE` |
+| Buttons | black colour | changed LEDs | on change |
+| Knobs | black colour | changed LEDs | after every colour write |
+| Base strips | black colour | whole strip on any change | on change |
+
+RPM follows PitHouse: on the KS Pro capture
+(`usb-capture/ksp/gfdsgfd.pcapng`) PitHouse wrote 36 RPM colour frames
+against 285 RPM bitmasks, so the wheel keeps colours across bitmask-only
+updates. Whether a cleared active bit alone darkens a *button* is uncaptured,
+so buttons still get an explicit black.
+
+Ordering: within a zone every colour write precedes the bitmask that lights
+it, and a dark LED whose new colour has not landed is held out of the bitmask
+until it has. Across zones the highest priority with work goes next (RPM,
+buttons, knobs, base), unless one has waited over 50 ms.
+
+A wheel zone whose bitmask has been silent for over 1000 ms (the ownership
+lapse below) has every colour rewritten on its next write. The keepalive
+re-feed still rewrites a zone's full colour set plus bitmask.
 
 ### Example (CS V2.1 — 10 RPM LEDs, alternating red/blue)
 
@@ -217,9 +262,11 @@ Bitmask (all 10 lit), 8-byte active+window form:
 
 ### Wheel echo
 
-Both write commands echo verbatim — see
-[`../wire/wheel-write-echoes.md`](../wire/wheel-write-echoes.md) entries for
-prefixes `19 00`, `19 01`, `19 03`, `1A 00`, `1A 01`, `1A 03` (group `0x3F`, dev `0x17`).
+[`../wire/wheel-write-echoes.md`](../wire/wheel-write-echoes.md) lists echo
+prefixes `19 00`, `19 01`, `1A 00`. The KS Pro does **not** echo any `19`/`1A`
+write: zero `BF 71 19`/`BF 71 1A` frames in the plugin capture of bundle
+M3D9WHJE (~69k LED writes) and in PitHouse's `usb-capture/ksp/gfdsgfd.pcapng`.
+Echoes can't be used to detect dropped LED frames on that wheel.
 
 ### Static (settings) vs live (telemetry) paths
 

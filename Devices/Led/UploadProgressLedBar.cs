@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Threading;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.Led
 {
@@ -296,16 +297,15 @@ namespace MozaPlugin.Devices.Led
                 s_engagedRpmN = rpmN;
                 s_lastFeedUtc = now;
 
-                // Same wire pair the live RPM path uses: colour chunks first so
-                // no LED lights a frame before its colour lands, then the
-                // 8-byte active+window bitmask. Window stays the full strip —
+                // Same RPM zone the live path publishes to (colours land before
+                // the bitmask that lights them). Window stays the full strip —
                 // the form proven on every captured wheel for this group — so
                 // the unlit side elements read as deliberately off rather than
                 // keeping whatever the paused pipeline last left there.
-                MozaLedDeviceManager.SendColorChunks(
-                    plugin, colors, rpmN, "wheel-telemetry-rpm-colors");
-                plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
-                    MozaLedDeviceManager.BuildWindowedBitmaskBytes(active, (1 << rpmN) - 1));
+                var layout = MozaLedDeviceManager.RpmLayout(plugin, rpmN, legacy: false);
+                if (layout != null)
+                    plugin.DeviceManager.Leds.Publish(LedZone.WheelRpm, layout,
+                        MozaLedDeviceManager.ToRgb(colors, rpmN), active, (1 << rpmN) - 1);
             }
         }
 
@@ -361,10 +361,10 @@ namespace MozaPlugin.Devices.Led
             var plugin = MozaPlugin.Instance;
             if (plugin != null && rpmN > 0 && plugin.Data.IsConnected)
             {
-                MozaLedDeviceManager.SendColorChunks(
-                    plugin, new Color[rpmN], rpmN, "wheel-telemetry-rpm-colors");
-                plugin.DeviceManager.WriteArray("wheel-send-rpm-telemetry",
-                    MozaLedDeviceManager.BuildWindowedBitmaskBytes(0, (1 << rpmN) - 1));
+                var layout = MozaLedDeviceManager.RpmLayout(plugin, rpmN, legacy: false);
+                if (layout != null)
+                    plugin.DeviceManager.Leds.Publish(LedZone.WheelRpm, layout, new int[rpmN],
+                        0, (1 << rpmN) - 1, forceColors: true, forceMask: true);
             }
 
             // The live pipeline's RPM cache still describes the frame the
