@@ -129,10 +129,11 @@ namespace MozaPlugin.Protocol
         /// own a separate oscillator rather than being summed into one tone — the
         /// firmware mixes the slots itself, at their own frequencies.
         ///
-        /// The user never picks one: the provider assigns each new effect the
-        /// next channel in rotation when it is created, wrapping once all eight
-        /// are spoken for. Which slot an effect lands on does not matter, because
-        /// every slot produces the same vibration.
+        /// The user never picks one: each switched-on effect is given the
+        /// least-used channel, and released when switched off (see
+        /// <c>MozaPedalHapticsBridge.SyncOscillatorAssignments</c>). Which slot an
+        /// effect lands on does not matter, because every slot produces the same
+        /// vibration.
         ///
         /// <see cref="PedalHapticsEffectSlot.RoadTexture"/> (slot 8) is not one
         /// of them: it takes a suspension position rather than a tone.
@@ -149,10 +150,6 @@ namespace MozaPlugin.Protocol
             if (channel >= ChannelsPerPedal) return (byte)(ChannelsPerPedal - 1);
             return (byte)channel;
         }
-
-        /// <summary>Next channel in rotation, for auto-assigning a newly created effect.</summary>
-        public static int RotateChannel(int counter)
-            => ((counter % ChannelsPerPedal) + ChannelsPerPedal) % ChannelsPerPedal;
 
         /// <summary>Pedal label with a leading capital, for device and channel names.</summary>
         public static string PedalLabel(byte pedal) => pedal switch

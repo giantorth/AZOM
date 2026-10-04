@@ -75,7 +75,7 @@ namespace MozaPlugin.Devices.Haptics
         }
 
         /// <summary>The hosted ShakeIt settings object for a motors sub-device, or null before SimHub constructs it.</summary>
-        private static object? GetHostedSettings(object motorsDeviceExtension)
+        internal static object? GetHostedSettings(object motorsDeviceExtension)
         {
             var field = FieldCache.GetOrAdd(motorsDeviceExtension.GetType(),
                 t => t.GetField(HostedPluginField, BindingFlags.NonPublic | BindingFlags.Instance));

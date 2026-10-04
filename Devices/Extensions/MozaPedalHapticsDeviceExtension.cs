@@ -15,7 +15,7 @@ namespace MozaPlugin.Devices.Extensions
     /// smaller than <see cref="MozaBaseDeviceExtension"/>: that one juggles an
     /// LED module, an ambient strip and a legacy settings import alongside the
     /// haptics takeover, whereas this definition declares HapticsFeature and
-    /// nothing else. Two jobs:
+    /// nothing else. Three jobs:
     ///
     /// <list type="number">
     /// <item>Swap our connection manager in for SimHub's
@@ -27,6 +27,8 @@ namespace MozaPlugin.Devices.Extensions
     /// Brake / Throttle, in the unit's port order. Re-asserted on a ~1 Hz tick
     /// because a profile switch runs <c>CreateOutputManager</c> again and stamps
     /// the stock one back.</item>
+    /// <item>Keep oscillator assignments in step with which effects are switched
+    /// on (<see cref="MozaPedalHapticsBridge.SyncOscillatorAssignments"/>).</item>
     /// </list>
     ///
     /// Unlike the wheelbase, the Connection tab is left in place — there is no
@@ -39,6 +41,11 @@ namespace MozaPlugin.Devices.Extensions
         // switch) is rare. Starts at the limit so the first DataUpdate tries.
         private const int ProviderInstallEveryNFrames = 60;
         private int _providerInstallTick = ProviderInstallEveryNFrames;
+
+        // Faster than the provider install: this is the delay between switching an
+        // effect on and it reaching an oscillator.
+        private const int OscillatorSweepEveryNFrames = 10;
+        private int _oscillatorSweepTick = OscillatorSweepEveryNFrames;
 
         private bool _driverInjected;
         private bool _connectionSwapAttempted;
@@ -173,6 +180,21 @@ namespace MozaPlugin.Devices.Extensions
                 _providerInstallTick = 0;
                 TryInstallProvider();
             }
+
+            if (++_oscillatorSweepTick >= OscillatorSweepEveryNFrames)
+            {
+                _oscillatorSweepTick = 0;
+                SyncOscillators();
+            }
+        }
+
+        private void SyncOscillators()
+        {
+            if (_motorsDevice == null) return;
+            var (assigned, released) = MozaPedalHapticsBridge.SyncOscillatorAssignments(_motorsDevice);
+            if (assigned > 0 || released > 0)
+                MozaLog.Debug($"[AZOM] Pedal-haptics {MozaPedalHapticsProtocol.PedalLabel(_pedal).ToLowerInvariant()} "
+                            + $"oscillators: {assigned} effect(s) assigned, {released} released");
         }
 
         public override void End(PluginManager pluginManager)

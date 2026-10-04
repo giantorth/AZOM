@@ -21,6 +21,9 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **Stock pedal-haptics effects vibrate again.** Switching an effect on now gives it an
+  oscillator; switching it off frees it.
+
 - **Wheel and base LEDs no longer lag behind the game.** Busy LED effects used to queue up and
   replay seconds late; the LEDs now always show the latest frame.
 
