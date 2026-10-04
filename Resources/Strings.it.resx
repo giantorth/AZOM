@@ -548,7 +548,7 @@ Apri prima un cruscotto in MOZA Pit House per questo volante.</value></data>
 Sei sicuro?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Cancella tutte le impostazioni</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Ridistribuisci definizioni dispositivo</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Questo riscriverà le definizioni dispositivo di SimHub per tutti i volanti, dash e basi MOZA noti, adattate alla base collegata.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Questo riscriverà le definizioni dispositivo di SimHub per tutti i volanti, dash, basi e unità di vibrazione pedali MOZA noti, adattate alla base collegata.
 
 Eventuali modifiche manuali a quei file andranno perse. Continuare?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Esportazione non riuscita: {0}</value></data>

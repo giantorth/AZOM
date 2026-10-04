@@ -550,7 +550,7 @@ Søkte under:
 Er du sikker?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Tøm alle innstillinger</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Distribuer enhetsdefinisjoner på nytt</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord og wheelbaser, tilpasset den tilkoblede wheelbasen.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord, wheelbaser og pedalvibrasjonsenheter, tilpasset den tilkoblede wheelbasen.
 
 Manuelle endringer i disse filene går tapt. Fortsette?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Eksport mislyktes: {0}</value></data>

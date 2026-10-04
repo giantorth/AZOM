@@ -565,7 +565,7 @@ Abra um painel no MOZA Pit House para este volante primeiro.</value></data>
 Tem certeza?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Limpar todas as configurações</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Reimplantar definições de dispositivo</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Isto regravará as definições de dispositivo do SimHub para todos os volantes, painéis e bases MOZA conhecidos, conforme a base conectada.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Isto regravará as definições de dispositivo do SimHub para todos os volantes, painéis, bases e unidades de vibração de pedais MOZA conhecidos, conforme a base conectada.
 
 Edições manuais nesses arquivos serão perdidas. Continuar?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Falha na exportação: {0}</value></data>

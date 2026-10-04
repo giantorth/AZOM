@@ -70,7 +70,40 @@ namespace MozaPlugin.Devices.Extensions
             return any;
         }
 
-        private static bool DeployPedalHapticsDevice(byte pedal, string? discoveredPid)
+        /// <summary>
+        /// Bulk-redeploy path: force-rewrite all three per-pedal definitions.
+        /// A detected unit stamps its own detection PID; otherwise the routed
+        /// binding (host wheelbase PID) is assumed, and the live detection path
+        /// re-stamps it if a USB unit turns up later.
+        /// </summary>
+        private static (int Written, int Total) RedeployAllPedalHaptics(string wheelbasePid)
+        {
+            RemoveLegacyPedalHapticsDefinition();
+
+            string pid = wheelbasePid;
+            var registry = MozaPlugin.Instance?.PedalHapticsRegistry;
+            if (registry != null)
+            {
+                foreach (var controller in registry.Devices)
+                {
+                    if (!controller.Detected) continue;
+                    pid = controller.DiscoveredPid ?? wheelbasePid;
+                    break;
+                }
+            }
+
+            int written = 0, total = 0;
+            for (byte pedal = MozaPedalHapticsProtocol.MinPedal;
+                 pedal <= MozaPedalHapticsProtocol.MaxPedal; pedal++)
+            {
+                total++;
+                if (DeployPedalHapticsDevice(pedal, pid, force: true))
+                    written++;
+            }
+            return (written, total);
+        }
+
+        private static bool DeployPedalHapticsDevice(byte pedal, string? discoveredPid, bool force = false)
         {
             var pid = discoveredPid ?? FallbackPid;
             var guid = PedalHapticsGuidFor(pedal);
@@ -83,7 +116,7 @@ namespace MozaPlugin.Devices.Extensions
                 var deviceJsonPath = Path.Combine(deviceDir, "device.json");
                 bool fileExists = File.Exists(deviceJsonPath);
 
-                if (fileExists && !IsPedalHapticsDefinitionStale(deviceJsonPath, guid, pid))
+                if (fileExists && !force && !IsPedalHapticsDefinitionStale(deviceJsonPath, guid, pid))
                 {
                     // Current, but the artwork may still be missing.
                     EnsureThumbnail(deviceDir, PedalHapticsThumbnailKey);

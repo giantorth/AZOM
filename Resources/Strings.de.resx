@@ -545,7 +545,7 @@ Gesucht unter:
 Sind Sie sicher?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Alle Einstellungen löschen</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Gerätedefinitionen neu bereitstellen</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dadurch werden die SimHub-Gerätedefinitionen für alle bekannten MOZA-Lenkräder, -Dashboards und -Wheelbases neu geschrieben, passend zur verbundenen Wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dadurch werden die SimHub-Gerätedefinitionen für alle bekannten MOZA-Lenkräder, -Dashboards, -Wheelbases und -Pedalvibrationseinheiten neu geschrieben, passend zur verbundenen Wheelbase.
 
 Manuelle Änderungen an diesen Dateien gehen verloren. Fortfahren?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export fehlgeschlagen: {0}</value></data>

@@ -545,7 +545,7 @@ Hãy mở một bảng đồng hồ trong MOZA Pit House cho vô-lăng này trư
 Bạn có chắc không?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Xóa tất cả thiết lập</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Triển khai lại định nghĩa thiết bị</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình và wheelbase MOZA đã biết, khớp với wheelbase đang kết nối.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình, wheelbase và bộ rung bàn đạp MOZA đã biết, khớp với wheelbase đang kết nối.
 
 Mọi chỉnh sửa thủ công trong các tệp đó sẽ bị mất. Tiếp tục?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Xuất thất bại: {0}</value></data>

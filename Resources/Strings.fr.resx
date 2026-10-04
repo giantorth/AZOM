@@ -545,7 +545,7 @@ Ouvrez d'abord un tableau de bord dans MOZA Pit House pour ce volant.</value></d
 Êtes-vous sûr ?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Effacer tous les paramètres</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redéployer les définitions d'appareil</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Cela réécrira les définitions d'appareil SimHub pour tous les volants, dashes et bases MOZA connus, adaptées à la base connectée.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Cela réécrira les définitions d'appareil SimHub pour tous les volants, dashes, bases et modules de vibration de pédales MOZA connus, adaptées à la base connectée.
 
 Toute modification manuelle de ces fichiers sera perdue. Continuer ?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Échec de l'exportation : {0}</value></data>

@@ -550,7 +550,7 @@ Abra primero un panel en MOZA Pit House para este volante.</value></data>
 ¿Está seguro?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Borrar todos los ajustes</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Reimplantar definiciones de dispositivo</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Esto reescribirá las definiciones de dispositivo de SimHub para todos los volantes, dashes y bases MOZA conocidos, ajustadas a la base conectada.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Esto reescribirá las definiciones de dispositivo de SimHub para todos los volantes, dashes, bases y unidades de vibración de pedales MOZA conocidos, ajustadas a la base conectada.
 
 Se perderán los cambios manuales en esos archivos. ¿Continuar?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Error al exportar: {0}</value></data>

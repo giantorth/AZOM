@@ -545,7 +545,7 @@
 确定吗？</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>清除所有设置</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>重新部署设备定义</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>这将根据已连接的基座，重新写入所有已知 MOZA 方向盘、仪表盘和基座的 SimHub 设备定义。
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>这将根据已连接的基座，重新写入所有已知 MOZA 方向盘、仪表盘、基座和踏板振动单元的 SimHub 设备定义。
 
 对这些文件的手动修改将丢失。是否继续？</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>导出失败：{0}</value></data>

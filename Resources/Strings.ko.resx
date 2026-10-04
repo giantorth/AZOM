@@ -544,7 +544,7 @@ MOZA Pit House를 설치하고 대시보드를 로드하거나, 사용자 지정
 계속하시겠습니까?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>모든 설정 지우기</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>장치 정의 다시 배포</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>연결된 휠베이스에 맞추어 알려진 모든 MOZA 휠, 대시, 휠베이스의 SimHub 장치 정의를 다시 작성합니다.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>연결된 휠베이스에 맞추어 알려진 모든 MOZA 휠, 대시, 휠베이스, 페달 진동 장치의 SimHub 장치 정의를 다시 작성합니다.
 
 해당 파일에 대한 수동 변경 사항은 사라집니다. 계속하시겠습니까?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>내보내기 실패: {0}</value></data>

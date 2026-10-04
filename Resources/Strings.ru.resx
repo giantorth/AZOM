@@ -545,7 +545,7 @@
 Вы уверены?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Очистить все настройки</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Переустановить определения устройств</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей и баз MOZA в соответствии с подключённой базой.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей, баз и вибромодулей педалей MOZA в соответствии с подключённой базой.
 
 Ручные изменения в этих файлах будут потеряны. Продолжить?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Не удалось экспортировать: {0}</value></data>

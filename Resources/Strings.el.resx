@@ -544,7 +544,7 @@
 Είστε σίγουροι;</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Εκκαθάριση όλων των ρυθμίσεων</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Επανεγκατάσταση ορισμών συσκευών</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Αυτό θα ξαναγράψει τους ορισμούς συσκευών του SimHub για κάθε γνωστό τιμόνι, dash και wheelbase MOZA, με βάση τη συνδεδεμένη wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Αυτό θα ξαναγράψει τους ορισμούς συσκευών του SimHub για κάθε γνωστό τιμόνι, dash, wheelbase και μονάδα δόνησης πεντάλ MOZA, με βάση τη συνδεδεμένη wheelbase.
 
 Τυχόν χειροκίνητες αλλαγές σε αυτά τα αρχεία θα χαθούν. Συνέχεια;</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Η εξαγωγή απέτυχε: {0}</value></data>

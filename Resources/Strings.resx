@@ -574,7 +574,7 @@ Open a dashboard in MOZA Pit House for this wheel first.</value></data>
 Are you sure?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Clear All Settings</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redeploy Device Definitions</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash and wheel base, matched to the connected wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash, wheel base and pedal haptics unit, matched to the connected wheelbase.
 
 Any manual edits to those files will be lost. Continue?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export failed: {0}</value></data>

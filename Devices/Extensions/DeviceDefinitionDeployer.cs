@@ -141,8 +141,8 @@ namespace MozaPlugin.Devices.Extensions
         /// <summary>
         /// Force-rewrite every device definition the plugin knows how to emit:
         /// one generated wheel definition per <see cref="WheelModelInfo.KnownModels"/>
-        /// entry (artwork included), plus the base ambient strip and the CM1/CM2
-        /// dashes. Unlike the lazy per-detection paths this
+        /// entry (artwork included), plus the base ambient strip, the CM1/CM2
+        /// dashes and the three S12 pedal-haptics devices. Unlike the lazy per-detection paths this
         /// ignores the staleness checks — the user asked for a redeploy, so an
         /// existing file that merely parses is still replaced (that is the repair
         /// case). Complements <see cref="RefreshDeployedThumbnails"/>, which tops up
@@ -209,6 +209,10 @@ namespace MozaPlugin.Devices.Extensions
                 if (DeployFromResource(deviceName, resource, pid, guid, force: true, thumbnailKey: thumbnailKey))
                     written++;
             }
+
+            var pedalHaptics = RedeployAllPedalHaptics(wheelbasePid);
+            written += pedalHaptics.Written;
+            total += pedalHaptics.Total;
 
             MozaLog.Info(
                 $"[AZOM] Redeployed all device definitions: {written}/{total} written " +
