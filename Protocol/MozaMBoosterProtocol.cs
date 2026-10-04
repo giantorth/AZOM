@@ -50,6 +50,55 @@ namespace MozaPlugin.Protocol
         /// <summary>Motor-write payload length (excludes group + device per dirt-client framing rule).</summary>
         public const byte MotorPayloadLen = 0x09;
 
+        // Firmware error reports -------------------------------------------
+        // A unit reports an error on group 0x0E as `03 <code:2 BE> 00 01`; Pit
+        // House acks with `04 <code:2 BE> 01` to that unit's id and the unit
+        // confirms on 0x8E (`04 <code> 00 01`). Unacked, a unit repeats the
+        // report once a second (JCJ5AEA2's chained unit: code 50 all session
+        // under AZOM). Pit House captures ("Brake pedal travel calibration",
+        // "Brake motor calibration") ack only 40 and 50 — never 42 or 0x9F —
+        // so those are the codes acked here. See docs/protocol/devices/mbooster.md
+        // "Firmware error reports".
+        public const byte ErrorReportSub = 0x03;
+        public const byte ErrorAckSub = 0x04;
+
+        /// <summary>Error codes Pit House acknowledges.</summary>
+        public static bool IsAcknowledgedErrorCode(ushort code) => code == 40 || code == 50;
+
+        /// <summary>
+        /// A group-0x0E error report, given the inbound message as
+        /// <c>[group, source, payload…]</c>: <c>0e &lt;src&gt; 03 &lt;code:2&gt; 00 01</c>.
+        /// </summary>
+        public static bool TryParseErrorReport(byte[] data, out ushort code)
+        {
+            code = 0;
+            if (data == null || data.Length < 7 || data[0] != MozaProtocol.FirmwareDebugGroup
+                || data[2] != ErrorReportSub)
+                return false;
+            code = (ushort)((data[3] << 8) | data[4]);
+            return true;
+        }
+
+        /// <summary>
+        /// The ack Pit House sends for a report from <paramref name="device"/>:
+        /// <c>7e 04 0e &lt;dev&gt; 04 &lt;code:2&gt; 01 &lt;ck&gt;</c>
+        /// (capture: <c>7e 04 0e 12 04 00 28 01 dc</c>).
+        /// </summary>
+        public static byte[] BuildErrorAckFrame(ushort code, byte device)
+        {
+            var frame = new byte[9];
+            frame[0] = MozaProtocol.MessageStart;
+            frame[1] = 0x04;
+            frame[2] = MozaProtocol.FirmwareDebugGroup;
+            frame[3] = device;
+            frame[4] = ErrorAckSub;
+            frame[5] = (byte)(code >> 8);
+            frame[6] = (byte)(code & 0xFF);
+            frame[7] = 0x01;
+            frame[8] = MozaProtocol.CalculateWireChecksum(frame, 8);
+            return frame;
+        }
+
         // ParamK constants per protocol note § 3 "Effect types" table.
         // param1 = clamp(round(paramK / freq_hz), 1, 255)
         public const double ParamKAbs       = 2000.0;

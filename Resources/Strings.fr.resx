@@ -609,8 +609,6 @@ Id : {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Dernier appui : bouton {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Charger les valeurs par défaut ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Resynchroniser essuie-glaces et feux</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Nom d'affichage</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Facultatif — aide à distinguer deux mBooster ayant le même rôle dans la liste des périphériques ci-dessus.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Effets personnalisés (expérimental)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// expérimental — vibration définie par l'utilisateur via des formules SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Expérimental — chaque effet personnalisé fait vibrer le moteur à l'aide d'une propriété SimHub ou d'une formule NCalc que vous fournissez. Tous les effets personnalisés (et l'effet Engine intégré) partagent un même canal, donc un seul peut piloter le moteur à la fois ; le dernier effet actif traité l'emporte. Fréquence/Intensité se comportent comme les curseurs de l'Engine.</value></data>

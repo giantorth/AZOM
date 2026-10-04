@@ -564,7 +564,9 @@ namespace MozaPlugin
                     onConnectivityResolved: OnMBoosterConnectivityResolved,
                     chainRolesSeedLookup: LookupMBoosterKnownChainRoles,
                     onChainRolesResolved: OnMBoosterChainRolesResolved,
-                    pedalSlotDetected: () => DetectionState.PedalsDetected);
+                    pedalSlotDetected: () => DetectionState.PedalsDetected,
+                    axisTypesSeedLookup: LookupMBoosterKnownPedalTypes,
+                    onAxisTypesResolved: OnMBoosterAxisTypesResolved);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.

@@ -63,7 +63,10 @@ namespace MozaPlugin.UI
             }
 
             // 4) Trigger a UI refresh so the sliders snap to the imported
-            //    values without waiting for the 500 ms tick.
+            //    values without waiting for the 500 ms tick. The mBooster tab
+            //    seeds once per (profile, pedal, settings object); an import
+            //    edits that same object in place, so drop the seed explicitly.
+            if (plan.TouchedMBoosters.Count > 0) _mboosterUiSeeded = false;
             try { RefreshDisplay(this, EventArgs.Empty); }
             catch { /* refresh is cosmetic — never throw out of the import path */ }
         }

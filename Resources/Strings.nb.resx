@@ -614,8 +614,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Sist trykket: knapp {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Last inn ETS2/ATS-standard</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Synkroniser viskere og lys på nytt</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Visningsnavn</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Valgfritt – hjelper med å skille to mBooster med samme rolle i enhetslisten over.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Egendefinerte effekter (eksperimentell)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// eksperimentell – brukerdefinert vibrasjon drevet av SimHub/NCalc-formler</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Eksperimentell – hver egendefinert effekt vibrerer motoren ved hjelp av en SimHub-egenskap eller NCalc-formel du oppgir. Alle egendefinerte effekter (og den innebygde Engine-effekten) deler én kanal, så bare én kan drive motoren om gangen; den sist behandlede aktive effekten vinner. Frekvens/intensitet oppfører seg som Engine-glidebryterne.</value></data>

@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Threading;
 using BA63Driver.Interfaces;
 using BA63Driver.Mapper;
 using SerialDash;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.Led
 {
@@ -51,30 +54,62 @@ namespace MozaPlugin.Devices.Led
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
             1.0, 1.0, 1.0, 1.0);
 
-        // Per-strip cached state. Bitmask = -1 means "nothing sent yet";
-        // colorHash = 0 means "no palette captured yet" (zero is a safe
-        // sentinel since any non-empty palette including all-black has at
-        // least the leading length byte folded in).
+        // Per-strip last published bitmask; -1 = nothing published yet.
         private readonly int[] _lastBitmask = new int[] { -1, -1 };
-        private readonly long[] _lastColorHash = new long[] { 0, 0 };
 
         // Whether we last sent live telemetry. Used to fire a single
         // bitmask=0 release frame on the active→idle transition so the
-        // device-side standby animation can take back over.
-        private bool _wasActive;
+        // device-side standby animation can take back over. Read by the keepalive
+        // timer, written on SimHub's LED thread.
+        private volatile bool _wasActive;
 
         // Latched while this pipeline is standing down for a dashboard upload,
         // so the resume edge can drop the per-strip change detection.
-        private bool _uploadPaused;
+        private volatile bool _uploadPaused;
 
         // LED-bitmask keepalive: the base firmware blanks its strip LEDs if the
         // bitmask isn't refreshed within a few seconds, even when unchanged — the
         // R25 capture sends the bitmask every frame (colors only on change). Re-send
-        // the last bitmask at 1 Hz when the value is static, matching the dash/wheel
-        // keepalive. Active path only — the idle-release path below stays quiet so
-        // the firmware standby animation resumes.
-        private DateTime _lastSendTime = DateTime.MinValue;
+        // the last bitmask at 1 Hz, from the plugin's LED keepalive timer rather than
+        // Display() so it survives SimHub's LED pipeline going quiet (the wheel and
+        // dash drivers moved for the same reason, bundle 2X7HPMMS). Active path only
+        // — the idle-release path below stays quiet so the firmware standby
+        // animation resumes. UTC ticks (0 = never) behind Interlocked.
+        private long _lastSendUtcTicks;
+        private long _lastLitUtcTicks;
         private const double KeepaliveIntervalSeconds = 1.0;
+        // Default hold past the last lit bit when the page has no explicit
+        // WheelKeepaliveTimeoutSec, matching the wheel and dash drivers.
+        private const int KeepaliveHoldSeconds = 45;
+
+        // Serialises Display() and TickKeepalive() so a replayed bitmask can't land
+        // between a strip's colour chunks and the new bitmask that lights them.
+        // Display() takes it; the keepalive only TryEnters.
+        private readonly object _emitLock = new object();
+
+        // Every live driver, so the keepalive timer can reach them. SimHub may keep
+        // one per base definition; each re-checks IsConnected() itself.
+        private static readonly List<MozaBaseLedDeviceManager> s_instances = new List<MozaBaseLedDeviceManager>();
+        private static readonly object s_instancesLock = new object();
+
+        public MozaBaseLedDeviceManager()
+        {
+            lock (s_instancesLock) s_instances.Add(this);
+        }
+
+        /// <summary>Drive every registered driver's keepalive. Called from the plugin's
+        /// LED keepalive timer.</summary>
+        internal static void TickKeepaliveAll()
+        {
+            MozaBaseLedDeviceManager[] snapshot;
+            lock (s_instancesLock)
+            {
+                if (s_instances.Count == 0) return;
+                snapshot = s_instances.ToArray();
+            }
+            foreach (var inst in snapshot)
+                inst.TickKeepalive();
+        }
 
         public LedModuleSettings LedModuleSettings { get; set; } = null!;
 
@@ -108,10 +143,12 @@ namespace MozaPlugin.Devices.Led
             {
                 _lastBitmask[0] = -1;
                 _lastBitmask[1] = -1;
-                _lastColorHash[0] = 0;
-                _lastColorHash[1] = 0;
+                var leds = MozaPlugin.Instance?.DeviceManager?.Leds;
+                leds?.Drop(LedZone.BaseStrip0);
+                leds?.Drop(LedZone.BaseStrip1);
                 _wasActive = false;
-                _lastSendTime = DateTime.MinValue;
+                Interlocked.Exchange(ref _lastSendUtcTicks, 0L);
+                Interlocked.Exchange(ref _lastLitUtcTicks, 0L);
                 OnDisconnect?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -151,7 +188,10 @@ namespace MozaPlugin.Devices.Led
 
         public object GetDriverInstance() => this;
 
-        public void Close() { }
+        public void Close()
+        {
+            lock (s_instancesLock) s_instances.Remove(this);
+        }
 
         public void ResetDetection() { }
 
@@ -207,6 +247,9 @@ namespace MozaPlugin.Devices.Led
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
 
+            // Released in the finally below; taken just before the send region.
+            bool emitLockHeld = false;
+
             try
             {
                 var ledColors = leds?.Invoke() ?? Array.Empty<Color>();
@@ -255,12 +298,15 @@ namespace MozaPlugin.Devices.Led
                     _uploadPaused = true;
                     return;
                 }
+                Monitor.Enter(_emitLock, ref emitLockHeld);
+
                 if (_uploadPaused)
                 {
                     _uploadPaused = false;
                     _lastBitmask[0] = _lastBitmask[1] = -1;
-                    _lastColorHash[0] = _lastColorHash[1] = 0;
-                    _lastSendTime = DateTime.MinValue;
+                    plugin.DeviceManager.Leds.Invalidate(LedZone.BaseStrip0);
+                    plugin.DeviceManager.Leds.Invalidate(LedZone.BaseStrip1);
+                    Interlocked.Exchange(ref _lastSendUtcTicks, 0L);
                     _wasActive = false;
                 }
 
@@ -273,8 +319,8 @@ namespace MozaPlugin.Devices.Led
                 {
                     if (_wasActive)
                     {
-                        SendBitmask(plugin, 0, 0);
-                        SendBitmask(plugin, 1, 0);
+                        ReleaseStrip(plugin, 0);
+                        ReleaseStrip(plugin, 1);
                         _lastBitmask[0] = 0;
                         _lastBitmask[1] = 0;
                         _wasActive = false;
@@ -293,30 +339,85 @@ namespace MozaPlugin.Devices.Led
                 if (brightness > 1) brightness = 1;
 
                 // Walk both physical strips in parallel — same pattern, just
-                // different SimHub source slice and target command suffix.
-                // keepaliveDue is computed once and shared so both strips refresh
-                // on the same 1 Hz tick; _lastSendTime advances only when a bitmask
-                // actually went out (change or keepalive), so a continuously moving
-                // value never triggers a redundant keepalive frame.
-                var now = DateTime.UtcNow;
-                bool keepaliveDue = (now - _lastSendTime).TotalSeconds >= KeepaliveIntervalSeconds;
+                // different SimHub source slice and target command suffix. A bitmask
+                // goes out here only on change; the unchanged refresh is the keepalive
+                // timer's job (TickKeepalive), which the send stamp below paces.
                 bool sent0 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 0, sourceOffset: 0,
-                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip);
                 bool sent1 = ProcessStrip(plugin, ledColors, brightness, stripIndex: 1, sourceOffset: ledsPerStrip,
-                    ledsPerStrip: ledsPerStrip, keepaliveDue: keepaliveDue);
+                    ledsPerStrip: ledsPerStrip);
+                long nowTicks = DateTime.UtcNow.Ticks;
                 if (sent0 || sent1)
-                    _lastSendTime = now;
+                    Interlocked.Exchange(ref _lastSendUtcTicks, nowTicks);
+                if (_lastBitmask[0] > 0 || _lastBitmask[1] > 0)
+                    Interlocked.Exchange(ref _lastLitUtcTicks, nowTicks);
             }
             finally
             {
+                if (emitLockHeld) Monitor.Exit(_emitLock);
                 AfterDisplay?.Invoke(this, EventArgs.Empty);
             }
         }
 
-        // Returns true if a bitmask frame was sent for this strip (change or
-        // keepalive) so the caller can advance the shared keepalive timer.
+        /// <summary>
+        /// Re-send each strip's last bitmask at 1 Hz from the LED keepalive timer, so
+        /// the strips hold when SimHub's LED pipeline goes quiet. Same hold rules as the
+        /// wheel and dash: while a game is active, while a strip is lit, or within the
+        /// hold since the last lit bit; otherwise the firmware takes the strips back.
+        /// Nothing after the idle-release frame: <c>_wasActive</c> is false then.
+        /// </summary>
+        internal void TickKeepalive()
+        {
+            if (MozaPlugin.IsShuttingDown) return;
+
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.Data.IsConnected || !plugin.IsBaseAmbientLedSupported) return;
+            if (!IsConnected()) return;
+            // Upload stand-down: only Display() clears _uploadPaused and re-arms the
+            // caches, so the timer stays quiet until a real frame comes back.
+            if (UploadProgressLedBar.IsStandDownActive || _uploadPaused) return;
+            if (!_wasActive) return;
+
+            long nowTicks = DateTime.UtcNow.Ticks;
+            if (!DueAfter(nowTicks, Interlocked.Read(ref _lastSendUtcTicks), KeepaliveIntervalSeconds)) return;
+
+            int b0 = _lastBitmask[0], b1 = _lastBitmask[1];
+            if (b0 < 0 && b1 < 0) return;
+            int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? KeepaliveHoldSeconds;
+            bool lit = b0 > 0 || b1 > 0;
+            if (!plugin.IsGameActive && !lit
+                && !WithinHold(nowTicks, Interlocked.Read(ref _lastLitUtcTicks), holdSec))
+                return;
+
+            if (!Monitor.TryEnter(_emitLock)) return;
+            try
+            {
+                if (!_wasActive) return;
+                // Bitmask only, as before. A no-op if the lane lost the strip (flush /
+                // reset); Display() republishes it on its next frame.
+                if (_lastBitmask[0] >= 0) plugin.DeviceManager.Leds.RequestRefresh(LedZone.BaseStrip0, colors: false);
+                if (_lastBitmask[1] >= 0) plugin.DeviceManager.Leds.RequestRefresh(LedZone.BaseStrip1, colors: false);
+                Interlocked.Exchange(ref _lastSendUtcTicks, nowTicks);
+            }
+            finally
+            {
+                Monitor.Exit(_emitLock);
+            }
+        }
+
+        // Still inside the hold window measured from a UTC-ticks stamp. 0 ticks = never.
+        private static bool WithinHold(long nowTicks, long stampTicks, int holdSec)
+            => holdSec > 0 && stampTicks != 0
+               && (nowTicks - stampTicks) < holdSec * TimeSpan.TicksPerSecond;
+
+        // True once `seconds` have elapsed since a stamp. Never-sent (0 ticks) is due.
+        private static bool DueAfter(long nowTicks, long lastTicks, double seconds)
+            => lastTicks == 0 || (nowTicks - lastTicks) >= (long)(seconds * TimeSpan.TicksPerSecond);
+
+        // Returns true if a bitmask frame was sent for this strip, so the caller can
+        // advance the shared keepalive clock.
         private bool ProcessStrip(MozaPlugin plugin, Color[] ledColors, double brightness,
-            int stripIndex, int sourceOffset, int ledsPerStrip, bool keepaliveDue)
+            int stripIndex, int sourceOffset, int ledsPerStrip)
         {
             // Materialise this strip's colors with brightness applied. Source
             // array may be shorter than expected — pad with black so the
@@ -341,106 +442,50 @@ namespace MozaPlugin.Devices.Led
                     bitmask |= (1 << i);
             }
 
-            // Hash the post-brightness palette so we re-send colors only on
-            // a meaningful change (matches PitHouse capture: "Colors are only
-            // re-sent when the palette changes — not every frame").
-            long colorHash = HashColors(stripColors);
-            bool colorsChanged = colorHash != _lastColorHash[stripIndex];
+            // The LED lane writes the strip only when the wheel's copy differs:
+            // the whole palette on any colour change (matches PitHouse: "Colors are
+            // only re-sent when the palette changes — not every frame"), the
+            // bitmask on change.
             bool bitmaskChanged = bitmask != _lastBitmask[stripIndex];
-
-            if (colorsChanged)
-            {
-                SendColorChunks(plugin, stripColors, stripIndex);
-                _lastColorHash[stripIndex] = colorHash;
-            }
-
-            if (bitmaskChanged || keepaliveDue)
-            {
-                SendBitmask(plugin, stripIndex, bitmask);
-                _lastBitmask[stripIndex] = bitmask;
-                return true;
-            }
-            return false;
+            var layout = StripLayout(plugin, stripIndex, ledsPerStrip);
+            if (layout != null)
+                plugin.DeviceManager.Leds.Publish(StripZone(stripIndex), layout,
+                    MozaLedDeviceManager.ToRgb(stripColors, ledsPerStrip), bitmask, 0);
+            _lastBitmask[stripIndex] = bitmask;
+            return bitmaskChanged;
         }
 
-        // Send a strip's colors as cmd-0x1A chunks of at most 5 entries
-        // ([idx, R, G, B] each, so 20 bytes of LED data per chunk). Chunk 1
-        // carries LEDs 0..4; chunk 2 carries whatever remains, so its shape
-        // follows strip length: 4 entries / wire N=18 on a 9-LED strip,
-        // 1 entry / wire N=6 on the R16 Ultra's 6-LED strip. A strip of 5 or
-        // fewer LEDs sends no chunk 2 at all.
-        //
-        // Chunk 2 must NOT be padded to 20 bytes. The wheel-LED command
-        // (0x19) needs a [0xFF, 0, 0, 0] trailing entry to hide zero-pad
-        // bytes from the wheel firmware's "interpret-as-set-LED-0-black" bug.
-        // The base firmware behaves differently: with that padding entry
-        // present, bitmask=0x01 (light only LED 0) silently produced no LEDs
-        // lit; 2+ active bits worked normally. Both the R25 (2026-05-05) and
-        // R16 Ultra (2026-08-22) captures send chunk 2 at exactly the
-        // remaining LED count with no padding.
-        private static void SendColorChunks(MozaPlugin plugin, Color[] strip, int stripIndex)
+        private static LedZone StripZone(int stripIndex)
+            => stripIndex == 0 ? LedZone.BaseStrip0 : LedZone.BaseStrip1;
+
+        private static readonly string[] s_strip0Mask = { "base-ambient-send-rpm-strip0" };
+        private static readonly string[] s_strip1Mask = { "base-ambient-send-rpm-strip1" };
+        private static readonly LedMaskEncoding[] s_le4 = { LedMaskEncoding.ActiveLe4 };
+
+        // Colours are cmd-0x1A chunks of at most 5 [idx, R, G, B] entries: chunk 1
+        // carries LEDs 0..4, chunk 2 whatever remains (4 entries on a 9-LED strip,
+        // 1 on the R16 Ultra's 6-LED strip). Chunk 2 must NOT be padded: with a
+        // [0xFF, 0, 0, 0] filler present, bitmask=0x01 lit nothing on the base. The
+        // R25 (2026-05-05) and R16 Ultra (2026-08-22) captures send it at exactly the
+        // remaining LED count. Whole-strip rewrites (sparseColors: false) keep that
+        // captured shape. The bitmask is a 4-byte LE u32 whatever the strip length
+        // (docs/protocol/leds/base-ambient-0x20-0x22.md).
+        private static LedZoneLayout? StripLayout(MozaPlugin plugin, int stripIndex, int ledsPerStrip)
         {
-            string command = stripIndex == 0
-                ? "base-ambient-rpm-colors-strip0"
-                : "base-ambient-rpm-colors-strip1";
-
-            const int MaxEntriesPerChunk = 5;
-            int total = strip.Length;
-
-            for (int first = 0; first < total; first += MaxEntriesPerChunk)
-            {
-                int count = Math.Min(MaxEntriesPerChunk, total - first);
-                var chunk = new byte[count * 4];
-                for (int i = 0; i < count; i++)
-                {
-                    int led = first + i;
-                    int o = i * 4;
-                    chunk[o]     = (byte)led;
-                    chunk[o + 1] = strip[led].R;
-                    chunk[o + 2] = strip[led].G;
-                    chunk[o + 3] = strip[led].B;
-                }
-                plugin.DeviceManager.WriteArray(command, chunk);
-            }
+            var idx = new byte[ledsPerStrip];
+            for (int i = 0; i < ledsPerStrip; i++) idx[i] = (byte)i;
+            return plugin.DeviceManager.BuildLedLayout(
+                stripIndex == 0 ? "base-ambient-rpm-colors-strip0" : "base-ambient-rpm-colors-strip1",
+                idx, stripIndex == 0 ? s_strip0Mask : s_strip1Mask, s_le4,
+                offViaMask: false, maskWithColors: false, sparseColors: false, lapseMs: 0);
         }
 
-        // Send a strip's bitmask as a 4-byte LE u32 (high bits zero). Payload
-        // width is always 4 bytes regardless of strip length; the used width
-        // is the LED count (0x3F max on 6 LEDs, 0x1FF on 9).
-        // Per docs/protocol/leds/base-ambient-0x20-0x22.md.
-        private static void SendBitmask(MozaPlugin plugin, int stripIndex, int bitmask)
+        // Hand a strip back to the firmware's standby animation: bitmask 0, no colour write.
+        private static void ReleaseStrip(MozaPlugin plugin, int stripIndex)
         {
-            string command = stripIndex == 0
-                ? "base-ambient-send-rpm-strip0"
-                : "base-ambient-send-rpm-strip1";
-            var payload = new byte[]
-            {
-                (byte)(bitmask & 0xFF),
-                (byte)((bitmask >> 8) & 0xFF),
-                (byte)((bitmask >> 16) & 0xFF),
-                (byte)((bitmask >> 24) & 0xFF),
-            };
-            plugin.DeviceManager.WriteArray(command, payload);
-        }
-
-        // Cheap palette change-detector. Fold each color's RGB into a 64-bit
-        // accumulator. Collisions are theoretically possible but irrelevant
-        // in practice — worst case is a missed re-send for one frame, which
-        // self-corrects on the next palette change.
-        private static long HashColors(Color[] strip)
-        {
-            unchecked
-            {
-                long h = 1469598103934665603L; // FNV-1a 64-bit basis
-                for (int i = 0; i < strip.Length; i++)
-                {
-                    var c = strip[i];
-                    h ^= c.R; h *= 1099511628211L;
-                    h ^= c.G; h *= 1099511628211L;
-                    h ^= c.B; h *= 1099511628211L;
-                }
-                return h;
-            }
+            var layout = StripLayout(plugin, stripIndex, CurrentLedsPerStrip);
+            if (layout != null)
+                plugin.DeviceManager.Leds.PublishMaskOnly(StripZone(stripIndex), layout, 0, 0);
         }
     }
 }

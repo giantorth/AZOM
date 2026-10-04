@@ -1,0 +1,3 @@
+[submodule "moza-simulator"]
+	path = moza-simulator
+	url = https://github.com/giantorth/moza-simulator.git

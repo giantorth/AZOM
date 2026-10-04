@@ -140,8 +140,6 @@
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Função</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Nome de exibição</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Opcional — ajuda a distinguir dois mBoosters com a mesma função na lista de dispositivos acima.</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Desativado</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Acelerador</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Freio</value></data>

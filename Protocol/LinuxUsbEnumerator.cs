@@ -150,6 +150,52 @@ namespace MozaPlugin.Protocol
             return results;
         }
 
+        /// <summary>
+        /// Every MOZA USB device the kernel exposes as hidraw (PID → kernel HID
+        /// name), i.e. what winebus could hand to HidSharp. Read from
+        /// <c>/sys/class/hidraw/*/device/uevent</c> (<c>HID_ID=0003:0000346E:0000PPPP</c>).
+        /// Empty — never throws — when sysfs is unreachable.
+        /// </summary>
+        public static IReadOnlyDictionary<ushort, string> EnumerateMozaHidraw()
+        {
+            var result = new SortedDictionary<ushort, string>();
+            string? root = WineHost.UnixPath("/sys/class/hidraw");
+            if (root == null) return result;
+
+            string[] dirs;
+            try { dirs = Directory.GetDirectories(root); }
+            catch (Exception ex)
+            {
+                MozaLog.DebugIfChanged("sysfs-hidraw",
+                    $"[AZOM] sysfs: cannot list {root}: {ex.GetType().Name}: {ex.Message}");
+                return result;
+            }
+
+            foreach (var dir in dirs)
+            {
+                string id = "", name = "";
+                foreach (var rawLine in ReadText(Path.Combine(dir, "device", "uevent")).Split('\n'))
+                {
+                    string line = rawLine.Trim();
+                    if (line.StartsWith("HID_ID=", StringComparison.Ordinal)) id = line.Substring("HID_ID=".Length);
+                    else if (line.StartsWith("HID_NAME=", StringComparison.Ordinal)) name = line.Substring("HID_NAME=".Length);
+                }
+                var parts = id.Split(':');
+                // Bus 0003 = USB; a Bluetooth/virtual node is not winebus's hidraw path.
+                if (parts.Length == 3
+                    && parts[0] == "0003"
+                    && uint.TryParse(parts[1], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint vid)
+                    && uint.TryParse(parts[2], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uint pid)
+                    && vid == MozaVid && pid <= ushort.MaxValue)
+                {
+                    // Kernel name is "<manufacturer> <product>" — "Gudsen MOZA R9 Base".
+                    if (name.StartsWith("Gudsen ", StringComparison.Ordinal)) name = name.Substring("Gudsen ".Length);
+                    if (name.Length > 0 || !result.ContainsKey((ushort)pid)) result[(ushort)pid] = name;
+                }
+            }
+            return result;
+        }
+
         private readonly struct UsbDevice
         {
             public readonly string BusPath;

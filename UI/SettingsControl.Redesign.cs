@@ -135,6 +135,7 @@ namespace MozaPlugin.UI
                     MBoosterInputX1Slider, MBoosterInputX2Slider, MBoosterInputX3Slider,
                     MBoosterInputX4Slider, MBoosterInputX5Slider, MBoosterInputX6Slider
                 });
+                MBoosterInputCurveEditor.DragCompleted += (_, __) => UpdateMBoosterFeelAxis();
 
                 // Two-way bindings: CurveEditor.YN ↔ EqNSlider.Value (FFB EQ
                 // uses the same line-graph control as the output curves,

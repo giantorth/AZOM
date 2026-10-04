@@ -612,8 +612,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Ultimo premuto: pulsante {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Carica impostazioni predefinite ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Risincronizza tergicristalli e luci</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Nome visualizzato</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Facoltativo — aiuta a distinguere due mBooster con lo stesso ruolo nell'elenco dei dispositivi sopra.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Effetti personalizzati (sperimentale)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// sperimentale — vibrazione definita dall'utente tramite formule SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Sperimentale — ogni effetto personalizzato fa vibrare il motore usando una proprietà SimHub o una formula NCalc fornita da te. Tutti gli effetti personalizzati (e l'effetto Engine integrato) condividono un unico canale, quindi solo uno può pilotare il motore alla volta; vince l'ultimo effetto attivo elaborato. Frequenza/Intensità si comportano come i cursori dell'Engine.</value></data>

@@ -203,20 +203,27 @@ query gets the empty one.
 Each device exposes eight ShakeIt channels, one per interchangeable hardware
 slot (0-7). Channel N drives slot N — that part is a plain address translation.
 
-The round-robin sits above it and is what the user never sees: SimHub calls
-`LoadDefaultPlatformSettings` when an effect is created, and that hands the
-effect the next channel in rotation, wrapping after eight. So effects spread
-across the module's own mixer at their own frequencies instead of collapsing
-into one tone, and nobody opens the channel list to arrange it.
+Assignment is what the user never sees, and it follows the effect's on/off
+switch. SimHub has no hook for that — `LoadDefaultPlatformSettings` only runs on
+Add effect / Reset effect, never for the stock 24-effect profile, and
+`CreateDefaultActivationFor` has no channel index — so the device extension
+sweeps the profile every 10 data ticks
+(`MozaPedalHapticsBridge.SyncOscillatorAssignments`):
 
-Two properties worth keeping in mind:
+- A switched-on effect (its own `IsEnabled` and every enclosing group's, the same
+  test `ProcessEffects` applies) that does not drive exactly one oscillator on
+  every placement gets the **least-used** oscillator among switched-on effects.
+- A switched-off effect has its oscillator released. Nothing is lost: SimHub's
+  Test button does nothing on a switched-off effect either.
+- Groups carry no tone and are never assigned.
 
-- **Assignment happens at creation, not at activation.** With more than eight
-  effects on a pedal, effects 1 and 9 permanently share slot 0 even if they are
-  the only two that ever run together and the rest sit idle. True "next free
-  oscillator at fire time" is not reachable: `UpdateOutput` only ever hands over
+So effects spread across the module's own mixer at their own frequencies instead
+of collapsing into one tone, idle effects hold nothing, and nobody opens the
+channel list to arrange it. Two notes:
+
+- **Assignment is per effect, not per firing.** `UpdateOutput` only hands over
   one already-mixed value per channel, so individual effects are invisible at
-  runtime.
+  runtime; past eight switched-on effects, some share an oscillator.
 - **Sharing is harmless.** ShakeIt sums the effects on a channel before the
   value arrives, and the slots are interchangeable.
 

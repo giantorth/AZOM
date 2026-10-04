@@ -245,6 +245,10 @@ namespace MozaPlugin.Hardware
                     controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, cfg.InputCurveX, dev);
                 }
             }
+
+            // Lane-wide; lives on the host unit only.
+            if (s.SleepMinutes >= 0)
+                controller.SendIntWrite("mbooster-sleep-minutes", s.SleepMinutes, controller.HostDeviceId);
         }
     }
 }

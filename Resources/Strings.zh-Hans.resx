@@ -609,8 +609,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>上次按下：按键 {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>加载 ETS2/ATS 默认值</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>重新同步雨刮与灯光</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>显示名称</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>可选 — 帮助在上面的设备列表中区分两个角色相同的 mBooster。</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>自定义效果（实验性）</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// 实验性 — 由 SimHub/NCalc 公式驱动的自定义振动</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>实验性 — 每个自定义效果使用你提供的 SimHub 属性或 NCalc 公式来驱动马达振动。所有自定义效果（以及内置的 Engine 效果）共用一个通道，因此同一时刻只有一个能驱动马达；最近处理的活动效果优先。频率/强度的行为与 Engine 的滑块相同。</value></data>

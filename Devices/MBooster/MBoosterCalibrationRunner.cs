@@ -99,16 +99,8 @@ namespace MozaPlugin.Devices.MBooster
         private const int MotorStateRunning = 1;
         private const int MotorStateComplete = 3;
 
-        // Register 0xB4 is NOT a usable calibration-mode gate. On the USB unit
-        // in the 2026-09-08 captures it went 2 → 0 on cal-start and back to 2
-        // after the reboot, which looked like a state machine — but a routed
-        // W17 lane (bug reports GVT5H8B8 / 34JAASN5) reads a constant 15
-        // through an entire run, including while the firmware has accepted the
-        // start frame. Gating entry on it made every travel calibration on
-        // that hardware fail with "the pedal never entered calibration mode".
-        // It is still read and reported in diagnostics, but nothing branches
-        // on it. The firmware's own `Pedal Calib …` log lines are the real
-        // progress signal — see _sawCalibProgress.
+        // No register gates calibration progress; the firmware's own
+        // `Pedal Calib …` log lines are the signal — see _sawCalibProgress.
 
         private const double TickMs = 250.0;
 
@@ -133,7 +125,6 @@ namespace MozaPlugin.Devices.MBooster
         private DateTime _stepDueUtc;
         private DateTime _stepStartedUtc;
         private DateTime _locateStartedUtc;
-        private DateTime _lastStateReadUtc;
         private bool _sawDisconnect;
         // Set once the firmware reports a real sweep on group 0x0E.
         private bool _sawCalibProgress;
@@ -215,9 +206,6 @@ namespace MozaPlugin.Devices.MBooster
                 _sawCalibProgress = false;
                 _firmwareNote = null;
                 _locateStartedUtc = default;
-                // default = "never read", so ReadCalibrationState's 1 Hz
-                // throttle lets this run's first read through immediately.
-                _lastStateReadUtc = default;
             }
 
             controller.SetEffectsSuspended(true);
@@ -229,7 +217,7 @@ namespace MozaPlugin.Devices.MBooster
                 // Straight into Pit House's fixed 20.0s window — it polls
                 // nothing here either. Whether the firmware actually started a
                 // sweep is judged from its own 0x0E log at the end of the
-                // window, not from a register (see the 0xB4 note above).
+                // window, not from a register (see the note above).
                 Advance(MBoosterCalStep.TravelSweeping, TravelSweepSeconds, "calibrating");
             }
             else
@@ -251,9 +239,8 @@ namespace MozaPlugin.Devices.MBooster
         /// stop frame: `Pedal Calib End` is what COMMITS the measured angle and
         /// load-cell range, so stopping a sweep early would write whatever
         /// partial range the motor had reached over the pedal's good
-        /// calibration. The reboot is what clears calibration mode
-        /// (register 0xB4 returns to 2 only after it — never on the stop frame),
-        /// and it is also the firmware's only exit from the motor routine's
+        /// calibration. The reboot is what clears calibration mode, and it is
+        /// also the firmware's only exit from the motor routine's
         /// debug mode / MotorMode 8, so one frame covers both routines.
         /// </summary>
         public void Cancel()
@@ -401,13 +388,9 @@ namespace MozaPlugin.Devices.MBooster
                         lock (_lock) _sawDisconnect = true;
                         break;
                     }
-                    // Lane is back; let its own read burst answer before
-                    // judging 0xB4.
+                    // Lane is back; let its own read burst answer.
                     if (_sawDisconnect)
-                    {
                         Advance(MBoosterCalStep.Verifying, VerifySeconds, "rebooting");
-                        ReadCalibrationState(controller!);
-                    }
                     else if (expired)
                     {
                         // Never saw the port drop. The commit already happened
@@ -423,7 +406,6 @@ namespace MozaPlugin.Devices.MBooster
                 case MBoosterCalStep.Verifying:
                     // Settle window only — the reboot has landed and the
                     // lane's own reconnect burst is re-reading everything.
-                    // Nothing branches on 0xB4 here (see its note above).
                     if (!expired) break;
                     if (controller == null || !controller.IsConnected)
                         Fail(controller, "the pedal did not come back after the reboot");
@@ -486,23 +468,6 @@ namespace MozaPlugin.Devices.MBooster
                     PollMotor(controller!);
                     break;
             }
-        }
-
-        /// <summary>
-        /// Ask the target device for register 0xB4, at most once a second. The
-        /// state machine ticks four times a second, which would otherwise put
-        /// four reads on the wire per second for the whole confirm/verify
-        /// window — the reply cannot even arrive that fast behind the lane's
-        /// own read burst.
-        /// </summary>
-        private void ReadCalibrationState(MBoosterDeviceController controller)
-        {
-            lock (_lock)
-            {
-                if ((DateTime.UtcNow - _lastStateReadUtc).TotalSeconds < 1.0) return;
-                _lastStateReadUtc = DateTime.UtcNow;
-            }
-            controller.SendRead("mbooster-calibration-state", _dev);
         }
 
         /// <summary>Last motor-locate status this run's target device reported:

@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
 using BA63Driver;
 using BA63Driver.Interfaces;
 using BA63Driver.Mapper;
+using GameReaderCommon.Enums;
 using SerialDash;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency;
+using SimHub.Plugins.DataPlugins.ShakeItV3.EffectsContainers;
+using SimHub.Plugins.DataPlugins.ShakeItV3.Settings;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 using MozaPlugin.Integration;
@@ -84,6 +88,160 @@ namespace MozaPlugin.Devices.Haptics
             {
                 MozaLog.Debug($"[AZOM] Could not install the pedal-haptics channels provider: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Give every switched-on effect exactly one oscillator, and release the
+        /// oscillator of every switched-off one. The channel grid is hidden from the
+        /// UI, so the plugin owns this assignment outright.
+        ///
+        /// A sweep rather than a hook: SimHub has no callback for an effect being
+        /// switched on — <c>LoadDefaultPlatformSettings</c> only runs on Add/Reset
+        /// effect, never for the stock profile — and <c>CreateDefaultActivationFor</c>
+        /// has no channel index. Runs on the data thread, the same thread as the tone
+        /// mixer, so the mixer never sees a half-written activation.
+        ///
+        /// A newcomer gets the oscillator fewest switched-on effects already hold, so
+        /// effects spread across the module's mixer instead of summing into one tone.
+        /// Only leaf effects are assigned; a group carries no tone of its own, and a
+        /// switched-off group silences its children.
+        /// </summary>
+        /// <returns>(assigned, released) counts, for logging.</returns>
+        public static (int Assigned, int Released) SyncOscillatorAssignments(object motorsDeviceExtension)
+        {
+            if (!IsSupported) return (0, 0);
+
+            int assigned = 0, released = 0;
+            try
+            {
+                var settings = MozaBaseHapticsBridge.GetHostedSettings(motorsDeviceExtension);
+                if (settings == null) return (0, 0);
+
+                foreach (var profile in MozaBaseHapticsBridge.ProfilesToWalk(settings))
+                {
+                    if (!(profile is ShakeItProfile shakeItProfile)) continue;
+                    var leaves = new List<(DeviceChannelActivationSettings Activation, bool On)>();
+                    CollectLeaves(shakeItProfile.EffectsContainers, true, 0, leaves);
+
+                    // Count what valid assignments already hold before placing newcomers.
+                    var load = new int[MozaPedalHapticsProtocol.ChannelsPerPedal];
+                    var unassigned = new List<DeviceChannelActivationSettings>();
+                    foreach (var (activation, on) in leaves)
+                    {
+                        int current = AssignedChannel(activation);
+                        if (!on)
+                        {
+                            if (ClearChannels(activation)) released++;
+                        }
+                        else if (current >= 0) load[current]++;
+                        else unassigned.Add(activation);
+                    }
+
+                    foreach (var activation in unassigned)
+                    {
+                        int channel = 0;
+                        for (int ch = 1; ch < load.Length; ch++)
+                            if (load[ch] < load[channel]) channel = ch;
+                        SetSingleChannel(activation, channel);
+                        load[channel]++;
+                        assigned++;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentOutOfRangeException)
+            {
+                // The UI thread edited the effect list mid-walk; the next sweep picks it up.
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[AZOM] Pedal-haptics oscillator sweep failed: {ex.Message}");
+            }
+            return (assigned, released);
+        }
+
+        // "On" matches ProcessEffects: own IsEnabled AND every enclosing group's.
+        // Depth-capped because this walks a user-editable tree.
+        private static void CollectLeaves(IList<EffectsContainerBase>? containers, bool parentOn, int depth,
+            List<(DeviceChannelActivationSettings, bool)> leaves)
+        {
+            if (depth > 8 || containers == null) return;
+
+            for (int i = 0; i < containers.Count; i++)
+            {
+                var container = containers[i];
+                if (container == null) continue;
+                bool on = parentOn && container.IsEnabled;
+
+                if (container is GroupContainer group)
+                    CollectLeaves(group.EffectsContainers, on, depth + 1, leaves);
+                else
+                    leaves.Add((container.SettingsStore.GetSettings<DeviceChannelActivationSettings>(), on));
+            }
+        }
+
+        /// <summary>
+        /// The one oscillator this effect drives, or -1 when it is not exactly one
+        /// oscillator on every placement — none, several (SimHub's stock defaults
+        /// enable all of them), or placements that disagree.
+        /// </summary>
+        private static int AssignedChannel(DeviceChannelActivationSettings activation)
+        {
+            int found = -1;
+            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            {
+                if (!activation.Channels.TryGetValue(placement, out var pca) || pca == null) return -1;
+
+                int single = -1;
+                for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
+                {
+                    if (!pca.Channels.TryGetValue(ch, out var a) || a == null || !a.IsEnabled) continue;
+                    if (single >= 0) return -1;
+                    single = ch;
+                }
+                if (single < 0 || (found >= 0 && single != found)) return -1;
+                found = single;
+            }
+            return found;
+        }
+
+        private static void SetSingleChannel(DeviceChannelActivationSettings activation, int channel)
+        {
+            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            {
+                if (!activation.Channels.TryGetValue(placement, out var pca) || pca == null)
+                {
+                    pca = new PlacementChannelsActivation();
+                    activation.Channels[placement] = pca;
+                }
+                for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
+                    SetChannel(pca, ch, ch == channel);
+            }
+        }
+
+        /// <returns>True when an enabled oscillator was actually switched off.</returns>
+        private static bool ClearChannels(DeviceChannelActivationSettings activation)
+        {
+            bool changed = false;
+            foreach (var pca in activation.Channels.Values)
+            {
+                if (pca == null) continue;
+                for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
+                    if (pca.Channels.TryGetValue(ch, out var a) && a != null && a.IsEnabled)
+                    {
+                        a.IsEnabled = false;
+                        changed = true;
+                    }
+            }
+            return changed;
+        }
+
+        // In place where the entry exists, so nothing bound to it is orphaned.
+        private static void SetChannel(PlacementChannelsActivation pca, int channel, bool enabled)
+        {
+            if (pca.Channels.TryGetValue(channel, out var existing) && existing != null)
+                existing.IsEnabled = enabled;
+            else
+                pca.Channels[channel] = new ChannelActivation { IsEnabled = enabled };
         }
 
         private static void Install(object? outputManager, object settings, byte pedal)

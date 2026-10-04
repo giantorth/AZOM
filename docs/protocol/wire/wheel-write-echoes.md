@@ -77,9 +77,13 @@ target dev `0x17` (wheel) on group `0x3F` unless noted:
 | `0A 00` | misc config | |
 | `24 FF` | display / idle config | |
 | `20 01` | misc config | |
-| `1A 00` | RPM LED telemetry | Live bitmask write (group 0 = RPM) |
-| `19 00` | RPM LED color | Live color chunk write (group 0 = RPM) |
-| `19 01` | button LED color | Live color chunk write (group 1 = button) |
+| `1A 00` | RPM LED telemetry | Live bitmask write (group 0 = RPM). Not echoed by the KS Pro † |
+| `19 00` | RPM LED color | Live color chunk write (group 0 = RPM). Not echoed by the KS Pro † |
+| `19 01` | button LED color | Live color chunk write (group 1 = button). Not echoed by the KS Pro † |
+
+† Zero `BF 71 19`/`BF 71 1A` frames from a KS Pro in the plugin capture of
+bundle M3D9WHJE (~69k live LED writes) and in PitHouse's
+`usb-capture/ksp/gfdsgfd.pcapng`. Which wheels do echo these is uncaptured.
 | `0B`* | newer-wheel LED cmd | *Group `0x3E` (not `0x3F`); 1-byte prefix |
 
 The single `0x3E` entry exists because newer-wheel LED commands sometimes

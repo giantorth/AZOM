@@ -608,8 +608,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>마지막 입력: 버튼 {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>ETS2/ATS 기본값 불러오기</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>와이퍼 및 라이트 재동기화</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>표시 이름</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>선택 사항 — 위 장치 목록에서 같은 역할을 가진 두 mBooster를 구분하는 데 도움이 됩니다.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>사용자 지정 효과 (실험적)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// 실험적 — SimHub/NCalc 수식으로 구동되는 사용자 정의 진동</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>실험적 — 각 사용자 지정 효과는 사용자가 제공한 SimHub 속성 또는 NCalc 수식으로 모터를 진동시킵니다. 모든 사용자 지정 효과(및 기본 Engine 효과)는 하나의 채널을 공유하므로 한 번에 하나만 모터를 구동할 수 있으며, 가장 최근에 처리된 활성 효과가 우선합니다. 주파수/강도는 Engine의 슬라이더와 동일하게 작동합니다.</value></data>

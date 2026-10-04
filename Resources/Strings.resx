@@ -148,8 +148,6 @@
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Device</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Role</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Display Name</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Optional — helps tell two mBoosters with the same role apart in the device list above.</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Disabled</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Throttle</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Brake</value></data>
