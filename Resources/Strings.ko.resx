@@ -501,6 +501,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>MOZA 대시보드가 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>휠베이스가 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>휠 '{1}'이(가) 연결되어 있지만 '{0}'이(가) SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>페달 진동이 SimHub에 추가되지 않음</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>페달 진동 장치가 연결되어 있지만 SimHub에 추가된 페달 장치가 없습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 포트</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>노브 표시등</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>비활성화됨</value></data>

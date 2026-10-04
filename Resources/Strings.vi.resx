@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Một bảng đồng hồ MOZA đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbase đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Vô-lăng '{1}' đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Chưa thêm bộ rung bàn đạp trong SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Bộ rung bàn đạp đang được kết nối, nhưng chưa có thiết bị bàn đạp nào được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>cổng COM của MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Đèn báo núm xoay</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Đã tắt</value></data>

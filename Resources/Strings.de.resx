@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ein MOZA-Dashboard ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Die Wheelbase ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Lenkrad „{1}“ ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Pedalvibration nicht in SimHub hinzugefügt</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Die Pedalvibration ist verbunden, aber es wurde kein Pedalgerät in SimHub hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>den MOZA-COM-Port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Drehknopf-Anzeigen</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>

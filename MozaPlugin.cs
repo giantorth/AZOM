@@ -489,6 +489,15 @@ namespace MozaPlugin
             set => _baseAmbientDeviceExtensionActive = value;
         }
 
+        // Count, not a flag: one extension instance per pedal device.
+        private int _pedalHapticsDeviceExtensionsActive;
+        internal bool PedalHapticsDeviceExtensionActive
+            => System.Threading.Volatile.Read(ref _pedalHapticsDeviceExtensionsActive) > 0;
+        internal void PedalHapticsDeviceExtensionStarted()
+            => System.Threading.Interlocked.Increment(ref _pedalHapticsDeviceExtensionsActive);
+        internal void PedalHapticsDeviceExtensionEnded()
+            => System.Threading.Interlocked.Decrement(ref _pedalHapticsDeviceExtensionsActive);
+
         /// <summary>
         /// Model prefixes with an active device extension. Copy-on-write: reads see a
         /// consistent snapshot; mutations (extension init/end only) allocate a new set.

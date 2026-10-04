@@ -531,6 +531,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>The wheelbase is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Wheel '{1}' is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Pedal haptics not added in SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Pedal haptics are connected, but no pedal device has been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>the MOZA COM port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knob Indicators</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Disabled</value></data>

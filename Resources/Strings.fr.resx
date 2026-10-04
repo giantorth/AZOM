@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un tableau de bord MOZA est connecté, mais le périphérique n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>La base est connectée, mais « {0} » n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Le volant « {1} » est connecté, mais « {0} » n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Vibration des pédales non ajoutée dans SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Le module de vibration des pédales est connecté, mais aucun périphérique de pédale n'a été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>le port COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicateurs de molette</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Désactivé</value></data>

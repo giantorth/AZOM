@@ -528,6 +528,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof Wan Yap Snarf!</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Boof Snarf Grr {0} Rrrf Barff Bark Grrowl Howl {0} Arf Yowl Grr!</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Ruff Awoo Wan Barff Ruff Awoo {1} Boof Grr Bark Yowl Grrowl Ruff {0} Arf Wroof Woof Yap Wan Grrowl {0} Bork Grr Snarf Wroof Rrrf Yowl!</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Grr Bark Woof Yowl!</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Boof Snarf Grr Rrrf Barff Bark Grrowl Howl Arf {0}!</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>Snarf!</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Wroof!</value></data>

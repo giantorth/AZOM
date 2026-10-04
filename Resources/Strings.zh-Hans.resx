@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>已连接 MOZA 仪表盘，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>底座已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>方向盘 “{1}” 已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>踏板振动未在 SimHub 中添加</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>踏板振动单元已连接，但尚未在 SimHub 中添加任何踏板设备。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 端口</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>旋钮指示灯</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>已禁用</value></data>

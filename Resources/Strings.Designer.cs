@@ -613,6 +613,8 @@ namespace MozaPlugin.Resources
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
         public static string Banner_ProfileNotAddedBase_Body => Get("Banner_ProfileNotAddedBase_Body");
         public static string Banner_ProfileNotAddedWheel_Body => Get("Banner_ProfileNotAddedWheel_Body");
+        public static string Banner_ProfileNotAddedPedalHaptics_Title => Get("Banner_ProfileNotAddedPedalHaptics_Title");
+        public static string Banner_ProfileNotAddedPedalHaptics_Body => Get("Banner_ProfileNotAddedPedalHaptics_Body");
         public static string Banner_PortFallbackName => Get("Banner_PortFallbackName");
         public static string DeviceDef_KnobIndicators => Get("DeviceDef_KnobIndicators");
         public static string Sdk_Status_Disabled => Get("Sdk_Status_Disabled");

@@ -505,6 +505,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un cruscotto MOZA è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>La base è collegata, ma «{0}» non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Il volante «{1}» è collegato, ma «{0}» non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Vibrazione pedali non aggiunta in SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>La vibrazione pedali è collegata, ma nessun dispositivo pedale è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>la porta COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicatori manopola</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Disattivato</value></data>

@@ -49,6 +49,7 @@ namespace MozaPlugin.Devices.Extensions
 
         private bool _driverInjected;
         private bool _connectionSwapAttempted;
+        private bool _registeredActive;
 
         private object? _motorsDevice;
         private object? _connectionDevice;
@@ -67,6 +68,12 @@ namespace MozaPlugin.Devices.Extensions
             byte pedal = MozaDeviceConstants.PedalHapticsPedalFor(
                 LinkedDevice.DeviceDescriptor?.DeviceTypeID ?? "");
             if (pedal != 0) _pedal = pedal;
+
+            if (!_registeredActive && MozaPlugin.Instance is { } plugin)
+            {
+                plugin.PedalHapticsDeviceExtensionStarted();
+                _registeredActive = true;
+            }
 
             // Injection is deferred to DataUpdate() — running it here would beat
             // SimHub's own sub-device setup, same as on the wheelbase.
@@ -207,6 +214,12 @@ namespace MozaPlugin.Devices.Extensions
             _connectionSwapAttempted = false;
             _motorsDevice = null;
             _driverInjected = false;
+
+            if (_registeredActive)
+            {
+                MozaPlugin.Instance?.PedalHapticsDeviceExtensionEnded();
+                _registeredActive = false;
+            }
         }
 
         // The unit has no per-device settings of its own — every knob lives in

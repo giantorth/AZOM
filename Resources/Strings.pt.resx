@@ -522,6 +522,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Um painel MOZA está conectado, mas o dispositivo não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>A base está conectada, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>O volante '{1}' está conectado, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Vibração dos pedais não adicionada no SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>A vibração dos pedais está conectada, mas nenhum dispositivo de pedal foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>a porta COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicadores de knob</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Desativado</value></data>

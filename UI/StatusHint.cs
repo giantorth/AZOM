@@ -38,6 +38,9 @@ namespace MozaPlugin.UI
         // a current-generation wheel answering like a legacy one, i.e. outdated
         // firmware. Remediation: update wheel/base firmware in MOZA Pit House.
         WheelFirmwareOutdated,
+        // A pedal-haptics unit answered but none of its per-pedal devices has
+        // been added under SimHub > Devices.
+        ProfileNotAddedPedalHaptics,
     }
 
     /// <summary>
