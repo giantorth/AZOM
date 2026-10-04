@@ -131,6 +131,40 @@ namespace MozaPlugin.Devices.MBooster
         private volatile byte[]? _axisTypes;
         public byte[]? AxisTypes => _axisTypes;
 
+        // Last session's types (persisted by the plugin), for UI tab placement
+        // only until this session's diagnostic completes — it streams ~30s
+        // after connect. Routing, chain detection and effects never read it.
+        private volatile byte[]? _seededAxisTypes;
+
+        /// <summary>Types for deciding which tab lists a pedal: live once
+        /// <see cref="AxisTypesComplete"/>, else the persisted seed. Not for
+        /// routing — see <see cref="AxisTypes"/>.</summary>
+        public byte[]? TabAxisTypes => AxisTypesComplete ? _axisTypes : _seededAxisTypes;
+
+        /// <summary>Seed <see cref="TabAxisTypes"/> from the persisted
+        /// last-known value. May replace an earlier seed (the serial-keyed entry
+        /// lands after the transport-keyed one); no-op once live types are in.</summary>
+        public void SeedAxisTypes(byte[]? types)
+        {
+            if (types == null || types.Length == 0 || AxisTypesComplete) return;
+            _seededAxisTypes = (byte[])types.Clone();
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} seeded pedal types from cache: {AxisTypesSignature(types)} (live diagnostic will confirm/override)");
+        }
+
+        private static string AxisTypesSignature(byte[] types)
+        {
+            var sb = new StringBuilder();
+            for (int r = 0; r < 3 && r < types.Length; r++)
+            {
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(RoleName(r)).Append('=')
+                  .Append(types[r] == 1 ? "active" : types[r] == 2 ? "passive" : "none");
+            }
+            return sb.ToString();
+        }
+
+        private string _lastAxisTypesResolved = "";
+
         // Which of the 3 diagnostic slots (T/B/C) have had a "<Pedal> pedal
         // is …" line parsed this session. Distinct from _axisTypes having a
         // non-zero entry: a pedal reported "not connected !" is type 0, so the
@@ -272,6 +306,8 @@ namespace MozaPlugin.Devices.MBooster
         private string _serialPartB = "";
 
         public bool Detected => _detected;
+        /// <summary>When the latest detection edge fired (see <see cref="MarkDetected"/>).</summary>
+        public DateTime DetectedAtUtc { get; private set; }
         public bool IsConnected => _connection.IsConnected;
         public MozaSerialConnection Connection => _connection;
 
@@ -366,6 +402,13 @@ namespace MozaPlugin.Devices.MBooster
         /// seeded ahead of the first heartbeat (~1 min).
         /// </summary>
         public event Action<byte[]>? ChainRolesResolved;
+
+        /// <summary>
+        /// Fired when a complete active/passive type block is read — axis-indexed
+        /// (0 none, 1 active, 2 passive). LIVE data only, on change. The plugin
+        /// persists it as the next controller's <see cref="SeedAxisTypes"/>.
+        /// </summary>
+        public event Action<byte[]>? AxisTypesResolved;
 
         /// <summary>
         /// Fired when the active/passive pedal-type diagnostic settles (or
@@ -693,9 +736,34 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         public bool TryConfigDeviceForRole(int roleIndex, int axisFallback, out byte dev)
         {
+            if (!ResolveConfigDevice(roleIndex, axisFallback, out dev)) return false;
+            // A role just written to a unit: until the heartbeat confirms it,
+            // the map is stale — refuse any id that contradicts the write.
+            if (ContradictsPendingRole(roleIndex, dev)) { dev = 0; return false; }
+            return true;
+        }
+
+        private bool ResolveConfigDevice(int roleIndex, int axisFallback, out byte dev)
+        {
             var map = _roleToDevice;
-            if (map != null && roleIndex >= 0 && !RoleIsAmbiguous(roleIndex)
-                && map.TryGetValue(roleIndex, out dev))
+            // Two pedals on one role (allowed, as in Pit House): the map and
+            // locality are keyed by role, so they can place only one of them.
+            // A passive pedal's registers live on the host; a role's SOLE motor
+            // pedal still owns the role's placement; two motor pedals on one
+            // role can't be told apart, and a guess would flash one pedal's
+            // config into the other's unit.
+            bool ambiguous = RoleIsAmbiguous(roleIndex);
+            if (ambiguous)
+            {
+                if (!IsAxisMotorized(axisFallback)) { dev = HostDeviceId; return true; }
+                if (MotorizedAxesWithRole(roleIndex) > 1)
+                {
+                    LogChainEvidenceOnce($"two motor pedals hold {RoleName(roleIndex)} — their config writes are held until the roles differ");
+                    dev = 0;
+                    return false;
+                }
+            }
+            if (map != null && roleIndex >= 0 && map.TryGetValue(roleIndex, out dev))
                 return true;
             // Heartbeat locality (see RoleLocality). Host-local: the host, even
             // while the map is being rebuilt after a port bounce. Chained but not
@@ -753,6 +821,114 @@ namespace MozaPlugin.Devices.MBooster
                     foreach (var id in MotorIds) if (id != HostDeviceId) return id;
             }
             return MotorDeviceForCurrentAxis(axisFallback);
+        }
+
+        /// <summary>
+        /// Assign the motor pedal on <paramref name="axisIndex"/> a new role on
+        /// the hardware, the way Pit House does: each unit's 0x21/0x22/0x23
+        /// hold the role (1 T, 2 B, 3 C) of its local channels, the motor pedal
+        /// is channel B (0x22), and a chained unit hangs off the host's channel
+        /// T — Pit House writes the host's 0x21, then the unit's 0x22
+        /// (docs/protocol/devices/mbooster.md "pedal-role map"). Call BEFORE
+        /// the plugin's own role setting changes: the unit is found from the
+        /// axis's current role. False (nothing written) for a passive or
+        /// untyped axis, or a unit not placed yet.
+        /// </summary>
+        public bool WritePedalRole(int axisIndex, int newRoleIndex)
+            => TryPedalRoleUnit(axisIndex, out byte dev) && WritePedalRoleTo(dev, newRoleIndex);
+
+        /// <summary>The unit holding the motor pedal on <paramref name="axisIndex"/>,
+        /// from its current role. False for a passive or untyped axis, or a
+        /// unit not placed yet. Resolve every unit of a swap before writing
+        /// any: each write makes the map stale until the next heartbeat.</summary>
+        public bool TryPedalRoleUnit(int axisIndex, out byte dev)
+        {
+            dev = 0;
+            var types = _axisTypes;
+            if (types == null || !AxisTypesComplete || axisIndex < 0 || axisIndex >= types.Length
+                || types[axisIndex] != 1)
+                return false;
+            return TryCalibDeviceForAxis(axisIndex, out dev);
+        }
+
+        /// <summary>Write <paramref name="newRoleIndex"/> to the unit
+        /// <paramref name="dev"/> (see <see cref="WritePedalRole"/>).</summary>
+        public bool WritePedalRoleTo(byte dev, int newRoleIndex)
+        {
+            if (newRoleIndex < 0 || newRoleIndex > 2) return false;
+            int value = newRoleIndex + 1;
+            bool chained = dev != HostDeviceId;
+            // Only one chain link is captured (host channel T); with several
+            // chained units which host channel each uses is unknown.
+            bool writeHostLink = chained && AnsweredChainIds().Count == 1;
+            lock (_pendingRoles)
+            {
+                foreach (var r in new List<int>(_pendingRoles.Keys))
+                    if (_pendingRoles[r].Dev == dev) _pendingRoles.Remove(r);
+                _pendingRoles[newRoleIndex] = (dev, DateTime.UtcNow);
+            }
+            if (writeHostLink) SendIntWrite("mbooster-status-21", value, HostDeviceId);
+            SendIntWrite("mbooster-status-22", value, dev);
+            if (writeHostLink) SendRead("mbooster-status-21", HostDeviceId);
+            SendRead("mbooster-status-22", dev);
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} pedal role -> {RoleName(newRoleIndex)} "
+                + $"on 0x{dev:x2} (0x22={value}"
+                + (writeHostLink ? $", host 0x21={value}" : chained ? ", host link not written: several chained units" : "")
+                + ")");
+            return true;
+        }
+
+        // Roles written by WritePedalRole that the host heartbeat has not yet
+        // placed on the unit they were written to: role index → (unit, when).
+        private readonly Dictionary<int, (byte Dev, DateTime AtUtc)> _pendingRoles =
+            new Dictionary<int, (byte Dev, DateTime AtUtc)>();
+        // Several heartbeats; past this the write is taken as not applied.
+        private static readonly TimeSpan PendingRoleTimeout = TimeSpan.FromMinutes(3);
+
+        private bool ContradictsPendingRole(int roleIndex, byte dev)
+        {
+            lock (_pendingRoles)
+            {
+                if (_pendingRoles.Count == 0) return false;
+                var now = DateTime.UtcNow;
+                foreach (var r in new List<int>(_pendingRoles.Keys))
+                {
+                    var p = _pendingRoles[r];
+                    if (now - p.AtUtc < PendingRoleTimeout) continue;
+                    _pendingRoles.Remove(r);
+                    MozaLog.Warn($"[AZOM/mBooster] {ShortIdentity(Identity)} heartbeat never placed {RoleName(r)} on 0x{p.Dev:x2} — using the role map as reported");
+                }
+                foreach (var kv in _pendingRoles)
+                {
+                    if (kv.Key == roleIndex && kv.Value.Dev != dev) return true;
+                    // A chained unit holds only its own pedal; the host also
+                    // answers for passive pedals.
+                    if (kv.Key != roleIndex && kv.Value.Dev == dev && dev != HostDeviceId) return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>Clear the pending roles <paramref name="roleToDev"/> now places
+        /// where they were written, when the live heartbeat's locality agrees —
+        /// the single-pedal map is built from the plugin's own role setting and
+        /// proves nothing. True if any cleared.</summary>
+        private bool ResolvePendingRoles(Dictionary<int, byte> roleToDev)
+        {
+            var loc = _roleLocality;
+            if (loc == null || _roleLocalityIsSeed) return false;
+            bool any = false;
+            lock (_pendingRoles)
+                foreach (var r in new List<int>(_pendingRoles.Keys))
+                {
+                    byte d = _pendingRoles[r].Dev;
+                    byte expected = d == HostDeviceId ? LocalityHost : LocalityRemote;
+                    if (!roleToDev.TryGetValue(r, out var mapped) || mapped != d) continue;
+                    if (r >= loc.Length || loc[r] != expected) continue;
+                    _pendingRoles.Remove(r);
+                    any = true;
+                }
+            return any;
         }
 
         /// <summary>
@@ -862,8 +1038,8 @@ namespace MozaPlugin.Devices.MBooster
 
         /// <summary>
         /// Whether more than one connected axis on this lane resolves to
-        /// <paramref name="roleIndex"/> — i.e. two physical pedals claim one
-        /// role, which is never valid (see
+        /// <paramref name="roleIndex"/> — two physical pedals share one role,
+        /// which Pit House allows (see
         /// <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>).
         ///
         /// The role→device map is keyed by role alone, so an ambiguous role
@@ -874,6 +1050,18 @@ namespace MozaPlugin.Devices.MBooster
         /// per axis by construction; it may not match a chain's plug order
         /// (that's what the map is for), but it never collides.
         /// </summary>
+        private int MotorizedAxesWithRole(int roleIndex)
+        {
+            var s = CurrentSettings;
+            int axisCount = ConnectedAxisCount;
+            int count = 0;
+            for (int a = 0; a < AxisSlotCount; a++)
+                if (IsAxisConnected(a) && IsAxisMotorized(a)
+                    && RoleIndexOf(MozaMBoosterRegistry.ResolveAxisRole(s, a, axisCount)) == roleIndex)
+                    count++;
+            return count;
+        }
+
         private bool RoleIsAmbiguous(int roleIndex)
         {
             if (roleIndex < 0) return false;
@@ -902,7 +1090,7 @@ namespace MozaPlugin.Devices.MBooster
             MozaLog.Warn(
                 $"[AZOM/mBooster] {ShortIdentity(Identity)}: two connected pedals both resolve to " +
                 $"'{RoleName(roleIndex)}'. Effects for that role route by axis index instead of the " +
-                $"chain map, and one pedal's position is dropped — assign each pedal a distinct role.");
+                $"chain map, and one pedal's position is dropped.");
         }
 
         /// <summary>Role → the 0/1/2 index the chain map and the motor-frame
@@ -990,24 +1178,17 @@ namespace MozaPlugin.Devices.MBooster
         // calibration status, keyed "<dev hex>:<command name>" — per device,
         // because a chain answers these from whichever unit was addressed and
         // a calibration routine has to read back the state of the pedal IT is
-        // driving, not the host's. Only mbooster-calibration-state and
-        // mbooster-motor-cal-locate have decoded meanings; the rest ride along
+        // driving, not the host's. mbooster-sleep-minutes, the role registers
+        // and mbooster-motor-cal-locate have decoded meanings; the rest ride along
         // so a support bundle shows them (they read as per-unit constants in
         // every capture so far — see docs/protocol/devices/mbooster.md).
         private readonly System.Collections.Generic.Dictionary<string, int> _statusRegs =
             new System.Collections.Generic.Dictionary<string, int>();
         private readonly object _statusLock = new object();
 
-        /// <summary>
-        /// Pedal calibration-mode state for a device id, from register 0xB4:
-        /// 2 = normal operation, 0 = mid travel calibration, -1 = not read yet.
-        /// Proven by both 2026-09-08 captures — it drops to 0 within ~0.3s of a
-        /// travel-calibration start and returns to 2 only after the soft
-        /// reboot, tracking the firmware's own
-        /// `pedal_active_mode changed: 4` / `Table 6 Param 50`. That is what
-        /// makes the reboot mandatory rather than cosmetic.
-        /// </summary>
-        public int CalibrationStateFor(byte device) => StatusValue(device, "mbooster-calibration-state");
+        /// <summary>Host unit's auto-sleep timeout in minutes (register 0xB4,
+        /// 0 = off), -1 = not read yet.</summary>
+        public int SleepMinutesReadback => StatusValue(HostDeviceId, "mbooster-sleep-minutes");
 
         /// <summary>
         /// Motor rotor-locate status for a device id, from the group-0x2A echo:
@@ -1038,7 +1219,9 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (!name.StartsWith("mbooster-", StringComparison.Ordinal)) return false;
             int dash = name.LastIndexOf('-');
-            if (dash < 0) return false;
+            // "mbooster-<role>-<field>": a single-segment name
+            // (mbooster-capabilities) has no role and threw here.
+            if (dash <= 9) return false;
             string field = name.Substring(dash + 1);
             string role = name.Substring(9, dash - 9);
             if (role != "throttle" && role != "brake" && role != "clutch") return false;
@@ -1271,6 +1454,7 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (roleToDev.Count == 0) return;
             _roleToDevice = roleToDev;
+            bool roleConfirmed = ResolvePendingRoles(roleToDev);
 
             var sb = new StringBuilder();
             for (int role = 0; role < 3; role++)
@@ -1280,6 +1464,7 @@ namespace MozaPlugin.Devices.MBooster
                     sb.Append(RoleName(role)).Append("=0x").Append(d.ToString("x2"));
                 }
             string sig = sb.ToString();
+            bool reapplied = false;
             if (sig != _lastRoleMapLogged)
             {
                 _lastRoleMapLogged = sig;
@@ -1288,7 +1473,14 @@ namespace MozaPlugin.Devices.MBooster
                 // RoutingResolved re-apply reach the units it now names — a
                 // chained unit answering its probe after the connect-time apply
                 // is the normal order of events.
-                LogRoutingDecision();
+                reapplied = LogRoutingDecision();
+            }
+            // A confirmed role write re-applies even when the map reads the
+            // same, so the role-keyed registers land under the new role.
+            if (roleConfirmed && !reapplied)
+            {
+                MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} role write confirmed by heartbeat — re-applying");
+                LogRoutingDecision(force: true);
             }
         }
 
@@ -1313,11 +1505,13 @@ namespace MozaPlugin.Devices.MBooster
             // The discovered set itself is kept: it identifies this rig's
             // topology, which a port bounce doesn't change.
             lock (_routedChainProbed) _routedChainProbed.Clear();
-            // Status read-backs describe a live device; a stale 0xB4 or motor
-            // status surviving a reconnect would let a calibration runner
-            // conclude "already normal" / "already complete" before the
-            // reconnected pedal has answered anything.
+            // Status read-backs describe a live device; a stale motor status
+            // surviving a reconnect would let a calibration runner conclude
+            // "already complete" before the reconnected pedal has answered
+            // anything.
             lock (_statusLock) _statusRegs.Clear();
+            // The next connect-time apply resends every feel-curve X.
+            lock (_lastFeelX) _lastFeelX.Clear();
         }
 
         private void OnConnectionMessage(byte[] data)
@@ -1338,6 +1532,11 @@ namespace MozaPlugin.Devices.MBooster
             // drop the rest.
             if (data[0] == MozaProtocol.FirmwareDebugGroup)
             {
+                if (MozaMBoosterProtocol.TryParseErrorReport(data, out ushort errorCode))
+                {
+                    OnFirmwareErrorReport(data[1], errorCode);
+                    return;
+                }
                 LogPedalDiagnosticIfRelevant(data);
                 return;
             }
@@ -1361,8 +1560,8 @@ namespace MozaPlugin.Devices.MBooster
                 {
                     StoreCalib((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
                     // A calibration routine driving a CHAINED pedal reads its
-                    // 0xB4 / motor-locate status back through this branch, not
-                    // the host arm below.
+                    // motor-locate status back through this branch, not the
+                    // host arm below.
                     StoreStatusRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
                     StoreOutputRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
                     StoreUnitIdentity((byte)unswapped, probe.Value.Name, probe.Value.ArrayValue);
@@ -1495,6 +1694,28 @@ namespace MozaPlugin.Devices.MBooster
         // back to the axis-index mapping (never worse than before).
         private volatile Dictionary<int, byte>? _roleToDevice;
         private string _lastRoleMapLogged = "";
+
+        // (device, code) pairs already logged — a unit repeats an unacked
+        // report once a second.
+        private readonly HashSet<int> _errorReportsLogged = new HashSet<int>();
+
+        /// <summary>
+        /// A unit's group-0x0E error report. Ack the codes Pit House acks, the
+        /// same way it does, so the unit stops repeating them — see
+        /// <see cref="MozaMBoosterProtocol.BuildErrorAckFrame"/>.
+        /// </summary>
+        private void OnFirmwareErrorReport(byte source, ushort code)
+        {
+            byte dev = (byte)(((source & 0x0f) << 4) | ((source & 0xf0) >> 4));
+            bool ack = MozaMBoosterProtocol.IsAcknowledgedErrorCode(code);
+            if (ack) SendOneShot(MozaMBoosterProtocol.BuildErrorAckFrame(code, dev));
+            bool first;
+            lock (_errorReportsLogged)
+                first = _errorReportsLogged.Count < LoggedSetCap && _errorReportsLogged.Add((dev << 16) | code);
+            if (first)
+                MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} firmware error {code} from 0x{dev:x2}"
+                    + (ack ? " — acked" : " — not acked (Pit House doesn't ack this code)"));
+        }
 
         private void LogPedalDiagnosticIfRelevant(byte[] data)
         {
@@ -1690,6 +1911,17 @@ namespace MozaPlugin.Devices.MBooster
                 }
                 RecomputeChainRoleMap();
             }
+            var types = _axisTypes;
+            if (types != null && AxisTypesComplete)
+            {
+                string typeSig = string.Join(",", types);
+                if (typeSig != _lastAxisTypesResolved)
+                {
+                    _lastAxisTypesResolved = typeSig;
+                    try { AxisTypesResolved?.Invoke((byte[])types.Clone()); }
+                    catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] AxisTypesResolved handler: {ex.Message}"); }
+                }
+            }
             LogRoutingDecision();
         }
 
@@ -1703,10 +1935,11 @@ namespace MozaPlugin.Devices.MBooster
         /// alone could still mis-place it) and whenever the role map changes
         /// (<see cref="PublishRoleMap"/>).
         /// </summary>
-        private void LogRoutingDecision()
+        /// <returns>True if RoutingResolved fired.</returns>
+        private bool LogRoutingDecision(bool force = false)
         {
             int activeCount = ActiveAxisCount;
-            if (activeCount < 0) return;
+            if (activeCount < 0) return false;
             var sb = new StringBuilder();
             var loc = _roleLocality;
             for (int a = 0; a < MaxAxes; a++)
@@ -1723,7 +1956,7 @@ namespace MozaPlugin.Devices.MBooster
                   .Append("=0x").Append(MotorDeviceForRole(roleIdx, a).ToString("x2"));
             }
             string sig = $"{activeCount}|{sb}";
-            if (sig == _lastRoutingLogged) return;
+            if (sig == _lastRoutingLogged && !force) return false;
             bool firstResolution = _lastRoutingLogged.Length == 0;
             _lastRoutingLogged = sig;
             MozaLog.Info(
@@ -1737,6 +1970,7 @@ namespace MozaPlugin.Devices.MBooster
             // guessed. Re-apply now that the routing is authoritative.
             try { RoutingResolved?.Invoke(firstResolution); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] RoutingResolved handler: {ex.Message}"); }
+            return true;
         }
 
         private string _lastRoutingLogged = "";
@@ -1870,6 +2104,7 @@ namespace MozaPlugin.Devices.MBooster
         public void MarkDetected()
         {
             if (_detected) return;
+            DetectedAtUtc = DateTime.UtcNow;
             _detected = true;
             MozaLog.Debug($"[AZOM/mBooster] Detected {ShortIdentity(Identity)}");
             try { DetectedRisingEdge?.Invoke(); }
@@ -1983,18 +2218,43 @@ namespace MozaPlugin.Devices.MBooster
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveY"/> and
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveX"/>).
         /// </summary>
-        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device)
+        /// <param name="allX">Send every X regardless — Pit House's Travel
+        /// start/end bursts carry all six.</param>
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device,
+            bool allX = false)
         {
-            SendIntWrite("mbooster-brake-deadzone", MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg), device);
             var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
             var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+            // Pit House's bursts (moza-simulator bridge, 2026-09-29): a
+            // Deadzone change is 0x07 + 0x08-0x0D + 0x0E, a Max Force change
+            // 0x08-0x0D + 0x0E, a node drag adds that node's X. So Deadzone
+            // and X go only where they changed since the last push to this
+            // unit (everything after a reconnect); the Y nodes and Max Force
+            // always.
+            int rawDz = MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg);
+            var rawX = new int[midX.Length + 1];
+            for (int i = 0; i < midX.Length; i++) rawX[i] = MozaMBoosterProtocol.EncodeThresholdKg(midX[i]);
+            rawX[midX.Length] = rawDz;
+            int[]? lastX;
+            lock (_lastFeelX)
+            {
+                _lastFeelX.TryGetValue(device, out lastX);
+                _lastFeelX[device] = rawX;
+            }
+            if (lastX == null || lastX.Length != rawX.Length || lastX[midX.Length] != rawDz)
+                SendIntWrite("mbooster-brake-deadzone", rawDz, device);
             for (int i = 0; i < midY.Length; i++)
             {
-                SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midX[i]), device);
+                if (allX || lastX == null || lastX.Length != rawX.Length || lastX[i] != rawX[i])
+                    SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", rawX[i], device);
                 SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
             }
             SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
         }
+
+        // Feel-curve X raw values (then the Deadzone) last written, per device id (see
+        // PushFeelCurveResync). Cleared on disconnect.
+        private readonly Dictionary<byte, int[]> _lastFeelX = new Dictionary<byte, int[]>();
 
         // ── Coalescing gate for UI-driven calibration writes ──
         // A slider raises ValueChanged per tick, and every one of these
@@ -2378,21 +2638,19 @@ namespace MozaPlugin.Devices.MBooster
                 SendRead("mbooster-brake-friction-1", dev);
                 SendRead("mbooster-brake-endstop-front", dev);
                 SendRead("mbooster-brake-endstop-end", dev);
-                // Calibration-mode state + the constants Pit House also polls.
-                // 0xB4 is the one with proven meaning (2 = normal, 0 = mid
-                // travel calibration); the rest ride along so a support bundle
-                // carries them.
+                // Sleep timeout, role map + the constants Pit House also polls;
+                // the undecoded ones ride along so a support bundle carries
+                // them.
                 foreach (var name in StatusReadNames)
                     SendRead(name, dev);
             }
         }
 
-        /// <summary>Status registers Pit House reads that have no decoded
-        /// meaning yet, plus the calibration-mode state. Surfaced in the
-        /// diagnostics dump — see <see cref="StatusRegisters"/>.</summary>
+        /// <summary>Status registers Pit House polls, decoded or not. Surfaced
+        /// in the diagnostics dump — see <see cref="StatusRegisters"/>.</summary>
         internal static readonly string[] StatusReadNames =
         {
-            "mbooster-calibration-state",
+            "mbooster-sleep-minutes",
             "mbooster-status-0d",
             "mbooster-status-21",
             "mbooster-status-22",

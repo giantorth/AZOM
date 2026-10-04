@@ -44,7 +44,7 @@ AB9 enumerates as its **own** Moza composite USB device (VID `0x346E` PID `0x100
 
 Address-disambiguation (only Moza devs in capture): wheelbase OUTs target dev IDs 0x13/0x14/0x15/0x17/0x19/0x1A/0x1B/0x1E (full sub-bus). AB9 OUTs target only `Main/Hub (0x12)` — confirms AB9 has its own internal "Main" with no sub-devices.
 
-### AB6 sibling — PID `0x1002` (2026-08-03; device confirmed, protocol unverified)
+### AB6 sibling — PID `0x1002` (2026-08-03; wire captures 2026-09-13 / 2026-09-25)
 
 A user diagnostics bundle (`2026-08-03_CS-Pro_1.5.3_HBNKHSF5`) enumerated a second active shifter alongside an R21 (`0x0000`). The device identifies itself in its HID product string, so the PID↔model mapping is confirmed:
 
@@ -54,15 +54,56 @@ COM6  VID 0x346E  PID 0x1002   HID product string: "MOZA AB6 FFB Base"
 
 HID descriptor: 8 GenericDesktop axes (`0x30`..`0x37`) + 128 buttons — the same generic MOZA composite descriptor the wheelbases report, so it carries no model information.
 
-**There is no AB6 wire capture.** The reporter had the since-retired `DisableAb9Detection` setting on, so `TryConnectAb9()` never ran and the port was never opened — their bundle contains 18,759 frames, all labelled `wheelbase`, and zero bytes on COM6. `0x1002` is registered in category `Ab9` and driven by the shared lane on the **assumption** of protocol parity with the AB9. Everything below (groups `0x1E`/`0x1F`/`0x20`, dev `0x12`, the FFB alloc handshake, the engine-vibration stream set) is AB9-measured and unverified on an AB6.
+That bundle had no AB6 wire traffic (the since-retired `DisableAb9Detection` was on). Two later bundles do, both native Windows with the link alive through submit:
 
-Open questions the first AB6 capture should settle:
+- `5KHRJ6NF` — plugin 1.6.0, AB6 on `COM6` alongside an R21 (`0x0000`), ~104k `ab9`-lane frames.
+- `NFZZA32E` — plugin 1.6.2, AB6 as the **only** MOZA device (no wheelbase), ~23k `ab9`-lane frames.
 
-- **Gate count / valid layout bytes.** `HardwareApplier.ApplyAb9ToHardware` fires on the detection rising edge and unconditionally sends `ab9.Mode`, which defaults to `SevenPlusR_L1` (`0x06`). If the AB6 has fewer gates this pushes an invalid layout. The plugin has no per-model layout gating — deliberately, since guessing the gate count would be inventing hardware behaviour.
-- **Whether the identity cascade answers at all.** If the AB6 does not reply to the group-`0x09` probe with a `0x89` response, `Ab9Detected` never latches, the tab stays hidden and no FFB init is sent — the failure is silent, not a crash.
-- **Whether the AB9-calibrated magnitudes carry over**: `EngineVibIntensityFullScale` `0x1996`, `EnginePulseAmpFullScale` `0x2328`, `MaxGearShiftIntensityRaw` `0x332C`, and `Ab9EngineVibrationWorker.FreqTickHz`.
+**Settled by these captures** (values from `NFZZA32E` unless noted; identity strings identical in both):
 
-Because the lane opens the port with `CaptureLabel = "ab9"`, any bundle from an AB6 owner with detection enabled now contains that capture.
+- **The identity cascade answers the AB9 probe set unchanged.** `7e 00 09 12` → `89 21 00 ff`; groups `0x02/0x04/0x05/0x06/0x07/0x08/0x0F/0x10/0x11` all answer on dev `0x21`. Model strings:
+
+  ```
+  87 21 01  "BA2 # MOT-1-V01"
+  88 21 01  "AS23-BA2-HW BM-C"
+  8f 21 01  "AS23-BA2-MC BA2"
+  ```
+
+- **Group `0x1E` reads answer for every AB9 cmd id**: `D3`=`06`, `D6`/`AF`/`B0`/`B2`/`A9`=`0x32` (50), `D4`=`00`, `5D`=`00`, `D7`/`D8`=`0x7FFD`. Group `0x2B` reads `01`/`02`/`04` answer (`04` = `0x0DAC` = 3500).
+- **FFB alloc is identical.** The six `20 12 07 <type>` allocs ACK as `a0 21 07 01..06`, and the device's own log confirms the same HID-PID table (`[INFO]ffb.c:707 New Effect Index:1, Type:3.` … `Index:6, Type:1.` — AB9 logs the same from `ffb.c:682`).
+- **The `0x13` commit is not rejected with the AB9's `unexpect sub_cmd : 19`.** The only warning in the window is `[WARN]steer_serial_cmd.c:58 unexpected parameter at line:2662`, logged *before* the `0x13` frame was sent; its trigger isn't identifiable from the capture.
+- **Layout write on connect**: 1.6.2 (`NFZZA32E`) sent no `1F 12 D3` write (stored `0x06` = profile default), only `1F 12 5D 00` (acked `9f 21`). 1.6.0 (`5KHRJ6NF`) wrote `5D`, `D3` and all five sliders back at connect, each equal to the value just read; all acked `9f 21`, no firmware complaint.
+
+**Hardware (per device owner):** AB9 and AB6 are both FFB bases that take an optional flight stick; the AB6 base additionally carries its own buttons, which the AB9 lacks. The plugin surfaces none of the AB6 base buttons.
+
+**The firmware log reports the stick as a separate sub-device.** Two log sources: dev `0x21` (`[INFO]main_diag.c:131 Base heart beat log`, `device connected: stick_reg`, ~60 s cadence) and dev `0x31` (`[INFO]stick_diag.c:126 Stick heart beat log`, with `thumb_x` / `thumb_y` / `axis_z` hall-sensor calibration and `hall_button work_mode: [work_mode: 1]`, ~60 s cadence). Whether the AB9 tab's shifter settings (gate layouts, gear-shift vibration) do anything on an AB6 is unverified.
+
+`5KHRJ6NF` caught the AB6 booting (`sys run_time` puts boot ~3 s before the plugin connected; the port was absent from the registry 5 s earlier). Its startup log (dev `0x21`):
+
+```
+[INFO]param_manage.c:1649 Param: 2 Init Successfully
+[INFO]stick.c:1346 Stick compatible mode is changed to mode 0
+[INFO]main_diag.c:90 Base Start up log
+base:APP version: 1.1.5.2
+base:usb_mode: 0
+base:base_work_mode: 1
+base:report_desc_mode: 0
+base:yaw_connection_detect_threshold: 60.00000
+base:stick_pov_hat_mode: 0
+base:user_selected_stick_id: 0
+base:yaw_calib_min: 120   yaw_calib_mid: 170   yaw_calib_max: 220
+[INFO]steer_cali.c:368 axis1 estimate torque is 0.04999
+[INFO]steer_ctrl.c:308 Axis0_angle_range = 3.89643.
+[INFO]steer.c:1427 steer set mode: 1
+```
+
+In `5KHRJ6NF` the heartbeat never logs `device connected: stick_reg` and no dev-`0x31` stick log appears over ~40 min, unlike `NFZZA32E` — consistent with no stick fitted, so `stick_reg` / dev `0x31` presence is the stick-attached signal. Its stored reads also differ: `5D`=`01`, `D7`/`D8`=`0x0000` (vs `00` / `0x7FFD`), sliders at user values (`D6`=100, `AF`=75, `B0`=90, `B2`=60, `A9`=90).
+
+**Still open:**
+
+- Whether `D3` layout values, the group-`0x1F` sliders, or the group-`0x20` engine-vib/gear-shift streams have any effect on an AB6 — the device ACKs them (`a0 21`), which proves nothing about behaviour.
+- Whether the AB9-calibrated magnitudes (`EngineVibIntensityFullScale` `0x1996`, `EnginePulseAmpFullScale` `0x2328`, `MaxGearShiftIntensityRaw` `0x332C`, `Ab9EngineVibrationWorker.FreqTickHz`) apply.
+- What PitHouse sends to an AB6 — no PitHouse-side AB6 capture exists.
 
 ### Shifter mode set — `Group 0x1F → dev 0x12, cmd 0xD300`
 

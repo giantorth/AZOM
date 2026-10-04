@@ -146,8 +146,6 @@
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Awoo!</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Rrrf!</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Yowl!</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Ruff Boof Bork Grrowl Howl!</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Yap!</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Ruff!</value></data>
@@ -530,6 +528,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof Wan Yap Snarf!</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Boof Snarf Grr {0} Rrrf Barff Bark Grrowl Howl {0} Arf Yowl Grr!</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Ruff Awoo Wan Barff Ruff Awoo {1} Boof Grr Bark Yowl Grrowl Ruff {0} Arf Wroof Woof Yap Wan Grrowl {0} Bork Grr Snarf Wroof Rrrf Yowl!</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Grr Bark Woof Yowl!</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Boof Snarf Grr Rrrf Barff Bark Grrowl Howl Arf {0}!</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>Snarf!</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Wroof!</value></data>

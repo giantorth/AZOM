@@ -123,7 +123,7 @@ namespace MozaPlugin.Protocol
             // there; sysfs carries the same identity. Native Windows never
             // reaches the sysfs branch (WineHost.UnixRoot is null).
             bool useSysfs = LinuxUsbEnumerator.Available;
-            var ports = useSysfs ? EnumerateFromSysfs() : EnumerateFromRegistry();
+            var ports = useSysfs ? WithWineRegistryPorts(EnumerateFromSysfs()) : EnumerateFromRegistry();
             var source = ports.Count > 0
                 ? (useSysfs ? MozaDiscoverySource.Sysfs : MozaDiscoverySource.Registry)
                 : MozaDiscoverySource.None;
@@ -392,6 +392,51 @@ namespace MozaPlugin.Protocol
                     serial: n.Serial));
             }
             return results;
+        }
+
+        /// <summary>
+        /// Under Wine, add MOZA ports declared in the Wine registry (a usbser
+        /// device under Enum\USB with a PortName) to the sysfs ones. Real
+        /// hardware never lands there — Wine only creates HID entries for it —
+        /// so these are ports a test harness registered on purpose: the
+        /// moza-simulator's <c>pithouse_wine.py register</c>, pointing a COM
+        /// name at a sim tty with the device's real VID/PID. An entry whose Wine
+        /// port mapping (<c>Software\Wine\Ports</c>) targets a tty sysfs already
+        /// found is skipped, so a real device is never listed twice.
+        /// </summary>
+        private static IReadOnlyList<PortInfo> WithWineRegistryPorts(IReadOnlyList<PortInfo> sysfs)
+        {
+            var declared = EnumerateFromRegistry();
+            if (declared.Count == 0) return sysfs;
+            var merged = new List<PortInfo>(sysfs);
+            var sysfsTtys = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < sysfs.Count; i++) sysfsTtys.Add(sysfs[i].PortName);
+            for (int i = 0; i < declared.Count; i++)
+            {
+                var p = declared[i];
+                string? target = WinePortTarget(p.PortName);
+                string leaf = target == null ? "" : target.Substring(target.LastIndexOf('/') + 1);
+                if (leaf.Length > 0 && sysfsTtys.Contains(leaf)) continue;
+                merged.Add(p);
+                if (s_loggedDeclaredPorts.Add(p.PortName))
+                    MozaLog.Info($"[AZOM] Wine registry declares {p.PortName} as MOZA PID 0x{p.Pid:X4}"
+                        + $" -> {target ?? "(no Wine port mapping)"} (test harness port)");
+            }
+            return merged;
+        }
+
+        private static readonly HashSet<string> s_loggedDeclaredPorts =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The unix device a Wine COM name maps to (Software\Wine\Ports), or null.</summary>
+        private static string? WinePortTarget(string comName)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"Software\Wine\Ports", writable: false);
+                return key?.GetValue(comName) as string;
+            }
+            catch { return null; }
         }
 
         private static IReadOnlyList<PortInfo> EnumerateFromRegistry()

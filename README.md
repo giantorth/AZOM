@@ -88,11 +88,20 @@ Screen-by-screen walkthrough: **[Install the Plugin](https://giant.orth.cc/guide
 
 Tested on old-protocol wheels (ES series), new-protocol wheels (Vision GS / GS V2P / TSW / KS Pro / CS Pro / FSR V2), multiple bases, the Universal Hub, MOZA handbrake and pedals, the AB9 active shifter, HGP/SGP shifters, mBooster, and stand-alone CM1/CM2 racing dashes.
 
-## This Plugin is Better With ATSR-EVO
+## This Plugin is Better Together
 
-<p align="center"><a href="https://github.com/ATSR-Alex/ATSR-Hub-EVO/"><img src="docs/images/atsr-logomark-mono-white-lrg.webp" alt="ATSR-EVO" width="400"></a></p>
-
-ATSR-Hub EVO uses a custom LED framework which allows for advanced telemetry and input driven effects and animations. Drive your wheel LEDs in incredibly advanced ways — see [Advanced LEDs with ATSR](https://giant.orth.cc/guides/atsr-led-profiles/) for ready-made MOZA profiles.
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+<a href="https://danielnewmanracing.com/"><img src="docs/images/Dnr_Logo_Wide_Full.webp" alt="Daniel Newman Racing" width="360"></a>
+<p><a href="https://danielnewmanracing.com/">Daniel Newman Racing</a> — data-rich LED profiles bringing real-time telemetry visualisation to your SimHub setup. 100+ LED profiles covering 600+ cars across iRacing, ACC, Le Mans Ultimate, F1, AMS2 and WRC, alongside dashboards, overlays and driver coaching.</p>
+</td>
+<td width="50%" align="center" valign="top">
+<a href="https://github.com/ATSR-Alex/ATSR-Hub-EVO/"><img src="docs/images/atsr-logomark-mono-white-lrg.webp" alt="ATSR-EVO" width="360"></a>
+<p><a href="https://github.com/ATSR-Alex/ATSR-Hub-EVO/">ATSR-Hub EVO</a> — more than just fancy lighting. An all-in-one LED framework with an effect editor, TC/ABS alerts, spotter notifications, input-driven effects and car-specific shift lights for hundreds of cars. See <a href="https://giant.orth.cc/guides/atsr-led-profiles/">Advanced LEDs</a> for ready-made MOZA profiles.</p>
+</td>
+</tr>
+</table>
 
 ## Custom Effects managed by SimHub
 

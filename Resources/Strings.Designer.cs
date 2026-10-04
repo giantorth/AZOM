@@ -218,8 +218,6 @@ namespace MozaPlugin.Resources
         public static string Subtitle_MBoosterPedals => Get("Subtitle_MBoosterPedals");
         public static string SliderLabel_Device => Get("SliderLabel_Device");
         public static string SliderLabel_Role => Get("SliderLabel_Role");
-        public static string SliderLabel_DisplayName => Get("SliderLabel_DisplayName");
-        public static string Hint_MBoosterDisplayName => Get("Hint_MBoosterDisplayName");
         public static string Option_Disabled => Get("Option_Disabled");
         public static string Option_Throttle => Get("Option_Throttle");
         public static string Option_Brake => Get("Option_Brake");
@@ -615,6 +613,8 @@ namespace MozaPlugin.Resources
         public static string Banner_ProfileNotAddedDash_Body => Get("Banner_ProfileNotAddedDash_Body");
         public static string Banner_ProfileNotAddedBase_Body => Get("Banner_ProfileNotAddedBase_Body");
         public static string Banner_ProfileNotAddedWheel_Body => Get("Banner_ProfileNotAddedWheel_Body");
+        public static string Banner_ProfileNotAddedPedalHaptics_Title => Get("Banner_ProfileNotAddedPedalHaptics_Title");
+        public static string Banner_ProfileNotAddedPedalHaptics_Body => Get("Banner_ProfileNotAddedPedalHaptics_Body");
         public static string Banner_PortFallbackName => Get("Banner_PortFallbackName");
         public static string DeviceDef_KnobIndicators => Get("DeviceDef_KnobIndicators");
         public static string Sdk_Status_Disabled => Get("Sdk_Status_Disabled");

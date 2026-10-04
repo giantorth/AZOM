@@ -727,21 +727,18 @@ namespace MozaPlugin.Protocol
             // docs/protocol/devices/mbooster.md "Pedal Feel".
             AddCommand("mbooster-brake-damping-press",   "mbooster", 35, 36, new byte[] { 0xAD, 0x00, 0x00 }, 2, "int");
             AddCommand("mbooster-brake-damping-release", "mbooster", 35, 36, new byte[] { 0xAD, 0x00, 0x01 }, 2, "int");
-            // Registers Pit House reads that had no names here. 0xB4 is the
-            // pedal's calibration-mode state — 2 = normal, 0 = in travel
-            // calibration; it drops to 0 within ~0.3s of a cal-start and
-            // returns to 2 only after the soft reboot, tracking the
-            // `Table 6 Param 50` / `pedal_active_mode changed: 4` the start
-            // frame writes. That is what makes the post-calibration reboot
-            // mandatory (see mbooster-soft-reboot below). The 0x0D/0x21-0x24
-            // set read as constants in both captures (0x12: 0/1/2/3/0;
-            // 0x1d: 0/2/1/3/0) — read and surfaced in diagnostics so the next
-            // capture resolves them rather than being guessed at.
-            AddCommand("mbooster-calibration-state", "mbooster", 35, 0xFF, new byte[] { 0xB4 }, 4, "int");
+            // 0xB4 is the auto-sleep timeout in minutes (0 = off, Pit House
+            // offers 1-300), host unit only — Pit House's `enter_sleep_time`.
+            // 0x0D/0x24 read as constants; surfaced in diagnostics.
+            // 0x21/0x22/0x23 are the role (1 T, 2 B, 3 C) of the unit's local
+            // channels T/B/C — the motor pedal is channel B, so 0x22 is its
+            // role. Pit House assigns roles by writing them (group 36, echoed);
+            // see docs/protocol/devices/mbooster.md "pedal-role map".
+            AddCommand("mbooster-sleep-minutes",     "mbooster", 35, 36,   new byte[] { 0xB4 }, 4, "int");
             AddCommand("mbooster-status-0d",         "mbooster", 35, 0xFF, new byte[] { 0x0D }, 2, "int");
-            AddCommand("mbooster-status-21",         "mbooster", 35, 0xFF, new byte[] { 0x21 }, 2, "int");
-            AddCommand("mbooster-status-22",         "mbooster", 35, 0xFF, new byte[] { 0x22 }, 2, "int");
-            AddCommand("mbooster-status-23",         "mbooster", 35, 0xFF, new byte[] { 0x23 }, 2, "int");
+            AddCommand("mbooster-status-21",         "mbooster", 35, 36,   new byte[] { 0x21 }, 2, "int");
+            AddCommand("mbooster-status-22",         "mbooster", 35, 36,   new byte[] { 0x22 }, 2, "int");
+            AddCommand("mbooster-status-23",         "mbooster", 35, 36,   new byte[] { 0x23 }, 2, "int");
             AddCommand("mbooster-status-24",         "mbooster", 35, 0xFF, new byte[] { 0x24 }, 4, "int");
             // ===== mBooster CALIBRATION ROUTINES =====
             // Pedal travel calibration — group 38, the SAME cmd ids the

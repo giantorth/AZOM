@@ -2,6 +2,89 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.6.3]
+
+## Added
+
+- **mBooster auto-sleep timeout.** Off, or 1 minute to 5 hours, set on the host pedal.
+
+## Changed
+
+- **mBooster pedals can share a role, as in Pit House.** Picking a role another pedal holds no
+  longer clears it from that pedal.
+
+- **mBooster Travel start and end can be set any distance apart.** The end no longer stops
+  32 mm past the start.
+
+- **The mBooster pedal display-name field is removed.** It only appeared on the selected row and
+  had no useful effect.
+
+## Fixed
+
+- **Stock pedal-haptics effects vibrate again.** Switching an effect on now gives it an
+  oscillator; switching it off frees it.
+
+- **Wheel and base LEDs no longer lag behind the game.** Busy LED effects used to queue up and
+  replay seconds late; the LEDs now always show the latest frame.
+
+- **Knobs can now be skipped in SimHub LED effects.** A skipped knob keeps its own colours
+  instead of going dark.
+
+- **Wheel LEDs stay on SimHub while the wheel renegotiates its dashboard.** They no longer
+  fall back to the wheel's own lighting during a dashboard switch or game-switch reload.
+
+- **Switching games no longer rewrites every wheel LED setting.** Only what the new game's
+  profile actually changes is written.
+
+- **The sleep-light colour you pick survives a game switch.** An older saved colour was being
+  written over it on every profile apply.
+
+- **Wheel LEDs repaint straight after a profile apply.** They no longer show the stored colours
+  until SimHub's next frame.
+
+- **Base ambient LEDs hold when SimHub's LED output pauses.** Their refresh now runs on its own
+  timer, like the wheel and dash.
+
+- **The Clear LEDs action keeps the LEDs off.** The plugin no longer relit the frame it had just
+  cleared, and the knob rings are cleared too.
+
+- **ES rims return to SimHub lighting after an idle gap.** The wake-up that puts them in
+  telemetry mode is repeated when lit frames resume.
+
+- **Wheel, pedal and button inputs read again on newer Wine.** Inputs are now decoded through
+  the system HID parser, which handles devices the previous parser rejected.
+
+- **mBooster Sim Input Mapping can have a deadzone.** Its first node now drags vertically too;
+  at 0 it holds the output at zero up to that point.
+
+- **The mBooster Pedal Feel graph scales to Max Force.** A light setting no longer sits
+  squashed at the bottom of a 200 kg axis.
+
+- **The mBooster page shows the right pedal's settings after startup.** When a passive pedal
+  moved to the Pedals tab, the page switched pedals but kept showing the old one's values.
+
+- **mBooster passive pedals land on the Pedals tab straight away.** Their type is remembered
+  from the last session instead of waiting ~30 s for the pedal to report it.
+
+- **PitHouse mBooster presets import the travel, force and feel curve PitHouse shows.** Newer
+  presets store these twice, and the importer read the older copy.
+
+- **The mBooster page shows imported values straight away.** It kept showing the pre-import
+  settings until you switched pedals or profiles, though the pedal already had the new ones.
+
+- **PitHouse pedal presets import Pedal Feel, damping, friction and G-Force.** Deadzone, Max
+  Force and the feel curve now come across instead of being skipped.
+
+- **Changing an mBooster pedal's role sets it on the pedal.** The role is written to the unit the
+  way Pit House does, which also repairs a chain whose pedals had swapped.
+
+- **mBooster error reports are acknowledged, as Pit House does.** A unit no longer repeats the
+  same error once a second for the whole session.
+
+- **mBooster settings are read-only until the pedal has identified.** Edits made in the first
+  seconds after connect could be overridden by the saved values.
+
+
 ## [1.6.2]
 
 ### Added

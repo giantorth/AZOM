@@ -109,9 +109,7 @@ namespace MozaPlugin.UI.Import
                 var axes = c.ConnectedAxisIndices();
                 var types = c.AxisTypes;
 
-                string deviceLabel = string.IsNullOrWhiteSpace(s.DisplayName)
-                    ? $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})"
-                    : $"{s.DisplayName} — {MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
+                string deviceLabel = $"{MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName})";
 
                 bool multiplePedals = axes.Count > 1;
                 int shown = 0;
@@ -125,11 +123,10 @@ namespace MozaPlugin.UI.Import
                     bool passive = types != null && axis < types.Length && types[axis] == 2;
 
                     // Row prefix leads with the role so a diff list reads
-                    // "Brake · ABS"; the device name disambiguates two pedals
-                    // that somehow share a role.
+                    // "Brake · ABS"; the pedal number disambiguates two pedals
+                    // sharing a role.
                     string rowPrefix = RoleName(role);
-                    if (!string.IsNullOrWhiteSpace(s.DisplayName)) rowPrefix += " — " + s.DisplayName;
-                    else if (multiplePedals) rowPrefix += $" — {string.Format(global::MozaPlugin.Resources.Strings.Label_PedalAxis, shown)}";
+                    if (multiplePedals) rowPrefix += $" — {string.Format(global::MozaPlugin.Resources.Strings.Label_PedalAxis, shown)}";
 
                     targets.Add(new MBoosterImportTarget(
                         c, axis, role, $"{pedalPart} · {RoleName(role)}", rowPrefix, passive));
@@ -416,14 +413,23 @@ namespace MozaPlugin.UI.Import
                 PitHouseMotorMapper.AddSkipped(plan, dp, prefix + "_press_combine", "brake-only");
             }
 
-            // ----- Explicitly unsupported families in this section -----
-            m.SkipFamily("damping", "no wire command");
-            m.SkipFamily("friction", "no wire command");
-            m.SkipFamily("forcelimit", "no wire command");
-            m.SkipFamily("gforce", "not implemented");
+            // ----- Motor-only: Pedal Feel, damping, friction, G-Force -----
+            // All brake-named singleton registers on the motorized unit
+            // (HardwareApplier skips them for a passive pedal), so a passive
+            // target has nothing to receive them.
+            if (target.IsPassive)
+            {
+                foreach (var family in new[] { "forcelimit", "forces_curve", "stroke_curve", "damping", "friction", "gforce" })
+                    m.SkipFamily(family, "passive pedal — no motor");
+            }
+            else
+            {
+                m.PedalFeel();
+                m.Damping();
+                m.Friction();
+                m.GForce();
+            }
             m.SkipFamily("motor_vibration", "PitHouse motor test");
-            m.SkipKey("forces_curve", "no plugin field");
-            m.SkipKey("stroke_curve", "no plugin field");
 
             if (target.IsPassive)
                 plan.NotImported.Add($"{target.RowPrefix}: passive pedal — effects won't play");
@@ -466,6 +472,28 @@ namespace MozaPlugin.UI.Import
 
             private string Key(string suffix) => _prefix + "_" + suffix;
 
+            // Pit House's own preset import reads the _v128 travel / force /
+            // curve keys when present (its "MBoost - 导入预设 - v128…" range
+            // checks) and the plain key otherwise; the two can differ (a user's
+            // 3.8–28.3 mm profile carried 3.8–19.8 in the plain key). The plain
+            // key is then listed as superseded, once.
+            private readonly HashSet<string> _superseded = new HashSet<string>(StringComparer.Ordinal);
+            private string Pick(string plain, params string[] v128)
+            {
+                foreach (var v in v128)
+                {
+                    var t = _dp[Key(v)];
+                    if (t == null || t.Type == JTokenType.Null) continue;
+                    if (_superseded.Add(plain))
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(plain), $"superseded by {Key(v)}");
+                    return v;
+                }
+                return plain;
+            }
+
+            private string TravelMinKey() => Pick("machinelimit_min", "machinelimit_min_v128");
+            private string TravelMaxKey() => Pick("machinelimit_max", "machinelimit_max_v128");
+
             private JToken? Token(string suffix)
             {
                 _plan.ConsideredKeys.Add(Key(suffix));
@@ -486,6 +514,23 @@ namespace MozaPlugin.UI.Import
                 if (t == null) return null;
                 try { return (bool)t; } catch { return null; }
             }
+
+            private double[]? NumArray(string suffix)
+            {
+                if (Token(suffix) is not JArray a) return null;
+                var r = new double[a.Count];
+                for (int i = 0; i < a.Count; i++)
+                {
+                    try { r[i] = (double)a[i]; } catch { return null; }
+                }
+                return r;
+            }
+
+            private static string Pct(float v) =>
+                v < 0 ? "(unset)" : v.ToString("F0", CultureInfo.InvariantCulture) + "%";
+
+            private static string Nodes(float[]? a) =>
+                a == null ? "(default)" : string.Join("/", a.Select(FormatCurvePoint));
 
             private void Add(string label, string oldDisplay, string newDisplay, Action<IMBoosterPedalConfig> apply)
             {
@@ -568,13 +613,14 @@ namespace MozaPlugin.UI.Import
 
             /// <summary>
             /// machinelimit_min/max → TravelStartMm/TravelEndMm as one row, so
-            /// the pair stays inside the range slider's own min/max gap. Unit
-            /// mapping (raw value = mm) is inferred, not captured.
+            /// the pair stays inside the range slider's own min/max gap. Values
+            /// are mm: Pit House stores the pedal's 0x84/0x85 read-back under
+            /// these keys on the same 0–53.5 mm scale the plugin writes.
             /// </summary>
             public void TravelRange()
             {
-                var lo = Num("machinelimit_min");
-                var hi = Num("machinelimit_max");
+                var lo = Num(TravelMinKey());
+                var hi = Num(TravelMaxKey());
                 if (lo == null && hi == null) return;
 
                 // Half a pair is only usable when the other end already has a
@@ -592,8 +638,6 @@ namespace MozaPlugin.UI.Import
                 // can never land somewhere the UI couldn't produce.
                 if (end - start < MBoosterUiConstants.TravelMinGapMm)
                     end = Math.Min(MBoosterUiConstants.TravelMaxMm, start + MBoosterUiConstants.TravelMinGapMm);
-                if (end - start > MBoosterUiConstants.TravelMaxGapMm)
-                    end = start + MBoosterUiConstants.TravelMaxGapMm;
 
                 string oldDisplay = _read.TravelStartMm < 0 || _read.TravelEndMm < 0
                     ? "(unset)"
@@ -601,8 +645,249 @@ namespace MozaPlugin.UI.Import
                 string newDisplay = $"{start.ToString("F1", CultureInfo.InvariantCulture)}–{end.ToString("F1", CultureInfo.InvariantCulture)} mm";
 
                 float s = start, e = end;
-                Add("Travel start–end (mm) *", oldDisplay, newDisplay,
+                Add("Travel start–end (mm)", oldDisplay, newDisplay,
                     c => { c.TravelStartMm = s; c.TravelEndMm = e; });
+            }
+
+            /// <summary>
+            /// forcelimit_min/max → Deadzone/Max Force; forces_curve (kg, the 6
+            /// nodes then the Max Force point) → InputCurveY as % of that span;
+            /// stroke_curve (mm, inside machinelimit_min..max) → InputCurveX as
+            /// % of travel. A default PitHouse preset has both curves at exact
+            /// k/7 steps of those ranges — the same k/7 the Pedal Feel wire
+            /// uses — which is what ties the keys to these fields.
+            /// </summary>
+            public void PedalFeel()
+            {
+                int n = MBoosterUiConstants.PedalFeelNodeCount;
+                var dzRaw = Num(Pick("forcelimit_min", "forcelimit_min_v128"));
+                var mfRaw = Num(Pick("forcelimit_max", "forcelimit_max_v128"));
+                string forcesKey = Pick("forces_curve", "forces_curve_cache_v128", "forces_curve_v128_cache");
+                var forces = NumArray(forcesKey);
+                if (mfRaw == null && forces != null && forces.Length == n + 1) mfRaw = forces[n];
+
+                MBoosterUiConstants.ForceRanges(true,
+                    out float mfMin, out float mfMax, out float dzMin, out float dzMax);
+                float? dz = dzRaw.HasValue ? (float)Math.Round(Clamp(dzRaw.Value, dzMin, dzMax), 1) : (float?)null;
+                // Whole kg, like the Max Force slider.
+                float? mf = mfRaw.HasValue ? (float)Math.Round(Clamp(mfRaw.Value, mfMin, mfMax)) : (float?)null;
+
+                if (dz.HasValue)
+                {
+                    float v = dz.Value;
+                    Add("Deadzone (kg)",
+                        _read.DeadzoneKg < 0 ? "(unset)" : _read.DeadzoneKg.ToString("F1", CultureInfo.InvariantCulture),
+                        v.ToString("F1", CultureInfo.InvariantCulture), c => c.DeadzoneKg = v);
+                }
+                if (mf.HasValue)
+                {
+                    float v = mf.Value;
+                    Add("Max force (kg)",
+                        _read.MaxForceKg < 0 ? "(unset)" : _read.MaxForceKg.ToString("F0", CultureInfo.InvariantCulture),
+                        v.ToString("F0", CultureInfo.InvariantCulture), c => c.MaxForceKg = v);
+                }
+
+                if (forces != null && forces.Length >= n)
+                {
+                    if (!dz.HasValue || !mf.HasValue || mf.Value <= dz.Value)
+                    {
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(forcesKey), "needs forcelimit_min < forcelimit_max");
+                    }
+                    else
+                    {
+                        // Relative to the preset's own span, before clamping —
+                        // that is the span PitHouse sampled the nodes on.
+                        double lo = dzRaw!.Value, span = mfRaw!.Value - dzRaw.Value;
+                        var y = new float[n];
+                        for (int i = 0; i < n; i++)
+                        {
+                            double pct = span > 0 ? (forces[i] - lo) / span * 100.0 : 0;
+                            y[i] = (float)Math.Round(Clamp(pct, 0, 100));
+                            // Nodes can't cross (the editor clamps Y to neighbours).
+                            if (i > 0 && y[i] < y[i - 1]) y[i] = y[i - 1];
+                        }
+                        Add("Pedal feel curve (Y, % of deadzone→max force)", Nodes(_read.InputCurveY), Nodes(y),
+                            c => c.InputCurveY = (float[])y.Clone());
+                    }
+                }
+
+                string strokeKey = Pick("stroke_curve", "stroke_curve_cache_v128", "stroke_curve_v128_cache");
+                var stroke = NumArray(strokeKey);
+                if (stroke != null && stroke.Length >= n)
+                {
+                    var tLo = Num(TravelMinKey());
+                    var tHi = Num(TravelMaxKey());
+                    if (tLo == null || tHi == null || tHi.Value <= tLo.Value)
+                    {
+                        PitHouseMotorMapper.AddSkipped(_plan, _dp, Key(strokeKey), "needs machinelimit_min < machinelimit_max");
+                    }
+                    else
+                    {
+                        double span = tHi.Value - tLo.Value;
+                        var x = new float[n];
+                        for (int i = 0; i < n; i++)
+                            x[i] = (float)Math.Round(Clamp((stroke[i] - tLo.Value) / span * 100.0, 1, 99));
+                        // Same 1-unit neighbour gap the editor enforces, and
+                        // the last node stays short of the fixed Max Force
+                        // point at 100.
+                        for (int i = 1; i < n; i++)
+                            if (x[i] < x[i - 1] + 1) x[i] = x[i - 1] + 1;
+                        for (int i = n - 1; i >= 0; i--)
+                        {
+                            float cap = i == n - 1 ? 99 : x[i + 1] - 1;
+                            if (x[i] > cap) x[i] = cap;
+                        }
+                        Add("Pedal feel curve (X, % of travel) *", Nodes(_read.InputCurveX), Nodes(x),
+                            c => c.InputCurveX = (float[])x.Clone());
+                    }
+                }
+            }
+
+            /// <summary>
+            /// damping_press/_release → Virtual Damping (0xAD), a switched-off
+            /// direction importing as 0% (how Pit House turns a register off —
+            /// see Natural Friction); damping_[release_]segment{1,2}_position +
+            /// damping_{press,release}_segment{1..3}_value → Segmented Damping
+            /// (0xB7); damping_switch → Segmented Damping on/off. A 2026-09-08
+            /// Pit House capture wrote 40%/25% to both registers — the same
+            /// values the sample preset holds under these keys.
+            /// </summary>
+            public void Damping()
+            {
+                VirtualDamping("press", "Virtual damping press *",
+                    c => c.DampingPressPct, (c, v) => c.DampingPressPct = v);
+                VirtualDamping("release", "Virtual damping release *",
+                    c => c.DampingReleasePct, (c, v) => c.DampingReleasePct = v);
+
+                var sd = _read.SegmentedDamping ?? new MBoosterSegmentedDampingSettings();
+                SegmentedSide("Segmented damping pressed *",
+                    Num("damping_segment1_position"), Num("damping_segment2_position"),
+                    Num("damping_press_segment1_value"), Num("damping_press_segment2_value"), Num("damping_press_segment3_value"),
+                    sd.Divider1Pressed, sd.Divider2Pressed, sd.Seg1Pressed, sd.Seg2Pressed, sd.Seg3Pressed,
+                    MBoosterUiConstants.SegDampDivider1PressedDefaultPct, MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
+                    (t, d1, d2, s1, s2, s3) =>
+                    {
+                        t.Divider1Pressed = d1; t.Divider2Pressed = d2;
+                        t.Seg1Pressed = s1; t.Seg2Pressed = s2; t.Seg3Pressed = s3;
+                    });
+                SegmentedSide("Segmented damping released *",
+                    Num("damping_release_segment1_position"), Num("damping_release_segment2_position"),
+                    Num("damping_release_segment1_value"), Num("damping_release_segment2_value"), Num("damping_release_segment3_value"),
+                    sd.Divider1Released, sd.Divider2Released, sd.Seg1Released, sd.Seg2Released, sd.Seg3Released,
+                    MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct, MBoosterUiConstants.SegDampDivider2ReleasedDefaultPct,
+                    (t, d1, d2, s1, s2, s3) =>
+                    {
+                        t.Divider1Released = d1; t.Divider2Released = d2;
+                        t.Seg1Released = s1; t.Seg2Released = s2; t.Seg3Released = s3;
+                    });
+
+                var sw = Bool("damping_switch");
+                if (sw.HasValue)
+                {
+                    bool v = sw.Value;
+                    Add("Segmented damping *", sd.DampingEnabled ? "On" : "Off", v ? "On" : "Off",
+                        c => (c.SegmentedDamping ??= new MBoosterSegmentedDampingSettings()).DampingEnabled = v);
+                }
+            }
+
+            private void VirtualDamping(string dir, string label,
+                Func<IMBoosterPedalConfig, float> get, Action<IMBoosterPedalConfig, float> set)
+            {
+                var v = Num("damping_" + dir);
+                var sw = Bool("damping_" + dir + "_switch");
+                if (sw != false && v == null) return;
+                float nv = sw == false ? 0f : (float)Math.Round(Clamp(v!.Value, 0, 100));
+                Add(label + " (%)", Pct(get(_read)), Pct(nv), c => set(c, nv));
+            }
+
+            private void SegmentedSide(string label,
+                double? d1, double? d2, double? s1, double? s2, double? s3,
+                float cd1, float cd2, float cs1, float cs2, float cs3,
+                float defD1, float defD2,
+                Action<MBoosterSegmentedDampingSettings, float, float, float, float, float> set)
+            {
+                if (d1 == null && d2 == null && s1 == null && s2 == null && s3 == null) return;
+                float Cur(float v, float dflt) => v >= 0 ? v : dflt;
+                float Seg(double? v, float cur) =>
+                    v.HasValue ? (float)Math.Round(Clamp(v.Value, 0, 100)) : Cur(cur, MBoosterUiConstants.SegDampSegDefaultPct);
+
+                // The divider editor's bounds: [10,80] / [20,90], ≥10 apart.
+                double a = Clamp(d1 ?? Cur(cd1, defD1), MBoosterUiConstants.SegDampDivider1MinPct, MBoosterUiConstants.SegDampDivider1MaxPct);
+                double b = Clamp(d2 ?? Cur(cd2, defD2), MBoosterUiConstants.SegDampDivider2MinPct, MBoosterUiConstants.SegDampDivider2MaxPct);
+                if (b - a < MBoosterUiConstants.SegDampDividerMinGapPct)
+                {
+                    b = Math.Min(MBoosterUiConstants.SegDampDivider2MaxPct, a + MBoosterUiConstants.SegDampDividerMinGapPct);
+                    a = Math.Min(a, b - MBoosterUiConstants.SegDampDividerMinGapPct);
+                }
+                float na = (float)Math.Round(a), nb = (float)Math.Round(b);
+                float n1 = Seg(s1, cs1), n2 = Seg(s2, cs2), n3 = Seg(s3, cs3);
+
+                string Describe(float x1, float x2, float y1, float y2, float y3) =>
+                    x1 < 0 || x2 < 0 || y1 < 0 || y2 < 0 || y3 < 0
+                        ? "(unset)"
+                        : $"{x1:F0}/{x2:F0}% · {y1:F0}/{y2:F0}/{y3:F0}%";
+                Add(label, Describe(cd1, cd2, cs1, cs2, cs3), Describe(na, nb, n1, n2, n3),
+                    c => set(c.SegmentedDamping ??= new MBoosterSegmentedDampingSettings(), na, nb, n1, n2, n3));
+            }
+
+            /// <summary>
+            /// friction_press (+ _switch) → Natural Friction. The plugin writes
+            /// one value to both 0xAE selectors, as every Pit House capture did;
+            /// a preset whose release side differs is noted, not merged.
+            /// </summary>
+            public void Friction()
+            {
+                var p = Num("friction_press");
+                var ps = Bool("friction_press_switch");
+                var r = Num("friction_release");
+                var rs = Bool("friction_release_switch");
+                if (p == null && ps == null) return;
+
+                bool curEn = _read.NaturalFrictionEnabled;
+                float curPct = _read.NaturalFrictionPct;
+                bool nEn = ps ?? curEn;
+                float nPct = p.HasValue ? (float)Math.Round(Clamp(p.Value, 0, 100)) : curPct;
+                string Describe(bool en, float pct) => (en ? "On" : "Off") + " · " + Pct(pct);
+                Add("Natural friction *", Describe(curEn, curPct), Describe(nEn, nPct), c =>
+                {
+                    c.NaturalFrictionEnabled = nEn;
+                    if (nPct >= 0) c.NaturalFrictionPct = nPct;
+                });
+
+                if ((r.HasValue && p.HasValue && Math.Abs(r.Value - p.Value) > 0.5)
+                    || (rs.HasValue && ps.HasValue && rs.Value != ps.Value))
+                    _plan.NotImported.Add($"{Key("friction_release")} = {(rs == false ? "off" : r?.ToString(CultureInfo.InvariantCulture) ?? "?")}    (plugin sets press and release together — press value used)");
+            }
+
+            /// <summary>gforce_switch / _max_pedal_movement (mm) / _response_speed
+            /// (%) → the G-Force effect's Enabled / MaxTravelMm / ResponseSpeedPct —
+            /// the same controls, named as in Pit House's own UI.</summary>
+            public void GForce()
+            {
+                var cur = _read.GForce;
+                if (cur == null) return;
+                var sw = Bool("gforce_switch");
+                var mv = Num("gforce_max_pedal_movement");
+                var sp = Num("gforce_response_speed");
+                if (sw == null && mv == null && sp == null) return;
+
+                bool nEn = sw ?? cur.Enabled;
+                float nMv = mv.HasValue
+                    ? (float)Math.Round(Clamp(mv.Value, MBoosterUiConstants.GForceMaxTravelMinMm, MBoosterUiConstants.GForceMaxTravelMaxMm), 1)
+                    : cur.MaxTravelMm;
+                int nSp = sp.HasValue
+                    ? (int)Math.Round(Clamp(sp.Value, MBoosterUiConstants.GForceResponseSpeedMinPct, MBoosterUiConstants.GForceResponseSpeedMaxPct))
+                    : cur.ResponseSpeedPct;
+                string Describe(bool en, float m, int s) =>
+                    $"{(en ? "On" : "Off")} · {m.ToString("F1", CultureInfo.InvariantCulture)}mm · speed {s.ToString(CultureInfo.InvariantCulture)}%";
+                Add("G-Force", Describe(cur.Enabled, cur.MaxTravelMm, cur.ResponseSpeedPct), Describe(nEn, nMv, nSp), c =>
+                {
+                    var t = c.GForce;
+                    if (t == null) return;
+                    t.Enabled = nEn;
+                    t.MaxTravelMm = nMv;
+                    t.ResponseSpeedPct = nSp;
+                });
             }
 
             /// <summary>

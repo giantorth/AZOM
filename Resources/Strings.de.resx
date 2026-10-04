@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ein MOZA-Dashboard ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Die Wheelbase ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Lenkrad „{1}“ ist verbunden, aber „{0}“ wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Pedalvibration nicht in SimHub hinzugefügt</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Die Pedalvibration ist verbunden, aber es wurde kein Pedalgerät in SimHub hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>den MOZA-COM-Port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Drehknopf-Anzeigen</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
@@ -545,7 +547,7 @@ Gesucht unter:
 Sind Sie sicher?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Alle Einstellungen löschen</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Gerätedefinitionen neu bereitstellen</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dadurch werden die SimHub-Gerätedefinitionen für alle bekannten MOZA-Lenkräder, -Dashboards und -Wheelbases neu geschrieben, passend zur verbundenen Wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dadurch werden die SimHub-Gerätedefinitionen für alle bekannten MOZA-Lenkräder, -Dashboards, -Wheelbases und -Pedalvibrationseinheiten neu geschrieben, passend zur verbundenen Wheelbase.
 
 Manuelle Änderungen an diesen Dateien gehen verloren. Fortfahren?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export fehlgeschlagen: {0}</value></data>
@@ -609,8 +611,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Zuletzt gedrückt: Taste {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>ETS2/ATS-Standard laden</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Wischer &amp; Licht neu abgleichen</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Anzeigename</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Optional – hilft, zwei mBooster mit derselben Rolle in der Geräteliste oben zu unterscheiden.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Benutzerdefinierte Effekte (Experimentell)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// experimentell – benutzerdefinierte Vibration über SimHub/NCalc-Formeln</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Experimentell – jeder benutzerdefinierte Effekt lässt den Motor mit einer von Ihnen angegebenen SimHub-Eigenschaft oder NCalc-Formel vibrieren. Alle benutzerdefinierten Effekte (und der eingebaute Engine-Effekt) teilen sich einen Kanal, sodass nur einer den Motor gleichzeitig ansteuern kann; der zuletzt verarbeitete aktive Effekt gewinnt. Frequenz/Intensität verhalten sich wie die Engine-Schieberegler.</value></data>

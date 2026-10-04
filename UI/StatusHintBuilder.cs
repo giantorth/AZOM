@@ -198,6 +198,25 @@ namespace MozaPlugin.UI
                 }
             }
 
+            // Rule 6: ProfileNotAddedPedalHaptics. Outside profileGate's
+            // IsConnected term: a USB unit doesn't need the wheelbase. One
+            // banner for the unit, cleared once ANY pedal device is added —
+            // leaving out a pedal with no motor is a valid setup.
+            if (elapsed >= ProfileNotAddedSettling
+                && !plugin.DeviceDefinitionDeployed
+                && Devices.Haptics.MozaPedalHapticsBridge.IsSupported
+                && plugin.PedalHapticsRegistry?.AnyDetected == true
+                && !plugin.PedalHapticsDeviceExtensionActive)
+            {
+                list.Add(new StatusHint(
+                    StatusHintKind.ProfileNotAddedPedalHaptics,
+                    Strings.Banner_ProfileNotAddedPedalHaptics_Title,
+                    string.Format(Strings.Banner_ProfileNotAddedPedalHaptics_Body,
+                        "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
+                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
+                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
+            }
+
             return list;
         }
     }

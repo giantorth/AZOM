@@ -1863,11 +1863,8 @@
                                  the Pedal Feel/Sim Input/Effects/Calibration cards below,
                                  replacing the old trio of Device combo + per-axis Pedal Roles
                                  panel + Configure-pedal combo. Each row's own Role combo edits
-                                 THAT pedal's Role regardless of which row is selected, with
-                                 cross-row uniqueness enforced in code (assigning a role clears it
-                                 off whichever other pedal previously held it). No per-device
-                                 DisplayName editor here (not required) — the row label still
-                                 reflects any DisplayName already set via BuildMBoosterComboLabel. -->
+                                 THAT pedal's Role regardless of which row is selected; two
+                                 pedals may share a role, as Pit House allows. -->
                             <ItemsControl x:Name="MBoosterDeviceRowsList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -1878,8 +1875,6 @@
                                             </Grid.RowDefinitions>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="160"/>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="160"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1895,23 +1890,13 @@
                                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
                                                 <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
                                             </ComboBox>
-                                            <!-- Only shown for the selected row — editing a non-selected
-                                                 device's name isn't useful since its config isn't on
-                                                 screen anyway, and it declutters the common case. -->
-                                            <TextBlock Grid.Row="0" Grid.Column="3" Text="{x:Static res:Strings.SliderLabel_DisplayName}" Style="{StaticResource LabelText}"
-                                                       VerticalAlignment="Center" Margin="16,0,10,0"
-                                                       Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
-                                            <TextBox Grid.Row="0" Grid.Column="4" Style="{StaticResource LfeNameBox}" MaxLength="40"
-                                                     Text="{Binding DisplayName, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                                     ToolTip="{x:Static res:Strings.Hint_MBoosterDisplayName}"
-                                                     Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
                                             <!-- Per-pedal hardware calibration routines. On this row so
                                                  there is no doubt which pedal they act on: a unit hosting
                                                  two ACTIVE pedals answers both on one device id, so one
                                                  shared pair could not say (bug GVT5H8B8). Hidden for a
                                                  passive pedal, which has no motor to sweep or locate.
                                                  Enable/caption pushed by RefreshMBoosterCalUi. -->
-                                            <StackPanel Grid.Row="0" Grid.Column="5" Orientation="Horizontal"
+                                            <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal"
                                                         VerticalAlignment="Center" Margin="16,0,0,0"
                                                         Visibility="{Binding CalVisible, Converter={StaticResource BoolToVisibility}}">
                                                 <Button Content="{Binding TravelCalLabel}" IsEnabled="{Binding TravelCalEnabled}"
@@ -1919,7 +1904,7 @@
                                                 <Button Content="{Binding MotorCalLabel}" IsEnabled="{Binding MotorCalEnabled}"
                                                         Click="MBoosterRowMotorCal_Click"/>
                                             </StackPanel>
-                                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="6"
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                                        Text="{Binding CalStatus}" Style="{StaticResource MutedHintText}"
                                                        TextWrapping="Wrap" Margin="0,4,0,2"
                                                        Visibility="{Binding CalStatus, Converter={StaticResource EmptyStringToVisibility}}"/>
@@ -2038,7 +2023,7 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
                                         <ctrl:MozaRangeSlider x:Name="MBoosterTravelRangeSlider" Height="90" Margin="0,0,0,16"
                                                               AccentBrush="{StaticResource CyanBrush}"
-                                                              Minimum="3.8" Maximum="49.7" MinGap="3.8" MaxGap="32.1"
+                                                              Minimum="3.8" Maximum="49.7" MinGap="3.8"
                                                               Unit="mm" Decimals="1"
                                                               LowValue="3.8" HighValue="35.9"
                                                               RangeChanged="MBoosterTravelRangeSlider_RangeChanged"/>
@@ -2132,7 +2117,8 @@
                                         <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               AllowHorizontalDrag="True"
-                                                              EndpointsOnlyDraggableInX="True"/>
+                                                              EndpointsOnlyDraggableInX="True"
+                                                              ClampSplineToPlot="True"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>
@@ -2974,6 +2960,24 @@
                                         <Button x:Name="MBoosterApplyCalButton" Content="{x:Static res:Strings.Button_Apply}" Click="MBoosterApplyCalButton_Click"/>
                                     </StackPanel>
                                 </StackPanel>
+                            </ctrl:SectionCard>
+
+                            <!-- Lane-wide, host unit only (0xB4). -->
+                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_Sleep}" Icon="{StaticResource IconMisc}"
+                                              IsCollapsible="True">
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SleepTimeout}" Style="{StaticResource SliderLabel}"/>
+                                    <Slider Grid.Column="1" x:Name="MBoosterSleepSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="1" ValueChanged="MBoosterSleepSlider_ValueChanged"/>
+                                    <TextBox Grid.Column="2" x:Name="MBoosterSleepValue" Style="{StaticResource SliderValueEditBox}"
+                                             Tag="{Binding ElementName=MBoosterSleepSlider}"
+                                             KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                             Text="0"/>
+                                </Grid>
                             </ctrl:SectionCard>
 
                         </StackPanel>

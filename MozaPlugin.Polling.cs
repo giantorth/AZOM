@@ -281,17 +281,15 @@ namespace MozaPlugin
         private int _ledKeepaliveTickInProgress;
 
         /// <summary>
-        /// Re-feed the wheel and dash LED frames so the firmware keeps rendering them.
-        /// Runs on its own timer because SimHub's <c>Display()</c> callback is not a
-        /// cadence we control: when its LED pipeline stalls the re-feed used to stall
-        /// with it, the firmware dropped host LED ownership ~1 s later, and the wheel
-        /// fell back to its stored idle effect however long the user's keepalive timeout
-        /// was set (bundle 2X7HPMMS — an 8 s stall mid-race against a 100 s setting).
+        /// Re-feed the wheel, dash and base ambient LED frames so the firmware keeps
+        /// rendering them. Runs on its own timer because SimHub's <c>Display()</c>
+        /// callback is not a cadence we control: when its LED pipeline stalls the re-feed
+        /// used to stall with it, the firmware dropped host LED ownership ~1 s later, and
+        /// the wheel fell back to its stored idle effect however long the user's keepalive
+        /// timeout was set (bundle 2X7HPMMS — an 8 s stall mid-race against a 100 s setting).
         ///
         /// <para>Each driver applies its own hold gates and pacing, so this is a cheap
-        /// fall-through on most ticks. Base ambient strips are not covered: that driver
-        /// recomputes from the live frame instead of replaying a cache, and has no hold
-        /// window to release on.</para>
+        /// fall-through on most ticks.</para>
         /// </summary>
         private void TickLedKeepalive()
         {
@@ -300,6 +298,9 @@ namespace MozaPlugin
 
             try { Devices.Led.MozaDashLedDeviceManager.Latest?.TickKeepalive(); }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Dash LED keepalive tick failed: {ex.Message}"); }
+
+            try { Devices.Led.MozaBaseLedDeviceManager.TickKeepaliveAll(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Base LED keepalive tick failed: {ex.Message}"); }
         }
 
         private void PollStatus(object sender, ElapsedEventArgs e)

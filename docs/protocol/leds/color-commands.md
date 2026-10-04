@@ -104,9 +104,28 @@ must hold the bitmask sticky across mid-session black frames: keep
 streaming colour chunks (so the firmware buffer renders the actual
 black frame), but suppress the bitmask write when its current value
 would be zero. Release the bitmask to zero only on explicit teardown
-(disconnect, mode switch). Plugin implementation: the knob block in
-`Devices/Led/MozaLedDeviceManager.cs` Display() gates the `1A 03` write on
-`knobBitmask != 0`; the keepalive re-emits the last non-zero value.
+(disconnect, mode switch). A knob whose `active` bit is clear while its
+`window` bit is set renders **dark**, not its stored colours (W17, bundle
+K72KZZ44: `07/0F` held knob 4 black for 4 min). Plugin implementation: the
+knob block in `Devices/Led/MozaLedDeviceManager.cs` Display() sends
+`active = window` = the knobs that have lit during the current encoders
+stream, so an effect's "off" stays dark while it runs and a knob no effect
+drives keeps its stored colours (bundles DX44K56M, RKYDB91K; `09/09` in
+BN8GNWGG lit the two undriven knobs). SimHub alpha-blends the encoders channel
+over black, so "assigned but off" and "unassigned" are the same colour; only
+the stream tells them apart — and the stream is one array for all knobs, so a
+pulsing effect on knobs 1/4 kept knobs 2/3 owned and dark after their effect
+ended (CJRWG63Z). The Individual-LEDs layer (`rawState`, built over
+`Color.Transparent`) keeps alpha, so a knob it draws is owned only while its
+slot is opaque: transparent punches through on that frame, opaque black stays
+dark (4RHC90MK: Individual-LEDs knobs 1/4 arrive opaque black in their off
+phase, undriven knobs transparent). The encoders channel gets the same rule by
+re-reading it through `LedModuleSettings.EncodersDriver.GetResult(100,
+Color.Transparent)`; the stream latch is only the fallback when that API isn't
+reachable. When the stream ends the ring is released with
+`0/0` at once (the first `Display()` without the encoders channel, or 300 ms
+after SimHub stops calling `Display()`), and the next stream claims only the
+knobs it lights.
 
 **Button color chunk** (`wheel-telemetry-button-colors`):
 
@@ -162,11 +181,16 @@ Chunks per group:
 | Button (`0x19 01`) | 14 (VGS) / 8 (CS V2.1, CS Pro) / varies | 3 chunks (last padded) |
 | Knob (`0x19 03`) | 4 (CS Pro) / 5 (KS Pro) | 1 chunk (last padded) |
 
-**Padding rule:** unused entries within a chunk MUST use index `0xFF`. Zero
-padding (`00 00 00 00`) is interpreted as "set LED 0 to black" by firmware,
-causing button 0 to flicker on every frame. See
-[`Devices/Led/MozaLedDeviceManager.cs:472`](../../../Devices/Led/MozaLedDeviceManager.cs)
-(`SendColorChunks`).
+**No padding:** a chunk carries only real LED entries and is short when it has
+fewer than 5 — the wheel frames on the length byte. Zero padding (`00 00 00 00`)
+reads as "set LED 0 to black" (button 0 flicker), and an index-`0xFF` filler
+corrupts the button-input matrix on stricter firmware (issue #100). PitHouse
+emits neither.
+
+Each entry names its own LED index, so a chunk need not cover a contiguous
+range. The plugin relies on that to write only changed LEDs (see
+[Plugin write path](#plugin-write-path)); PitHouse has not been captured
+sending a sparse chunk, so that shape is plugin-originated.
 
 ### Bitmask format
 
@@ -186,6 +210,46 @@ Selects which LEDs are currently lit. The plugin emits the **8-byte
   in the chunk write.
 
 Plugin sends the bitmask only when it changes, regardless of color-chunk cadence.
+
+### Plugin write path
+
+Live wheel and base-ambient LED writes go through `LedFrameScheduler`
+([`Protocol/LedFrameScheduler.cs`](../../../Protocol/LedFrameScheduler.cs)), not
+a queue. The LED drivers publish the colours + bitmask each zone (RPM, buttons,
+knobs, base strip 0/1) should show; the write loop pulls one frame per 4 ms
+paced slot, alternating with the one-shot FIFO, and builds it from the state at
+that moment diffed against what was last written. A burst of SimHub frames
+collapses to the latest one.
+
+The previous FIFO path kept every frame: on a KS Pro + R25 (bundle M3D9WHJE)
+the paced lane ran pinned at ~243 frames/s for the whole capture while SimHub
+produced more, so the wheel replayed seconds-old LED states and its bitmask
+keepalive arrived late enough to drop back to the idle effect.
+
+Per zone:
+
+| Zone | Dark LED | Colour writes | Bitmask |
+|------|----------|---------------|---------|
+| RPM | bitmask only | changed LEDs that are lit | on change |
+| RPM, bare "CS" | black colour | whole set on any change | on change, plus `41 FD DE` |
+| Buttons | black colour | changed LEDs | on change |
+| Knobs | black colour | changed LEDs | after every colour write |
+| Base strips | black colour | whole strip on any change | on change |
+
+RPM follows PitHouse: on the KS Pro capture
+(`usb-capture/ksp/gfdsgfd.pcapng`) PitHouse wrote 36 RPM colour frames
+against 285 RPM bitmasks, so the wheel keeps colours across bitmask-only
+updates. Whether a cleared active bit alone darkens a *button* is uncaptured,
+so buttons still get an explicit black.
+
+Ordering: within a zone every colour write precedes the bitmask that lights
+it, and a dark LED whose new colour has not landed is held out of the bitmask
+until it has. Across zones the highest priority with work goes next (RPM,
+buttons, knobs, base), unless one has waited over 50 ms.
+
+A wheel zone whose bitmask has been silent for over 1000 ms (the ownership
+lapse below) has every colour rewritten on its next write. The keepalive
+re-feed still rewrites a zone's full colour set plus bitmask.
 
 ### Example (CS V2.1 — 10 RPM LEDs, alternating red/blue)
 
@@ -210,9 +274,11 @@ Bitmask (all 10 lit), 8-byte active+window form:
 
 ### Wheel echo
 
-Both write commands echo verbatim — see
-[`../wire/wheel-write-echoes.md`](../wire/wheel-write-echoes.md) entries for
-prefixes `19 00`, `19 01`, `19 03`, `1A 00`, `1A 01`, `1A 03` (group `0x3F`, dev `0x17`).
+[`../wire/wheel-write-echoes.md`](../wire/wheel-write-echoes.md) lists echo
+prefixes `19 00`, `19 01`, `1A 00`. The KS Pro does **not** echo any `19`/`1A`
+write: zero `BF 71 19`/`BF 71 1A` frames in the plugin capture of bundle
+M3D9WHJE (~69k LED writes) and in PitHouse's `usb-capture/ksp/gfdsgfd.pcapng`.
+Echoes can't be used to detect dropped LED frames on that wheel.
 
 ### Static (settings) vs live (telemetry) paths
 
@@ -222,3 +288,28 @@ path uses cmd `0x1F [G] FF [N]` to persist a per-LED color in EEPROM (see
 [`../devices/wheel-0x17.md` § Extended LED Group Architecture](../devices/wheel-0x17.md)).
 The two pipelines coexist: static colors render in idle mode; live colors
 override while a frame is feeding the bitmask.
+
+### Live ownership and the keepalive
+
+The firmware renders a group's live frame only while its bitmask keeps arriving. About
+**1000 ms** after the last `0x1A [G]` write it drops live ownership and the group falls back
+to its stored render: the static palette or the idle effect. Measured on the CS Pro knob
+ring, where a 1.0 s re-feed plus ~98 ms of host jitter reverted the ring about 0.7 times a
+second. Hosts therefore re-feed an unchanged frame well inside that window.
+
+Plugin behaviour (`Devices/Led/MozaLedDeviceManager.cs`, `TickKeepalive`):
+
+- Re-feeds each section every 0.75 s from its own timer, not from SimHub's `Display()`,
+  so a stalled SimHub LED pipeline does not stall the feed.
+- Holds a section while a game is active, while it is lit, or for `WheelKeepaliveTimeoutSec`
+  (default 45 s) since it last changed. Knobs key the hold on SimHub still driving the
+  encoder channel. Past that, a steadily dark section is released to the wheel.
+- During catalog negotiation it re-feeds the bitmask alone. That the bitmask by itself holds
+  ownership is inferred from the rule above, not separately captured.
+- An out-of-band static write (`0x1F`, `0x27`) repaints the frame buffer. The plugin marks the
+  section for resend and re-feeds on the next keepalive tick rather than waiting for SimHub.
+
+Old-protocol ES rims have no windowed bitmask: they enter telemetry mode on an all-on then
+all-off pulse of `wheel-old-send-telemetry` (`0x3FF`, `0`). The plugin repeats that pulse before
+a lit frame whenever the feed lapsed past 1000 ms. Whether an ES actually leaves telemetry
+mode when unfed is **unverified**; the threshold is borrowed from the new-protocol rims.

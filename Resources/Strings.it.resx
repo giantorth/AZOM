@@ -505,6 +505,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Un cruscotto MOZA è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>La base è collegata, ma «{0}» non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Il volante «{1}» è collegato, ma «{0}» non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Vibrazione pedali non aggiunta in SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>La vibrazione pedali è collegata, ma nessun dispositivo pedale è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>la porta COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicatori manopola</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Disattivato</value></data>
@@ -548,7 +550,7 @@ Apri prima un cruscotto in MOZA Pit House per questo volante.</value></data>
 Sei sicuro?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Cancella tutte le impostazioni</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Ridistribuisci definizioni dispositivo</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Questo riscriverà le definizioni dispositivo di SimHub per tutti i volanti, dash e basi MOZA noti, adattate alla base collegata.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Questo riscriverà le definizioni dispositivo di SimHub per tutti i volanti, dash, basi e unità di vibrazione pedali MOZA noti, adattate alla base collegata.
 
 Eventuali modifiche manuali a quei file andranno perse. Continuare?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Esportazione non riuscita: {0}</value></data>
@@ -612,8 +614,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Ultimo premuto: pulsante {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Carica impostazioni predefinite ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Risincronizza tergicristalli e luci</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Nome visualizzato</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Facoltativo — aiuta a distinguere due mBooster con lo stesso ruolo nell'elenco dei dispositivi sopra.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Effetti personalizzati (sperimentale)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// sperimentale — vibrazione definita dall'utente tramite formule SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Sperimentale — ogni effetto personalizzato fa vibrare il motore usando una proprietà SimHub o una formula NCalc fornita da te. Tutti gli effetti personalizzati (e l'effetto Engine integrato) condividono un unico canale, quindi solo uno può pilotare il motore alla volta; vince l'ultimo effetto attivo elaborato. Frequenza/Intensità si comportano come i cursori dell'Engine.</value></data>

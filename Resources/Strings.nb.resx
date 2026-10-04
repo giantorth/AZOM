@@ -507,6 +507,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Et MOZA-dashbord er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbasen er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Rattet «{1}» er tilkoblet, men «{0}» er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Pedalvibrasjon er ikke lagt til i SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Pedalvibrasjonen er tilkoblet, men ingen pedalenhet er lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA-COM-porten</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knappindikatorer</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Deaktivert</value></data>
@@ -550,7 +552,7 @@ Søkte under:
 Er du sikker?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Tøm alle innstillinger</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Distribuer enhetsdefinisjoner på nytt</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord og wheelbaser, tilpasset den tilkoblede wheelbasen.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Dette skriver om SimHub-enhetsdefinisjonene for alle kjente MOZA-ratt, dashbord, wheelbaser og pedalvibrasjonsenheter, tilpasset den tilkoblede wheelbasen.
 
 Manuelle endringer i disse filene går tapt. Fortsette?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Eksport mislyktes: {0}</value></data>
@@ -614,8 +616,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Sist trykket: knapp {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Last inn ETS2/ATS-standard</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Synkroniser viskere og lys på nytt</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Visningsnavn</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Valgfritt – hjelper med å skille to mBooster med samme rolle i enhetslisten over.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Egendefinerte effekter (eksperimentell)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// eksperimentell – brukerdefinert vibrasjon drevet av SimHub/NCalc-formler</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Eksperimentell – hver egendefinert effekt vibrerer motoren ved hjelp av en SimHub-egenskap eller NCalc-formel du oppgir. Alle egendefinerte effekter (og den innebygde Engine-effekten) deler én kanal, så bare én kan drive motoren om gangen; den sist behandlede aktive effekten vinner. Frekvens/intensitet oppfører seg som Engine-glidebryterne.</value></data>

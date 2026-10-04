@@ -181,6 +181,13 @@ namespace MozaPlugin.Settings
         public Dictionary<string, int[]> MBoosterKnownChainRoles { get; set; }
             = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
 
+        // Last-known active/passive type per pedal axis per mBooster lane (0
+        // none, 1 active, 2 passive), keyed like MBoosterKnownPedals. Seeds tab
+        // placement only (MBoosterDeviceController.TabAxisTypes) — the live
+        // diagnostic takes ~30s after connect.
+        public Dictionary<string, int[]> MBoosterKnownPedalTypes { get; set; }
+            = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —

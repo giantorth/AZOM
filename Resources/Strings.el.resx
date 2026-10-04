@@ -501,6 +501,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Ένα ταμπλό MOZA είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Η βάση τιμονιού είναι συνδεδεμένη, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Το τιμόνι «{1}» είναι συνδεδεμένο, αλλά το «{0}» δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Η δόνηση πεντάλ δεν έχει προστεθεί στο SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Η μονάδα δόνησης πεντάλ είναι συνδεδεμένη, αλλά καμία συσκευή πεντάλ δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>τη θύρα COM της MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Ενδείξεις περιστροφικών</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Απενεργοποιημένο</value></data>
@@ -544,7 +546,7 @@
 Είστε σίγουροι;</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Εκκαθάριση όλων των ρυθμίσεων</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Επανεγκατάσταση ορισμών συσκευών</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Αυτό θα ξαναγράψει τους ορισμούς συσκευών του SimHub για κάθε γνωστό τιμόνι, dash και wheelbase MOZA, με βάση τη συνδεδεμένη wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Αυτό θα ξαναγράψει τους ορισμούς συσκευών του SimHub για κάθε γνωστό τιμόνι, dash, wheelbase και μονάδα δόνησης πεντάλ MOZA, με βάση τη συνδεδεμένη wheelbase.
 
 Τυχόν χειροκίνητες αλλαγές σε αυτά τα αρχεία θα χαθούν. Συνέχεια;</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Η εξαγωγή απέτυχε: {0}</value></data>
@@ -608,8 +610,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Τελευταίο πάτημα: κουμπί {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Φόρτωση προεπιλογών ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Επανασυγχρονισμός υαλοκαθαριστήρων &amp; φώτων</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Όνομα εμφάνισης</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Προαιρετικό — βοηθά να ξεχωρίσετε δύο mBooster με τον ίδιο ρόλο στη λίστα συσκευών παραπάνω.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Προσαρμοσμένα εφέ (Πειραματικό)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// πειραματικό — δόνηση καθορισμένη από τον χρήστη μέσω τύπων SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Πειραματικό — κάθε προσαρμοσμένο εφέ δονεί το μοτέρ χρησιμοποιώντας μια ιδιότητα SimHub ή τύπο NCalc που παρέχετε. Όλα τα προσαρμοσμένα εφέ (και το ενσωματωμένο εφέ Engine) μοιράζονται ένα κανάλι, οπότε μόνο ένα μπορεί να οδηγεί το μοτέρ κάθε φορά· κερδίζει το πιο πρόσφατα επεξεργασμένο ενεργό εφέ. Η συχνότητα/ένταση συμπεριφέρονται όπως τα ρυθμιστικά του Engine.</value></data>

@@ -148,8 +148,6 @@
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Device</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Role</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Display Name</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Optional — helps tell two mBoosters with the same role apart in the device list above.</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Disabled</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Throttle</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Brake</value></data>
@@ -533,6 +531,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>A MOZA dashboard is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>The wheelbase is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Wheel '{1}' is connected, but '{0}' hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Pedal haptics not added in SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Pedal haptics are connected, but no pedal device has been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>the MOZA COM port</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Knob Indicators</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Disabled</value></data>
@@ -576,7 +576,7 @@ Open a dashboard in MOZA Pit House for this wheel first.</value></data>
 Are you sure?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Clear All Settings</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Redeploy Device Definitions</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash and wheel base, matched to the connected wheelbase.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>This will rewrite the SimHub device definitions for every known MOZA wheel, dash, wheel base and pedal haptics unit, matched to the connected wheelbase.
 
 Any manual edits to those files will be lost. Continue?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Export failed: {0}</value></data>

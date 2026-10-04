@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Một bảng đồng hồ MOZA đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>Wheelbase đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Vô-lăng '{1}' đang được kết nối, nhưng '{0}' chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Chưa thêm bộ rung bàn đạp trong SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Bộ rung bàn đạp đang được kết nối, nhưng chưa có thiết bị bàn đạp nào được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>cổng COM của MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Đèn báo núm xoay</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Đã tắt</value></data>
@@ -545,7 +547,7 @@ Hãy mở một bảng đồng hồ trong MOZA Pit House cho vô-lăng này trư
 Bạn có chắc không?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Xóa tất cả thiết lập</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Triển khai lại định nghĩa thiết bị</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình và wheelbase MOZA đã biết, khớp với wheelbase đang kết nối.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Thao tác này sẽ ghi lại các định nghĩa thiết bị SimHub cho mọi vô lăng, màn hình, wheelbase và bộ rung bàn đạp MOZA đã biết, khớp với wheelbase đang kết nối.
 
 Mọi chỉnh sửa thủ công trong các tệp đó sẽ bị mất. Tiếp tục?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Xuất thất bại: {0}</value></data>
@@ -609,8 +611,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Lần nhấn cuối: nút {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Tải mặc định ETS2/ATS</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Đồng bộ lại gạt mưa và đèn</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Tên hiển thị</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Tùy chọn — giúp phân biệt hai mBooster có cùng vai trò trong danh sách thiết bị ở trên.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Hiệu ứng tùy chỉnh (Thử nghiệm)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// thử nghiệm — rung do người dùng định nghĩa bằng công thức SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Thử nghiệm — mỗi hiệu ứng tùy chỉnh làm rung động cơ bằng thuộc tính SimHub hoặc công thức NCalc mà bạn cung cấp. Tất cả hiệu ứng tùy chỉnh (và hiệu ứng Engine tích hợp) dùng chung một kênh, nên tại một thời điểm chỉ một hiệu ứng có thể điều khiển động cơ; hiệu ứng đang hoạt động được xử lý gần nhất sẽ thắng. Tần số/Cường độ hoạt động như thanh trượt của Engine.</value></data>

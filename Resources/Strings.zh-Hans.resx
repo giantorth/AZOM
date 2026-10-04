@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>已连接 MOZA 仪表盘，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>底座已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>方向盘 “{1}” 已连接，但 “{0}” 尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>踏板振动未在 SimHub 中添加</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>踏板振动单元已连接，但尚未在 SimHub 中添加任何踏板设备。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>MOZA COM 端口</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>旋钮指示灯</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>已禁用</value></data>
@@ -545,7 +547,7 @@
 确定吗？</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>清除所有设置</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>重新部署设备定义</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>这将根据已连接的基座，重新写入所有已知 MOZA 方向盘、仪表盘和基座的 SimHub 设备定义。
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>这将根据已连接的基座，重新写入所有已知 MOZA 方向盘、仪表盘、基座和踏板振动单元的 SimHub 设备定义。
 
 对这些文件的手动修改将丢失。是否继续？</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>导出失败：{0}</value></data>
@@ -609,8 +611,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>上次按下：按键 {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>加载 ETS2/ATS 默认值</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>重新同步雨刮与灯光</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>显示名称</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>可选 — 帮助在上面的设备列表中区分两个角色相同的 mBooster。</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>自定义效果（实验性）</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// 实验性 — 由 SimHub/NCalc 公式驱动的自定义振动</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>实验性 — 每个自定义效果使用你提供的 SimHub 属性或 NCalc 公式来驱动马达振动。所有自定义效果（以及内置的 Engine 效果）共用一个通道，因此同一时刻只有一个能驱动马达；最近处理的活动效果优先。频率/强度的行为与 Engine 的滑块相同。</value></data>

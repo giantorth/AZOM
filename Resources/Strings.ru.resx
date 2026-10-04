@@ -502,6 +502,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Приборная панель MOZA подключена, но устройство не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>База подключена, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>Руль «{1}» подключён, но «{0}» не добавлен в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Вибрация педалей не добавлена в SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>Вибромодуль педалей подключён, но ни одно устройство педали не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>COM-порт MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Индикаторы регуляторов</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Отключено</value></data>
@@ -545,7 +547,7 @@
 Вы уверены?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Очистить все настройки</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Переустановить определения устройств</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей и баз MOZA в соответствии с подключённой базой.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Это перезапишет определения устройств SimHub для всех известных рулей, приборных панелей, баз и вибромодулей педалей MOZA в соответствии с подключённой базой.
 
 Ручные изменения в этих файлах будут потеряны. Продолжить?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Не удалось экспортировать: {0}</value></data>
@@ -609,8 +611,6 @@ Id: {2}</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Последнее нажатие: кнопка {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Загрузить настройки ETS2/ATS по умолчанию</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Пересинхронизировать стеклоочистители и свет</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Отображаемое имя</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Необязательно — помогает различать два mBooster с одинаковой ролью в списке устройств выше.</value></data>
   <data name="Section_CustomEffects" xml:space="preserve"><value>Пользовательские эффекты (экспериментально)</value></data>
   <data name="Subtitle_CustomEffectsExperimental" xml:space="preserve"><value>// экспериментально — пользовательская вибрация на основе формул SimHub/NCalc</value></data>
   <data name="Hint_CustomEffectsExperimental" xml:space="preserve"><value>Экспериментально — каждый пользовательский эффект заставляет мотор вибрировать, используя указанное вами свойство SimHub или формулу NCalc. Все пользовательские эффекты (и встроенный эффект Engine) используют один канал, поэтому одновременно мотором может управлять только один; побеждает последний обработанный активный эффект. Частота/интенсивность работают как ползунки Engine.</value></data>

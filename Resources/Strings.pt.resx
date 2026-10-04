@@ -140,8 +140,6 @@
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_Device" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Função</value></data>
-  <data name="SliderLabel_DisplayName" xml:space="preserve"><value>Nome de exibição</value></data>
-  <data name="Hint_MBoosterDisplayName" xml:space="preserve"><value>Opcional — ajuda a distinguir dois mBoosters com a mesma função na lista de dispositivos acima.</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Desativado</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Acelerador</value></data>
   <data name="Option_Brake" xml:space="preserve"><value>Freio</value></data>
@@ -524,6 +522,8 @@
   <data name="Banner_ProfileNotAddedDash_Body" xml:space="preserve"><value>Um painel MOZA está conectado, mas o dispositivo não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedBase_Body" xml:space="preserve"><value>A base está conectada, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_ProfileNotAddedWheel_Body" xml:space="preserve"><value>O volante '{1}' está conectado, mas '{0}' não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Title" xml:space="preserve"><value>Vibração dos pedais não adicionada no SimHub</value></data>
+  <data name="Banner_ProfileNotAddedPedalHaptics_Body" xml:space="preserve"><value>A vibração dos pedais está conectada, mas nenhum dispositivo de pedal foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
   <data name="Banner_PortFallbackName" xml:space="preserve"><value>a porta COM MOZA</value></data>
   <data name="DeviceDef_KnobIndicators" xml:space="preserve"><value>Indicadores de knob</value></data>
   <data name="Sdk_Status_Disabled" xml:space="preserve"><value>Desativado</value></data>
@@ -567,7 +567,7 @@ Abra um painel no MOZA Pit House para este volante primeiro.</value></data>
 Tem certeza?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Limpar todas as configurações</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Reimplantar definições de dispositivo</value></data>
-  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Isto regravará as definições de dispositivo do SimHub para todos os volantes, painéis e bases MOZA conhecidos, conforme a base conectada.
+  <data name="Dialog_RedeployDefinitions_Body" xml:space="preserve"><value>Isto regravará as definições de dispositivo do SimHub para todos os volantes, painéis, bases e unidades de vibração de pedais MOZA conhecidos, conforme a base conectada.
 
 Edições manuais nesses arquivos serão perdidas. Continuar?</value></data>
   <data name="Dialog_ExportFailed" xml:space="preserve"><value>Falha na exportação: {0}</value></data>
