@@ -2,6 +2,27 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.6.4]
+
+## Added
+
+- **Soft limit strength: Soft, Middle or Hard, as in Pit House.** Sets the soft limit to 50, 75 or
+  100% of its maximum. It's saved in profiles and imported from Pit House presets.
+
+- **FFB center deadzone compensation, 0 to 10, as in Pit House.** It lives under the output curve
+  and bends it, boosting the middle of the range the most. Like Pit House, it rebuilds the curve
+  from linear, so it replaces a hand-edited curve, and a curve it didn't make reads as 10.
+
+## Changed
+
+- **Game FFB intensity goes up to 200%.** That's Pit House's range. It used to stop at 100%.
+
+## Fixed
+
+- **Retain Game FFB now sends the same "on" value as Pit House.** It used to send 1 where Pit House
+  sends 20, and SimHub's `AZOM.SoftLimitRetain` read a base set by Pit House as off. Profiles saved
+  with the old value are updated when applied.
+
 ## [1.6.3]
 
 ## Added
@@ -21,7 +42,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
-- **Stock pedal-haptics effects vibrate again.** Switching an effect on now gives it an
+- **Stock pedal-haptics effects won't fail to vibrate.** Switching an effect on now gives it an
   oscillator; switching it off frees it.
 
 - **Wheel and base LEDs no longer lag behind the game.** Busy LED effects used to queue up and

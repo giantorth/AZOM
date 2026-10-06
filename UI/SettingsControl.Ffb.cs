@@ -188,6 +188,78 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        // ===== FFB center deadzone compensation =====
+        // PitHouse's 0-10 slider has no register of its own. Each step rewrites
+        // y1-y4 from the linear curve as y = x + n·x·(100−x)/1600, rounded half
+        // up, at x = 20/40/60/80; y5 is left alone. Verified live for every n
+        // (docs/protocol/devices/wheelbase-0x13.md).
+        private static readonly int[] CurveBreakpoints = { 20, 40, 60, 80 };
+
+        private static int DeadzoneCompPoint(int x, int n)
+            => (1600 * x + n * x * (100 - x) + 800) / 1600;
+
+        /// <summary>
+        /// The level whose points match the current curve. Any other curve
+        /// reads as 10, which is what PitHouse shows after a hand edit.
+        /// </summary>
+        private int DeadzoneCompFromCurve()
+        {
+            int[] xs = { _data.FfbCurveX1, _data.FfbCurveX2, _data.FfbCurveX3, _data.FfbCurveX4 };
+            int[] ys = { _data.FfbCurveY1, _data.FfbCurveY2, _data.FfbCurveY3, _data.FfbCurveY4 };
+            if (ys[0] < 0) return 0;   // curve not read yet
+            for (int i = 0; i < 4; i++)
+                if (xs[i] != CurveBreakpoints[i]) return 10;
+            for (int n = 0; n <= 10; n++)
+            {
+                bool match = true;
+                for (int i = 0; i < 4 && match; i++)
+                    match = ys[i] == DeadzoneCompPoint(CurveBreakpoints[i], n);
+                if (match) return n;
+            }
+            return 10;
+        }
+
+        private void DeadzoneCompSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int n = (int)Math.Round(e.NewValue);
+            DeadzoneCompValue.Text = $"{n}";
+            ApplyDeadzoneCompensation(n);
+        }
+
+        private void ApplyDeadzoneCompensation(int n)
+        {
+            int[] y = new int[4];
+            for (int i = 0; i < 4; i++) y[i] = DeadzoneCompPoint(CurveBreakpoints[i], n);
+
+            // The formula is defined at the standard breakpoints, so snap any
+            // dragged X positions back first (PitHouse never moves them).
+            bool snapX = _data.FfbCurveX1 != 20 || _data.FfbCurveX2 != 40
+                      || _data.FfbCurveX3 != 60 || _data.FfbCurveX4 != 80;
+            using (_suppressor.Begin())
+            {
+                if (snapX)
+                {
+                    FfbCurveX1Slider.Value = 20; FfbCurveX1Value.Text = "20"; _data.FfbCurveX1 = 20;
+                    FfbCurveX2Slider.Value = 40; FfbCurveX2Value.Text = "40"; _data.FfbCurveX2 = 40;
+                    FfbCurveX3Slider.Value = 60; FfbCurveX3Value.Text = "60"; _data.FfbCurveX3 = 60;
+                    FfbCurveX4Slider.Value = 80; FfbCurveX4Value.Text = "80"; _data.FfbCurveX4 = 80;
+                }
+                FfbCurveY1Slider.Value = y[0]; FfbCurveY1Value.Text = $"{y[0]}"; _data.FfbCurveY1 = y[0];
+                FfbCurveY2Slider.Value = y[1]; FfbCurveY2Value.Text = $"{y[1]}"; _data.FfbCurveY2 = y[1];
+                FfbCurveY3Slider.Value = y[2]; FfbCurveY3Value.Text = $"{y[2]}"; _data.FfbCurveY3 = y[2];
+                FfbCurveY4Slider.Value = y[3]; FfbCurveY4Value.Text = $"{y[3]}"; _data.FfbCurveY4 = y[3];
+            }
+            if (snapX)
+            {
+                _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x1", 20); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x2", 40);
+                _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x3", 60); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-x4", 80);
+            }
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y1", y[0]); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y2", y[1]);
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y3", y[2]); _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-curve-y4", y[3]);
+            _plugin.SaveSettings();
+        }
+
         private void FfbCurvePreset_Linear(object s, RoutedEventArgs e) => ApplyFfbCurvePreset(FfbCurvePresets[0]);
         private void FfbCurvePreset_SCurve(object s, RoutedEventArgs e) => ApplyFfbCurvePreset(FfbCurvePresets[1]);
         private void FfbCurvePreset_Exponential(object s, RoutedEventArgs e) => ApplyFfbCurvePreset(FfbCurvePresets[2]);

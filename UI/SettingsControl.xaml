@@ -615,7 +615,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_GameFfbStrength}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="FfbStrengthSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbStrengthSlider_ValueChanged"/>
+                                        <Slider Grid.Column="1" x:Name="FfbStrengthSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="FfbStrengthSlider_ValueChanged"/>
                                         <TextBox Grid.Column="2" x:Name="FfbStrengthValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=FfbStrengthSlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
@@ -866,6 +866,20 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SoftLimitStrength}" Style="{StaticResource SliderLabel}"/>
+                                        <!-- cmd 0x1B: Soft 50 / Middle 75 / Hard 100 (% of max) -->
+                                        <ctrl:SegmentedControl Grid.Column="1" x:Name="SoftLimitStrengthCombo" HorizontalAlignment="Left"
+                                                               VerticalAlignment="Center" SelectionChanged="SoftLimitStrengthCombo_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitSoft}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitMiddle}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitHard}"/>
+                                        </ctrl:SegmentedControl>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Stiffness}" Style="{StaticResource SliderLabel}"/>
@@ -937,6 +951,21 @@
                                         <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="FfbCurvePreset_Exponential"/>
                                         <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="FfbCurvePreset_Parabolic"/>
                                     </StackPanel>
+                                    <!-- PitHouse "FFB center deadzone compensation": no register of
+                                         its own, rewrites curve points y1-y4 (see ApplyDeadzoneCompensation). -->
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneCompensation}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="DeadzoneCompSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="10" TickFrequency="1" ValueChanged="DeadzoneCompSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="DeadzoneCompValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=DeadzoneCompSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="0"/>
+                                    </Grid>
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </Grid>

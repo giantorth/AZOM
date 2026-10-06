@@ -5,7 +5,7 @@
 | Command | ID | Bytes | Type | Notes |
 |---------|----|-------|------|-------|
 | limit | `01` | 2 | int | Steering angle limit. Raw = degrees / 2. Firmware floors the stored value at 60° (raw `0x1E`) — lower writes read back as 60°. Verified live 2026-08-05 via write-then-readback; PitHouse's own UI stops at 90°. |
-| ffb-strength | `02` | 2 | int | |
+| ffb-strength | `02` | 2 | int | PitHouse "game force feedback intensity". Raw = % × 10. PitHouse range 0–200 %, so raw 0–2000. Verified live 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`: min `02 00 00`, max `02 07 D0`, then `02 02 BC` = 70 %). |
 | inertia | `04` | 2 | int | |
 | damper | `07` | 2 | int | |
 | friction | `08` | 2 | int | |
@@ -25,16 +25,16 @@
 | equalizer8 | `33` | 2 | int | **30 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
 | equalizer9 | `34` | 2 | int | **50 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
 | equalizer10 | `35` | 2 | int | **80 Hz band** (fw ≥ 1.2.10.10); 0–500 (%) |
-| torque | `12` | 2 | int | |
+| torque | `12` | 2 | int | PitHouse "maximum torque limit". Raw = % directly. Writes seen: 50, 100, 75 (`12 00 32` / `12 00 64` / `12 00 4B`) on 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`). |
 | natural-inertia | `13` | 2 | int | Hands-off protection |
 | natural-inertia-enable | `16` | 2 | int | |
 | max-angle | `17` | 2 | int | |
 | ffb-reverse | `18` | 2 | int | |
 | speed-damping | `19` | 2 | int | |
 | speed-damping-point | `1A` | 2 | int | |
-| soft-limit-strength | `1B` | 2 | int | |
-| soft-limit-retain | `1C` | 2 | int | |
-| soft-limit-stiffness | `1F` | 2 | int | |
+| soft-limit-strength | `1B` | 2 | int | Soft-limit strength as % of max. The PitHouse UI writes Soft = 50 (`0x32`), Middle = 75 (`0x4B`), Hard = 100 (`0x64`). Its bundled preset library (`default_preset_library.rcc`, 227 presets) also holds 56 and 78, apparently an older Soft/Middle mapping. Base echoes the write on `A9`/`31`. Verified live 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`, `29 13 1B 00 4B` / `1B 00 64` / `1B 00 32`). |
+| soft-limit-retain | `1C` | 2 | int | PitHouse "enable soft limit in games" toggle. PitHouse writes 0 = off, 20 (`0x14`) = on, never 1. Base echoes the write on `A9`/`31`. Verified live 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`, `29 13 1C 00 14` / `1C 00 00`). |
+| soft-limit-stiffness | `1F` | 2 | int | PitHouse UI 1–10 maps linearly to raw 100–500: raw = round(100 + (n−1)·400/9), giving 100, 144, 189, 233, 278, 322, 367, 411, 456, 500. Base echoes the write on `A9`/`31`. Verified live for all 10 steps on 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`). |
 | temp-strategy / performance-output | `1E` | 2 | int | "Performance output" in newer PitHouse builds. 0 = Reserved, 1 = Full. Verified live 2026-05-10 (`bridge-20260510-115644.jsonl` t=41902.486 `1E 00 01`, t=42166.594 `1E 00 00`). |
 | ffb-curve-x1 | `22 01` | 1 | int | FFB linearization curve X point 1 |
 | ffb-curve-x2 | `22 02` | 1 | int | |
@@ -54,6 +54,38 @@ directly — it has no dedicated deadzone register. In
 each slider position re-emitted the y1–y4 points (`22 05`…`22 08`) as a 4-write
 burst (6 bursts for the 6 slider values). These map to the existing
 `base-ffb-curve-*` command-DB entries; no new command is needed.
+
+That slider is PitHouse's "FFB center deadzone compensation", 0–10. It lives on
+a different page from the base FFB curve editor, but has no register of its own
+and works by rewriting the same curve points the editor controls. At slider
+position `n`, each point is `y = x + n·x·(100−x)/1600`, rounded half up, where
+`x` is 20/40/60/80 for y1–y4. The boost peaks mid-range, and y5 (x=100) is never
+written. Verified live for every step 1–10 on 2026-10-05
+(`pithouse-r16-shim-20261005-164127.jsonl`, 17:02:03–17:02:21), starting from
+the default linear curve:
+
+| n | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| y1 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 |
+| y2 | 42 | 43 | 45 | 46 | 48 | 49 | 51 | 52 | 54 | 55 |
+| y3 | 62 | 63 | 65 | 66 | 68 | 69 | 71 | 72 | 74 | 75 |
+| y4 | 81 | 82 | 83 | 84 | 85 | 86 | 87 | 88 | 89 | 90 |
+
+The level is never stored on the base, so it can't be read back; only the
+resulting points can. Cross-checked against the base's own firmware log
+(PitHouse `DeviceLog/2026-10/05.txt`): during all three sweeps the R16 stored
+only `param_manage.c` Table 5 params 43–46, whose float values are exactly
+y1–y4. The capture shows no other writes, and the main hub's settings read
+back unchanged throughout. A fast drag can leave a half-updated burst (seen:
+30-42-62-82), apparently because PitHouse resends only the points it thinks
+changed. Editing one point in the curve editor writes just that point (seen:
+`22 06` = 63, `22 06` = 56). After such an edit the PitHouse UI shows this
+slider at 10, but nothing is sent on the wire for that. The next slider move
+discards the hand edit: it rewrites all of y1–y4 from the linear base (seen
+17:03:37 `22 06` = 56, then at 17:03:44 a full 20-40-60-80 rewrite). The slider
+never adds its boost on top of a custom curve. Don't confuse this slider with the main hub's Interpolation
+slider (`0x12` cmd `4C`, value = 10 × position), which is also 0–10 but leaves
+the curve alone.
 
 #### FFB effect equalizer — 10 bands (fw ≥ 1.2.10.10)
 

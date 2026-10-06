@@ -796,4 +796,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>已保存的颜色</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>填充奇数 LED</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>填充偶数 LED</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>强度</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>柔和</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>适中</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>强硬</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>中心死区补偿</value></data>
 </root>

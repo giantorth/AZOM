@@ -241,7 +241,7 @@ namespace MozaPlugin
 
         // Soft limit
         public volatile int SoftLimitStiffness = -1;
-        public volatile int SoftLimitStrength;
+        public volatile int SoftLimitStrength = -1;
         public volatile int SoftLimitRetain = -1;
 
         // FFB misc

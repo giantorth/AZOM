@@ -795,4 +795,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>저장된 색상</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>홀수 LED 채우기</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>짝수 LED 채우기</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>강도</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>부드럽게</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>보통</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>단단하게</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>중앙 데드존 보정</value></data>
 </root>

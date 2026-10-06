@@ -475,7 +475,8 @@ namespace MozaPlugin.Settings
         public int SpeedDampingPoint { get; set; } = -1;
         public int NaturalInertia { get; set; } = -1;
         public int SoftLimitStiffness { get; set; } = -1;   // raw uses formula
-        public int SoftLimitRetain { get; set; } = -1;      // 0/1
+        public int SoftLimitStrength { get; set; } = -1;    // % of max: 50/75/100
+        public int SoftLimitRetain { get; set; } = -1;      // 0 = off, 20 = on
         public int FfbReverse { get; set; } = -1;           // 0/1
         public int Protection { get; set; } = -1;           // 0/1
 
@@ -732,6 +733,7 @@ namespace MozaPlugin.Settings
             Inertia = p.Inertia; Spring = p.Spring;
             SpeedDamping = p.SpeedDamping; SpeedDampingPoint = p.SpeedDampingPoint;
             NaturalInertia = p.NaturalInertia; SoftLimitStiffness = p.SoftLimitStiffness;
+            SoftLimitStrength = p.SoftLimitStrength;
             SoftLimitRetain = p.SoftLimitRetain; FfbReverse = p.FfbReverse;
             Protection = p.Protection;
 
@@ -941,6 +943,7 @@ namespace MozaPlugin.Settings
             Inertia = data.Inertia; Spring = data.Spring;
             SpeedDamping = data.SpeedDamping; SpeedDampingPoint = data.SpeedDampingPoint;
             NaturalInertia = data.NaturalInertia; SoftLimitStiffness = data.SoftLimitStiffness;
+            SoftLimitStrength = data.SoftLimitStrength;
             SoftLimitRetain = data.SoftLimitRetain; FfbReverse = data.FfbReverse;
             Protection = data.Protection;
 

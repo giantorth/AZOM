@@ -62,8 +62,10 @@ namespace MozaPlugin.UI.Import
                    v => v, v => v,
                    () => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v);
 
-            if (dp["softLimitStrength"] != null)
-                plan.NotImported.Add("softLimitStrength (no profile field)");
+            // Raw % of max, same as the wire value: Soft 50 / Middle 75 / Hard 100.
+            AddInt(plan, dp, "softLimitStrength", "Soft Limit Strength", "%",
+                   v => v, v => v,
+                   () => profile.SoftLimitStrength, v => profile.SoftLimitStrength = v);
 
             AddInt(plan, dp, "speedDependentDamping", "Speed Damping", "",
                    v => v, v => v,

@@ -1573,6 +1573,12 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v,
                   () => _data.SoftLimitStiffness,   v => _data.SoftLimitStiffness   = v,
                   "base-soft-limit-stiffness");
+            Apply(() => profile.SoftLimitStrength,  v => profile.SoftLimitStrength  = v,
+                  () => _data.SoftLimitStrength,    v => _data.SoftLimitStrength    = v,
+                  "base-soft-limit-strength");
+            // Earlier builds saved "on" as 1; PitHouse writes 20 (cmd 0x1C).
+            if (profile.SoftLimitRetain == 1)
+                profile.SoftLimitRetain = 20;
             Apply(() => profile.SoftLimitRetain,    v => profile.SoftLimitRetain    = v,
                   () => _data.SoftLimitRetain,      v => _data.SoftLimitRetain      = v,
                   "base-soft-limit-retain");
@@ -1749,7 +1755,7 @@ namespace MozaPlugin.Hardware
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
                 profile.NaturalInertia = -1; profile.SoftLimitStiffness = -1;
-                profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
+                profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
                 profile.WorkMode = -1;

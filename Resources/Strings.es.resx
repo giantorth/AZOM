@@ -801,4 +801,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Color guardado</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>RELLENAR LEDS IMPARES</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>RELLENAR LEDS PARES</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Intensidad</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Suave</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Medio</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Duro</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Compensación de zona muerta central</value></data>
 </root>

@@ -795,4 +795,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Cor salva</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>PREENCHER LEDS ÍMPARES</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>PREENCHER LEDS PARES</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Intensidade</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Suave</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Médio</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Rígido</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Compensação de zona morta central</value></data>
 </root>

@@ -40,7 +40,7 @@ namespace MozaPlugin.UI
                 "main-get-inertia-gain", "main-get-spring-gain",
                 "base-protection", "base-natural-inertia",
                 "base-speed-damping", "base-speed-damping-point",
-                "base-soft-limit-stiffness", "base-soft-limit-retain",
+                "base-soft-limit-stiffness", "base-soft-limit-strength", "base-soft-limit-retain",
                 "base-ffb-reverse", "main-get-work-mode", "main-get-led-status",
                 "main-get-ble-mode", "main-get-compat-mode",
                 "base-mcu-temp", "base-mosfet-temp", "base-motor-temp"
@@ -262,7 +262,7 @@ namespace MozaPlugin.UI
             RotationSlider.Value = rot;
             SetValueText(RotationValue, $"{rot:F0}°");
 
-            double ffb = Clamp(_data.FfbStrength / 10.0, 0, 100);
+            double ffb = Clamp(_data.FfbStrength / 10.0, 0, 200);   // PitHouse range 0-200 %
             FfbStrengthSlider.Value = ffb;
             SetValueText(FfbStrengthValue, $"{ffb:F0}%");
 
@@ -368,6 +368,12 @@ namespace MozaPlugin.UI
             SetValueText(SoftLimitStiffnessValue, $"{stiff:F0}");
             SoftLimitRetainCheck.IsChecked = _data.SoftLimitRetain > 0;
 
+            // Soft limit strength (cmd 0x1B): highlight the nearest of 50/75/100,
+            // nothing until the base has reported it.
+            int sls = _data.SoftLimitStrength;
+            SoftLimitStrengthCombo.SelectedIndex = sls < 0 ? -1
+                : sls < 63 ? 0 : sls < 88 ? 1 : 2;
+
             StandbyCheck.IsChecked = _data.WorkMode > 0;
             SyncAutoStandbyCombo();
             LedStatusCheck.IsChecked = _data.LedStatus != 0;
@@ -403,6 +409,11 @@ namespace MozaPlugin.UI
             SetSliderRaw(FfbCurveY3Slider, FfbCurveY3Value, _data.FfbCurveY3, 0, 100, "");
             SetSliderRaw(FfbCurveY4Slider, FfbCurveY4Value, _data.FfbCurveY4, 0, 100, "");
             SetSliderRaw(FfbCurveY5Slider, FfbCurveY5Value, _data.FfbCurveY5, 0, 100, "");
+
+            // Deadzone compensation has no register; read it back off the curve.
+            int dz = DeadzoneCompFromCurve();
+            DeadzoneCompSlider.Value = dz;
+            SetValueText(DeadzoneCompValue, $"{dz}");
         }
 
     }

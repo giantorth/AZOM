@@ -795,4 +795,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Αποθηκευμένο χρώμα</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>ΓΕΜΙΣΜΑ ΜΟΝΩΝ LED</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>ΓΕΜΙΣΜΑ ΖΥΓΩΝ LED</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Ισχύς</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Μαλακό</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Μεσαίο</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Σκληρό</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Αντιστάθμιση νεκρής ζώνης κέντρου</value></data>
 </root>
