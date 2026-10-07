@@ -246,7 +246,7 @@ namespace MozaPlugin.Telemetry
                 // so on a healthy cold start this gate passes on the first check
                 // (no dead latency); the cap only bites a screenless / never-ready
                 // wheel or one that wouldn't re-advertise after the re-requests.
-                byte gateMgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
+                byte gateMgmt = EffectiveMgmtPort;
                 // Dynamic session follow: gate on whichever session the tier-def will
                 // actually ride. ResolveTierDefSession() follows the catalog to the flag
                 // session when the wheel committed it there (Form B), so a flag-only

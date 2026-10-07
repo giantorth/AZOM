@@ -19,6 +19,9 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **Dashboard data on session 0x01 is acknowledged again.** When the wheel skipped the open ack, its
+  catalog and log went unacknowledged and it resent them every second.
+
 - **A CM2 dash gets telemetry back after its hub or base is power-cycled.** A quick reconnect left it
   on dead sessions until SimHub was restarted.
 

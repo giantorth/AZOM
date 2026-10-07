@@ -268,14 +268,14 @@ namespace MozaPlugin.Telemetry.Lifecycle
             int now = Environment.TickCount;
 
             // Revoke liveness on the affected session.
-            if (session == _sender.MgmtPort)
+            if (session == _sender.EffectiveMgmtPort)
                 Interlocked.Exchange(ref _session01EngagedUtcTicks, 0);
             if (session == _sender.FlagByte && Interlocked.Read(ref _session02FirstInboundUtcTicks) != 0)
                 Interlocked.Exchange(ref _session02FirstInboundUtcTicks, 0);
             // Stamp the mgmt close time unconditionally. No consumer today —
             // the post-close settle window it fed was removed with the rest of
             // the unread threshold constants; kept as a cheap observation point.
-            if (session == _sender.MgmtPort)
+            if (session == _sender.EffectiveMgmtPort)
                 Interlocked.Exchange(ref _session01LastCloseUtcTicks, DateTime.UtcNow.Ticks);
 
             // Tier-def reject wedge — see the field block for the full story.
@@ -504,7 +504,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             {
                 byte tierDefSes = _sender.ResolveTierDefSession();
                 bool tierDefIsFlag = tierDefSes == _sender.FlagByte
-                    && _sender.FlagByte != _sender.MgmtPort;
+                    && _sender.FlagByte != _sender.EffectiveMgmtPort;
                 // Both lanes are measured the same way: newest of (pushed data,
                 // ack). _session01LastInboundUtcTicks is already fed by both.
                 long s01 = Interlocked.Read(ref _session01LastInboundUtcTicks);
@@ -542,7 +542,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     int hostSends = _sender.SessionOutboundCount(tierDefSes);
                     if (deadStamp != 0 || hostSends > 0)
                     {
-                        byte mirrorSes = tierDefIsFlag ? _sender.MgmtPort : _sender.FlagByte;
+                        byte mirrorSes = tierDefIsFlag ? _sender.EffectiveMgmtPort : _sender.FlagByte;
                         string span = deadStamp != 0
                             ? $"for {deadAgeMs / 1000}s"
                             : $"at all this Start cycle ({deadAgeMs / 1000}s since Active)";
@@ -908,8 +908,8 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // ResolveTierDefSession(), so name it here — otherwise the s01/s02
             // ages below can't be read against the restart verdict.
             byte tierDefSes = _sender.ResolveTierDefSession();
-            byte mirrorSes = tierDefSes == _sender.FlagByte && _sender.FlagByte != _sender.MgmtPort
-                ? _sender.MgmtPort
+            byte mirrorSes = tierDefSes == _sender.FlagByte && _sender.FlagByte != _sender.EffectiveMgmtPort
+                ? _sender.EffectiveMgmtPort
                 : _sender.FlagByte;
             return $"{(engaged ? "yes" : "no")} (catalog={catalog} state={state} slotRoundTrip={roundTrip} " +
                    $"s09devinit={(_sender.WheelReadyObserved ? "yes" : "no")} " +

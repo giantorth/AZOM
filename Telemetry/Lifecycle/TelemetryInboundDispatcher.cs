@@ -116,7 +116,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // proves the session is open even if the wheel never pushes data on
             // it. See DisplayWatchdog (liveness feeder) for why this matters on
             // slow-bring-up wheels (CS-Pro / Universal Hub).
-            if (data[4] == _sender.MgmtPort && _sender.MgmtPort != 0)
+            if (data[4] == _sender.EffectiveMgmtPort)
                 _sender.Watchdog.NoteSession01Engaged();
             // Same proof on the FlagByte lane. Separate `if` (not `else`) so a
             // Form-A wheel with FlagByte == MgmtPort stamps both. Without this
@@ -211,13 +211,15 @@ namespace MozaPlugin.Telemetry.Lifecycle
             }
 
             // Ack on mgmt session. Specific-seq ack (NOT running max) — otherwise
-            // retransmits of older seqs never get cleared.
-            if (session == _sender.MgmtPort && _sender.MgmtPort != 0)
+            // retransmits of older seqs never get cleared. Effective port: the
+            // wheel can keep 0x01 live without fc:00-acking our open.
+            byte mgmt = _sender.EffectiveMgmtPort;
+            if (session == mgmt)
             {
                 if (seq > _sender._mgmtAckSeq)
                     _sender._mgmtAckSeq = seq;
                 _sender.SendSessionAckInternal(
-                    _sender.MgmtPort, _sender.GapAwareCatalogAckSeq(_sender.MgmtPort, seq));
+                    mgmt, _sender.GapAwareCatalogAckSeq(mgmt, seq));
                 _sender.MgmtResponseEvent.Set();
                 // Mgmt session engagement signal — data flow on sess=MgmtPort
                 // is the strongest possible proof the session is alive.
@@ -448,7 +450,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // session-layer ports we open and keep (mgmt 0x01 / telem 0x02)
             // need this; dispatcher-owned upload sessions handle their own
             // close routing below.
-            if (session == _sender.MgmtPort || session == _sender.FlagByte)
+            if (session == _sender.EffectiveMgmtPort || session == _sender.FlagByte)
                 _sender.SendSessionAckInternal(session, (ushort)closeSeq);
             // File-transfer sessions: the wheel's post-upload CLOSE is
             // reliable-delivery too — PitHouse fc-acks it within ~20 ms
@@ -467,7 +469,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 return;
             }
             // Legacy routing for non-dispatcher sessions.
-            if (session == _sender.MgmtPort) _sender.MgmtResponseEvent.Set();
+            if (session == _sender.EffectiveMgmtPort) _sender.MgmtResponseEvent.Set();
             _sender.Uploader.NoteEndMarker(session);
         }
     }

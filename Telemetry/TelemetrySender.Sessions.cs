@@ -107,7 +107,7 @@ namespace MozaPlugin.Telemetry
         /// stay mirrored.</summary>
         internal byte ResolveTierDefSession()
         {
-            byte mgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
+            byte mgmt = EffectiveMgmtPort;
             // Prefer mgmt (0x01) whenever it carries the wheel's real catalog+END.
             // A Form-A wheel (CS-Pro) binds the subscription there, and after a
             // power cycle the cold-start catalog-on-flag is coaxed back onto mgmt
@@ -144,13 +144,22 @@ namespace MozaPlugin.Telemetry
         /// wrong session is "switch is visual but the dash shows no data."</summary>
         internal byte ResolveFfSession()
         {
-            byte mgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
+            byte mgmt = EffectiveMgmtPort;
             byte flag = FlagByte != 0 ? FlagByte : (byte)0x02;
             return ResolveTierDefSession() == flag ? mgmt : flag;
         }
         internal TierState[]? Tiers => _tiers;
         internal ChannelCatalogParser CatalogParser => _catalogParser;
+        /// <summary>The negotiated mgmt port, 0 when its open drew no fc:00
+        /// ack. Use for gates that need a confirmed open (upload).</summary>
         internal byte MgmtPort => _mgmtPort;
+        /// <summary>The mgmt session we actually transmit on: falls back to
+        /// 0x01 when the open drew no fc:00 ack. A wheel can answer that open
+        /// with fc:23 yet keep 0x01 live (acks our chunks, pushes its catalog
+        /// and log there), so inbound acks/liveness must key on this, not on
+        /// <see cref="MgmtPort"/> — otherwise the wheel's 0x01 queue is never
+        /// acked and it retransmits it every second (bundle RRG9T829).</summary>
+        internal byte EffectiveMgmtPort => _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
         internal byte NextFlagBase
         {
             get => _nextFlagBase;
