@@ -19,6 +19,9 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **A CM2 dash gets telemetry back after its hub or base is power-cycled.** A quick reconnect left it
+  on dead sessions until SimHub was restarted.
+
 - **Retain Game FFB now sends the same "on" value as Pit House.** It used to send 1 where Pit House
   sends 20, and SimHub's `AZOM.SoftLimitRetain` read a base set by Pit House as off. Profiles saved
   with the old value are updated when applied.
