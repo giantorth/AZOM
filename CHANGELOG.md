@@ -19,6 +19,8 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **Multiple standalone mBooster pedals read from the correct axis.**
+
 - **Dashboard data on session 0x01 is acknowledged again.** When the wheel skipped the open ack, its
   catalog and log went unacknowledged and it resent them every second.
 

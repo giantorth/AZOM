@@ -1530,6 +1530,27 @@ After each, Pit House's topology lines follow the new values. For JCJ5AEA2's
 chained unit (really the throttle, `0x22` = 2) the repair is Pit House's own
 write `24 1d 22 00 01`.
 
+**A channel reports on the HID axis of its role, not of its name** (bug report
+GQ8HAWCV: three standalone units, one per USB). Every unit's heartbeat said
+`Brake pedal is connected` / `PD Linked:[T 0 B 1 C 0]`; the HID moved:
+
+| port | `0x21/0x22/0x23` | HID usage that moved |
+|---|---|---|
+| COM9 | `1/2/3` | `0x34` (Ry, axis 1) |
+| COM3 | `3/2/1` | `0x34` (Ry, axis 1) |
+| COM8 | `2/1/3` | `0x33` (Rx, axis 0) |
+
+So channel X reports on axis `0x2X − 1`. The host's map is identity in every
+chain capture so far (KG143GNC: the chained throttle on the host's channel T
+moved Rx), which is why axis = channel held until now. The plugin keeps the
+heartbeat state (connectivity, types, locality, and their persisted seeds)
+indexed by channel and derives the axis-indexed views through the host's map
+(`MBoosterDeviceController.RederiveAxisViews`), USB lanes only. It keeps the
+last complete map across a port bounce. If two connected channels would land
+on one axis, it falls back to channel order (logged). A role write moves the
+pedal's axis with it; the `0x22` read-back re-routes the lane. Before this,
+COM8 read 0, and a role write on a standalone unit would do the same.
+
 ### Firmware error reports — group `0x0E`, sub `03` / `04`
 
 A unit reports an error unprompted on group `0x0E`; Pit House acks it and
