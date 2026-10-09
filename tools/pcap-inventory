@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Inventory the MOZA 0x7E frames of one USB device in a USBPcap pcapng.
+
+Groups checksum-valid frames by (direction, group, device id, first payload
+bytes) and prints count, rate, first/last time, payload lengths and example
+payloads - the first thing to run on a capture of an unknown device.
+
+Usage:
+    tools/pcap-inventory <capture.pcapng> --device auto          # pick the MOZA device
+    tools/pcap-inventory <capture.pcapng> --device 5 --timeline  # + first-seen order
+    tools/pcap-inventory <capture.pcapng> --device 5 --jsonl out.jsonl
+    tools/pcap-inventory <capture.pcapng> --device 5 --dump h2b:1e:07
+
+`--device auto` lists every USB address with its VID:PID (from the device
+descriptors in the capture) and valid-frame count, then picks the VID 0x346E
+device with the most frames. Ethernet adapters on the same bus produce
+checksum collisions, so "most frames overall" is not enough.
+
+`--jsonl` writes {"t": <epoch seconds>, "dir": "h2b"|"b2h", "hex": <frame>}
+lines, the format tools/moza_trace.py and tools/motion-decode consume.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from moza_wire import scan_moza_frames_checked  # noqa: E402
+from usbpcap import MOZA_VID, TRANSFER_BULK, device_descriptor_ids, iter_usb_packets  # noqa: E402
+
+
+def survey(path: str) -> tuple[dict[int, int], dict[int, tuple[int, int]]]:
+    """Per-device valid-frame counts and VID:PID map."""
+    counts: dict[int, int] = defaultdict(int)
+    ids: dict[int, tuple[int, int]] = {}
+    for pkt in iter_usb_packets(path):
+        if pkt.transfer == TRANSFER_BULK and pkt.payload:
+            counts[pkt.device] += sum(1 for _ in scan_moza_frames_checked(pkt.payload))
+            continue
+        d = device_descriptor_ids(pkt)
+        if d is not None:
+            ids[pkt.device] = d
+    return counts, ids
+
+
+def pick_device(path: str, vid: int) -> int | None:
+    counts, ids = survey(path)
+    print(f"# {path}: USB devices (valid MOZA frames / VID:PID)", file=sys.stderr)
+    for dev, n in sorted(counts.items(), key=lambda x: -x[1]):
+        vp = ids.get(dev)
+        label = f"{vp[0]:04x}:{vp[1]:04x}" if vp else "no descriptor seen"
+        print(f"#   dev {dev:3d}: {n:8d} frames  {label}", file=sys.stderr)
+    matching = [(n, dev) for dev, n in counts.items() if ids.get(dev, (None,))[0] == vid and n > 0]
+    if matching:
+        return max(matching)[1]
+    if not ids:
+        print("# no device descriptors in capture (started after enumeration); falling back to most frames",
+              file=sys.stderr)
+        return max(counts.items(), key=lambda x: x[1])[0] if counts else None
+    print(f"# no device with VID {vid:04x} carries MOZA frames", file=sys.stderr)
+    return None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("capture")
+    ap.add_argument("--device", required=True, help="USBPcap device address, or 'auto'")
+    ap.add_argument("--vid", type=lambda s: int(s, 0), default=MOZA_VID, help="VID for auto (default 0x346E)")
+    ap.add_argument("--jsonl", help="also write the device's frames as JSONL")
+    ap.add_argument("--examples", type=int, default=4, help="distinct payload examples per row")
+    ap.add_argument("--key-bytes", type=int, default=1, help="payload bytes used as the cmd key")
+    ap.add_argument("--timeline", action="store_true", help="print first-seen order of every key")
+    ap.add_argument("--dump", help="print every frame matching dir:grp:cmd (hex), e.g. h2b:1e:07")
+    args = ap.parse_args()
+
+    if args.device == "auto":
+        dev = pick_device(args.capture, args.vid)
+        if dev is None:
+            return 2
+        print(f"# selected device {dev}", file=sys.stderr)
+    else:
+        dev = int(args.device, 0)
+
+    dump = None
+    if args.dump:
+        d, g, c = args.dump.split(":")
+        dump = (d, int(g, 16), int(c, 16))
+
+    t0 = None
+    stats: dict = {}
+    first_seen: list = []
+    other: dict = defaultdict(int)
+    nframes = 0
+    leftover = 0
+    jsonl = open(args.jsonl, "w") if args.jsonl else None
+    try:
+        for pkt in iter_usb_packets(args.capture):
+            if pkt.device != dev:
+                continue
+            if t0 is None:
+                t0 = pkt.t
+            if pkt.transfer != TRANSFER_BULK:
+                other[(pkt.endpoint, pkt.transfer, len(pkt.payload))] += 1
+                continue
+            if not pkt.payload:
+                continue
+            direction = "b2h" if pkt.is_in else "h2b"
+            consumed = 0
+            for fr in scan_moza_frames_checked(pkt.payload):
+                consumed += len(fr)
+                nframes += 1
+                grp, devid, pl = fr[2], fr[3], fr[4:-1]
+                key = (direction, grp, devid, pl[: args.key_bytes].hex())
+                st = stats.get(key)
+                if st is None:
+                    st = {"n": 0, "first": pkt.t, "last": pkt.t, "payloads": {}, "lens": set()}
+                    stats[key] = st
+                    first_seen.append((pkt.t - t0, key))
+                st["n"] += 1
+                st["last"] = pkt.t
+                st["lens"].add(len(pl))
+                h = pl.hex()
+                if h not in st["payloads"] and len(st["payloads"]) < 64:
+                    st["payloads"][h] = pkt.t - t0
+                if jsonl:
+                    jsonl.write(json.dumps({"t": pkt.t, "dir": direction, "hex": fr.hex()}) + "\n")
+                if dump and dump[0] == direction and dump[1] == grp and pl and pl[0] == dump[2]:
+                    print(f"{pkt.t - t0:10.4f} {direction} grp={grp:02x} dev={devid:02x} {pl.hex()}")
+            if consumed < len(pkt.payload):
+                leftover += 1
+    finally:
+        if jsonl:
+            jsonl.close()
+
+    if dump:
+        return 0
+    if t0 is None:
+        print(f"# {args.capture}: no packets for device {dev}")
+        return 1
+    span = max((s["last"] for s in stats.values()), default=t0) - t0
+    print(f"# {args.capture}")
+    print(f"# dev={dev} frames={nframes} span={span:.1f}s bulk-packets-with-unparsed-bytes={leftover}")
+    if other:
+        print("# non-bulk traffic on this device:")
+        for (ep, tr, ln), n in sorted(other.items(), key=lambda x: -x[1]):
+            print(f"#   ep=0x{ep:02x} transfer={tr} len={ln}: {n}")
+    print()
+    print(f"{'dir':4} {'grp':>4} {'dev':>4} {'cmd':>6} {'n':>7} {'rate/s':>8} {'first':>8} {'last':>8} "
+          f"{'lens':>10} {'distinct':>8}  examples")
+    for key, st in sorted(stats.items(), key=lambda kv: (kv[0][1], kv[0][3], kv[0][0])):
+        direction, grp, devid, cmd = key
+        dt = st["last"] - st["first"]
+        rate = (st["n"] - 1) / dt if dt > 0 and st["n"] > 1 else 0.0
+        lens = ",".join(str(x) for x in sorted(st["lens"]))
+        ex = list(st["payloads"].items())[: args.examples]
+        exs = " | ".join(f"{h}@{tt:.2f}" for h, tt in ex)
+        more = "" if len(st["payloads"]) <= args.examples else f" (+{len(st['payloads']) - args.examples})"
+        print(f"{direction:4} {grp:>4x} {devid:>4x} {cmd:>6} {st['n']:>7} {rate:>8.2f} {st['first'] - t0:>8.2f} "
+              f"{st['last'] - t0:>8.2f} {lens:>10} {len(st['payloads']):>8}  {exs}{more}")
+    if args.timeline:
+        print("\n# first-seen order")
+        for dt, key in first_seen:
+            print(f"{dt:9.3f}  {key[0]} grp={key[1]:02x} dev={key[2]:02x} cmd={key[3]}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

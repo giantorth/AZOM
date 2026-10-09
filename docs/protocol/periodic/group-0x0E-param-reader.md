@@ -16,6 +16,8 @@ Pithouse sends 158 per session. Host reads EEPROM parameters sequentially and re
 
 Debug log entries confirm `0x40/1E` channel config commands write to EEPROM. Diagnostic only — **not required for telemetry**.
 
+> The MOZA Motion Controller (motion platform, separate USB device PID `0x2000`) is the heaviest user of this group seen so far: it narrates every mode change, port map, error and fault dump as `cmd=05` ASCII lines from the controller *and* from each actuator, and Motion Manager sweeps `00 00 [idx]` registers on all of them at ~1 Hz. Same frame shapes as here; catalog in [`../motion/firmware-log-0x0E.md`](../motion/firmware-log-0x0E.md).
+
 Starts ~1s after session opens. Per-device targeting is **setup-dependent**: on the R5 `extreme_dogging` capture Pithouse polls base (0x12), wheel (0x17, 68 frames) and pedals (0x13); on the R9 + bare-"CS" capture (`cs v2(1).pcapng`) it polls `0x0E` **only on the base** (`0e12`/`0e13`) and sends **zero** `0e17` to the wheel.
 
 **Wheel poll removed from the plugin (do not re-add to 0x17).** The plugin briefly sent a fixed wheel param poll `7E 03 0E 17 00 00 01` every ~5 s, added as a presumed keepalive. It was removed because:

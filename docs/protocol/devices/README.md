@@ -28,6 +28,8 @@ All communication goes over a single COM serial interface. Device IDs are addres
 | handbrake | 27 | `0x1B` | [`handbrake-0x1B.md`](handbrake-0x1B.md) | |
 | estop | 28 | `0x1C` | [`estop-0x1C.md`](estop-0x1C.md) | Emergency stop button |
 | AB9 active shifter | 18 | `0x12` | [`ab9-shifter.md`](ab9-shifter.md) | Separate USB composite (VID `0x346E` PID `0x1000`) with its own dev `0x12`. Writes on `Group 0x1F`, reads on `Group 0x1E` (1-byte cmd payload, 2-byte BE responses on `0x9E`), engine-vibration multi-stream on `Group 0x20` |
+| motion controller | 18 | `0x12` | [`../motion/`](../motion/) | MOZA Motion Controller (VID `0x346E` PID `0x2000`) — bus master of the HMA150 motion platform, its own USB device. Note the **opposite** group convention from the AB9: writes on `0x1E`, reads on `0x1F`; run state `0x20`/`0x21`; game streams `0x22` |
+| actuator ports 1–8 | 20–27 | `0x14`–`0x1B` | [`../motion/identity-and-ports.md`](../motion/identity-and-ports.md) | HMA150 actuators behind the motion controller: port *p* (1-based) = dev `0x13 + p`. The numbers coincide with the dash/wheel/ES/pedal/shifter/handbrake ids above only by value — this is a different bus behind a different USB device |
 
 Response device IDs have their nibbles swapped: base `0x13` → response `0x31`, wheel `0x17` → `0x71`, ES wheel `0x18` → `0x81`, etc. Response group IDs have `0x80` added. See [`../wire/frame-format.md`](../wire/frame-format.md) for full response encoding rules.
 

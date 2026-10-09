@@ -29,6 +29,7 @@ Moza wheel/base firmware has shipped multiple incompatible protocol changes. Thi
 | R9 base | CSP capture | Identity bytes byte-identical between dev `0x12` and dev `0x13` |
 | R12 base | KS Pro capture | Same identity-cascade behaviour as R9 |
 | R5 base | W17 live captures | Type02 host of W17 wheel; same identity-cascade pattern as R9/R12 |
+| HMA150 motion platform (Motion Controller `G01 SU` + 4 actuators `G01 AU # MOT-1-V01`) | `~/Downloads/hma150/*.pcapng` (2026-10-06/07, MOZA Motion Manager 1.0.3.10) | Separate USB device (PID `0x2000`), no wheel protocol at all. Controller fw tuple `02 23 00` / hw `02 18 00` / rev `U-V13`; actuators fw `02 1C 00` / hw `02 16 00` / rev `U-V14`, descriptor `[MP24-G01-HW_AU-CU-V10][G01][512][4]`. See [`motion/`](motion/) |
 
 ## Topical pages by firmware sensitivity
 

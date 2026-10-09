@@ -1380,6 +1380,622 @@ else
 | `ControllerState` | `…ControlRemapper.Models` | public |
 | `ControlMapperPluginSettings` | `…ControlRemapper.Models` | public |
 
+## Motion Plugin — Custom Outputs
+
+How a plugin can supply its own motion-platform output to SimHub's **Motion** plugin (the
+licensed motion feature — `IsSimHubMotionLicenceInstalled` / `…Valid` live in `SimHub.Plugins.dll`).
+Decompiled with `ilspycmd` 10.1.1 from a SimHub **9.12.8** install on 2026-10-07. None of this is a
+documented API: type names, member signatures and even the namespace casing can change between
+releases. Recorded here as reference material only — whether the MOZA plugin should integrate the
+HMA150 this way is an open decision (the platform's own game mode takes *raw telemetry*, not
+per-actuator positions — see [`protocol/motion/game-stream-0x22.md`](protocol/motion/game-stream-0x22.md)).
+
+### Assembly and namespaces
+
+- **`SimHub.Plugins.Motion.dll`** (~9 MB) — **not vendored in `libs/SimHub/`**; `SimHub.Plugins.dll`
+  holds no Motion types. A plugin building against it would copy the DLL in with `Private=false`
+  like the others.
+- Namespaces are inconsistently cased: `SimHub.Plugins.Motion.{Contracts, Outputs,
+  Outputs.ActuatorOrdering, Outputs.GenericCommon, Outputs.GenericSerialV2, Geometry}` and
+  `Simhub.Plugins.Motion.{Models, Settings}` (lower-case *h*).
+- Plugin class `SimHub.Plugins.Motion.MotionPlugin`, `[PluginName("Motion")]`.
+
+### Pipeline — telemetry → effects → geometry → outputs
+
+```
+SimHub data thread   MotionPlugin.DataUpdate(ref GameData)
+                       → MotionInputData (sanitised telemetry; OrientationPitchDegrees = −OrientationPitch)
+                       → MotionWorkerBase.SetCurrentGameState(data)          // stores a reference only
+"MotionUpdateThread"  MotionWorkerSleep: ProcessCore(); Thread.Sleep(2)      // ~2–3 ms, independent of game rate
+                       → per MotionDevice: Update(dt, snapshot)
+                           → EffectsProcessor.Process → GroupedMotionState {Primary, Secondary}   (DOFs in deg / mm / %)
+                           → GetMotionState (overrides: simulated / quick-test / OpenXR / e-stop / suspend; 2 s transitions)
+                           → GeometryAggregator.UpdateCore → CompositeGeometryResult {Primary, Secondary GeometryResult}
+                           → Output.Update(result) or Output.KeepAlive(result)   // Output is always a ControllersAggregatorOutput
+                               → one OutputWorker thread per enabled sub-output ("Motion <name>"):
+                                 ApplyState → sub.Update / sub.KeepAlive; Thread.Sleep(sub.RefreshRateMs)
+                                   → GetAxisValue(result, channelIdx, …) → wire format
+```
+
+- `MotionPlugin` is `[NoAutoEnablePlugin]`, `Priority => -9999`, implements `IPlugin, IDataPlugin,
+  IWPFSettingsV2, IRTDataPlugin`; `Init` calls `GameManager.SetHighPrecision()`, loads
+  `GeneralSettingsV3` (falls back to / saves as `GeneralSettingsV2`), applies each device's
+  `StartMode`, creates the worker (`MotionWorkerMultimedia` and `UseMultimediaTimer` exist but
+  nothing reads them) and a 16 ms UI `DispatcherTimer`.
+- **`MotionInputData`** (built only while the game runs, is not paused and the car is on track —
+  otherwise defaults): `GameConnected`, `InCar`, `GamePaused`, `GameProcessDetected`; orientation
+  yaw/pitch/roll (`*Sanitized` when `UseSanitizedValuesForMotion`), pitch/roll/yaw velocities,
+  `LocalVelocity{Forward,Lateral,Upward}`, `Acceleration{Sway,Surge,Heave}` (m/s²),
+  `SuspensionVelocityMs[4]` (× `SuspensionVelocityMsMotionRatio`), `WheelSlip`, `WheelsSpeed`,
+  `WheelsRPS`, `WheelsOnKerbs`, `GroundSpeed` (km/h), pit-limiter fields, `DirectTractionLoss`,
+  `ABSActive`/`TCActive`, `IsInPit`/`IsInPitLane`, RPM/MaxRPM, pedals, `Gear`,
+  `GearChangeFromInputs` (dynamic button `MotionGearChange`), flight ground contacts,
+  `WorldCoordinates`, track-profiler pitch range, `Belt*`/`Unfiltered*` acceleration copies.
+- **`MotionDevice`** = one platform setup: `Output` (always a `ControllersAggregatorOutput`, JSON
+  `OutputEx`, N `AggregatedOutputs`), `Geometry` + optional `SecondaryGeometry`, `Profiles`
+  (`MotionEffectsProfile`: `Effects`, `ProfileSettings`, `ProfilePresets`, `FineBoosterSettings`),
+  `PowerSettings`, `IdleManager`, `EffectsProcessor`, motion-compensation objects, `WitMotionManager`,
+  `WindMotionAdapter`, simulated/quick-test sources. `Devices` is unbounded but only
+  `CurrentDevice` (`SelectedDeviceId`) is active; the others are forced disabled.
+- **Device update order**: inactive → return; welcome layer showing → disabled; assignation
+  callback set → only that runs; invalid → disabled; motion-compensation + WitMotion init;
+  **shutdown** (disabled / disposing while started): 2 s transition to zero, then `Output.Stop()`
+  once parked + 500 ms; **idle** (`IdleManager.ShouldBeIdling`): 2 s to zero, then
+  `Output.KeepAlive(last)` every tick (wind still flows); leaving idle: 2 s +
+  `AfterConnectMotionDelay`; sensor calibration; **normal**: `EffectsProcessor.Process` →
+  `GetMotionState` → `StartOutput` (after `DisconnectReconnectDelay`, state `Cooldown` meanwhile) →
+  `GeometryAggregator.UpdateCore` when `Output.IsReadyForLiveMotionData()` → `Output.Update`.
+- `GetMotionState` override precedence (last wins): remote simulated → simulated → quick test →
+  OpenXR CorEstimator pose → **output failure or `IsSafetyStopped()` freezes the last pose**
+  (`SafetyStopped`) → `IsSuspended` zero → `ForceSuspend` zero → not ready zero. A `StateKind`
+  change starts a 2 s transition (max(`AfterConnectMotionDelay`, 4 s) around an e-stop).
+- `MotionDeviceState`: 0 Disabled, 1 Cooldown, 2 Active, 3 EStop, 4 Idle, 5 GoingToIdle,
+  6 Failure, 7 Stopping, 8 Suspended, 9 NotFound, 10 Starting, 11 InvalidConfiguration,
+  12 NotConfigured, 13 Calibrating, 14 GoingToCalibration. `OutputConnectionState`: 0 Disconnected,
+  1 Connected, 2 NotFound, 3 Failure. `SafetyState { None = 0, EStopped = 1 }`.
+- **Per-output worker** (`ControllersAggregator/OutputWorker`): the aggregator never touches
+  hardware; each enabled sub-output gets a dedicated `Thread` (Normal priority) looping
+  `ApplyState(state); Thread.Sleep(Output.RefreshRateMs)` — plain sleep, latest-state only, frames
+  drop or repeat freely; an exception sets `ConnectionState = Failure`.
+- **`MotionOutputBase` lifecycle**: `Start(isAssignationMode)` → `ApplySettings` (running settings
+  are a JSON clone) → `StartInternal` → `AfterStarting`. `Update`: `CheckIdleStop`; once:
+  `BeforeStartingMotion` then **`Unpark`** (a `DirectActuatorTransition` from park to live positions
+  over `ParkDuration`, fed through pseudo-roles `500+idx`); `isReadyForLiveMotionData = true`;
+  `BoostActuators`; `UpdateInternal`; `LastUpdatePositions`. `KeepAlive`: with `AllowIdling`
+  (default true) or in assignation mode → `CheckMotionStop` (**park**: transition to park
+  positions, `BeforeStoppingMotion`) → `CheckIdleStart` (`BeforeStartingIdle`) →
+  `KeepAliveInternal`; otherwise it just calls `Update` with the zero pose. `Stop`: park,
+  `CheckIdleStop`, `BeforeStopping`, `StopInternal`, `ConnectionState = Disconnected`.
+
+### Effects
+
+Per tick `EffectsProcessor.Process` (`Core/EffectsProcessor.cs`): safety checks (|surge| > 500 m/s²
+artefact → 800 ms soft transition; angular crash |Δpitch|+|Δroll| > `CrashDetectionAnglesThreshold`;
+telemetry gap > 100 ms → soft transition), gear-change / flight-touchdown artefact removal,
+acceleration crash detection (absolute or delta), `LowSpeedDampener` (blends accelerations and
+pitch to a 500 ms average below `LowSpeedAccelerationsDampeningSpeed` 15 km/h, near the pit
+limiter, flight on ground); then for every effect `IsAvailableOnCurrentPlatform &&
+AvailableOnCurrentGame`: `gain = categoryGain(effect.MotionCategory) × categoryGain(MotionGlobal)`
+(haptics and belts use their own category only), `effect.GetMotionState(...)`, and every
+`MotionEffectComponent.OutputValueWithGain` is **summed** into `GroupedMotionState.AddToAxis(target,
+MotionAxis, value)`; yaw normalised to ±180; settings-change transition; `GlobalSmoothing`;
+crash transition (`CrashFilterPreset` −2 → 1.75 … 1 → 0.75); state transition. A state signature
+(`Live,connected,InCar,paused,<car>,teleportation,gamestatereset,pitlane,pit`) change triggers a soft
+transition; teleport = > 10 m jump (50 m flight).
+
+Inside an effect (`MotionEffectBase.GetMotionState` → `GetComponents`): source value → washout →
+dynamic-range compression → `FilterBasicProgressiveAcceleration` → `FilterBasicSmoothing`
+(`Smoothing` 0–100, sigmoid EMA) → `FilterBasicInOutScaling` (`clamp(value/Input, −1, 1) × Output`,
+or a soft knee with `SoftBounds`/`SoftBoundRange`) → `CorrectionCurve` (`GammaFilter`: `GammaValue`,
+`Threshold`, `MinimumValue`, `DeadZoneSmoothing`, `Negate`) → `× Gain/100 × kindGain`; disabled or
+muted-by-isolation → 0. Common JSON keys: `Gain`, `IsEnabled`, `ScalingRange {Input, Output}`
+(telemetry units → deg / mm / %), `SeparateScalingRange`, `Smoothing`, `SoftBounds`,
+`SoftBoundRange`, `EnableDynamicRangeCompression`, `AccelerationFilter {…}`, `WashoutSettings
+{EnableWashout, EnableAdapativeWashout, Soft/Strong/ExtremeValue {BaseWashout},
+WashoutMultiplierMode}`, `CorrectionCurve {GammaFilter, IsEnabled}`, `ReverseDirection`,
+`ForwardWhenBraking`, `OutwardForces`, `PerceptualForces`. Haptic effects add
+`ChildOuputSettingsStore.ChildOutputSettings[] {DisplayName, IsEnabled, OutputValue, MotionTarget,
+ChildOutputCategory}` (one per destination), speed boost (`EnableSpeedBoost`, `BoostSpeed`,
+`BoostValue`) and pulse shape (`PulseDuration`, `UseAdvancedShape`, `Advanced{PulseDuration,
+RampUpDuration, RampDownDuration}`). Traction-loss effects add `TractionLossRange`, `VelocityRange`,
+`OutputRange`, `TractionLossMode`, controlled-velocity settings, `YawRateSensibility`, `Bias`.
+
+Registry `MotionDevice.GetEffectsTypes(gameFamily)`; P = pre-enabled, R/F = racing/flight only.
+Target is Primary unless noted; `Secondary*Effect` twins drive the secondary geometry.
+
+| Effect | UI name | Category | Input | Output `MotionAxis` | Needs capability |
+|--------|---------|----------|-------|---------------------|------------------|
+| `PitchEffect` (P) / `SecondaryPitchEffect` | Pitch | PrimaryPlatform | `OrientationPitchDegrees` (+ track-profiler adjust) | `PitchDegrees` | `Pitch` |
+| `PitchRateEffect` (P, F) | Pitch rate | PrimaryPlatform | pitch velocity | `PitchDegrees` | `PitchChangeVelocity` |
+| `RollEffect` (P) / `RollRateEffect` (P, F) | Roll / Roll rate | PrimaryPlatform | roll (`ContinuousAngleTracker`) / roll velocity | `RollDegrees` | `Roll` / `RollChangeVelocity` |
+| `SurgeEffect` (P) | Surge to pitch | PrimaryPlatform | `AccelerationSurge` (`ForwardWhenBraking`) | `PitchDegrees` | `Surge` |
+| `Surge6DofsEffect` (P) | Surge | PrimaryPlatform | `AccelerationSurge` | `SurgeMm` (geometries that accept it) | `Surge` |
+| `SwayEffect` (P) / `Sway6DofsEffect` (P) | Sway to roll / Sway | PrimaryPlatform | `AccelerationSway` (`OutwardForces`) | `RollDegrees` / `SwayMm` | `Sway` |
+| `HeaveEffect` (P) | Heave | PrimaryPlatform | `AccelerationHeave` | `HeaveMm` | `Heave` |
+| `Yaw6DofsEffect` (P) | Yaw / Yaw (Continuous) | PrimaryPlatform | yaw via `ContinuousYawTracker` | `YawDegrees` | `Yaw` |
+| `TractionLossEffect` / `TractionLoss6DofsEffect` | Rear traction loss to roll / to yaw | PrimaryPlatform | TL angle (below) | `RollDegrees` / `YawDegrees` | `LocalVelocity` or `DirectTractionLoss` |
+| `SuspensionEffect` | Suspensions | Haptic | `SuspensionVelocityMs[4]` (0 below 0.5 km/h) | corner axes, `ExtraHeaveMm`, `ExtraPitchDegrees` ((FL+FR−RL−RR)/2), `ExtraRollDegrees`, belt centre | `SuspensionVelocity(Partial)` |
+| `TractionLossHapticsEffect` | Traction loss | Haptic | lateral/forward velocity, 25–45 Hz oscillator (`Sensitivity`, `SignalGrain`, `SideFocus`) | corners L/R, belt, dedicated heave/roll | `LocalVelocity` |
+| `WingsLoadHapticsEffect` (F) / `FlightTouchdownHapticsEffect` (F) | Wings load / Touch down | Haptic | √((2·pitchRate)² + (rollRate/2)²) / ground-contact increments → pulse | corners, belt, dedicated axes / `HeaveMm`, belt | `YawChangeVelocity` / `FlightGroundContactsCount` |
+| `RumbleStripsEffect` (R) | Rumble strips | Haptic | `WheelsOnKerbs[4]`, speed factor (5–100 km/h)³ | corners/heave, belt, dedicated heave/roll | `WheelsOnKerbs` |
+| `EngineEffect` | Engine vibration | Haptic | RPM, MaxRPM, throttle, surge; `EngineEffectShape` Legacy/V2, `StopAtSpeedKmh`, `V2_*` | `HeaveMm`, belt, dedicated heave/pitch/roll | `RPM` |
+| `GearChangeEffect` (R) | Gear change | Haptic | gear change → pulse | `PitchDegrees`, `HeaveMm`, `SurgeMm`, secondary, `ExtraSurge*`, belt, dedicated | `Gear` |
+| `ABSEffect` (R) | ABS trigger | Haptic | `ABSActive` → up to 3 pulses (`PulseManager`) | `CornerFrontLeftMm`/`CornerFrontRightMm`, belt, dedicated heave/pitch | `ABSActive` |
+| `AudioEffect` | Audio to haptics | Haptic | WASAPI loopback, biquad low-pass (`LowPassFrequency`, `PreAmp`) | corners L/R, belt, dedicated axes | — |
+| `ExtraAxis{Heave, Pitch, HeaveToPitch, PitchRate, SurgeToPitch, Roll, RollRate, SwayToRoll, TractionLossToRoll, Sway, Surge, SurgeSecondary}Effect` (P) | dedicated-axis variants | `MotionExtraAxis*` | the same inputs | `ExtraHeaveMm`, `ExtraPitchDegrees`, `ExtraRollDegrees`, `ExtraSwayMm`, `ExtraSurgeMm`, `ExtraSurgeSecondaryMm` | — |
+| `ExtraAxis{TractionLoss, TractionLossSway, TractionLossYaw}Effect` (P) | single TL table | MotionExtraAxisTractionLoss | TL angle / sway / continuous yaw | `ExtraTLDegrees` | — |
+| `ExtraAxisFrontRear{TractionLoss, TractionLossSway, TractionLossYaw}Effect` (P) | front + rear TL | MotionExtraAxisTractionLoss | TL angle (`Bias` splits range) / sway / yaw | `ExtraTLFrontMm` (negated), `ExtraTLRearMm` | — |
+| `ExtraAxisBelt{Surge, Sway, SingleSway, Heave}Effect` (P) | belt tensioner | BeltTensioner | `BeltAcceleration*` (`NegativeTorqueMode`, `ActivateOnlyOnBraking`, `BrakingLevelPercent`) | `ExtraBeltTensioner{Center, Left, Right}Percent` | — |
+
+TL angle (`TractionLossEffectHelper.GetTLAngle`): direct mode = `−DirectTractionLoss` when the game
+exposes it; `TractionLoss` mode = acos-based angle between local velocity and forward, blended with
+yaw rate at low speed (`YawRateSensibility`), faded in over 5–30 km/h; velocity mode =
+`LocalVelocityLateral` faded over 5–30 km/h; then washout, DRC and an optional "controlled
+velocity" `SignalFollower`. `SpinAndLockHapticsEffect` has a defaults file but is never registered.
+
+**Defaults**: `Motion/EffectsDefaults/{Racing|Flight}/<EffectClass>.json` is the serialised settings
+object (flat keys above + `SettingsVersion`); `MotionEffectBase.LoadDefaultSettings(family)` applies
+hard-coded defaults, then `EffectsDefaultsOverrides/<Family>/<Type>.json` (user "save as default"),
+else the factory file, via `JObject.Parse(...).Populate(Settings)` (unknown keys ignored — the
+legacy `MaxInputRange` keys in `PitchRateEffect.json` are dead). Many `Secondary*`/`ExtraAxis*`
+effects reuse their parent's file (`LoadDefaultsFromType()`). Defaults apply only when an effect is
+first added (`AddIfMissing`) or on `ResetSettings`. **Profiles**: `MotionDevice :
+ProfileSettingsBase<MotionEffectsProfile, MotionDevice>` (`SimHub.Plugins.ProfilesCommon`, see
+[Profile System](#profile-system-simhubpluginsprofilescommon)) with `FilterByGameFamily`; each
+profile has a `TargetGameFamily`, `ProfilePresets` (`ActivePreset`, per-effect `PresetSettings`), and
+`ProfileSettings`: `GlobalSmoothing`, `CategoryGains`/`SecondaryCategoryGains`, crash filter,
+artefact removal, low-speed / pit-limiter / on-ground dampening, `UseSanitizedValuesForMotion`,
+`CenterOfRotationOffset`, `ActuatorStrokeLimitAndOffsetOverride`.
+
+### Geometries
+
+**DOF inputs** (`Simhub.Plugins.Motion.Models.MotionAxis`, carried in `MotionState`, physical
+units — degrees, millimetres, percent): 0 `YawDegrees`, 1 `PitchDegrees`, 2 `RollDegrees`,
+3 `HeaveMm`, 4 `SurgeMm`, 5 `SwayMm`, 6–9 `Corner{FrontLeft,FrontRight,RearLeft,RearRight}Mm`,
+10/11 `Side{Left,Right}Mm`, 12 `ExtraSwayMm`, 13 `ExtraSurgeMm`, 14 `ExtraTLDegrees`,
+15/16 `ExtraTL{Front,Rear}Mm`, 17–19 `ExtraBeltTensioner{Left,Right,Center}Percent`,
+20–22 `ExtraWind{Left,Right,Center}Percent`, 23 `ExtraSurgeSecondaryMm`, 24 `ExtraHeaveMm`,
+25 `ExtraPitchDegrees`, 26 `ExtraRollDegrees`, 100/101 `Dummy1/2`. Directions: pitch Rear/Front,
+roll Left/Right, heave Down/Up, surge Backward/Forward.
+
+A device geometry is an `ICompositeGeometry` (`CompositeGeometry<TBase>`): one **base geometry**
+plus extra axes (`Axis: ObservableCollection<IMotionExtraAxis>`). `UpdateCore`: extra axes
+`Premix`, base `UpdateCore`, extra axes `UpdateCore` merged with `GeometryResult.MergeWith`
+(same-role positions add). Base geometries reset the DOFs they do not support.
+
+| Composite (picker name) | Base class | Inputs | Output roles |
+|-------------------------|-----------|--------|--------------|
+| `GenericGeometry3Dof4Linear` "3 DOFs / 4 corners" | `Geometry3Dof4Linear` | pitch, roll, heave, 4 corners | `LinearCorner{FL,FR,RL,RR}` (1–4) |
+| `GenericGeometry3Dof4Linear2F1R` / `…1F2R` | `Geometry3Dof4Linear2F1R` / `1F2R` | same, rears or fronts averaged | FL, FR, `LinearRearCenter` / `LinearFrontCenter`, RL, RR |
+| `GenericGeometry2Dof2Linear` "2 DOFs / Left right (Seat mover)" | `Geometry2Dof2Linear` | pitch, roll, side L/R, heave | `LinearSide{Left,Right}` (31/32) |
+| `GenericGeometry6DofsRotary` / `…6DofsLinear` "6DOFs Rotary / Linear Hexapod" | `Geometry6DOFsStewartRotary` (crank + rod) / `…StewartLinear` | yaw, pitch, roll, heave, sway, surge, corners | `SixDOFsHexapod*` (51–56) |
+| `GenericGeometryFourDofsLinear` "4DOFs Linear" | `GeometryFourDofsLinear` | yaw (coupled from a rear A-frame), pitch, roll, heave, corners | `FourDofsLinearCorner*` (33–36) |
+| `GenericGeometryYawVRBypass` "Yaw VR 1/2/3 motion" | `GeometryYawVRBypass` | yaw, pitch, roll, corners | **none** — output reads `GeometryResult.MotionState` (pose); forces `YawVROutput` |
+| `GenericGeometry6DOFsBypass` "6DOFs Bypass" | `Geometry6DOFsBypass` | 6 DOF + corners folded into a pose | **none** — pose only (use `<PoseAxis:…>` tokens) |
+| `GenericGeometryNull` "Add-ons only" | `NullGeometry` | — | extra axes only |
+| `GenericGeometry2DOFSeatMover{Linear,Rotary}` (not in picker) | `Geometry2DOFSeatMover*` | pitch, roll, side L/R, heave | 31/32 |
+
+Extra axes (`Geometry.ExtraAxis.*`): `SurgeAxis` / `SurgeAxisSecondary` / `SwayAxis` / `HeaveAxis`
+(mm ÷ stroke/2, speed-limited by `ActuatorsSpikeFilterMmPerSecond`), `PitchAxis` / `RollAxis`
+(deg ÷ `AxisRangeHalfDegrees`), `TLSingleAxis` (deg ÷ `MaximumAngle`/2 → `SingleTractionLoss`),
+`TLFrontRearAxis` (→ `Front/RearTractionLoss`), `BeltSingleAxis` / `BeltDualAxis` /
+`PTABeltDualAxis` (positive input `CenterPosition`(+`CenterOffset`) → `PullLimit`, negative →
+`ReleaseLimit`, `SplineFilter`, `KeepParked`), `WindAxis{Center,LeftRight,Triple}` (0..100 % ×
+`MaxPercent` → −1..+1, fed by `WindMotionAdapter`, not effects).
+
+**3 DOF / 4 corners solve** (`Geometry3Dof4Linear.Update` + `Core/Geometry3Dof4LinearHelper`):
+stroke-limit transition and heave/pitch/roll offsets → reset sway/yaw/surge, `AxisLimitingSettings`
+down-scalers, angular spike limiter (`ActuatorsSpikeFilterDegreesPerSecond` 50 °/s) → inverse
+kinematics: corners at (±`RigLength`/2, ±`RigWidth`/2) (optional `RigWidthFront`), rotate by
+pitch/roll about `CenterOfRotation{Front,Right}Offset`, translate by heave, leg extension by
+floor-plane projection → `ActiveDownScaler`: when max |leg| exceeds the stroke (limit, safety
+`ActuatorSafetyRangePercent` 20 %, prediction 5 %) a binary search scales the whole pose down →
+`Position = Offset(0, stroke, leg) × 2 − 1` (**−1 fully retracted, 0 mid-stroke, +1 fully
+extended**) + corner haptics `mm / (stroke/2)` → clamp ±1, `ActuatorsSpikeFilterMmPerSecond` (500)
+→ `SetAxisPosition(role, range = ActuatorsStroke, Mm, pos, acceptBoost: true)`. Defaults:
+`RigLength` 1000, `RigWidth` 600, `ActuatorsStroke` 150; capacities `PitchCapacity = 90 −
+atan((L/2 + |COR|)/(strokeLimit/2))`, `HeaveCapacity = strokeLimit/2` feed the effects' bounds.
+Hexapod / 4 DOF / seat movers use `SixDofInput` and per-actuator `IActuator` models (linear or
+rotary crank) and report `PrimaryOverflowPercent = (1/LastScale − 1) × 100`.
+
+**Results**: `ActuatorPosition { Position (−1..+1, 0 = centre; belts/wind −1 = released/off),
+BoostedPosition?, Range (stroke mm / degrees / 100 %), Unit (None, Mm, Degrees, Percent),
+CrankLength, CanBeBoosted }`; `GeometryResult { Axis, UnscaledAxisCenter, MotionState (final pose),
+PrimaryOverflowPercent, PitchOverflowPercent, RollOverflowPercent, spike-limiter counters,
+MotionCompensation* fields, PrimaryAxisStates, BeltAxisStates }` with `SetAxisPosition`,
+`GetAxisValueOrDefault`, `GetBoostedAxisValueOrDefault`, `Mix`, `MergeWith`;
+`CompositeGeometryResult { PrimaryGeometryResult, SecondaryGeometryResult }` with
+`GetTarget(MotionTarget)`. **Secondary** = `MotionTarget.Secondary`, a second geometry stacked on
+the primary (the picker only creates it as a `GenericGeometry2Dof2Linear` seat mover when
+`HasSeatMover`); `Secondary*` effects, `Global.SecondaryPlatform.Gain` and roles assigned with
+`MotionTarget = Secondary` (`LinearSideLeft/Right`) drive it. **Boost** = the "Motion detail
+amplifier" (`MotionOutputBase.BoostActuators`, `Outputs.Booster/FineMotionAssist`,
+`FineBoosterSettings { IsEnabled, SmallMovementBoost 3, MaximumBoostedVelocity 500,
+ReturnSpeedScale 1.5, AllowedDriftFactor 2, Gain 100 (0..300) }`): amplifies small slow movements
+of `CanBeBoosted` positions (a velocity-dependent high-pass), faded out within `EdgeSafetyMargin`
+0.1 of the ends, written to `BoostedPosition`; only outputs calling `GetAxisValue(…,
+boostAllowed: true)` see it.
+
+`GetAxisValue` exactly: `k = (Roles[idx]?.RangeLimit ?? 100) / 100`; a `(ActuatorRole)(500+idx)`
+entry returns its raw `Position` (park/unpark transitions); `(100+idx)` returns `Position × k`
+(identification test); no assignment → `defaultUnassignedValue` (0 = mid-stroke); else the boosted
+or plain value for `(MotionTarget, Role)` × k, negated when `ReverseDirection`. **No clamping** here
+(geometries clamp earlier). Park position = `ParkPosition/50 − 1` (negated when reversed), used only
+when `UseParkPositionEx`; `UseParkPositionsFromRoles` takes the role's `DefaultParkPosition` (−1 for
+lift roles, 0 for surge/TL/sway/wind).
+
+### Actuator ordering and the assignation dialog
+
+`ActuatorOrderingSettings`: serialised `Roles` (auto-resized to `MaxActuators` with `DefaultRoles`),
+`ConfigurationDone` (default true; `ConfigurationIncomplete = !ConfigurationDone && MaxActuators > 0`
+blocks start with "Actuator order settings have not been configured."), `UseParkPosition`,
+`ParkDuration` (5000 ms); not serialised `TestingAmplitude` 2 %, `BeltTestingAmplitude` 10 %,
+`TestingFrequency` 2 Hz. `TryLoadDefaultMapping` auto-assigns role groups present in the geometry
+(4-corner order RL, FL, FR, RR; hexapod order; TL + surge). `ActuatorRoleAssignment { Role,
+MotionTarget, ReverseDirection, RangeLimit % (100), ParkPosition % (50), ParkPositionFromRole,
+ManualPosition, Identify, IdentificationMode (None, LeftDown, UpRight, Absolute, All),
+OutputNumber, RoleMissing }`.
+
+`ActuatorOrderingIdentificationDialog`: sets a no-op `IdentificationCallback` (suspends the normal
+device update), calls `output.Start(isAssignationMode: true)` on that one output with its own
+`OutputWorker(keepAlive: true)`, then feeds the selected channel through `(ActuatorRole)(100+idx)`:
+`None` = sine × `TestingAmplitude`, `LeftDown`/`UpRight` = `(lfo ∓ 1) × amplitude`, `Absolute` =
+`ManualPosition/50` (all negated when reversed; belts use `BeltTestingAmplitude`); switches to
+`keepAlive: false` once unparked; the user picks a role per channel from `AvailableRoles`;
+`OkAsync` rejects duplicates and missing primary roles and runs `TestAll` for direction-sensitive
+roles. Start-time check (`IMotionOutputExtensions.GetOutputErrors`): with
+`PowerSettings.CheckAxisAssignment` every geometry role must be mapped by some active controller;
+`CheckAxisAssignmentRelax` (default) lets a whole `ComponentGroup` idle unmapped.
+
+### Power, idle, safety
+
+`PowerSettings` (per device): `StartMode` (`Last`; Off forces disabled, AlwaysOn enables when the
+configuration is valid — applied only at Init), `UseIdleTimeout` (true), `IdleTimeoutSeconds` (30),
+`IdleDetectionMode` (0 = a running game process counts as activity; 1 = connected or paused;
+2 = connected and not paused), `StartInIdle` (true), `AfterConnectMotionDelay` (5 s; also floors
+e-stop recovery at 4 s), `DisconnectReconnectDelay` (0 s cooldown before restart),
+`ShowForceOnlineButton`, `CheckAxisAssignment`/`…Relax`, `UseSafetyDelays` (display text only),
+`IsInitialized`. Activity is also kept alive by `ForceSuspend`, the OpenXR receiver, simulated /
+remote / quick-test sources; `ForceOnline` or sensor calibration cancel idle.
+
+Idle: 2 s to zero, then `Output.KeepAlive` every tick; sub-outputs with `AllowIdling` park once
+and run `KeepAliveInternal` (output-specific heartbeat or hold), otherwise they keep receiving
+`Update` with the zero pose; leaving idle unparks and ramps over 2 s + `AfterConnectMotionDelay`.
+`IsEnabled` is the on/off switch (`Enable()`/`Disable()` = zero, park, `Stop()`); `IsSuspended`
+(`Global.SuspendMotion`) and `ForceSuspend` hold a zero pose with outputs live. **E-stop**: an
+output raising `SafetyState.EStopped` (Thanos hardware e-stop) or `ConnectionState = Failure`
+freezes the last pose, shows `EStop`/`Failure`, can play `Sounds\Motion-Error.mp3`, recovers over
+≥ 4 s. "Overflow" is only the geometry down-scaling percentage (`Global.Geometry*Overflow`).
+
+### Licence gating
+
+`SimHub.Licensing.GlobalLicenseManager` (`HasActiveMotionLicence`, `MotionTrialActive`,
+`StartMotionTrial`, …) — the **only functional gate** is in `MotionWorkerBase.ProcessCore`:
+`if (!haslicence && !MotionTrialActive()) shared = new MotionInputData();`. Unlicensed, the whole
+pipeline still runs on **empty telemetry**: outputs start, connect, unpark, park and idle; manual,
+simulated, quick-test and assignation sources still move the platform; game-driven motion stays
+neutral. The trial runs only while live, on track, enabled and past the welcome layer
+(`MotionPluginSettings.ShowLayer` forces disabled until `Enable()`).
+
+### Feedback inputs and motion compensation
+
+- **WitMotion IMU** (`SimHub.WitMotion.dll` → `WitmotionImuReader`; `MotionCompensation/WitMotionManager`,
+  one per device): serial 115200, 100 Hz; `SerialPort`, `MountingMode`, `YawCorrection`,
+  `YawDriftCorrectionEnabled`, `ZeroOrientation`. Not used for actuator control — it feeds VR
+  motion compensation (`SixDofsMotionCompensation.Update`: `EnablePhysicalSensor`,
+  `PhysicalFactor`, `PhysicalSmoothing`, `PhysicalGain`); "Calibrate sensor" parks at zero then
+  `CalibrateFlat` / `CaptureZeroOrientation`. The COM port is reserved from SimHub's scanner.
+- Motion-compensation outputs: a 6-DOF rig pose to the memory-mapped file `Local\motionRigPose`;
+  OpenXR-MotionCompensation telemetry to `Local\OXRMC_Telemetry` (the OpenXR `CorEstimator` can
+  also be an input pose source). `OpenVRMotionCompensation` exists but `MotionCompensations =
+  { OpenXRMC, OpenXRMC }` lists OpenXR twice, so OpenVR never updates (apparent bug).
+- `YawVROutput` reads tracker yaw/pitch/roll, temperatures and battery back over TCP/UDP; with
+  `UseYawVRForMotionCompensation` the angles become `MotionCompensationExternal{Yaw,Pitch,Roll}`.
+- Apart from the SCN DLL and YawVR, **no actuator-position feedback path exists**; outputs are
+  open-loop.
+- Other sources: `SimulatedMotionStateAggregator` (manual/auto motion from the UI),
+  `QuickMotionTest`, `RemoteSimulatedMotionStateAggregator.Enable(id)/KeepAlive(id)` (2 s timeout;
+  no caller in the DLL — `ApiEnabled`/`ApiToken` suggest the web API), `WindMotionAdapter`.
+
+### Exported properties and actions (plugin "MotionPlugin")
+
+Properties: `Global.GeometryPrimaryOverflow`, `Global.GeometrySecondaryOverflow`,
+`Global.DeviceState`, `Global.MotionEnabled`, `Global.ActiveMotionSetup`, `Global.MotionSuspended`;
+`Global.{MotionOrientations | PrimaryPlatform | SecondaryPlatform | Sway | Surge | SurgeSecondary |
+Heave | Pitch | Roll | Haptics | BeltTensioner | TractionLoss}.Gain`;
+`Global.MotionDetailAmplifier.{Enabled, Gain}`, `Global.GlobalMotionSmoothing`,
+`Global.ActiveProfilePreset`, `Global.BeltTensioner.{KeepParked, Offset}`,
+`Global.TrackProfiler.*`, `YawVR.{TemperatureRoll, TemperaturePitch, TemperatureYaw,
+TemperatureMax}`, `MotionCompensationComponent.<FilterCode>.{Enabled, TargetScale,
+TargetSmoothing, SpeedLimiter*}` (+ `Sensor*`, "Smooothing" spelled with three o's), per effect
+`<EffectClass>.{Available, Enabled, IsIsolated, IsMuted, Gain, Smoothing, EnableWashout, Washout}`,
+dynamic `YawDiff`. **No per-actuator position property exists.**
+
+Actions: `Global.{ToggleMotionEnabled, EnableMotion, DisableMotion, SuspendMotion,
+CalibratePhysicalSensor, OpenEffectsCompactView}`, `Global.BeltTensioner.{Set/Disable/Toggle}KeepParked`
+/ `{Increment/Decrement/Reset}Offset`, `Global.*.{Increment,Decrement}Gain`,
+`Global.MotionDetailAmplifier.{Toggle, IncrementGain, DecrementGain}`,
+`Global.GlobalMotionSmoothing.{Increment, Decrement}`, `Global.{Next,Previous}ProfilePreset`,
+`Global.ToggleTrackProfiler`, `Recording.MarkMotionTelemetryRecord`,
+`Filters.ToggleCrashFilterSoundFeedback`, `QuickTest.Toggle{Roll,Pitch}Test`, per effect
+`<Effect>.{ToggleState, ToggleIsolated, Increment/DecrementGain, Increment/DecrementSmoothing}`,
+dynamic button `MotionGearChange`.
+
+### The output contract (all public)
+
+```csharp
+// SimHub.Plugins.Motion.Contracts
+[JsonConverter(typeof(AbstractConverterAllowNull<IMotionOutput>))]
+public interface IMotionOutput : IDisposable, IAbstractSerialize
+{
+    void Start(bool isAssignationMode = false);
+    void Stop();
+    void Update(CompositeGeometryResult geometryResult);
+    void KeepAlive(CompositeGeometryResult geometryResult);
+    bool IsConnected { get; }
+    OutputConnectionState ConnectionState { get; }
+    Control SettingsControl { get; }            // WPF
+    int RefreshRateMs { get; }
+    void DataUpdate(PluginManager pluginManager, GameData data);
+    IEnumerable<string> GetReservedSerialPorts();
+    Guid OutputId { get; }
+}
+
+public abstract class MotionOutputBase<TSettings> : IMotionOutput<TSettings>
+    where TSettings : OutputSettingsBase
+{
+    public abstract string Name { get; }
+    public abstract string PreviewIcon { get; }
+    public abstract Control SettingsControl { get; }
+    protected abstract IEnumerable<string> GetOutputConfigurationErrorsInternal(bool ignoreAxisAssignment);
+    protected abstract void StartInternal();
+    public abstract void StopInternal();
+    protected abstract void KeepAliveInternal(CompositeGeometryResult geometryResult);
+    protected abstract void UpdateInternal(CompositeGeometryResult geometryResult, TSettings currentSettings);
+
+    public virtual int RefreshRateMs => 2;      // worker thread sleeps this between Update calls
+    // virtual hooks: BeforeStartingMotion(geo), BeforeStoppingMotion(), BeforeStartingIdle(),
+    //                BeforeStoppingIdle(), Park(), Unpark()
+    public virtual double GetAxisValue(CompositeGeometryResult geometryResult, int idx,
+        TSettings currentSettings, bool boostAllowed = false, double defaultUnassignedValue = 0.0);
+    protected void ProcessCommunicationError(Exception ex);
+    public string TypeName => GetType().Name;   // the key the loader matches on
+}
+
+public abstract class SerialOutputBase<TSettings> : MotionOutputBase<TSettings>
+    where TSettings : OutputSettingsBase, ISerialPortSettings
+{   // owns `protected ISerialPort SerialPort`; BeforeSerialOpen/AfterSerialOpen hooks;
+    // implements StartInternal/StopInternal/KeepAliveInternal/GetReservedSerialPorts
+}
+// GenericSerialOutputV2 : SerialOutputBase<GenericSerialOutputSettingsV2> is the reference implementation.
+```
+
+Settings chain: `Simhub.Plugins.Motion.Models.OutputSettingsBase` →
+`ActuatorOrderingSettingsBase(bool allowParkPosition, int actuatorsCount = 8) : OutputSettingsBase,
+IActuatorOrderingSettings` → `GenericSerialOutputSettingsV2 : ActuatorOrderingSettingsBase,
+ISerialPortSettings`. The output is created with `Activator.CreateInstance` and then
+`serializer.Populate`d, so the settings object must exist from the constructor / field
+initializer and persist with `[JsonObject(MemberSerialization.OptIn)]` + `[JsonProperty]`.
+
+### What an output receives per tick
+
+`Update` gets a `CompositeGeometryResult { PrimaryGeometryResult, SecondaryGeometryResult }`, each a
+`GeometryResult` with `IReadOnlyDictionary<ActuatorRole, ActuatorPosition> Axis` (`ActuatorPosition
+{ double Position; double? BoostedPosition; Range }`). These are **per-actuator values after
+SimHub's geometry / DOF mixing**, not raw pitch/roll/heave. `GetAxisValue(geo, channelIdx,
+Settings, boostAllowed: true)` resolves the channel's assigned role, applies `RangeLimit` and
+`ReverseDirection` and returns the geometry's **−1..+1** position (0 = mid-stroke; it does not clamp
+— see "Geometries" for the exact code); `GenericSerialOutputV2.UpdateInternal` simply formats
+that per channel. The per-output worker thread runs every `RefreshRateMs` (2 ms default,
+~500 Hz; the generic outputs keep 2 ms while `UseLegacyDelay` is on, otherwise the shortest
+UpdateCommand delay).
+
+MotionPlugin publishes only `Global.*` (DeviceState, MotionEnabled, overflow, gains, belt, track
+profiler), `MotionCompensationComponent.*`, per-effect `*.Gain` / `*.Enabled` and YawVR
+temperatures — **no per-actuator or `Axis1`-style properties**, so deriving from the base class is
+the only way to get the mixed values.
+
+### Roles and axis assignment
+
+`ActuatorOrderingSettings.Roles[i].Role` is the `ActuatorRole` of output channel *i* (`Axis{i+1}`),
+`0` = `None` (unused — not "auto"); the full enum with values is at the end of the hardware-presets
+subsection below. `RangeLimit` (default 100) and `ParkPosition` (default 50) are stored per role;
+`MaxActuatorsEx` is on `ActuatorOrderingSettingsEditable`. The SimFeedback sample preset ships every
+role as 0 with `ConfigurationDone: false`, so the user maps channels in the UI.
+`AxisFormat { Unset = 0, Binary = 1, NumberString = 2, HexString = 3 }` and `AxisResolution` (bits)
+drive the generic template tokens — see "Generic template language" below.
+
+### Registration — the picker is closed, the loader is open
+
+A plugin cannot add an entry to the hard-coded picker list, but every saved or imported controller
+is materialised by `TypeName` through a resolver that scans plugin DLLs too (details under "How the
+controller list is built"). Net effect: a `public class MyOutput : SerialOutputBase<MySettings>` (or
+`MotionOutputBase<…>` for a non-serial transport; parameterless constructor; short name not
+clashing with a built-in) plus a `Motion\Presets\<name>.shmotioncontroller` =
+`{"Output": {"TypeName": "MyOutput", "CustomName": "…", …}}` (**`CustomName` required**) appears
+under *Presets*, and the same file imports through the import dialog. Folder layout:
+`Motion/Presets/` (empty by default), `Motion/MotionHardwarePresets/*/config.shmotionoutput`,
+`Motion/EffectsDefaults/{Racing,Flight}/`, `Motion/EffectsDefaultsOverrides/`; saved setups under
+`PluginsData/Common/MotionInterfaces/` and `MotionPlugin.GeneralSettingsV2.json`.
+
+### Power settings (`StartMode`, `IdleDetectionMode`, …)
+
+```csharp
+public enum Simhub.Plugins.Motion.Models.OutputStartMode { Off, Last, AlwaysOn }
+public enum Simhub.Plugins.Motion.Models.IdleDetection
+{ GameConnectOrPausedAndProcess, GameConnectedOrPaused, GameConnectedNotPaused }
+```
+
+Current builds keep these on `MotionDevice.PowerSettings` (`StartMode`, `UseIdleTimeout`,
+`IdleTimeoutSeconds`, `StartInIdle`, `IdleDetectionMode`, `AfterConnectMotionDelay`,
+`DisconnectReconnectDelay`, …), not on the output settings. The flat fields in an old
+`.shmotioncontroller` (as in the SimFeedback sample) are legacy: they land in
+`OutputSettingsBase`'s `[JsonExtensionData] internal JObject ExtParams` and are copied into
+`PowerSettings` once, if it has not been set up yet.
+
+### How the controller list is built (`SimHub.Plugins.Motion.UI.OutputPicker`)
+
+Verified by decompiling `SimHub.Plugins.Motion.dll` (9.12.8) in full — 997 files — and
+`AbstractConverter<,>` out of `SimHub.Plugins.dll`.
+
+- The picker constructor hard-codes three lists, each shown **sorted by `Name`**:
+  *Generic* — `GenericSerialOutputV2`, `GenericUDPOutputV2`, `DummyOutput`;
+  *Standard* (source order) — `DynamicXDX2UltraOutput`, `ThermaltakeGM53DofsOutput`,
+  `Cammus3DofsOutput`, `TrakRacer3DOFMotionSystemOutput`, `RaceBearMotion4XOutput`,
+  `ThanosAMCControllerOutput`, `Thanos4UControllerOutput`, `VNMControllerOutput`,
+  `Motion4simControllerOutput`, `PTActuatorsCANOutput`, `DIYSimHubBeltTensionerOutput`,
+  `SMC3OutputH6P6`, `SMC3OutputV2H3P3H2P2`, `SMC3OutputV2H4`, `SMC3OutputNJMotionEvoLegacy`,
+  `SMC3OutputV2Single`, `SCNOutput`; *Legacy* — `ThanosAMCOpenHardwareControllerOutput`,
+  `ThanosAMCMDBOXControllerOutput`.
+- *Presets*: every `Motion\Presets\**\*.shmotioncontroller` deserialised as
+  `Simhub.Plugins.Motion.Settings.MotionControllerSettings { IMotionOutput Output }`; rejected when
+  `Output` is a `ControllersAggregatorOutput` or `CustomName` is empty. The shipped folder is
+  empty; the UI links to github.com/SHWotever/SimHubMotionPresets. "Import from file" takes the
+  same format (`ImportType = Imported`).
+- **Resolution of `TypeName`** — `SimHub.Plugins.SettingsBuilderModule.AbstractConverter<T, UDefault>`
+  (decompiled): a static `PluginFinder.GetResolver(…, typeof(T)).GetPlugins()` is filtered to
+  non-abstract types assignable to `IMotionOutput`, grouped by `Name.ToLowerInvariant()`; `ReadJson`
+  looks up `TypeName`/`typeName` lower-cased, falls back to `UDefault` when it is concrete, else
+  null when `AllowNull`, then `Activator.CreateInstance(type)` + `serializer.Populate(...)`. The
+  finder is the same assembly scan that discovers `IDeviceExtensionFilter` /
+  `IDeviceDescriptorsRegistry` implementations in plugin DLLs, so a public non-abstract
+  `IMotionOutput` in a plugin assembly is resolvable by its short class name. Not in the picker,
+  but reachable through a preset or import file.
+- Outputs that are never in the picker: `YawVROutput` and `PTActuatorsBeltForceOutput` are
+  *forced* by their geometry (`GeometryYawVRBypass.GetForcedOutputType()`,
+  `PTABeltDualAxis.GetForcedOutputType()` → `MotionDevice` does `Activator.CreateInstance`);
+  `ControllersAggregatorOutput` ("Multiple controllers") is created internally and runs each child
+  on its own `OutputWorker` thread; the legacy `GenericSerialOutput`, `GenericUDPOutput`,
+  `SMC3Output`, `SimFeedbackOpenSFXOutput` (its `StartInternal` throws "deprecated"),
+  `DMoverControllerOutput`, `SCNHyperAxisOutput` exist only so old saved JSON still loads.
+- Serialised members of an output: `TypeName`, `OutputId`, `CustomName`, `CustomNamePattern`,
+  `ShowOriginalName`, `Comments`, `ImportType`, `AutomaticOrigin`, `ReviewManager`, `Settings`.
+  `Settings.ActuatorOrderingSettings.Roles[] = { Role, MotionTarget, ReverseDirection, RangeLimit,
+  ParkPosition }` plus `ConfigurationDone`, `UseParkPosition`, `ParkDuration`, `MaxActuatorsEx`.
+
+### Shared output conventions
+
+- Every output receives per-channel values in **[−1, +1]** from `GetAxisValue` (applies
+  `RangeLimit/100` and `ReverseDirection`; role `500+idx` is a raw test value).
+- Lifecycle: `StartInternal` → `AfterStarting`; first `Update`: `BeforeStartingMotion` → `Unpark`
+  (ramp to live position) → `UpdateInternal` every tick; going idle: `Park` → `BeforeStoppingMotion`
+  → `KeepAliveInternal` loop (`BeforeStartingIdle` / `BeforeStoppingIdle`); stop: `BeforeStopping`
+  → `StopInternal`.
+- `SerialOutputBase<T>` opens the port at `BaudRate` (default 250000) with RTS = DTR = true and a
+  5 s write timeout; `KeepAliveInternal` writes a zero-length buffer every 500 ms. Its **default
+  frame** is `FF FF` + `ProtocolAxis` (8) × uint16 **big-endian** + `0A 0D`, with
+  `ConvertTo16Bits(v) = clamp((v/2 + 0.5) × 65536, 0, 65535)` — centre `0x8000`.
+
+### Built-in output controllers (9.12.8)
+
+No code exists for Qubic, ProSimu, Next Level Racing, Sigma Integrale, MotionAlpha, Simucube or
+MOZA; FlyPT appears only in the OpenVR/OpenXR motion-compensation UI; DOF Reality is a set of
+SMC3 (Arduino) wrappers; VeroMotion, Novus and eRacing-Lab exist only as hardware presets over the
+PT-Actuator and Thanos outputs.
+
+| Class | UI name | Transport | Channels / roles | Rate | Per-tick frame and handshake |
+|-------|---------|-----------|------------------|------|------------------------------|
+| `GenericSerialOutputV2` | Generic serial output | serial, user baud (default 115200), RTS default on, DTR off, `AfterOpenDelay` | 10, user-assigned | 2 ms unless `UseLegacyDelay` off | user template (below) |
+| `GenericUDPOutputV2` | Generic UDP output | UDP `TargetIPAddress:TargetPort` (127.0.0.1:11000), optional ping check | 10 | same | one datagram per command, no reply wait |
+| `DummyOutput` | Testing virtual output | none (WPF window) | 10 | 2 | shows Axis1..10; can simulate E-stop / failure / not-found |
+| `DynamicXDX2UltraOutput` | DynamicX DX2 Ultra | serial 921600 8N1, RTS/DTR off | 2 fixed: `LinearSideLeft`, `LinearSideRight` | 10 | `54 00 02 [A1 BE16] [A2 BE16] 56` |
+| `ThermaltakeGM53DofsOutput` / `TrakRacer3DOFMotionSystemOutput` / `RaceBearMotion4XOutput` (all `GM53DofsOutput`) | Thermaltake GM5 3DOF / Trak Racer 3DOF / Race Bear Motion 4X | serial 115200 8N1, RTS on | 4 fixed: FR, RR, RL, FL; park at bottom | 2 (≥ 4 ms between frames) | `"HA"` + 4 × BE16, no terminator |
+| `Cammus3DofsOutput` | Cammus Dynamic Racing Simulator | serial 115200 8N1 | 4 fixed: FL, FR, RL, RR | 2 | `61 62 [A1][A2][A3][A4] 63 64`, **8-bit** per axis |
+| `ThanosAMCControllerOutput` | Thanos AMC Controller (AASD15A) | serial 250000, FTDI VID `0x0403` filter | 7, user-assigned | 2 | `FF FF` + 8 × BE16 + `0A 0D`; text handshake `RQM` → `AMC…`/`Thanos…` version, `C:<type>`, `CMD56`, spike filters `spv15..19`, enhancements (fw ≥ 2.26.8): `CMD60/66/65/63/70/64/62V`; async `SH:E-stopped:`, `SH:Active:`, `SH:Park_Done:` |
+| `Thanos4UControllerOutput` | Thanos Thanos4U Controller | same | 4 (`T4UM`/`T4US`), enhancements fw ≥ 1.02.9 | 2 | same 20-byte frame + handshake |
+| `ThanosAMCOpenHardwareControllerOutput` / `ThanosAMCMDBOXControllerOutput` (legacy) | Thanos Open Hardware / AMC MDBOX | serial 250000 | 7 | `UpdateIntervalMs` (2) | plain `FF FF` + 8 × BE16 + `0A 0D`, no handshake |
+| `VNMControllerOutput` | VNM Motion Controller | serial 250000, RTS/DTR on | 9, user-assigned | 2 | `FF FF` + 9 × BE16 + `0A 0D` |
+| `Motion4simControllerOutput` | Motion4Sim Servo Motion Controller | serial 250000 | 8 | 2 | `FF FF` + 8 × **uint24 BE** + `0A 0D`; optional `F9 F9 80 00 00 00 0A 0D` calibrate-online at start |
+| `DIYSimHubBeltTensionerOutput` | SimHub DIY Belt Tensioner | serial 250000 | 2 (`BeltLeft`, `BeltRight`) | 2 | `FF FF 01` + 2 × BE16 + `0A 0D`; start: `FF FF 0E` version, `FF FF 0A` motor count, speed `FF FF 02`, accel `FF FF 03` |
+| `SMC3OutputV2Single` | SMC3 controller | serial 500000 (`Smc3Controller`), DTR = reset, forced for STM VID `0x0483` | 3, user-assigned | `Settings.RefreshRateMs` (10) | three 5-byte packets `[A hi lo][B hi lo][C hi lo]`; position 511 + v·511 (10-bit) or 2047 + v·2047 (12-bit fw); handshake `[ver]` → `[v hi lo]`, `[ena]`, PID `[D..O hi lo]`, 1 s zero-byte keepalive |
+| `SMC3OutputV2H3P3H2P2` | DofReality M2 / MP2 / H2 / P2 / H3 / P3 (SMC3) | same | 3 fixed: `LinearSideLeft`, `LinearSideRight`(rev), `SingleTractionLoss`; PID defaults Kp130 Ki3 Kd4 Ks5 | 10 | same |
+| `SMC3OutputV2H4` | DofReality H4 / P4 (SMC3) | same | 4 fixed: RR(rev), RL(rev), TL(rev), `LinearFrontCenter`(rev) | 10 | `[A][B][C]` + `[Y hi lo]` |
+| `SMC3OutputH6P6` | DofReality H6 / P6 (SMC3) | **two** serial ports (`SerialPortL`/`SerialPortR`) | 6 hexapod roles, `RangeLimit` 95 | 10 | `[A][B][C]` per board; `[v6d][v6D]` reads the board side to auto-assign ports |
+| `SMC3OutputNJMotionEvoLegacy` | NJMotion Evo (SMC3) | same | 2: side left/right(rev) | 10 | `[A][B][C]` |
+| `SCNOutput` (+ hidden `SCNHyperAxisOutput`) | Dyadic Systems SCN5 / SCN6 | vendor DLL `TMBSCOM.dll` (copied to `%TEMP%` and `LoadLibrary`'d), `\\.\COMx` 115200 | 2 axes | 2 | `fn_move_abs(axis, centre + centre·v·SafeRange%)`; homing at start / before motion / stop; wire format hidden in the DLL |
+| `PTActuatorsCANOutput` | PT-Actuator CAN Controller | vendor DLL `PT_MOTOR_DLL.dll` (P/Invoke, `Serial_OpenPort(n, 115200)`) | up to 15 CAN ids; default RL, FL, FR, RR, RearTL, Surge, FrontTL(rev), BeltL/R | `RefreshIntervalMs` 1–50 (5) | per motor `PP_Abs_move` / `PP_Abs_move_enhance` with pos = (v+1)/2 · 10000; `LED_Set`; E-stop poll; start: online check, versions, `CMD_Enable_motor` ×15, homing `HM_Set`/`HM_start_motor`, `PP_Set(vel, acc, dec)`; stop `PP_stop_motor`, `Serial_ClosePort` |
+| `PTActuatorsBeltForceOutput` (forced) | PT-Actuator CAN BeltForce | same DLL | motors 7/8 only (belts) | 5 | same |
+| `YawVROutput` (forced by `GeometryYawVRBypass`) | Yaw VR | UDP 50010 (pose) + TCP 50020 (control); discovery by UDP broadcast `YAW_CALLING` | pose bypass, no actuators (YAW1/2/3) | 5 | ASCII `Y[yyy.yyy]P[ppp.ppp]R[rrr.rrr]` (roll and yaw negated); TCP `0x30` + UDP port + `"SimHub"`, `0xD4`, `0xF6`, `0xA1` start / `0xA2` stop / `0xA3` exit; 1 s status timer `E5 E4 B0 F6`; tracker feedback `Y[..]P[..]R[..]U[..]`; optional shared memory `YawVRGEFile` |
+| `ControllersAggregatorOutput` | Multiple controllers | — | fans out to children | children's own | passes the geometry to every child worker |
+| `DMoverControllerOutput` (hidden) | D-MOVER (DM-H3) | serial 1 500 000 | 4: FL, FR, RL, RR | 2 | `66 CC 00` + 17-byte payload + sum-checksum per motor, CANopen SDO setup at open; position scaling looks saturated at \|v\| ≈ 0.02 (apparent bug) |
+| `SimFeedbackOpenSFXOutput` (deprecated) | OpenSFX SimFeedback AC-Servo | serial 460800 | 4 | 2 | `StartInternal` throws; the shipped `.shmotioncontroller` preset for SimFeedback uses `GenericSerialOutputV2` instead (`3,<CommandCounter>,<Axis1,string,-4096,4096>,…;` at 250000 baud, `10;` → `10,Arduino ready`, `14,<Setting,…>;`, keepalive `15;`, stop `7;`) |
+
+`SimHub.WitMotion.dll` is an **input**: `MotionCompensation.WitMotionManager` reads a WitMotion IMU
+over serial (115200, 100 Hz) for VR motion compensation; it is not an output.
+
+### Generic template language (`GenericSerialOutputV2` / `GenericUDPOutputV2`)
+
+Source: `SimHub.Plugins.Motion.Outputs.GenericCommon/GenericCommand.cs` (`UpdateRegEx`,
+`PartFactory`). Text between tokens is sent as Latin-1 bytes; there are **no escape sequences**
+(write `<10>`/`<13>` or `<0x0A>`/`<0x0D>` for CR/LF) and **no checksum/CRC token**. A token that
+fails to parse is sent literally.
+
+| Token | Where | Encoding |
+|-------|-------|----------|
+| `<AxisN>` (`N` = 1–9 digits, trailing `a`/`b` ignored — `<Axis10>` cannot be written) | Update / IdleUpdate only | `u = clamp((v+1)/2 · (2^R − 1))`, `R` = `AxisResolution` bits (default **8**); `AxisFormat` `Binary` → ⌈R/8⌉ bytes big-endian, `NumberString` → decimal ASCII, `HexString` → upper-case hex without leading zeros |
+| `<Left>` / `<Right>` | same | Axis1 / Axis2 shortcuts |
+| `<AxisN,string,min,max>` | same | decimal ASCII of (int) v mapped −1..1 → min..max; always a string |
+| `<Actuator,Role>` (`ActuatorRole` name) | same | like `<AxisN>` but reads the geometry role directly (bypasses slot reverse/range); the factory indexes `array[2]` of a 2-part split — likely throws |
+| `<ActuatorPosition:N\|map=a,b\|clamp=a,b\|format=F\|stringformat=S\|round=n\|littleendian>` | same | slot N through `FormatConverter.EncodeValue` (default Float, big-endian, 3 decimals) |
+| `<PoseAxis:[Primary\|Secondary:]Axis\|rev\|convert=Unit\|clamp\|map=s0,s1,d0,d1\|format\|stringformat\|round\|littleendian\|bigendian>` | same | platform pose (`MotionAxis`: `YawDegrees`, `PitchDegrees`, `RollDegrees`, `HeaveMm`, `SurgeMm`, `SwayMm`, corners, `Extra*`, belts, wind) with unit conversion (`UnitKind`: Degrees, Radians, CentiDegrees, Millimeters, Meters, Percent, PercentZeroToOne, m/s, cm/s, m/s², °/s, rad/s) — the token to use with a 6-DOF pose-bypass geometry |
+| `<Pose:…>` | same | v1 of the above (ints big-endian, floats native little-endian, no clamp) |
+| `<NNN>` / `<0xHH>` | any phase | one raw byte |
+| `<CommandCounter>` | any | per-token counter from 1, decimal ASCII |
+| `<Setting,Name,Fmt>` | any | `string.Format("{0:Fmt}", Settings.Name)` from the protocol's `SettingsBuilder` (user NCalc settings). The editor's "insert setting" button writes `<Settings,…>` (plural), which does not match — sent literally |
+| `<Setting:Name\|map\|clamp\|format\|stringformat\|round\|littleendian>` | any | numeric setting through `FormatConverter` |
+
+`PartFormat`: `String, Float, Double, Uint8, UInt16, UInt24, UInt32, Int8, Int16, Int24, Int32`
+(clamped to range); `StringFormatKind`: `None, String, AlwaysSignedString`; strings use `"0.###"`.
+
+`GenericProtocolDefinitionV2`: `AxisResolution` (bits, default 8), `AxisFormat` (`Binary` default),
+`UseLegacyDelay` (default **true**), `ShowAdvancedPhases`, `SettingsBuilder`, and the command lists
+`StartCommands`, `UpdateCommands`, `StopCommands`, `ConnectedCommands`, `DisconnectCommands`,
+`IdleStartCommands`, `IdleUpdateCommands`, `IdleStopCommands`. `GenericCommand { Command,
+CommandDelay }`; `GenericCommandWithResponse` adds `MustWaitForMessage`, `WaitForMessage` (also a
+template), `WaitForDelay` (timeout, 5000 ms) — serial only, `ReadExisting` until the text appears,
+timeout = failure + port closed.
+
+Phase semantics: `StartCommands` run in `BeforeStartingMotion` (at the first live update, before
+unpark — not at port open); `UpdateCommands` every tick, each sent when `now − lastSent ≥
+CommandDelay` (or always when `CommandDelay == RefreshRateMs`); `StopCommands` in
+`BeforeStoppingMotion` after `Park`, with axis values reading 0; with `ShowAdvancedPhases`,
+`ConnectedCommands` in `AfterStarting`, `DisconnectCommands` in `BeforeStopping`, `IdleStart` /
+`IdleStop` on idle transitions, `IdleUpdateCommands` in `KeepAliveInternal`. `RefreshRateMs` is
+2 ms while `UseLegacyDelay` is on; otherwise `max(1, min CommandDelay)` of the active update
+list (vendor wrappers on `GenericSerialOutputV2Base`: the single update command's delay, else 2).
+
+### Hardware presets (`Motion\MotionHardwarePresets\<dir>\`)
+
+Read by `MotionPresets.MotionHardwarePresetsProvider.GetPresets()` for the setup wizard's
+"Accessories" page (not the output picker). `preset.json = { Name, Brand, Comment, ParentPreset,
+IsGenericPreset, DebugOnly }`; `config.shmotionoutput = { Geometry, SecondaryGeometry, Output }`
+(a child without a config inherits its parent's config and logo); `logo.png`. **Every preset wraps
+exactly one child output in a `ControllersAggregatorOutput`.** 25 folders ship in 9.12.8:
+
+| Preset | Geometry (+ extra axes) | Child output | Roles in slot order |
+|--------|-------------------------|--------------|---------------------|
+| DOFReality H2 / P2 (parent `DOFReality_2DOFs`) | `Geometry2Dof2Linear` | `SMC3OutputV2H3P3H2P2` | 31 SideLeft, 32 SideRight (rev); `RefreshRateMs` 10 |
+| DOFReality H3 / P3 (parent `_3DOFs`) | `Geometry2Dof2Linear` + `TLSingleAxis` | `SMC3OutputV2H3P3H2P2` | 31, 32 (rev), 6 SingleTractionLoss |
+| DOFReality H4 / P4 | `Geometry3Dof4Linear1F2R` + `TLSingleAxis` | `SMC3OutputV2H4` | 4 RR (rev), 3 RL (rev), 6 TL (rev), 13 FrontCenter (rev) |
+| DOFReality H6 / P6 (parent `_6DOFs`) | `Geometry6DOFsStewartRotary` (rod 560, crank 90) | `SMC3OutputH6P6` | 56 (rev), 55, 54 (rev), 51, 52 (rev), 53 — all `RangeLimit` 95 |
+| Cammus 3DOFs | `Geometry3Dof4Linear` (stroke 80) | `Cammus3DofsOutput` | 1, 2, 3, 4 |
+| DynamicX DX2 Ultra | `Geometry2Dof2Linear` | `DynamicXDX2UltraOutput` | 31, 32 |
+| Thermaltake GM5 / Trak Racer 3DOF / RaceBear Motion 4X 100 & 150 | `Geometry3Dof4Linear` | the matching `GM53DofsOutput` subclass | 2, 4, 3, 1; `UseParkPosition` |
+| eRacing-Lab RS MINI / RS MEGA 4U, Novus XMotion | `Geometry3Dof4Linear` | `Thanos4UControllerOutput` | 3, 1, 2, 4 |
+| eRacing-Lab RS MEGA Plus | same | `ThanosAMCControllerOutput` | 3, 1, 2, 4 |
+| VeroMotion Champion GT 100 mm / GTR 150 mm | `Geometry3Dof4Linear` (stroke 100 / 150) | `PTActuatorsCANOutput` | 3, 1, 2, 4 (CAN ids 1–4), `RefreshIntervalMs` 5 |
+| VeroMotion Legend GT / GTR | `Geometry3Dof4Linear` + `SurgeAxis` + `TLFrontRearAxis` | `PTActuatorsCANOutput` | 3, 1, 2, 4, 8 RearTL (rev), 5 Surge, 7 FrontTL |
+| VeroMotion BeltForce (`DebugOnly`) | `NullGeometry` + `PTABeltDualAxis` | `PTActuatorsBeltForceOutput` | 21, 22 |
+| Yaw VR | `GeometryYawVRBypass` | `YawVROutput` | — (pose bypass) |
+| Sample | — | — | `preset.json` only |
+
+`ActuatorRole` (`Outputs.ActuatorOrdering`): 1–4 `LinearCornerFrontLeft/FrontRight/RearLeft/RearRight`;
+5 `SurgeAxis`; 6/7/8 `SingleTractionLoss`/`FrontTractionLoss`/`RearTractionLoss`; 9 `SwayAxis`;
+10 `SurgeAxisSecondary`; 11 `HeaveAxis`; 12 `PitchAxis`; 13/14 `LinearFrontCenter`/`LinearRearCenter`;
+15 `RollAxis`; 21–23 `BeltLeft/Right/Center`; 31/32 `LinearSideLeft/Right`; 33–36
+`FourDofsLinearCorner*`; 51–56 `SixDOFsHexapod` FrontRight, MiddleRight, RearRight, RearLeft,
+MiddleLeft, FrontLeft; 61–63 `WindLeft/Center/Right`; 100+ / 500+ test axes.
+
 ## MahApps Metro
 
 SimHub's UI is built on [MahApps.Metro](https://mahapps.com/). Plugin UIs can use MahApps controls (`MetroComboBox`, `ToggleSwitch`, etc.) for consistent styling. The assemblies are already loaded by SimHub at runtime.

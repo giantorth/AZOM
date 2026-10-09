@@ -163,7 +163,7 @@ touch session lifecycle, test a game switch explicitly.
 | `Data/` | `Telemetry.json` — 400+ channel definitions (URL, compression, package_level, default `simhub_property`/`simhub_scale`) |
 | `Themes/` | WPF theme dictionaries (`MozaTheme`, `MozaIcons`, `Generic.xaml`). **Frozen path** — see [Paths that can't move](#paths-that-cant-move) |
 | `docs/` | This guide, protocol reference (`docs/protocol/`), SimHub internals notes (`simhub.md`), capture workflow (`usb-capture.md`), MOZA Dashboard Studio CLI integration (`dashboard-studio.md`) |
-| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …) plus the no-capture emitter checks (`cmd-frame`, `pedal-haptics-frame-check`) and `dissector-selftest.lua`. Capture dir comes from `MOZA_TRACE_DIR` |
+| `tools/` | Reusable wire-trace / capture analysis scripts (`moza_trace.py`, `tierdef-decode`, `cm1-0x35-decode`, `fsr1-*`, `wire-*`, …) plus the no-capture emitter checks (`cmd-frame`, `pedal-haptics-frame-check`) and `dissector-selftest.lua`. Capture dir comes from `MOZA_TRACE_DIR`. pcapng front-end: `usbpcap.py` (streaming USBPcap reader), `pcap-inventory` (per-USB-device frame inventory + JSONL export, `--device auto`), `pcap-slim` (one device out of a multi-GB capture), `pcap_to_jsonl.py`. Motion platform: `motion-decode`, `motion-replay-correlate` + `simhub_replay.py` (SimHub session-recording reader) — see [`docs/protocol/motion/`](protocol/motion/) |
 | _(moved out)_ | The Python wheel/device emulator + USB-gadget bridge rig now lives in its own project: [giantorth/moza-simulator](https://github.com/giantorth/moza-simulator) |
 | `libs/SimHub/` | Reference-only SimHub DLLs, auto-updated by CI |
 
