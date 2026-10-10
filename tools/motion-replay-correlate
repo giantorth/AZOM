@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""Correlate the motion-platform 0x22 game stream with a same-session SimHub replay.
+
+Aligns the host->controller 0x22/00 telemetry frames (tools/pcap-inventory --jsonl,
+epoch timestamps) to the replay frames (tools/simhub_replay.py, 10 Hz) by UTC, searches
+a small lag window, then for every float field reports the replay channels that fit it
+best (linear least squares: value = a * channel + b, ranked by R^2). Also checks the
+tail bytes against Throttle/Brake, the 0x22/09 oscillator base frequency against RPM,
+the 0x22/07 bursts against BrakeABSactive, the 0x22/08 pulses against Gear changes and
+prints the game state at each 0x20/02 run-state toggle.
+
+Usage:
+    tools/motion-replay-correlate capture.jsonl /path/to/Replays/IRacing/20261007_204238
+        [--anchor f8] [--lag-max 3] [--lag-step 0.05] [--top 3] [--max-samples 3000]
+
+The replay stem is the path without extension (reads .telemetry.json/.jsonidx/.metadata).
+"""
+from __future__ import annotations
+
+import argparse
+import bisect
+import json
+import math
+import struct
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+sys.path.insert(0, str(Path(__file__).parent))
+from simhub_replay import channel_value, iter_frames, numeric_channels, read_metadata  # noqa: E402
+
+
+def f32(b: bytes, off: int) -> float:
+    return struct.unpack_from(">f", b, off)[0]
+
+
+def load_stream(path: str):
+    frames00, osc09, ev07, ev08, toggles = [], [], [], [], []
+    with open(path) as fh:
+        for line in fh:
+            o = json.loads(line)
+            if o["dir"] != "h2b":
+                continue
+            fr = bytes.fromhex(o["hex"])
+            grp, pl, t = fr[2], fr[4:-1], o["t"]
+            if grp == 0x22 and pl:
+                c = pl[0]
+                if c == 0x00 and len(pl) == 53:
+                    frames00.append((t, [f32(pl, 1 + 4 * i) for i in range(12)], pl[49], pl[50], pl[51], pl[52]))
+                elif c == 0x09 and len(pl) == 51:
+                    osc09.append((t, [(pl[3 + 9 * i], f32(pl, 4 + 9 * i), f32(pl, 8 + 9 * i)) for i in range(5)]))
+                elif c == 0x07 and len(pl) >= 12:
+                    ev07.append((t, f32(pl, 4), f32(pl, 8)))
+                elif c == 0x08 and len(pl) >= 10:
+                    ev08.append((t, pl[1], f32(pl, 4)))
+            elif grp == 0x20 and len(pl) >= 3 and pl[0] == 0x02:
+                toggles.append((t, pl[1], pl[2]))
+    return frames00, osc09, ev07, ev08, toggles
+
+
+def linfit(xs: List[float], ys: List[float]) -> Optional[Tuple[float, float, float]]:
+    n = len(xs)
+    if n < 3:
+        return None
+    sx = sum(xs); sy = sum(ys)
+    sxx = sum(x * x for x in xs); sxy = sum(x * y for x, y in zip(xs, ys))
+    den = n * sxx - sx * sx
+    if abs(den) < 1e-12:
+        return None
+    a = (n * sxy - sx * sy) / den
+    b = (sy - a * sx) / n
+    ybar = sy / n
+    ss_tot = sum((y - ybar) ** 2 for y in ys)
+    ss_res = sum((y - (a * x + b)) ** 2 for x, y in zip(xs, ys))
+    r2 = 1 - ss_res / ss_tot if ss_tot > 1e-12 else float("nan")
+    return a, b, r2
+
+
+class Replay:
+    def __init__(self, stem: str):
+        self.meta = read_metadata(stem)
+        self.t: List[float] = []
+        self.chan: List[Dict[str, float]] = []
+        self.raw: List[dict] = []
+        for fr in iter_frames(stem):
+            self.t.append(fr.t_utc)
+            self.chan.append(numeric_channels(fr.data))
+            self.raw.append(fr.data)
+        self.names = sorted(set().union(*[c.keys() for c in self.chan])) if self.chan else []
+
+    def nearest(self, t: float, tol: float) -> Optional[int]:
+        j = bisect.bisect_left(self.t, t)
+        best, bd = None, tol
+        for jj in (j - 1, j):
+            if 0 <= jj < len(self.t):
+                d = abs(self.t[jj] - t)
+                if d <= bd:
+                    best, bd = jj, d
+        return best
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("jsonl")
+    ap.add_argument("stem")
+    ap.add_argument("--anchor", default="f8", help="stream field used for the lag search (default f8)")
+    ap.add_argument("--anchor-channels", default="Telemetry.LFshockDefl,Telemetry.RFshockDefl,Telemetry.LRshockDefl,Telemetry.RRshockDefl")
+    ap.add_argument("--lag-max", type=float, default=3.0)
+    ap.add_argument("--lag-step", type=float, default=0.05)
+    ap.add_argument("--tol", type=float, default=0.06, help="max |dt| to pair a stream frame with a replay frame")
+    ap.add_argument("--top", type=int, default=3)
+    ap.add_argument("--max-samples", type=int, default=3000)
+    ap.add_argument("--min-var", type=float, default=1e-9, help="skip replay channels with lower variance")
+    args = ap.parse_args()
+
+    frames00, osc09, ev07, ev08, toggles = load_stream(args.jsonl)
+    rep = Replay(args.stem)
+    print(f"# replay: {rep.meta.game} {rep.meta.car} @ {rep.meta.track}  frames={len(rep.t)}  "
+          f"UTC {rep.meta.start_utc:.1f}..{rep.meta.end_utc:.1f}")
+    if not frames00:
+        print("# no 0x22/00 frames in capture")
+        return 2
+    print(f"# stream: {len(frames00)} 0x22/00 frames  UTC {frames00[0][0]:.1f}..{frames00[-1][0]:.1f}")
+    overlap = min(frames00[-1][0], rep.meta.end_utc) - max(frames00[0][0], rep.meta.start_utc)
+    print(f"# overlap: {overlap:.1f}s")
+    if overlap <= 0:
+        return 2
+
+    # subsample the stream evenly for the fits
+    step = max(1, len(frames00) // args.max_samples)
+    sample = frames00[::step]
+    anchor_idx = int(args.anchor[1:])
+    anchor_chans = [c for c in args.anchor_channels.split(",") if c]
+
+    def pairs(lag: float, field: int, chan: str) -> Tuple[List[float], List[float]]:
+        xs, ys = [], []
+        for (t, vals, *_rest) in sample:
+            j = rep.nearest(t + lag, args.tol)
+            if j is None:
+                continue
+            v = rep.chan[j].get(chan)
+            if v is None:
+                continue
+            xs.append(v); ys.append(vals[field])
+        return xs, ys
+
+    # --- lag search on the anchor field ---------------------------------------
+    best_lag, best_r2, best_chan = 0.0, -1.0, ""
+    lag = -args.lag_max
+    while lag <= args.lag_max + 1e-9:
+        for ch in anchor_chans:
+            xs, ys = pairs(lag, anchor_idx, ch)
+            fit = linfit(xs, ys)
+            if fit and not math.isnan(fit[2]) and fit[2] > best_r2:
+                best_lag, best_r2, best_chan = lag, fit[2], ch
+        lag += args.lag_step
+    print(f"# lag search on {args.anchor}: best lag {best_lag:+.2f}s (stream time + lag = replay time) "
+          f"via {best_chan} R^2={best_r2:.4f}")
+    lag = best_lag
+
+    # --- per-field channel ranking --------------------------------------------
+    # precompute pairing once
+    paired: List[Tuple[List[float], int]] = []
+    for (t, vals, *_rest) in sample:
+        j = rep.nearest(t + lag, args.tol)
+        if j is not None:
+            paired.append((vals, j))
+    print(f"# paired samples: {len(paired)} of {len(sample)}")
+    chan_cols: Dict[str, List[float]] = {}
+    for name in rep.names:
+        col = [rep.chan[j].get(name) for _v, j in paired]
+        if any(c is None for c in col):
+            continue
+        m = sum(col) / len(col)
+        var = sum((c - m) ** 2 for c in col) / len(col)
+        if var < args.min_var:
+            continue
+        chan_cols[name] = col
+    print(f"# candidate replay channels with variance: {len(chan_cols)}")
+    print("\n# field  best-fit channels (R^2, scale a, offset b)  value = a*channel + b")
+    for fi in range(12):
+        ys = [v[fi] for v, _j in paired]
+        if max(ys) - min(ys) < 1e-9:
+            print(f"  f{fi:<3} constant {ys[0]:.4f}")
+            continue
+        ranked = []
+        for name, col in chan_cols.items():
+            fit = linfit(col, ys)
+            if fit and not math.isnan(fit[2]):
+                ranked.append((fit[2], name, fit[0], fit[1]))
+        ranked.sort(reverse=True)
+        best = ranked[: args.top]
+        print(f"  f{fi:<3} " + " | ".join(f"{n} R2={r2:.4f} a={a:.4g} b={b:.4g}" for r2, n, a, b in best))
+
+    # --- tail bytes ------------------------------------------------------------
+    for label, byte_idx, chan in (("tail[0]", 2, "Telemetry.Throttle"), ("tail[1]", 3, "Telemetry.Brake")):
+        xs, ys = [], []
+        for rec in sample:
+            j = rep.nearest(rec[0] + lag, args.tol)
+            if j is None:
+                continue
+            v = rep.chan[j].get(chan)
+            if v is None:
+                continue
+            xs.append(v); ys.append(float(rec[byte_idx]))
+        fit = linfit(xs, ys)
+        if fit:
+            print(f"# {label} vs {chan}: a={fit[0]:.3f} b={fit[1]:.3f} R2={fit[2]:.4f}")
+    flags = {}
+    for rec in frames00:
+        flags[(rec[4], rec[5])] = flags.get((rec[4], rec[5]), 0) + 1
+    print(f"# tail[2],tail[3] histogram: {sorted(flags.items(), key=lambda x: -x[1])[:6]}")
+
+    # --- 0x22/09 oscillators vs RPM -------------------------------------------
+    if osc09:
+        for k in range(5):
+            xs, ys = [], []
+            for t, recs in osc09[:: max(1, len(osc09) // args.max_samples)]:
+                j = rep.nearest(t + lag, args.tol)
+                if j is None:
+                    continue
+                rpm = rep.chan[j].get("Telemetry.RPM")
+                if rpm is None:
+                    continue
+                xs.append(rpm); ys.append(recs[k][2])
+            fit = linfit(xs, ys)
+            if fit:
+                print(f"# 0x22/09 record {k} freq vs RPM: freq = {fit[0]:.5f}*RPM + {fit[1]:.2f}  R2={fit[2]:.4f}  "
+                      f"(1/60 = 0.01667)")
+    # --- 0x22/07 vs ABS ---------------------------------------------------------
+    if ev07:
+        hit = tot = 0
+        for t, _a, _f in ev07:
+            j = rep.nearest(t + lag, args.tol)
+            if j is None:
+                continue
+            tot += 1
+            if rep.chan[j].get("Telemetry.BrakeABSactive", 0.0) > 0.5:
+                hit += 1
+        print(f"# 0x22/07 frames with BrakeABSactive at the paired replay frame: {hit}/{tot}")
+    # --- 0x22/08 vs gear changes -----------------------------------------------
+    if ev08:
+        gear_edges = []
+        prev = None
+        for j in range(len(rep.t)):
+            g = rep.chan[j].get("Telemetry.Gear")
+            if prev is not None and g is not None and g != prev:
+                gear_edges.append((rep.t[j], prev, g))
+            prev = g if g is not None else prev
+        matched = 0
+        for t, seq, amp in ev08:
+            tt = t + lag
+            near = [e for e in gear_edges if abs(e[0] - tt) <= 0.3]
+            if near:
+                matched += 1
+        print(f"# 0x22/08 pulses: {len(ev08)}, within 0.3s of a Gear change: {matched}; gear changes in replay: {len(gear_edges)}")
+        for t, seq, amp in ev08[:12]:
+            tt = t + lag
+            near = [e for e in gear_edges if abs(e[0] - tt) <= 0.3]
+            print(f"    seq {seq:3d} amp {amp:.3f} -> " + (f"gear {near[0][1]:.0f}->{near[0][2]:.0f}" if near else "no gear edge"))
+    # --- 0x20/02 toggles --------------------------------------------------------
+    if toggles:
+        print("\n# 0x20/02 run-state writes with game state at that moment")
+        keys = ["Telemetry.Speed", "Telemetry.IsOnTrack", "Telemetry.OnPitRoad", "Telemetry.Throttle",
+                "Telemetry.Brake", "Telemetry.Gear", "Telemetry.RPM"]
+        for t, sub, arg in toggles:
+            j = rep.nearest(t + lag, 0.6)
+            state = ", ".join(f"{k.split('.')[-1]}={rep.chan[j].get(k)}" for k in keys) if j is not None else "no replay frame"
+            print(f"  {t - frames00[0][0]:8.2f}s  0x20/02 {sub:02x} {arg:02x}  {state}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

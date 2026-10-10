@@ -287,7 +287,7 @@ namespace MozaPlugin.Telemetry
                 int MaxCatalogRequests =
                     (MozaPlugin.Instance?.Settings?.EnableRadarTrackMapChannels ?? false)
                         ? 6 : 3;
-                byte mgmt = _mgmtPort != 0 ? _mgmtPort : (byte)0x01;
+                byte mgmt = EffectiveMgmtPort;
                 byte flag = FlagByte;
                 int totalWaited = 0;
                 bool haveCatalog = false;

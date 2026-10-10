@@ -1,5 +1,18 @@
 ## Open questions
 
+- **Motion platform (HMA150 / Motion Controller PID `0x2000`)** — see [`motion/`](motion/). Everything below is observed-but-unexplained; the rest of the protocol is verified byte-exact.
+  - `0x22/00` telemetry field **f7**: tracks 0.35 × Speed in the straight-line `100_STROKE` run (R² 0.88) but fits no replay channel at Spa (−50…+56, negative while coasting). Not a plain irsdk channel — possibly a host-derived quantity (traction-loss / slip?). Needs a capture with wheel-speed channels in the replay or a controlled test (constant speed, then wheelspin).
+  - **f6** fits −(VertAccel − g) only loosely (R² 0.43–0.64 against the 10 Hz replay) — host-side filtering, or a different vertical quantity. A replay recorded at 60 Hz would settle it.
+  - **Modes 3, 4, 5**: 3 is reached right after the travel self-check and prints the kinematic model (`Device Type`, `Output Displacement`, `Calib Length/Width`) — "position calibration" is a label inferred from the UI button, not confirmed; 4 appears for one poll after game mode ends; 5 is always transitional. Confirm by pressing *Position Calibration* and *Speed Mode Setting* in Motion Manager under capture.
+  - **`0x20/02` `03 00` ↔ `02 00` toggles in game mode** line up with brake application (~5 % threshold while stationary; braking zones at speed) but the exact rule is unknown. Also unknown: whether the controller behaves differently in state 02 vs 03 (the `0x22` stream never pauses).
+  - **Status records**: `0x21/01` byte 1 (`3C` / `3A` / `00`), mode-poll flag bit `0x04` (seen at power-up and after a cable re-seat) and `0x01` (the mode-4 poll); the per-port 32-bit word in `0x21/02` during game mode (`BF C9 6A 16` = the current yaw's bit pattern, `84 80 00 59`).
+  - **`0x0E/03` notification codes** `00 01 03 04 0D` (not mode numbers).
+  - **Port → corner role codes**: 5 = Rear-Left and 7 = Rear-Right are consistent in two captures; 1 = Front-Right / 3 = Front-Left assumes the UI's "Device N" rows are in port order. One capture that assigns a single known corner would pin it.
+  - **`0x27` per-actuator block** (8 floats, first ≈ 1000) and **`0x1F/09`** (always 0): meaning unknown.
+  - **`0x22/09` record 0** (265 Hz, gain 0.00018, constant) — which haptic effect; and the gain ↔ slider mapping of the engine harmonics (sliders were never moved under capture).
+  - **Lighting table `0x1E/0B`** parameter names: the lighting page was never exercised; only the shape (3 global bytes + 3 zones × 8 params with RGB values) is known.
+  - **Mode 2 as a streaming target**: only discrete `0x1E/07` slider setpoints were captured (9 frames / 73 s). Whether the controller accepts and smooths a continuous setpoint stream at game rates is untested — relevant to any host-side-cueing integration (e.g. SimHub's Motion plugin, [`../simhub.md`](../simhub.md) § Motion plugin).
+  - **HID interface** of the controller: enumerated, never used by Motion Manager. Report descriptor not captured.
 -
 - **EEPROM direct access** — group 10 protocol found in rs21_parameter.db but never observed in USB captures; needs live verification.
 

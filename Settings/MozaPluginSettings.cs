@@ -338,6 +338,11 @@ namespace MozaPlugin.Settings
         // FixMBoosterCurveArraysSeventhsBug.
         public bool MBoosterCurveArraysFixedSeventhsBug { get; set; }
 
+        // One-shot marker for moving the mBooster output curve from the
+        // host-side CurveY/CurveX to the device curve (HardwareCurveY over
+        // Min..Max). See MozaPlugin.MigrateMBoosterOutputCurveToDevice.
+        public bool MBoosterOutputCurveMovedToDevice { get; set; }
+
         // Where wheelbase LFE effects come from. The plugin's own LFE tab and a
         // SimHub ShakeIt haptics device would sum on the wire, so exactly one owns
         // it. ShakeIt mode is what puts HapticsFeature in the base's device.json,

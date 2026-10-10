@@ -801,4 +801,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Lagret farge</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>FYLL ULIKE LED-ER</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>FYLL LIKE LED-ER</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Styrke</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Myk</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Middels</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Hard</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Kompensasjon for dødsone i midten</value></data>
 </root>

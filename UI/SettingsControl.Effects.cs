@@ -385,7 +385,7 @@ namespace MozaPlugin.UI
             // sliders (BindEditorToSliders), so without a seed those sliders sit at
             // 0 and the editors draw a collapsed/garbage curve. A null target makes
             // both seeders fall back to their own Linear-preset default array
-            // (MBoosterOutputCurveDefault / MBoosterInputCurveDefault) and sane
+            // (Linear over 0–100 / MBoosterInputCurveDefault) and sane
             // per-control defaults; the seed writes go through _suppressor so the
             // slider ValueChanged handlers (which would no-op on the null target
             // anyway) stay quiet while the bindings still update the editors.

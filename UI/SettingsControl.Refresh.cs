@@ -40,7 +40,7 @@ namespace MozaPlugin.UI
                 "main-get-inertia-gain", "main-get-spring-gain",
                 "base-protection", "base-natural-inertia",
                 "base-speed-damping", "base-speed-damping-point",
-                "base-soft-limit-stiffness", "base-soft-limit-retain",
+                "base-soft-limit-stiffness", "base-soft-limit-strength", "base-soft-limit-retain",
                 "base-ffb-reverse", "main-get-work-mode", "main-get-led-status",
                 "main-get-ble-mode", "main-get-compat-mode",
                 "base-mcu-temp", "base-mosfet-temp", "base-motor-temp"
@@ -165,15 +165,11 @@ namespace MozaPlugin.UI
             // Track the SELECTED pedal's own axis, not always the master's —
             // otherwise every pedal page showed the master (throttle) input.
             int idx = _mboosterEffectPedalIndex;
-            double preCurve = (idx >= 0 && idx < selected.LastAxisRawPercentPreCurve.Length)
-                ? selected.LastAxisRawPercentPreCurve[idx] : selected.LastRawPercentPreCurve;
             // TRUE raw reading — % of Max Force's own hardware ceiling, i.e.
             // the physical force the user is actually applying to the pedal,
             // captured in OnHidAxisUpdate BEFORE the host-side Max Threshold
             // rescale. This is the Pedal Feel curve's real input domain
-            // (Deadzone-Max Force span) and what "Input Force" should show —
-            // preCurve above is post-Threshold-rescale now (Sim Input
-            // Mapping's own, different domain), not this pedal's raw input.
+            // (Deadzone-Max Force span) and what "Input Force" should show.
             double rawInput = (idx >= 0 && idx < selected.LastAxisRawPercentPreThreshold.Length)
                 ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
 
@@ -183,17 +179,12 @@ namespace MozaPlugin.UI
             // no live TRUE "input to that curve" value to plot (that would
             // need the raw pre-reshape force, which AZOM never receives).
             // Best available proxy: rawInput — positionally correct against
-            // the curve's own Deadzone-Max Force X axis (unlike preCurve,
-            // which is now Threshold-rescaled and belongs to a different
-            // domain), even though it can't reflect the device's own
-            // internal reshaping.
-            // The Sim Input Mapping curve is the opposite: purely host-side
-            // (see EvaluateCurveArbitraryX), so its live marker uses
-            // preCurve exactly — the already-hardware-shaped, Threshold-
-            // rescaled position that's actually fed INTO this curve, not
-            // pct (which is the curve's own output).
+            // the curve's own Deadzone-Max Force X axis, even though it can't
+            // reflect the device's own internal reshaping.
+            // The output curve runs on the device too, and AZOM has no
+            // reading of its input to place on it.
             MBoosterInputCurveEditor.LiveX = hidConnected ? rawInput : double.NaN;
-            MBoosterCurveEditor.LiveX = preCurve;
+            MBoosterCurveEditor.LiveX = double.NaN;
 
             // Live "position % · kg force" readout above the Pedal Feel
             // curve editor (MBoosterPedalFeelLiveLabel) — the raw force the
@@ -262,7 +253,7 @@ namespace MozaPlugin.UI
             RotationSlider.Value = rot;
             SetValueText(RotationValue, $"{rot:F0}°");
 
-            double ffb = Clamp(_data.FfbStrength / 10.0, 0, 100);
+            double ffb = Clamp(_data.FfbStrength / 10.0, 0, 200);   // PitHouse range 0-200 %
             FfbStrengthSlider.Value = ffb;
             SetValueText(FfbStrengthValue, $"{ffb:F0}%");
 
@@ -368,6 +359,12 @@ namespace MozaPlugin.UI
             SetValueText(SoftLimitStiffnessValue, $"{stiff:F0}");
             SoftLimitRetainCheck.IsChecked = _data.SoftLimitRetain > 0;
 
+            // Soft limit strength (cmd 0x1B): highlight the nearest of 50/75/100,
+            // nothing until the base has reported it.
+            int sls = _data.SoftLimitStrength;
+            SoftLimitStrengthCombo.SelectedIndex = sls < 0 ? -1
+                : sls < 63 ? 0 : sls < 88 ? 1 : 2;
+
             StandbyCheck.IsChecked = _data.WorkMode > 0;
             SyncAutoStandbyCombo();
             LedStatusCheck.IsChecked = _data.LedStatus != 0;
@@ -403,6 +400,11 @@ namespace MozaPlugin.UI
             SetSliderRaw(FfbCurveY3Slider, FfbCurveY3Value, _data.FfbCurveY3, 0, 100, "");
             SetSliderRaw(FfbCurveY4Slider, FfbCurveY4Value, _data.FfbCurveY4, 0, 100, "");
             SetSliderRaw(FfbCurveY5Slider, FfbCurveY5Value, _data.FfbCurveY5, 0, 100, "");
+
+            // Deadzone compensation has no register; read it back off the curve.
+            int dz = DeadzoneCompFromCurve();
+            DeadzoneCompSlider.Value = dz;
+            SetValueText(DeadzoneCompValue, $"{dz}");
         }
 
     }

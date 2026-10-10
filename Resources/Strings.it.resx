@@ -799,4 +799,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Colore salvato</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>RIEMPI LED IMPARI</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>RIEMPI LED PARI</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Intensità</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Morbido</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Medio</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Duro</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Compensazione zona morta centrale</value></data>
 </root>

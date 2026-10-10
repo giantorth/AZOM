@@ -186,9 +186,24 @@ namespace MozaPlugin.UI
         private void SoftLimitRetainCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
-            int val = SoftLimitRetainCheck.IsChecked == true ? 1 : 0;
+            // PitHouse writes 20 for on, never 1 (cmd 0x1C, see wheelbase-0x13.md).
+            int val = SoftLimitRetainCheck.IsChecked == true ? 20 : 0;
             _data.SoftLimitRetain = val;
             _plugin.HardwareApplier.WriteIfBaseConnected("base-soft-limit-retain", val);
+            _plugin.SaveSettings();
+        }
+
+        // cmd 0x1B, % of max. Index order matches the XAML items.
+        private static readonly int[] SoftLimitStrengthValues = { 50, 75, 100 };
+
+        private void SoftLimitStrengthCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            int idx = SoftLimitStrengthCombo.SelectedIndex;
+            if (idx < 0 || idx >= SoftLimitStrengthValues.Length) return;
+            int val = SoftLimitStrengthValues[idx];
+            _data.SoftLimitStrength = val;
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-soft-limit-strength", val);
             _plugin.SaveSettings();
         }
 

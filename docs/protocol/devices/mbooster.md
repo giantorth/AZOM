@@ -395,8 +395,8 @@ routed lanes work. Writes go through the controller to
 The calibration uses the CRP pedals-bus param 1, not the `0x0000` Pit House
 sends for the motor sweep; no capture of a passive-pedal calibration on an
 mBooster exists. Sensor Ratio is hidden (brake-named singleton). The
-host-side Sim Input Mapping curve (`CurveY`) is not applied to these axes —
-it has no editor there, and the device-side curve replaces it.
+output curve and range are the same fields and registers the active
+pedal's curve uses (see [Sim Input Mapping](#sim-input-mapping)).
 
 **The presence read (`mbooster-presence`) carries no chain information.**
 Three distinct topologies all returned raw `[00 02]`: a confirmed
@@ -1430,8 +1430,8 @@ Two things this exposed in `RequestCalibrationReads`:
 - The fifteen `mbooster-{throttle,brake,clutch}-y1..y5` reads it *did* ask for
   were **silently dropped**: those commands lost their entries when the output
   curve moved host-side, and `SendRead` returns false for an unknown name. Pit
-  House still reads all fifteen, so they are back as **read-only** entries
-  (write group `0xFF`) — the disproven write path stays gone.
+  House still reads all fifteen, so they are back — and written too, as the
+  output curve of every pedal (see [Sim Input Mapping](#sim-input-mapping)).
 
 ### Auto-sleep — `0xB4`
 
@@ -1515,6 +1515,31 @@ the role on the unit it was written to — which moves the role-keyed registers
 heartbeat's host/remote locality to agree: the single-active-pedal map is built
 from the plugin's own role setting and proves nothing.
 
+A single unit does the same (moza-simulator `mbooster` bridge, active brake
+with passive throttle and clutch, Pit House 1.4.1.13, 2026-10-10). Brake →
+Throttle, one burst: the throttle role's stored feel config (`0x84`/`0x85`,
+`0xAB` 01–0E, `0xAD`, `0xAE`, `0xB2`), the `b1` motor frames, `24 12 22 00 01`
+part-way through, then `throttle-y1..y4`, `throttle-max`, `0xB7`,
+`throttle-min`. Back to Brake mirrors it with the brake role's values and
+`22 00 02`. `y5` was in neither (both roles held 100). The values restored
+were the role's stored ones, not the curve edited moments before.
+
+The plugin's re-apply after its own role write matches it on a single unit:
+the `0x22` read-back already agrees with the heartbeat's host locality, so it
+follows ~60 ms after the write (against the sim); a chain waits for the next
+heartbeat. The role is also part of the profile while the unit holds one
+register: the connect,
+profile-switch and routing re-applies write the profile's role first when the
+host's `0x22` reads otherwise — a role the profile sets, never the axis-order
+default, so a role chosen in Pit House survives an untouched profile
+(`MBoosterDeviceController.SyncPedalRole`;
+bug report NPN9FR6W started in a profile with the brake set to Throttle while
+the unit read Brake). Single-unit lanes only — on a chain the unit is found
+from the role, which is what disagrees — and never while a role write is
+waiting for the heartbeat. A passive pedal's role lives on the host's channel
+register (`0x21`/`0x23`); no capture shows Pit House writing one, so the
+plugin doesn't.
+
 **Duplicate roles are allowed.** Pit House, setting the host's Brake to
 Throttle while the chained unit was Throttle (2026-09-29), wrote only the host
 (`22 00 01` plus the throttle role's stored config and throttle min/max /
@@ -1529,6 +1554,27 @@ real firmware reports then is not captured.
 After each, Pit House's topology lines follow the new values. For JCJ5AEA2's
 chained unit (really the throttle, `0x22` = 2) the repair is Pit House's own
 write `24 1d 22 00 01`.
+
+**A channel reports on the HID axis of its role, not of its name** (bug report
+GQ8HAWCV: three standalone units, one per USB). Every unit's heartbeat said
+`Brake pedal is connected` / `PD Linked:[T 0 B 1 C 0]`; the HID moved:
+
+| port | `0x21/0x22/0x23` | HID usage that moved |
+|---|---|---|
+| COM9 | `1/2/3` | `0x34` (Ry, axis 1) |
+| COM3 | `3/2/1` | `0x34` (Ry, axis 1) |
+| COM8 | `2/1/3` | `0x33` (Rx, axis 0) |
+
+So channel X reports on axis `0x2X − 1`. The host's map is identity in every
+chain capture so far (KG143GNC: the chained throttle on the host's channel T
+moved Rx), which is why axis = channel held until now. The plugin keeps the
+heartbeat state (connectivity, types, locality, and their persisted seeds)
+indexed by channel and derives the axis-indexed views through the host's map
+(`MBoosterDeviceController.RederiveAxisViews`), USB lanes only. It keeps the
+last complete map across a port bounce. If two connected channels would land
+on one axis, it falls back to channel order (logged). A role write moves the
+pedal's axis with it; the `0x22` read-back re-routes the lane. Before this,
+COM8 read 0, and a role write on a standalone unit would do the same.
 
 ### Firmware error reports — group `0x0E`, sub `03` / `04`
 
@@ -1595,9 +1641,9 @@ parking still applies to whichever calibrations still carry it.
 
 ## Sim Input Mapping
 
-Two real hardware calibrations, plus a purely host-side output curve, all
-on the pedal's own unit (`MotorDeviceForRole` — see
-[Chain topology](#chain-topology--connectivity-diagnostics)).
+Three hardware calibrations on the pedal's own unit (`MotorDeviceForRole` —
+see [Chain topology](#chain-topology--connectivity-diagnostics)); Max
+Threshold's effect is applied host-side.
 
 - **Sensor Output Ratio** (`SensorOutputRatioPct`, 0–100%) — blends the
   angle sensor (0%) against the load cell (100%). Wire command
@@ -1626,56 +1672,59 @@ on the pedal's own unit (`MotorDeviceForRole` — see
   instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
   position — already 0–100% of Max Force's span — into 0–100% of
   Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
-  before the Sim Input Mapping curve ever sees it, the same category as
-  Sim Input Mapping's own CurveY/CurveX below (no wire command actually
-  does the real work). The `mbooster-brake-threshold` write is still sent
+  for AZOM's own telemetry; like any host-side remap it never reaches the
+  game's view of the axis. The `mbooster-brake-threshold` write is still sent
   (harmless, matches whatever Pit House itself does with the field even if
   it isn't the mechanism that matters) but AZOM no longer depends on it.
-- **Output curve** (`CurveY`/`CurveX`, 6 nodes + an implicit fixed origin
-  at (0,0)) — **REVISED, bug bundle 5VR5AQ8Y**: this is now confirmed
-  **purely host-side, with no wire command at all**. It used to be
-  believed to write through `mbooster-{throttle,brake,clutch}-y1..y5`
-  (15 commands, confirmed-real but for the wrong shape) and, in an
-  even earlier iteration, an experimental `curve7` resync (`0xAB`
-  selectors `0x01`-`0x06`) — both are now removed; see
-  [Removed: `y1..y5` and `curve7`](#removed-y1y5-and-curve7-historical)
-  below. What this curve actually does: it remaps the pedal's raw HID
-  position — which by the time AZOM reads it already reflects Deadzone,
-  Max Force, and the Pedal Feel curve's real hardware shaping (see
-  [Pedal Feel](#pedal-feel) below) — into whatever value AZOM reports as
-  game telemetry (`MozaData.{Throttle,Brake,Clutch}Position`). Applied in
-  `MozaMBoosterRegistry.OnHidAxisUpdate` via
-  `EvaluateCurveArbitraryX(cfg.CurveX, cfg.CurveY, posPct)`, in the exact
-  spot `InputCurveY`'s host-side application used to occupy before Pedal
-  Feel moved to hardware. Nodes are draggable both vertically (`CurveY`)
-  and horizontally (`CurveX`, via `AllowHorizontalDrag` on the curve
-  editor) — a dragged last node lets "100% output" happen before "100%
-  input," since the evaluator plateaus at the last node's Y beyond its X
-  (same trick as before, just now the ONLY consumer of the shaped value
-  is AZOM's own telemetry, not a second wire push). Default (un-dragged)
-  breakpoints are `100/6 × k` for k=1..6 (≈16.67/33.33/50/66.67/83.33/100%),
-  evenly spaced with the last node at exactly 100% — so an untouched
-  curve maps full input to full output, and "100% before 100%" only
-  happens once a user explicitly drags the last node inward. **Bug,
-  fixed**: this used to be `100/7 × k` (last node ~85.71%, not 100%),
-  inherited from matching the (now-removed, disproven) `curve7`
-  mechanism's own selectors purely so a never-dragged node would render
-  identically to the old experimental shape — which meant Linear (and
-  every other preset) topped out around 86% instead of reaching 100%.
-  `MozaPlugin.FixMBoosterCurveArraysSeventhsBug` is a one-shot migration
-  that repairs any profile that saved one of the old preset shapes.
-  **Output deadzone** (bug report 6SWSMJX0): the first node drags on both
-  axes (middle nodes are Y-only, the last is free). Dropping it to Y=0 and
-  dragging it right holds output at 0 up to that input — the only
-  sim-output deadzone AZOM has; the reporter found Pedal Feel's Deadzone
-  changes the motor feel but not the reported value. The evaluator
-  clamps spline control points to 0–100, so the curve stays inside 0–100
-  and a flat run at 0 doesn't dip negative (editor: `ClampSplineToPlot`).
+- **Output curve** (`HardwareCurveY` + `Min`/`Max`) — **device calibration,
+  the same registers Pit House drives** (moza-simulator `mbooster` bridge
+  with Pit House 1.4.1.13, 2026-10-10, every point dragged through its
+  range):
 
-Both hardware calibrations use the shared `-1` "not yet set / no override"
-sentinel, so a fresh profile never overwrites what is already on the
-device. `CurveY`/`CurveX` are `null` by default (identity / no remapping)
-— existing profiles are unaffected until a user opens this section.
+  | Pit House curve point | Drag | Wire (group 36, role prefix) |
+  |---|---|---|
+  | start | X only — Y is fixed at 0 | `<role>-min` (2-byte int, %) |
+  | 1–4 | Y only — X is never stored | `<role>-y1..y4` (float, 0–100) |
+  | end | X and Y | `<role>-max`, `<role>-y5` (a diagonal drag sends both in one burst) |
+
+  The four middle points stay **evenly spaced between start and end**
+  ("squish" visually as the ends move): with range `min..max` they sit at
+  `min + k·(max−min)/5`, `y5` at `max`. Output is 0 below `min` and
+  plateaus at `y5` past `max`. With the default 0–100 range that is the
+  fixed 20/40/60/80/100% the older notes describe. Pit House stopped the
+  start at 90 against an end at 100, and the end at 10 against a start at
+  0 (`MBoosterUiConstants.OutputCurveMinRangePct`). Its Linear preset is
+  `y1..y4` = 20/40/60/80 in one burst, range untouched. AZOM's presets are
+  the CRP pedals' (`SettingsControl.PedalCurvePresets`); NPN9FR6W's unit
+  read back exactly their Exponential shape (6/14/28/54/100).
+
+  So "no output until 20% pedal" is `<role>-min` = 20 — a device setting,
+  not a curve shape. AZOM's editor is the same model
+  (`MozaCurveEditor.EndpointRangeMode`: start X = Min, Y pinned at 0; end
+  X = Max; middle points derived), stored in the fields the Pedals tab
+  uses for a passive pedal, and written by the connect/profile apply and
+  the UI. The live input marker is hidden on this curve: it runs on the
+  device, and AZOM has no reading of its input to place.
+
+  **History.** From bug bundle 5VR5AQ8Y until bug report NPN9FR6W this
+  curve was host-side only (`CurveY`/`CurveX`, 6 nodes at draggable X,
+  evaluated in `OnHidAxisUpdate` by `EvaluateCurveArbitraryX`). It never
+  reached the device or the game — only AZOM's `MozaData` positions — and
+  on a routed lane (positions mirrored in from the base) it was not even
+  applied there: NPN9FR6W's brake curve held output at 0 to 18% and the
+  pedal still read 15% at 15%. `MozaPlugin.MigrateMBoosterOutputCurveToDevice`
+  (one-shot, `MBoosterOutputCurveMovedToDevice`) moves every saved curve
+  onto the device model (`MozaMBoosterRegistry.MigrateLegacyOutputCurve`):
+  the host curve shaped the device's already range-mapped output, so a
+  leading run of nodes at 0 becomes `Min`, the last node's X becomes
+  `Max`, and `y1..y5` are the composed output at the five points (an
+  unset `Min`/`Max` is taken as 0/100). A pedal that already had
+  `HardwareCurveY` keeps it. The older 5→6-node and `100/7` curve
+  migrations still run first.
+
+Every calibration here uses the shared `-1`/`null` "not yet set / no
+override" sentinel, so a fresh profile never overwrites what is already
+on the device; the editor then shows the unit's own read-back.
 
 ## Pedal Feel
 
@@ -2206,6 +2255,11 @@ than a hard rule.
 
 ### Removed: `y1..y5` and `curve7` (historical)
 
+**`y1..y5` is back** as every pedal's output curve (bug report NPN9FR6W,
+Pit House capture 2026-10-10 — see [Sim Input Mapping](#sim-input-mapping)):
+removing it left the curve host-side, where it never reached the device or
+the game.
+
 Two mechanisms this investigation built, then removed once the Sim Input
 Mapping / Pedal Feel split above was clarified — kept here for context,
 matching this doc's convention of preserving past-bug/decision history
@@ -2416,13 +2470,12 @@ contains that pixel X, then inverts that segment's X(t) via bisection
 read off the exact point ON the spline. The two editors get different
 values so each shows what it actually receives:
 
-- **Input Curve**: `LastRawPercentPreCurve` — post deadzone/max-force,
-  pre-`InputCurveY` (what this curve's evaluator receives).
-- **Output Curve**: `LastHidPosition * 100` (post-`InputCurveY`, i.e.
-  what's sent onward to game telemetry) — an approximation of what the
-  device's own firmware curve sees, since that runs on the device's
-  own raw sensor reading, a separate signal path we don't otherwise
-  observe.
+- **Input Curve**: `LastAxisRawPercentPreThreshold` — the HID reading
+  before the host-side Max Threshold rescale (on a routed lane, the base's
+  reading mirrored in by role).
+- **Output Curve**: hidden since the curve moved onto the device (see
+  [Sim Input Mapping](#sim-input-mapping)) — AZOM has no reading of its
+  input to place.
 
 A separate card (Pit House calls this class of setting "input
 mapping") holds the Pit House-parity controls, all still under
@@ -2454,7 +2507,8 @@ mapping") holds the Pit House-parity controls, all still under
   setting of ~125kg to within rounding error. Two independent
   confirmations is about as solid as unofficial reverse-engineering
   gets, but it's still unconfirmed by Moza — the in-UI warning says so.
-- **Output curve** (`CurveY`, 5-point) — moved here from Calibration.
+- **Output curve** (`CurveY`, 5-point; superseded — now the device curve,
+  see [Sim Input Mapping](#sim-input-mapping)) — moved here from Calibration.
   `MozaCurveEditor`-driven, mirrors the wheelbase pedal Y curves.
   Like Direction/Min/Max, always writes through the
   `mbooster-throttle-y1..y5` slot regardless of the device's assigned
@@ -2625,7 +2679,7 @@ rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 | ------------------------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `<p>_outdir`                                     | `Direction`                                             | `mbooster-<p>-dir`                                                                     |
 | `<p>_min` / `<p>_max`                            | *(not imported)*                                        | **unit mismatch**, see below                                                           |
-| `<p>_nonlinear1..5`                              | `CurveY[0..4]`                                          | output curve, `mbooster-<p>-y1..y5`; both sides are 0–100                              |
+| `<p>_nonlinear1..5`                              | `HardwareCurveY[0..4]`                                  | output curve, `mbooster-<p>-y1..y5`; all five required, as for CRP                     |
 | `<p>_abs_switch/_amp/_freq/_smoothness`          | `Abs.Enabled/.IntensityPct/.FrequencyHz/.SmoothnessPct` | brake-only in PitHouse                                                                 |
 | `<p>_lockup_switch/_amp/_freq`                   | `Lockup.*`                                              | brake-only                                                                             |
 | `<p>_brakethreshold_switch/_amp/_freq`           | `Threshold.Enabled/.IntensityPct/.FrequencyHz`          | brake-only                                                                             |

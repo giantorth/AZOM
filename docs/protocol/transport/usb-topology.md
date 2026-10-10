@@ -14,6 +14,7 @@ input subsystems.
 | Product ID | `0x0006` / `0x0002` / `0x0012` | Wheelbase composite (R5 / R9 / R12, etc.) |
 | Product ID | `0x0025` | CM2 Racing Dash — separate USB device when connected by its own cable (own CDC pipe) |
 | Product ID | `0x1000` | AB9 active shifter — separate USB device, parallel composite (see [`../devices/ab9-shifter.md`](../devices/ab9-shifter.md)) |
+| Product ID | `0x2000` | MOZA Motion Controller — separate USB device heading its own actuator bus (see below and [`../motion/`](../motion/)) |
 | Class / SubClass / Protocol | composite (`0xEF / 0x02 / 0x01`) | Multi-interface device |
 
 A standalone-USB CM2 is its own USB device with its own CDC serial pipe (a
@@ -76,6 +77,27 @@ Group-`0x43` screen telemetry is addressed to the device that owns the display:
 The CM2 uses the same group-`0x43` tier-def / value-frame format as a
 wheel-integrated display, just at a different target dev. See
 [`../devices/dash-0x14.md`](../devices/dash-0x14.md).
+
+### Motion Controller (PID `0x2000`) — a second bus
+
+The motion platform is not a peripheral of the wheelbase. Its controller enumerates as its own
+composite (`Gudsen` / `MOZA Motion Controller`, bcdDevice `0x0100`, serial string = its
+group-`0x06` UID) with the same three-interface shape, and heads a bus of up to eight HMA150
+actuators that reuse the `0x14`–`0x1B` id range:
+
+| Interface | Class | Endpoints | Purpose |
+|-----------|-------|-----------|---------|
+| MI_00 | CDC ACM control (`0x02 / 0x02`) | `0x81` INTERRUPT IN (8 B, bInterval 16) | CDC notifications; `SET_LINE_CODING` 9600 8N1 at connect |
+| MI_01 | CDC data (`0x0A`) | `0x02` BULK OUT / `0x82` BULK IN (**512 B** — high-speed) | Every Moza frame of the motion protocol |
+| MI_02 | HID (`0x03`) | `0x03` INTERRUPT OUT / `0x83` INTERRUPT IN (64 B, bInterval 1) | Enumerated, **idle in every capture** |
+
+| Device ID | Hex | Role |
+|-----------|-----|------|
+| 18 | `0x12` | Motion Controller (bus master; replies as `0x21`) |
+| 20–27 | `0x14`–`0x1B` | Actuator ports 1–8 (port *p* = `0x13 + p`); four HMA150s populated on the captured rig |
+
+Frames never cross between this bus and a wheelbase; the shared id values are coincidence.
+Full description: [`../motion/README.md`](../motion/README.md).
 
 ### Re-enumeration on disconnect
 

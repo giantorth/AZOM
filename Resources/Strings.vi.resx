@@ -796,4 +796,9 @@ Id: {2}</value></data>
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Màu đã lưu</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>TÔ CÁC LED LẺ</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>TÔ CÁC LED CHẴN</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Cường độ</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Mềm</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Trung bình</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Cứng</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Bù vùng chết trung tâm</value></data>
 </root>

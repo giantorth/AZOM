@@ -19,6 +19,7 @@ Hierarchical split of the original `docs/moza-protocol.md`. Layout is **function
 | [`settings/`](settings/) | Wheel settings (`0x3F/0x40`, dev `0x17`), dashboard settings (`0x32/0x33`, dev `0x14`), EEPROM direct access (`0x0A`) |
 | [`periodic/`](periodic/) | Group `0x0E` parameter reader, `0x1F`, `0x28`, `0x29`, `0x2B` periodic / occasional commands |
 | [`devices/`](devices/) | Per-device pages — main hub (`0x12`), wheelbase (`0x13`), dash (`0x14`), wheel (`0x17`), pedals (`0x19`), shifter / handbrake / e-stop, AB9 active shifter, S12 pedal vibration (group `0x4D`). Device ID table cross-links into functional pages |
+| [`motion/`](motion/) | MOZA motion platform — HMA150 actuators behind the **MOZA Motion Controller** (VID `0x346E` PID `0x2000`), a separate USB device with its own bus, driven by MOZA Motion Manager (not Pit House). Identity + actuator ports, modes / run state / status, effect parameters, the `0x22` game streams (raw vehicle telemetry + host-rendered haptics), firmware log. No session layer, no dashboards |
 | [`plugin/`](plugin/) | SimHub plugin implementation notes: startup phases, session management, tier impl, reassembly fallback |
 | [`findings/`](findings/) | Dated journal entries from deep-dive sessions. Kept verbatim for traceability; canonical info is reflected in the topical pages |
 
@@ -40,6 +41,8 @@ Hierarchical split of the original `docs/moza-protocol.md`. Layout is **function
 - Authoritative command DB: `Pit House/bin/rs21_parameter.db` (SQLite, 919 commands). Per-device command tables in [`devices/`](devices/); value-encoding rules in [`telemetry/service-parameter-transforms.md`](telemetry/service-parameter-transforms.md).
 - USB capture methodology: see `docs/usb-capture.md`.
 - Plugin-side wire divergence and PitHouse-observed deviations: see [`findings/`](findings/).
+
+> **Status (2026-10-07):** The MOZA motion platform (Motion Controller PID `0x2000` + HMA150 actuators) is documented from USBPcap captures of MOZA Motion Manager 1.0.3.10 in [`motion/`](motion/): enumeration of the controller and up to 8 actuator ports, the mode state machine, effect-parameter writes (verified byte-exact against the Motion Manager sliders), and the ~33 Hz game-mode telemetry frame (fields identified by least-squares against a same-session SimHub replay). Protocol only — no plugin lane exists yet and PID `0x2000` is still an unknown PID to `MozaUsbIds`.
 
 > **Status (2026-04-30):** Multi-pkg-level dashboards (Grids, Rally V4) rendering live on Type02 firmware (R5 base + W17 wheel). Plugin parity with PitHouse confirmed for Nebula (1 pkg-level), Rally V4 (3 pkg-levels), Grids (2 pkg-levels). New learnings landed:
 >

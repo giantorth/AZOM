@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""Decode MOZA motion-platform (HMA150 / "MOZA Motion Controller") traffic from a wire JSONL.
+
+Input is the {"t","dir","hex"} JSONL written by tools/pcap-inventory --jsonl or
+tools/pcap_to_jsonl.py (t = epoch seconds). Protocol reference: docs/protocol/motion/.
+
+Subcommands:
+    log       <jsonl>              firmware log lines (group 0x0E cmd 05) reassembled per device,
+                                   interleaved with host 0x1E/0x20 writes and mode-poll changes
+    streams   <jsonl> [--csv F]    group 0x22 game-mode streams: cmd 00 telemetry frame field stats
+                                   and samples, cmd 09 oscillators, cmd 07/08 events
+    control   <jsonl>              annotated timeline of control traffic (0x1E/0x1F/0x20/0x21/0x0E 03-04)
+                                   with floats decoded and repeats collapsed
+    identity  <jsonl>              identity strings and one-shot reads per device id
+    registers <jsonl>              group 0x0E cmd 00 register sweeps: value sets per device and index
+
+Examples:
+    tools/motion-decode log capture.jsonl
+    tools/motion-decode streams capture.jsonl --csv stream.csv --rows 20
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import struct
+import sys
+from collections import OrderedDict, defaultdict
+from typing import Dict, Iterator, List, Tuple
+
+MODE_NAMES = {
+    0: "idle",
+    1: "game",
+    2: "manual-test",
+    3: "position-calibration",
+    5: "armed",
+    7: "travel-self-check",
+    8: "port-self-test",
+    13: "standby",
+}
+RUN_STATE = {1: "stop", 2: "hold", 3: "run", 4: "identify-port"}
+EFFECT_SLOTS = {0: "pitch", 1: "roll", 3: "heave", 7: "accel-pitch", 8: "accel-roll"}
+AXIS_NAMES = {0: "pitch", 1: "roll", 3: "heave"}
+
+
+def load(path: str) -> Iterator[Tuple[float, str, int, int, bytes]]:
+    with open(path) as fh:
+        for line in fh:
+            o = json.loads(line)
+            fr = bytes.fromhex(o["hex"])
+            yield o["t"], o["dir"], fr[2], fr[3], fr[4:-1]
+
+
+def f32(b: bytes, off: int = 0) -> float:
+    return struct.unpack_from(">f", b, off)[0]
+
+
+def mode_name(m: int) -> str:
+    return f"{m} ({MODE_NAMES.get(m, '?')})"
+
+
+# ---------------------------------------------------------------- log
+
+def cmd_log(args: argparse.Namespace) -> int:
+    t0 = None
+    partial: Dict[int, str] = {}
+    last_poll = None
+    for t, d, grp, dev, pl in load(args.jsonl):
+        if t0 is None:
+            t0 = t
+        rel = t - t0
+        if d == "b2h" and grp == 0x0E and pl and pl[0] == 0x05:
+            buf = partial.get(dev, "") + pl[1:].decode("ascii", "replace")
+            if buf.endswith("\n"):
+                print(f"{rel:9.3f}  LOG dev={dev:02x}  {buf.rstrip()}")
+                partial[dev] = ""
+            else:
+                partial[dev] = buf
+        elif d == "h2b" and grp in (0x1E, 0x20):
+            print(f"{rel:9.3f}  >>> h2b grp={grp:02x} dev={dev:02x} {pl.hex()}  {describe_write(grp, pl)}")
+        elif d == "b2h" and grp == 0x9F and pl and pl[0] == 0x03 and len(pl) >= 5:
+            cur = pl[1:5].hex()
+            if cur != last_poll:
+                print(f"{rel:9.3f}  <<< mode-poll target={mode_name(pl[1])} current={mode_name(pl[2])} flags={pl[4]:02x}")
+                last_poll = cur
+    for dev, buf in partial.items():
+        if buf:
+            print(f"      end  LOG dev={dev:02x}  (partial) {buf}")
+    return 0
+
+
+def describe_write(grp: int, pl: bytes) -> str:
+    if not pl:
+        return ""
+    c = pl[0]
+    if grp == 0x1E:
+        if c == 0x02 and len(pl) >= 5:
+            return f"assign port {pl[1]} -> axis role {pl[3]}"
+        if c == 0x03 and len(pl) >= 2:
+            return f"set mode {mode_name(pl[1])}"
+        if c == 0x05 and len(pl) >= 10:
+            return f"effect slot {pl[1]} ({EFFECT_SLOTS.get(pl[1], '?')}) intensity={f32(pl, 2):.3f} smoothness={f32(pl, 6):.3f}"
+        if c == 0x06 and len(pl) >= 9:
+            return f"road-detail intensity={f32(pl, 1):.3f} smoothness={f32(pl, 5):.3f}"
+        if c == 0x07 and len(pl) >= 6:
+            return f"manual axis {pl[1]} ({AXIS_NAMES.get(pl[1], '?')}) = {f32(pl, 2):+.3f}"
+        if c == 0x0A:
+            return f"set device type {pl[1] if len(pl) > 1 else '?'}"
+        if c == 0x0B and len(pl) >= 3:
+            return f"light table zone {pl[1]} param {pl[2]} = {pl[3:].hex()}"
+    if grp == 0x20 and c == 0x02 and len(pl) >= 3:
+        if pl[1] == 0x04:
+            return f"identify port {pl[2]}"
+        return f"run-state {pl[1]} ({RUN_STATE.get(pl[1], '?')})"
+    return ""
+
+
+# ---------------------------------------------------------------- streams
+
+def cmd_streams(args: argparse.Namespace) -> int:
+    t0 = None
+    rows00: List[Tuple[float, float, List[float], str]] = []
+    rows09: List[Tuple[float, str, List[Tuple[int, float, float]], str]] = []
+    rows07: List[Tuple[float, str, float, float]] = []
+    rows08: List[Tuple[float, str, float, int]] = []
+    tails: Dict[str, int] = defaultdict(int)
+    for t, d, grp, dev, pl in load(args.jsonl):
+        if d != "h2b" or grp != 0x22 or not pl:
+            continue
+        if t0 is None:
+            t0 = t
+        c = pl[0]
+        if c == 0x00 and len(pl) == 53:
+            vals = [f32(pl, 1 + 4 * i) for i in range(12)]
+            tail = pl[49:53].hex()
+            tails[tail] += 1
+            rows00.append((t, t - t0, vals, tail))
+        elif c == 0x09 and len(pl) == 51:
+            recs = [(pl[3 + 9 * i], f32(pl, 4 + 9 * i), f32(pl, 8 + 9 * i)) for i in range(5)]
+            rows09.append((t - t0, pl[1:3].hex(), recs, pl[48:51].hex()))
+        elif c == 0x07 and len(pl) >= 12:
+            rows07.append((t - t0, pl.hex(), f32(pl, 4), f32(pl, 8)))
+        elif c == 0x08 and len(pl) >= 10:
+            rows08.append((t - t0, pl.hex(), f32(pl, 4), struct.unpack_from(">H", pl, 8)[0]))
+
+    if not rows00:
+        print("# no 0x22/00 frames")
+    else:
+        span = rows00[-1][1] - rows00[0][1]
+        print(f"# 0x22/00 frames: {len(rows00)}  span {span:.1f}s  rate {len(rows00) / max(1e-9, span):.2f}/s")
+        gaps = sorted(rows00[i][1] - rows00[i - 1][1] for i in range(1, len(rows00)))
+        if gaps:
+            print(f"# inter-frame gap ms: min {gaps[0]*1e3:.1f} p50 {gaps[len(gaps)//2]*1e3:.1f} "
+                  f"p90 {gaps[int(len(gaps)*0.9)]*1e3:.1f} max {gaps[-1]*1e3:.1f}")
+        top = sorted(tails.items(), key=lambda x: -x[1])[:8]
+        print(f"# tail [throttle][brake][b2][flags] most common: {top}")
+        print("# field  min        max        mean       first      last")
+        for i in range(12):
+            col = [r[2][i] for r in rows00]
+            print(f"  f{i:<4} {min(col):10.4f} {max(col):10.4f} {sum(col)/len(col):10.4f} {col[0]:10.4f} {col[-1]:10.4f}")
+        step = max(1, len(rows00) // args.rows)
+        print("# sample rows (t_rel, f0..f11, tail)")
+        for r in rows00[::step][: args.rows]:
+            print(f"  {r[1]:8.2f} " + " ".join(f"{v:8.3f}" for v in r[2]) + f"  {r[3]}")
+        if args.csv:
+            with open(args.csv, "w") as out:
+                out.write("t_epoch,t_rel," + ",".join(f"f{i}" for i in range(12)) + ",throttle,brake,b2,flags\n")
+                for r in rows00:
+                    tb = bytes.fromhex(r[3])
+                    out.write(f"{r[0]:.6f},{r[1]:.4f}," + ",".join(f"{v:.6f}" for v in r[2])
+                              + f",{tb[0]},{tb[1]},{tb[2]},{tb[3]}\n")
+            print(f"# wrote {args.csv}")
+    if rows09:
+        span = rows09[-1][0] - rows09[0][0]
+        print(f"\n# 0x22/09 frames: {len(rows09)}  rate {len(rows09) / max(1e-9, span):.2f}/s  "
+              f"hdr {sorted(set(r[1] for r in rows09))}  trailer {sorted(set(r[3] for r in rows09))}")
+        ids = defaultdict(set)
+        for r in rows09:
+            for k, (fid, _a, _f) in enumerate(r[2]):
+                ids[k].add(fid)
+        print(f"# per-record lead byte sets: { {k: sorted(v) for k, v in ids.items()} }")
+        step = max(1, len(rows09) // args.rows)
+        for r in rows09[::step][: args.rows]:
+            print(f"  {r[0]:8.2f} " + " | ".join(f"{fid:02x} g={a:8.5f} f={f:8.3f}" for fid, a, f in r[2]))
+    if rows07:
+        print(f"\n# 0x22/07 frames: {len(rows07)}  distinct payloads: {len(set(r[1] for r in rows07))}")
+        for r in rows07[: args.rows]:
+            print(f"  {r[0]:8.2f} {r[1]}  amp={r[2]:.5f} hz={r[3]:.3f}")
+    if rows08:
+        print(f"\n# 0x22/08 frames: {len(rows08)}")
+        for r in rows08[: args.rows * 2]:
+            print(f"  {r[0]:8.2f} {r[1]}  amp={r[2]:.5f} u16={r[3]}")
+    return 0
+
+
+# ---------------------------------------------------------------- control
+
+def cmd_control(args: argparse.Namespace) -> int:
+    t0 = None
+    last: Dict[Tuple[str, int, int, int], str] = {}
+    for t, d, grp, dev, pl in load(args.jsonl):
+        if t0 is None:
+            t0 = t
+        if not pl:
+            continue
+        g = grp & 0x7F
+        if g not in (0x1E, 0x1F, 0x20, 0x21) and not (g == 0x0E and pl[0] in (0x03, 0x04)):
+            continue
+        key = (d, grp, dev, pl[0])
+        h = pl.hex()
+        if last.get(key) == h and not args.all:
+            continue
+        last[key] = h
+        note = describe_write(grp, pl) if d == "h2b" else describe_reply(grp, pl)
+        print(f"{t - t0:9.3f}  {d} grp={grp:02x} dev={dev:02x} {h:<32} {note}")
+    return 0
+
+
+def describe_reply(grp: int, pl: bytes) -> str:
+    c = pl[0]
+    if grp == 0x9F:
+        if c == 0x00 and len(pl) >= 3:
+            return f"supported actuators {pl[1]}, ports {pl[2]}"
+        if c == 0x02 and len(pl) >= 5:
+            return f"port {pl[1]} axis role {pl[3]}"
+        if c == 0x03 and len(pl) >= 5:
+            return f"mode poll: target={mode_name(pl[1])} current={mode_name(pl[2])} flags={pl[4]:02x}"
+        if c == 0x04 and len(pl) >= 6:
+            return f"global {pl[1]} = {f32(pl, 2):.3f}"
+        if c == 0x06 and len(pl) >= 9:
+            return f"road-detail {f32(pl, 1):.3f} / {f32(pl, 5):.3f}"
+        if c == 0x08 and len(pl) >= 9:
+            return f"rig L1={f32(pl, 1):.1f} L2={f32(pl, 5):.1f} mm"
+    if grp == 0x9E:
+        return "echo: " + describe_write(0x1E, pl)
+    if grp == 0xA1:
+        if c == 0x01 and len(pl) >= 7:
+            return f"controller status b1={pl[1]:02x} b3={pl[3]} b4={pl[4]} flags={pl[6]:02x}"
+        if c == 0x02 and len(pl) >= 5:
+            return f"port {pl[1]} present={pl[2]} slave={pl[4]:02x} rest={pl[5:].hex()}"
+        if c == 0x03 and len(pl) >= 2:
+            return f"run-state readback {pl[1]} ({RUN_STATE.get(pl[1], '?')})"
+    if grp == 0x0E and c == 0x03:
+        return "device-initiated 0x0E/03 (host answers 0x0E/04)"
+    return ""
+
+
+# ---------------------------------------------------------------- identity
+
+def cmd_identity(args: argparse.Namespace) -> int:
+    seen: Dict[int, "OrderedDict[str, str]"] = defaultdict(OrderedDict)
+    for _t, d, grp, dev, pl in load(args.jsonl):
+        if d != "b2h":
+            continue
+        g = grp & 0x7F
+        if g in (0x02, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0F, 0x10, 0x11):
+            key = f"grp {g:02x} cmd {pl[:1].hex() if g not in (0x06, 0x09, 0x02) else '-'}"
+            body = pl[1:] if g not in (0x06, 0x09, 0x02) else pl
+            txt = body.rstrip(b"\x00").decode("ascii", "replace") if g in (0x07, 0x08, 0x0F, 0x10, 0x11) else ""
+            seen[dev].setdefault(key, f"{body.hex()}  {txt!r}" if txt else body.hex())
+        elif g == 0x27 and len(pl) >= 33:
+            floats = [f32(pl, 1 + 4 * i) for i in range(8)]
+            seen[dev].setdefault("grp 27 cmd 00 (8 x f32)", " ".join(f"{v:.5g}" for v in floats))
+        elif g == 0x1F and pl and pl[0] in (0x00, 0x04, 0x06, 0x08, 0x09):
+            seen[dev].setdefault(f"grp 1f cmd {pl[0]:02x} {pl[1:2].hex() if pl[0] == 0x04 else ''}".strip(),
+                                 pl[1:].hex() + "  " + describe_reply(0x9F, pl))
+    for dev in sorted(seen):
+        print(f"\n## reply dev {dev:02x} (request dev {((dev & 0x0F) << 4) | (dev >> 4):02x})")
+        for k, v in seen[dev].items():
+            print(f"  {k:<28} {v}")
+    return 0
+
+
+# ---------------------------------------------------------------- registers
+
+def cmd_registers(args: argparse.Namespace) -> int:
+    vals: Dict[Tuple[int, int], Dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    for _t, d, grp, dev, pl in load(args.jsonl):
+        if d != "b2h" or grp != 0x8E or len(pl) < 7 or pl[0] != 0x00:
+            continue
+        idx = pl[2]
+        v = struct.unpack_from(">I", pl, 3)[0]
+        vals[(dev, idx)][v] += 1
+    devs = sorted(set(k[0] for k in vals))
+    for dev in devs:
+        print(f"\n## dev {dev:02x}")
+        for (dv, idx), hist in sorted(vals.items()):
+            if dv != dev:
+                continue
+            top = sorted(hist.items(), key=lambda x: -x[1])[:6]
+            print(f"  idx {idx:2d}: " + ", ".join(f"{v} x{n}" for v, n in top))
+    return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("log"); p.add_argument("jsonl"); p.set_defaults(fn=cmd_log)
+    p = sub.add_parser("streams"); p.add_argument("jsonl"); p.add_argument("--csv"); p.add_argument("--rows", type=int, default=12)
+    p.set_defaults(fn=cmd_streams)
+    p = sub.add_parser("control"); p.add_argument("jsonl"); p.add_argument("--all", action="store_true", help="do not collapse repeats")
+    p.set_defaults(fn=cmd_control)
+    p = sub.add_parser("identity"); p.add_argument("jsonl"); p.set_defaults(fn=cmd_identity)
+    p = sub.add_parser("registers"); p.add_argument("jsonl"); p.set_defaults(fn=cmd_registers)
+    args = ap.parse_args()
+    return args.fn(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

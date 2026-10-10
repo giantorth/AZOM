@@ -139,6 +139,8 @@ namespace MozaPlugin
             // Pause first so the sender's next tick sees the timer stopped
             // before ResetWheelDetection issues its full Stop().
             try { _telemetrySender?.Pause(); } catch { }
+            // A bus CM2 lane on this pipe lost its sessions too.
+            _dualDisplay?.OnConnectionLost(_connection);
             // Drop pending response watches — the wheel/port we sent to is
             // gone; their pending responses will never arrive on this
             // connection. They'd otherwise keep retrying after reconnect

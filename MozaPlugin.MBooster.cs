@@ -890,6 +890,33 @@ namespace MozaPlugin
         }
 
         /// <summary>
+        /// One-shot migration (see
+        /// <see cref="MozaPluginSettings.MBoosterOutputCurveMovedToDevice"/>):
+        /// every profile's and every pedal's host-side output curve becomes the
+        /// device curve — see MozaMBoosterRegistry.MigrateLegacyOutputCurve.
+        /// </summary>
+        private void MigrateMBoosterOutputCurveToDevice()
+        {
+            var profiles = _settings?.ProfileStore?.Profiles;
+            if (profiles == null) return;
+            int moved = 0;
+            foreach (var profile in profiles)
+            {
+                if (profile?.MBoosterSettings == null) continue;
+                foreach (var device in profile.MBoosterSettings.Values)
+                {
+                    if (device == null) continue;
+                    if (global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.MigrateLegacyOutputCurve(device)) moved++;
+                    if (device.Pedals != null)
+                        foreach (var pedal in device.Pedals.Values)
+                            if (pedal != null && global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.MigrateLegacyOutputCurve(pedal)) moved++;
+                }
+            }
+            if (moved > 0)
+                MozaLog.Info($"[AZOM/mBooster] Output curve moved onto the device for {moved} pedal config(s)");
+        }
+
+        /// <summary>
         /// Called once per detection rising edge by the registry. Pushes any
         /// saved calibration values to the device and kicks off a read-back
         /// for unset calibration fields. The doc warns this surface may not

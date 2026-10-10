@@ -103,6 +103,7 @@ namespace MozaPlugin
         {
             if (IsShuttingDown) return;
             try { _telemetrySender?.Pause(); } catch { }
+            _dualDisplay?.OnConnectionLost(_dashboardManager?.Connection);
             DetectionState.DashDetected = false;
             _data.IsDashboardConnected = false;
             // Same reasoning as OnSerialDisconnected: pending reads for a port

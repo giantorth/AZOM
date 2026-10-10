@@ -615,7 +615,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_GameFfbStrength}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="FfbStrengthSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbStrengthSlider_ValueChanged"/>
+                                        <Slider Grid.Column="1" x:Name="FfbStrengthSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="200" TickFrequency="1" ValueChanged="FfbStrengthSlider_ValueChanged"/>
                                         <TextBox Grid.Column="2" x:Name="FfbStrengthValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=FfbStrengthSlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
@@ -866,6 +866,20 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SoftLimitStrength}" Style="{StaticResource SliderLabel}"/>
+                                        <!-- cmd 0x1B: Soft 50 / Middle 75 / Hard 100 (% of max) -->
+                                        <ctrl:SegmentedControl Grid.Column="1" x:Name="SoftLimitStrengthCombo" HorizontalAlignment="Left"
+                                                               VerticalAlignment="Center" SelectionChanged="SoftLimitStrengthCombo_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitSoft}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitMiddle}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_SoftLimitHard}"/>
+                                        </ctrl:SegmentedControl>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Stiffness}" Style="{StaticResource SliderLabel}"/>
@@ -937,6 +951,21 @@
                                         <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="FfbCurvePreset_Exponential"/>
                                         <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="FfbCurvePreset_Parabolic"/>
                                     </StackPanel>
+                                    <!-- PitHouse "FFB center deadzone compensation": no register of
+                                         its own, rewrites curve points y1-y4 (see ApplyDeadzoneCompensation). -->
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DeadzoneCompensation}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="DeadzoneCompSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="10" TickFrequency="1" ValueChanged="DeadzoneCompSlider_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="DeadzoneCompValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=DeadzoneCompSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="0"/>
+                                    </Grid>
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </Grid>
@@ -2114,11 +2143,12 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_DeadzoneKg}" Style="{StaticResource SliderLabel}"
                                                    MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"
                                                    Visibility="Hidden"/>
+                                        <!-- Pit House's output curve: start = range start (X only),
+                                             end = range end (X and Y), y1..y4 evenly spaced between. -->
                                         <ctrl:MozaCurveEditor x:Name="MBoosterCurveEditor" Height="220" NodeCount="6"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               AllowHorizontalDrag="True"
-                                                              EndpointsOnlyDraggableInX="True"
-                                                              ClampSplineToPlot="True"/>
+                                                              EndpointRangeMode="True"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,12,0,20">
                                             <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="MBoosterCurvePreset_Linear"/>
                                             <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="MBoosterCurvePreset_SCurve"/>
@@ -2168,10 +2198,10 @@
                                         </Grid>
                                         </StackPanel><!-- MBoosterBrakeOnlyPanel -->
 
-                                        <!-- Data-store sliders, driven by MBoosterCurveEditor -->
+                                        <!-- Data-store sliders, driven by MBoosterCurveEditor: Y1 is the
+                                             start point (pinned 0), Y2..Y6 = device y1..y5, X1/X6 = Min/Max. -->
                                         <StackPanel Visibility="Collapsed">
-                                            <Slider x:Name="MBoosterY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY1Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY1Value" Text="20"/>
+                                            <Slider x:Name="MBoosterY1Slider" Minimum="0" Maximum="100" TickFrequency="1"/>
                                             <Slider x:Name="MBoosterY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY2Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterY2Value" Text="40"/>
                                             <Slider x:Name="MBoosterY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY3Slider_ValueChanged"/>
@@ -2182,18 +2212,8 @@
                                             <TextBox x:Name="MBoosterY5Value" Text="100"/>
                                             <Slider x:Name="MBoosterY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY6Slider_ValueChanged"/>
                                             <TextBox x:Name="MBoosterY6Value" Text="100"/>
-                                            <Slider x:Name="MBoosterX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX1Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX1Value" Text="20"/>
-                                            <Slider x:Name="MBoosterX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX2Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX2Value" Text="40"/>
-                                            <Slider x:Name="MBoosterX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX3Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX3Value" Text="60"/>
-                                            <Slider x:Name="MBoosterX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX4Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX4Value" Text="80"/>
-                                            <Slider x:Name="MBoosterX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX5Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX5Value" Text="100"/>
-                                            <Slider x:Name="MBoosterX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterX6Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterX6Value" Text="100"/>
+                                            <Slider x:Name="MBoosterRangeStartSlider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterRangeStartSlider_ValueChanged"/>
+                                            <Slider x:Name="MBoosterRangeEndSlider" Minimum="0" Maximum="100" TickFrequency="1" Value="100" ValueChanged="MBoosterRangeEndSlider_ValueChanged"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Grid>

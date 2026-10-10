@@ -9,6 +9,7 @@ timing out the host or to surface device-side debug information.
 | Bus heartbeat | `0x00` | every dev `0x12..0x1E` (13 IDs) | ~1 Hz | none (`N=0`) | Per-device presence ping |
 | Dash keepalive | `0x43` | `0x14`, `0x15`, `0x17` | ~1 Hz | `00` (`N=1`) | Connection-level ping; device replies `0x80` |
 | Sequence counter | `0x2D` | `0x13` | ~30–50 Hz | `F5 31 00 00 00 [seq]` | Frame-sync counter (see [`telemetry/control-signals.md`](telemetry/control-signals.md)) |
+| Motion-platform polls *(separate USB device, PID `0x2000`)* | `0x06` · `0x1F/03` · `0x21/01` · `0x21/02 [port]` | ports `0x14`–`0x1B` · controller `0x12` | 2 Hz each (`0x06` to all 8 ports, `0x21/02` per populated port) | UID / mode poll / status records | Motion Manager's presence + state polling; the `0x22` game streams are not answered and are not keepalives. See [`motion/README.md`](motion/README.md) § Traffic at a glance |
 
 ### Group `0x00` bus heartbeat
 

@@ -144,7 +144,7 @@ namespace MozaPlugin.Settings
             new NumericSetting {
                 Name = "FfbStrength", Commands = new[] { "base-ffb-strength" },
                 GetRaw = d => d.FfbStrength, SetRaw = (d, v) => d.FfbStrength = v,
-                Min = 0, Max = 100, Fine = 5, Coarse = 10,
+                Min = 0, Max = 200, Fine = 5, Coarse = 10,   // PitHouse goes to 200 % (raw 2000)
                 ToDisplay = FromTenths, ToRaw = ToTenths },
 
             new NumericSetting {
@@ -244,6 +244,13 @@ namespace MozaPlugin.Settings
                 Min = 1, Max = 10, Fine = 1, Coarse = 2,
                 ToDisplay = FromSoftLimit, ToRaw = ToSoftLimit },
 
+            // % of max. PitHouse only offers Soft 50 / Middle 75 / Hard 100,
+            // so steps of 25 land on those three.
+            new NumericSetting {
+                Name = "SoftLimitStrength", Commands = new[] { "base-soft-limit-strength" },
+                GetRaw = d => d.SoftLimitStrength, SetRaw = (d, v) => d.SoftLimitStrength = v,
+                Min = 50, Max = 100, Fine = 25, Coarse = 25 },
+
             new NumericSetting {
                 Name = "SpeedDamping", Commands = new[] { "base-speed-damping" },
                 GetRaw = d => d.SpeedDamping, SetRaw = (d, v) => d.SpeedDamping = v,
@@ -324,9 +331,11 @@ namespace MozaPlugin.Settings
                 Name = "FfbReverse", Command = "base-ffb-reverse",
                 Get = d => d.FfbReverse, Set = (d, v) => d.FfbReverse = v },
 
+            // cmd 0x1C: PitHouse writes 0 = off, 20 = on.
             new ToggleSetting {
                 Name = "SoftLimitRetain", Command = "base-soft-limit-retain",
-                Get = d => d.SoftLimitRetain, Set = (d, v) => d.SoftLimitRetain = v },
+                Get = d => d.SoftLimitRetain, Set = (d, v) => d.SoftLimitRetain = v,
+                OnValue = 20 },
 
             // cmd 0x1E: 0 = Reserved, 1 = Full. "On" = full output.
             new ToggleSetting {

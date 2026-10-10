@@ -54,6 +54,19 @@ namespace MozaPlugin.Hardware
             // MBoosterDeviceController.SoleConnectedAxis.
             var connectedAxes = controller.ConnectedAxes;
             int soleAxis = controller.SoleConnectedAxis();
+
+            // The motor pedal's role first, as Pit House does on a role change:
+            // the role-keyed writes below then land under the role the unit
+            // reports. Only a role the profile sets — never the axis-order
+            // default, and never Disabled.
+            for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.MaxAxes; axis++)
+            {
+                if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
+                    continue;
+                if (global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.TryExplicitAxisRole(s, axis, roleAxisCount, out var desired))
+                    controller.SyncPedalRole(axis, global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.RoleIndexOf(desired));
+            }
+
             for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.MaxAxes; axis++)
             {
                 if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
@@ -99,18 +112,23 @@ namespace MozaPlugin.Hardware
                     continue;
                 }
 
-                if (cfg.Direction >= 0) controller.SendIntWrite($"mbooster-{prefix}-dir", cfg.Direction, dev);
-                if (cfg.Min >= 0) controller.SendIntWrite($"mbooster-{prefix}-min", cfg.Min, dev);
-                if (cfg.Max >= 0) controller.SendIntWrite($"mbooster-{prefix}-max", cfg.Max, dev);
-                // CurveY/CurveX (Sim Input Mapping output curve) are NOT
-                // pushed here — purely host-side now, no wire command at
-                // all (see MozaMBoosterRegistry.EvaluateCurveArbitraryX and
-                // docs/protocol/devices/mbooster.md "Sim Input Mapping").
-                // HardwareCurveY is a passive pedal's Pedals-tab curve.
+                // Output registers the unit already reports are skipped, as
+                // Pit House's role-change burst left out a y5 already at 100.
+                bool Differs(string name, int value) => controller.OutputRegisterValue(dev, name) != value;
+                string dirName = $"mbooster-{prefix}-dir", minName = $"mbooster-{prefix}-min", maxName = $"mbooster-{prefix}-max";
+                if (cfg.Direction >= 0 && Differs(dirName, cfg.Direction)) controller.SendIntWrite(dirName, cfg.Direction, dev);
+                if (cfg.Min >= 0 && Differs(minName, cfg.Min)) controller.SendIntWrite(minName, cfg.Min, dev);
+                if (cfg.Max >= 0 && Differs(maxName, cfg.Max)) controller.SendIntWrite(maxName, cfg.Max, dev);
+                // Output curve: y1..y5 over the Min..Max range above, the
+                // registers Pit House writes for every pedal type.
                 var hwCurve = cfg.HardwareCurveY;
                 if (hwCurve != null && hwCurve.Length == 5)
                     for (int i = 0; i < 5; i++)
-                        controller.SendFloatWrite($"mbooster-{prefix}-y{i + 1}", hwCurve[i], dev);
+                    {
+                        string yName = $"mbooster-{prefix}-y{i + 1}";
+                        if (Differs(yName, (int)Math.Round(hwCurve[i])))
+                            controller.SendFloatWrite(yName, hwCurve[i], dev);
+                    }
                 // Travel / End Stop / Natural Friction / Segmented Damping are
                 // load-cell + motor Pedal Feel features living on brake-named
                 // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no

@@ -20,7 +20,7 @@ namespace MozaPlugin.Devices
             "base-damper", "base-friction", "base-inertia", "base-spring",
             "base-protection", "base-natural-inertia",
             "base-speed-damping", "base-speed-damping-point",
-            "base-soft-limit-stiffness", "base-soft-limit-retain",
+            "base-soft-limit-stiffness", "base-soft-limit-strength", "base-soft-limit-retain",
             "base-ffb-reverse", "base-temp-strategy", "base-gearshift-vibration",
             "main-get-work-mode", "main-get-led-status",
             "main-get-damper-gain", "main-get-friction-gain",

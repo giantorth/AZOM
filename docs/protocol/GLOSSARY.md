@@ -7,6 +7,7 @@ One-line definitions for jargon used throughout `docs/protocol/`. Hardware names
 | Term | Meaning |
 |------|---------|
 | **PitHouse** / **Pit House** | Moza's official Windows configuration + dashboard tool. Reference implementation we reverse-engineer against |
+| **Motion Manager** | MOZA's separate Windows application for the motion platform (observed `1.0.3.10 - release`). Reference implementation for [`motion/`](motion/); not Pit House |
 | **SimHub** | Third-party sim racing dashboard tool. Hosts the plugin in this repo |
 | **Boxflat** | Open-source Linux Moza driver ([github.com/Lawstorant/boxflat](https://github.com/Lawstorant/boxflat)). Original reverse-engineering source |
 | **plugin** | Unqualified — refers to this repo's SimHub plugin |
@@ -42,6 +43,10 @@ One-line definitions for jargon used throughout `docs/protocol/`. Hardware names
 | **MDD** | Standalone Moza display peripheral (device `0x14`). Distinct from wheels with built-in screens |
 | **AB9** | Moza AB9 active shifter (separate USB device, settings via `Group 0x1F → dev 0x12`) |
 | **S09 CM2** | A dash variant — connects as bus 19 directly off bus 2 |
+| **Motion Controller** | The USB box (VID `0x346E` PID `0x2000`, identity `G01 SU`, "SU" = supervisor unit) that heads the motion platform's own actuator bus as dev `0x12`. See [`motion/`](motion/) |
+| **HMA150** | MOZA's linear motion actuator (identity `G01 AU # MOT-1-V01`, "AU" = actuator unit); four of them make the 4-corner platform. Each sits on an **actuator port** of the Motion Controller |
+| **actuator port** | One of eight connectors on the Motion Controller; port *p* (1-based, the "Device p" of Motion Manager's port-assignment page) is slave dev `0x13 + p` on the motion bus |
+| **cueing** | Turning vehicle motion (pitch, roll, accelerations …) into actuator travel. On the MOZA platform the **controller** does this from raw telemetry the host streams (`0x22/00`); only the haptic oscillators are rendered host-side |
 
 ## Firmware eras
 

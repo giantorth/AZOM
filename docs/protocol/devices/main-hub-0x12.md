@@ -1,6 +1,6 @@
 ## Main (Device `0x12` / 18)
 
-> Device id `0x12` is shared across several physical devices on the bus — it is the wheelbase main controller, the universal hub, the AB9 active shifter, the mBooster pedals, and the CM2 standalone dashboard's bridge/main. Disambiguation happens at the USB level (each device exposes its own VID/PID composite) and via group context (group `0x32` writes addressed to `0x12` belong to the CM2 standalone dashboard, not the wheelbase main).
+> Device id `0x12` is shared across several physical devices on the bus — it is the wheelbase main controller, the universal hub, the AB9 active shifter, the mBooster pedals, the CM2 standalone dashboard's bridge/main, and — on its own USB device, PID `0x2000` — the MOZA Motion Controller ([`../motion/`](../motion/)). Disambiguation happens at the USB level (each device exposes its own VID/PID composite) and via group context (group `0x32` writes addressed to `0x12` belong to the CM2 standalone dashboard, not the wheelbase main; groups `0x1E`/`0x1F`/`0x20`–`0x22` addressed to `0x12` on PID `0x2000` belong to the motion controller and have nothing to do with the `0x1E`/`0x1F` tables below).
 
 ### CM2 bridge/main routing
 

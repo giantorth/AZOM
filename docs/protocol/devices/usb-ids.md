@@ -34,6 +34,17 @@ expected to stay in sync.
 | `0x002F` | PedalHaptics| S12 pedal vibration           | confirmed   |
 | `0x1000` | Ab9         | AB9 active shifter            | confirmed   |
 | `0x1002` | Ab9         | AB6 active shifter            | confirmed   |
+| `0x2000` | *(none yet)*| MOZA Motion Controller (HMA150 motion platform) | confirmed   |
+
+PID `0x2000` is the **MOZA Motion Controller** — the USB box that drives the
+HMA150 4-corner motion platform (product string `MOZA Motion Controller`,
+CDC ACM + CDC data + an idle HID interface). Confirmed from the device
+descriptor in every capture under `~/Downloads/hma150/` (2026-10). It is
+**not in `MozaUsbIds.cs`**, so today it is an unknown PID: the wheelbase and
+AB9 connections both accept it as a probe candidate (see
+[Unknown-PID fallback](#unknown-pid-fallback)) and would write base/AB9
+probe frames into a motion controller. Its protocol is documented in
+[`../motion/`](../motion/); there is no plugin lane for it.
 
 PID `0x0006` is reported by Windows as USB string `"MOZA R12 Base"`
 (see [`../../../usb-capture/USB-device-tree-view-infos.txt`](../../../usb-capture/USB-device-tree-view-infos.txt)).
@@ -75,6 +86,7 @@ CDC device.
 | `Hub`       | **Hub-only (no base):** the primary `Wheelbase` `MozaSerialConnection` claims the hub port (its filter admits hub PIDs) and runs the full wheel/session/telemetry pipeline there. **Base + hub both present:** the base stays the primary (the registry walk prefers a `Wheelbase`-category port) and a dedicated [`MozaHubDeviceManager`](../../../Devices/MozaHubDeviceManager.cs) claims the hub port to enumerate its peripherals (pedals/handbrake/port-power) in parallel. The `_activePorts` guard stops the dedicated connection from re-opening a hub the primary already holds. | Primary: `MozaProbeTarget.BaseAndHub`. Dedicated: `MozaProbeTarget.HubOnly` (single `0x64` hub probe), registry-only (probe fallback force-disabled). The post-session `0xE4` reply from `hub-port1-power` calls `MarkHubDetected()` to set `HubProbeSucceeded` for [`TelemetrySender`](../../../Telemetry/TelemetrySender.cs)'s 5-slot enumeration burst (primary pipe only). |
 | `Dashboard` | Dedicated `MozaSerialConnection` filtered to dashboard PIDs only (`0x0025`), separate from the wheelbase connection so a standalone CM2 works alongside a base | Registry direct-claims the dashboard port by PID (no probe scan); screen telemetry / config writes address `dev_id=0x12` (CM2 bridge/main). A CM2 *behind* a wheelbase has no own port and is the dash sub-device at `dev_id=0x14` on the wheelbase connection. |
 | `PedalHaptics` | [`PedalHapticsDeviceController`](../../../Devices/PedalHaptics/PedalHapticsDeviceController.cs) (multi-device under [`MozaPedalHapticsRegistry`](../../../Devices/PedalHaptics/MozaPedalHapticsRegistry.cs)), one dedicated connection per S12 plugged straight into the PC, addressed `0x12`. A unit behind a base/hub has no port of its own and is reached on that pipe through the extended envelope (`0x1F` + extended id `0x1E`) instead. See [`pedal-haptics.md`](pedal-haptics.md). | `MozaProbeTarget.PedalHaptics` — registry-only, claimed by PID; probe fallback force-disabled, so this never writes scan bytes to a port it was not handed. |
+| *(motion, `0x2000`)* | **No category and no lane.** The MOZA Motion Controller currently falls into `Unknown` below, i.e. the wheelbase and AB9 probes may be written into it. Wire protocol: [`../motion/`](../motion/). | *(none)* |
 | `Unknown`   | Both `Wheelbase` and `Ab9` connections accept unknown PIDs as fallback    | Each runs its own probe; the first matching response wins             |
 
 ## Discovery path

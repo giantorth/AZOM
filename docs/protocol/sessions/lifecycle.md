@@ -10,6 +10,8 @@
 
 Pithouse opens **two sessions simultaneously** (0x01 and 0x02) in same USB packet. Wheel responds with `fc:00` acks for both. The `fc:00` session bytes in steady state track **session ack protocol** (incrementing ack_seq for each 7c:00 data chunk received), NOT telemetry flag byte.
 
+**A missing fc:00 on the 0x01 open does not mean 0x01 is closed (seen on a W13 display wheel, bundle `RRG9T829`; the session layer is common to dashboard wheels).** After the narrow 0x01–0x03 closes went unacked, both opens of 0x01 drew `c3 71 fc 23 xx 01 00` instead of `fc 00 01`. 0x02 acked normally. The wheel still used 0x01: it fc:00-acked host chunks there and pushed its catalog, kind=10/16 and the kind=14 log reply on it. Unacked wheel data is resent as the whole pending queue every ~1 s for 10 rounds, then dropped. Newly queued records stay in later rounds, so the batch grows (27→36 chunks seen). The host must ack every session it transmits on, whether or not the open was acked. The plugin keys inbound acks on `EffectiveMgmtPort` (0x01 fallback) for this.
+
 **Device-initiated (type=0x81, 6-byte payload):**
 
 Device opens sessions 0x04, 0x06, 0x08, 0x09, 0x0A with 6-byte form (not 4-byte host form):

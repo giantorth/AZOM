@@ -556,8 +556,10 @@ namespace MozaPlugin.Devices.MBooster
                                 default: v = 0; break;
                             }
                             c.LastAxisPositions[a] = v;
-                            if (a < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[a] = v * 100.0;
-                            if (a == 0) { c.LastHidPosition = v; c.LastRawPercentPreCurve = v * 100.0; }
+                            // The base reports the shaped value, as a USB
+                            // lane's HID does — feeds the Input Force readout.
+                            if (a < c.LastAxisRawPercentPreThreshold.Length) c.LastAxisRawPercentPreThreshold[a] = v * 100.0;
+                            if (a == 0) c.LastHidPosition = v;
                         }
                     }
                     c.PostTelemetry(snap);
@@ -615,23 +617,12 @@ namespace MozaPlugin.Devices.MBooster
             }
             if (c == null) return;
 
-            // Pedal Feel — Deadzone, Max Force, and the Pedal Feel curve
-            // (InputCurveY) are all now REAL hardware calibration
-            // (mbooster-brake-deadzone/-maxforce/-feelcurve-1..6, cmdId
-            // 0xAB selectors 0x07-0x0E — see
-            // MBoosterDeviceController.PushFeelCurveResync and
-            // docs/protocol/devices/mbooster.md "Pedal Feel"): the device
-            // reshapes the raw HID axis itself before this read ever sees
-            // it, so there is nothing left to reshape here for those.
-            // Sim Input Mapping (CurveY/CurveX) is the opposite: it has NO
-            // wire command at all (see docs "Sim Input Mapping") — it
-            // remaps THIS already-hardware-shaped value into what AZOM
-            // reports to the sim, applied here so every downstream
-            // consumer (position bar, MergePositions -> game telemetry,
-            // the effect worker's brake-position fallback) sees the same
-            // remapped value. Per-axis: the master (axis 0) uses the
-            // lane's flat fields, each chained pedal uses its own per-pedal
-            // entry.
+            // Pedal Feel (Deadzone, Max Force, InputCurveY) and the output
+            // curve (HardwareCurveY over Min..Max, mbooster-{role}-y1..y5)
+            // are device calibration: the unit has already shaped this value.
+            // Only Max Threshold is still applied here. Per-axis: the master
+            // (axis 0) uses the lane's flat fields, each chained pedal its
+            // own per-pedal entry.
             var laneSettings = _settingsLookup(c.Identity);
             IMBoosterPedalConfig? cfg = laneSettings;
             if (axisIndex > 0)
@@ -662,32 +653,14 @@ namespace MozaPlugin.Devices.MBooster
                 // hardware testing (bug bundle — "Max Threshold does
                 // nothing" investigation). Max Threshold is meant to be a
                 // purely host-side remap of the ALREADY-Max-Force-scaled raw
-                // position into "100% at Threshold's kg" for the sim, same
-                // category as Sim Input Mapping's CurveY/CurveX below (no
-                // wire command actually does the real work). Unset (-1) or
-                // non-positive Threshold is a no-op (ratio 1, same as
+                // position into "100% at Threshold's kg" for the sim. Unset
+                // (-1) or non-positive Threshold is a no-op (ratio 1, same as
                 // Threshold == Max Force) so an uncustomized profile keeps
                 // its previous raw-passthrough behavior unchanged.
                 double maxForceKg = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200.0;
                 double thresholdKg = cfg.MaxThresholdKg > 0 ? cfg.MaxThresholdKg : maxForceKg;
                 if (Math.Abs(thresholdKg - maxForceKg) > 0.0001)
                     posPct = Math.Min(100.0, posPct * (maxForceKg / thresholdKg));
-
-                // Store the pre-remap percent for EVERY axis so the UI's
-                // live curve markers follow whichever pedal is selected (axis 0
-                // also mirrored to LastRawPercentPreCurve for legacy callers).
-                if (axisIndex < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[axisIndex] = posPct;
-                if (axisIndex == 0) c.LastRawPercentPreCurve = posPct;
-                // A Pedals-tab passive pedal shapes on the device
-                // (HardwareCurveY); the host-side curve has no editor there.
-                if (cfg.CurveY != null && cfg.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount
-                    && !IsPedalsTabPassive(c, axisIndex))
-                    posPct = EvaluateCurveArbitraryX(cfg.CurveX ?? DefaultCurveX, cfg.CurveY, posPct);
-            }
-            else
-            {
-                if (axisIndex < c.LastAxisRawPercentPreCurve.Length) c.LastAxisRawPercentPreCurve[axisIndex] = posPct;
-                if (axisIndex == 0) c.LastRawPercentPreCurve = posPct;
             }
 
             double shaped01 = posPct / 100.0;
@@ -708,22 +681,12 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
-        /// Catmull-Rom evaluation generalized to arbitrary (draggable) node
-        /// X positions instead of a fixed spacing — used for the Sim Input
-        /// Mapping output curve's horizontal node drag
-        /// (<c>MBoosterDeviceSettings.CurveX</c>/<c>CurveY</c>). Purely
-        /// host-side (see docs/protocol/devices/mbooster.md "Sim Input
-        /// Mapping") — this remaps the pedal's already-hardware-shaped raw
-        /// HID position into what AZOM reports as game telemetry; there is
-        /// no wire command for it. Beyond the last node's X, returns that
-        /// node's Y (flat plateau) — this is what makes "100% output
-        /// before 100% input" work: drag the last node left and everything
-        /// past it just stays at that Y. Node count is derived from
-        /// <paramref name="xs"/>'s own length (not hardcoded to the current
-        /// <see cref="MBoosterUiConstants.SimInputMappingNodeCount"/>) so
-        /// this same evaluator can also resample an OLDER saved curve (e.g.
-        /// a legacy 5-node one) at a NEW breakpoint set during migration —
-        /// see MozaPlugin's curve-array migration.
+        /// Catmull-Rom evaluation through nodes at arbitrary X, with an
+        /// implicit (0,0) origin and a flat plateau past the last node — the
+        /// shape the retired host-side output curve
+        /// (<c>CurveX</c>/<c>CurveY</c>) had. Kept for resampling saved and
+        /// imported curves onto the device curve (see MozaPlugin's curve
+        /// migrations and PitHousePedalsMapper).
         /// </summary>
         internal static double EvaluateCurveArbitraryX(float[] xs, float[] ys, double x)
         {
@@ -771,17 +734,64 @@ namespace MozaPlugin.Devices.MBooster
             return CubicBezier(p1y, c1y, c2y, p2y, (lo + hi) / 2.0);
         }
 
-        // Default (un-dragged) node X breakpoints for the Sim Input Mapping
-        // output curve, 100/6 * k for k=1..6 — evenly spaced, last node at
-        // exactly 100% so an untouched curve maps full input to full output.
-        // (Previously 100/7 * k, inherited from the disproven/removed
-        // curve7 mechanism's selectors purely for cosmetic continuity — see
-        // docs/protocol/devices/mbooster.md "Sim Input Mapping" — which left
-        // the last node short at ~85.7%, so "100% output before 100% input"
-        // via EvaluateCurveArbitraryX's plateau only needs a user's explicit
-        // drag now, not an already-shortened default.)
-        private static readonly float[] DefaultCurveX =
+        // Un-dragged node X of the retired host-side output curve (CurveY
+        // with CurveX null): 100/6 * k for k=1..6.
+        internal static readonly float[] LegacyOutputCurveDefaultX =
             { 100f / 6f, 200f / 6f, 300f / 6f, 400f / 6f, 500f / 6f, 600f / 6f };
+
+        /// <summary>
+        /// Move one pedal's retired host-side output curve (CurveY/CurveX) onto
+        /// the device curve (HardwareCurveY over Min..Max) and clear it. The
+        /// host curve shaped the device's already range-mapped output, so the
+        /// two compose: a leading run of nodes at 0 becomes the range start, the
+        /// last node's X the range end (the host curve plateaued past it), and
+        /// y1..y5 are the composed output at the five evenly spaced points. An
+        /// unset Min/Max is taken as 0/100 and only written when it moves. A
+        /// HardwareCurveY already set is what the device ran — it wins. True if
+        /// anything changed.
+        /// </summary>
+        internal static bool MigrateLegacyOutputCurve(IMBoosterPedalConfig cfg)
+        {
+            if (cfg.CurveY == null && cfg.CurveX == null) return false;
+            var ys = cfg.CurveY;
+            var xs = cfg.CurveX;
+            cfg.CurveY = null;
+            cfg.CurveX = null;
+            int n = MBoosterUiConstants.SimInputMappingNodeCount;
+            if (ys == null || ys.Length != n) return true;
+            if (cfg.HardwareCurveY != null && cfg.HardwareCurveY.Length == 5) return true;
+            if (xs == null || xs.Length != n) xs = LegacyOutputCurveDefaultX;
+
+            // Legacy curve domain: 0..100 across the device's own range.
+            double start = 0;
+            for (int k = 0; k < n && ys[k] <= 0; k++) start = xs[k];
+            double end = Math.Max(start, xs[n - 1]);
+
+            int m0 = cfg.Min >= 0 ? cfg.Min : 0;
+            int m1 = cfg.Max >= 0 ? cfg.Max : 100;
+            if (m1 <= m0) m1 = Math.Min(100, m0 + MBoosterUiConstants.OutputCurveMinRangePct);
+            double span = m1 - m0;
+            int newMin = (int)Math.Round(m0 + start / 100.0 * span);
+            int newMax = (int)Math.Round(m0 + end / 100.0 * span);
+            if (newMax - newMin < MBoosterUiConstants.OutputCurveMinRangePct)
+            {
+                newMax = Math.Min(100, newMin + MBoosterUiConstants.OutputCurveMinRangePct);
+                newMin = newMax - MBoosterUiConstants.OutputCurveMinRangePct;
+            }
+
+            var curve = new float[5];
+            for (int k = 1; k <= 5; k++)
+            {
+                double raw = newMin + k * (newMax - newMin) / 5.0;
+                double u = span > 0 ? (raw - m0) / span * 100.0 : 100.0;
+                double y = EvaluateCurveArbitraryX(xs, ys, u);
+                curve[k - 1] = (float)Math.Round(Math.Max(0, Math.Min(100, y)));
+            }
+            cfg.HardwareCurveY = curve;
+            if (cfg.Min >= 0 || newMin != 0) cfg.Min = newMin;
+            if (cfg.Max >= 0 || newMax != 100) cfg.Max = newMax;
+            return true;
+        }
 
         // Default/un-dragged shape of the Pedal Feel curve's 6 Y nodes
         // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D),
@@ -1102,6 +1112,22 @@ namespace MozaPlugin.Devices.MBooster
             if (axisIndex == 0 && legacy != MBoosterRole.Disabled)
                 return legacy;
             return PositionalRole(axisIndex, legacy);
+        }
+
+        /// <summary>
+        /// The role the profile itself sets for an axis — the same fields
+        /// <see cref="ResolveAxisRole"/> reads, minus its axis-order default.
+        /// False when the profile holds no role there, so a default never
+        /// overrides a role set on the device (e.g. from Pit House).
+        /// </summary>
+        internal static bool TryExplicitAxisRole(MBoosterDeviceSettings? s, int axisIndex, int axisCount, out MBoosterRole role)
+        {
+            role = MBoosterRole.Disabled;
+            if (s == null) return false;
+            var roles = s.AxisRoles;
+            if (roles != null && axisIndex >= 0 && axisIndex < roles.Length) role = roles[axisIndex];
+            else if (axisCount <= 1 || axisIndex == 0) role = s.Role;
+            return role != MBoosterRole.Disabled;
         }
 
         // Axis order → role, the standard Moza pedal convention: Rx(0x33) =

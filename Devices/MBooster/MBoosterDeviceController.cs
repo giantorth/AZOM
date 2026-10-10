@@ -111,13 +111,30 @@ namespace MozaPlugin.Devices.MBooster
             private set => _deviceReportedMaxThresholdKg = value;
         }
 
-        // Which pedal slots the device reports physically connected, indexed by
-        // HID axis (0 = throttle/Rx, 1 = brake/Ry, 2 = clutch/Rz — the same
-        // throttle/brake/clutch order the axes default to). Parsed from the
-        // device's "PD Linked:[T x B y C z]" group-0x0E diagnostic. null until
-        // that line arrives (the device streams it only under some conditions);
-        // when null the UI falls back to showing every detected axis. Volatile
-        // reference swap so the UI thread sees a consistent array.
+        // The host heartbeat names the unit's local CHANNELS (T/B/C — the motor
+        // pedal is always B), but each channel reports on the HID axis of the
+        // role the unit's pedal-role map (0x21/0x22/0x23) gives it: a standalone
+        // unit set to Throttle (0x22 = 1) says "Brake pedal is connected" and
+        // moves Rx (bundle GQ8HAWCV). The heartbeat state is kept channel-
+        // indexed as heard (and persisted that way); ConnectedAxes, AxisTypes,
+        // TabAxisTypes and RoleLocality are the axis-indexed views of it
+        // through _slotAxis — see RederiveAxisViews.
+        private volatile bool[]? _slotConnected;
+        private volatile byte[]? _slotTypes;
+        private volatile byte[]? _seededSlotTypes;
+        private volatile byte[]? _slotLocality;
+        // Channel → HID axis from the host's role map; identity until it is
+        // read. Topology: kept across a port bounce like the heartbeat state.
+        private volatile int[] _slotAxis = { 0, 1, 2 };
+        private string _lastSlotAxisLogged = "0,1,2";
+
+        // Which pedals the device reports physically connected, indexed by HID
+        // axis (0 = throttle/Rx, 1 = brake/Ry, 2 = clutch/Rz). From the
+        // device's "PD Linked:[T x B y C z]" group-0x0E diagnostic through
+        // _slotAxis. null until that line arrives (the device streams it only
+        // under some conditions); when null the UI falls back to showing every
+        // detected axis. Volatile reference swap so the UI thread sees a
+        // consistent array.
         private volatile bool[]? _connectedAxes;
         public bool[]? ConnectedAxes => _connectedAxes;
 
@@ -147,7 +164,8 @@ namespace MozaPlugin.Devices.MBooster
         public void SeedAxisTypes(byte[]? types)
         {
             if (types == null || types.Length == 0 || AxisTypesComplete) return;
-            _seededAxisTypes = (byte[])types.Clone();
+            _seededSlotTypes = (byte[])types.Clone();
+            RederiveAxisViews();
             MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} seeded pedal types from cache: {AxisTypesSignature(types)} (live diagnostic will confirm/override)");
         }
 
@@ -190,7 +208,7 @@ namespace MozaPlugin.Devices.MBooster
         private bool _blockOpen;
         // "min 65535.00000" is the firmware's unset marker; real pedals read within ±30°.
         private const double LocalMinSentinel = 60000.0;
-        // Committed role-indexed [T,B,C] locality. Volatile whole-array swap: read
+        // Committed locality, axis-indexed view of _slotLocality. Volatile whole-array swap: read
         // by the routing resolvers and the diagnostics dump. Topology, not
         // connection state — kept across a port bounce like _axisTypes.
         private volatile byte[]? _roleLocality;
@@ -316,13 +334,6 @@ namespace MozaPlugin.Devices.MBooster
         // registry; published as a property so the UI panel can show the bar.
         public double LastHidPosition { get; internal set; }
 
-        // Same signal, but BEFORE the input curve (i.e. after deadzone/max
-        // force only) — 0..100. Lets the UI place a live position marker on
-        // the Pedal Feel input curve showing exactly what it receives, since
-        // LastHidPosition is already past that point. See
-        // MozaMBoosterRegistry.OnHidAxisUpdate.
-        public double LastRawPercentPreCurve { get; internal set; }
-
         // GenericDesktop axis usages 0x30..0x37 — a chain host exposes at most
         // this many pedal axes on one HID report.
         public const int MaxAxes = 8;
@@ -336,24 +347,12 @@ namespace MozaPlugin.Devices.MBooster
         // torn sample costs one tick of a wrong amplitude, never a crash.
         public readonly double[] LastAxisPositions = new double[MaxAxes];
 
-        // Per-axis pre-input-curve percent (0..100) — the same signal as
-        // LastRawPercentPreCurve (after deadzone/max-force, before the input
-        // curve) but for EVERY pedal, so the settings tab's live curve markers
-        // track whichever pedal is selected, not just the master. NOTE: since
-        // MozaMBoosterRegistry.OnHidAxisUpdate added the host-side Max
-        // Threshold rescale, this is "% of Threshold's span" (the Sim Input
-        // Mapping curve's own input domain) — see LastAxisRawPercentPreThreshold
-        // below for the true raw reading (% of Max Force's span) instead.
-        public readonly double[] LastAxisRawPercentPreCurve = new double[MaxAxes];
-
         // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
         // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
         // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
         // force the user is actually applying to the pedal. This is the
         // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
-        // what the "Input Force" live label/marker should show — unlike
-        // LastAxisRawPercentPreCurve, which is now post-Threshold-rescale and
-        // represents the Sim Input Mapping curve's own (different) domain.
+        // what the "Input Force" live label/marker should show.
         public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
@@ -388,7 +387,7 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Fired when the device's own connectivity diagnostic ("PD Linked" /
         /// "Pedals connected state") has been parsed — i.e. LIVE data, never a
-        /// seed. Arg: the role-indexed [T,B,C] connected flags. The plugin
+        /// seed. Arg: the channel-indexed [T,B,C] connected flags. The plugin
         /// persists these per device so the next controller (plugin restart,
         /// next session) can be seeded instead of waiting for the broadcast.
         /// </summary>
@@ -396,7 +395,7 @@ namespace MozaPlugin.Devices.MBooster
 
         /// <summary>
         /// Fired when the host heartbeat has settled which roles live on the
-        /// host and which on a chained unit — role-indexed [T,B,C] of
+        /// host and which on a chained unit — channel-indexed [T,B,C] of
         /// <see cref="LocalityHost"/> / <see cref="LocalityRemote"/>. LIVE data
         /// only, on change. The plugin persists it so the next controller is
         /// seeded ahead of the first heartbeat (~1 min).
@@ -404,7 +403,7 @@ namespace MozaPlugin.Devices.MBooster
         public event Action<byte[]>? ChainRolesResolved;
 
         /// <summary>
-        /// Fired when a complete active/passive type block is read — axis-indexed
+        /// Fired when a complete active/passive type block is read — channel-indexed
         /// (0 none, 1 active, 2 passive). LIVE data only, on change. The plugin
         /// persists it as the next controller's <see cref="SeedAxisTypes"/>.
         /// </summary>
@@ -450,8 +449,9 @@ namespace MozaPlugin.Devices.MBooster
         public void SeedConnectedAxes(bool[]? connected)
         {
             if (connected == null || connected.Length == 0) return;
-            if (_connectedAxes != null) return;
-            _connectedAxes = (bool[])connected.Clone();
+            if (_slotConnected != null) return;
+            _slotConnected = (bool[])connected.Clone();
+            RederiveAxisViews();
             MozaLog.Info(
                 $"[AZOM/mBooster] {ShortIdentity(Identity)} seeded connectivity from cache: " +
                 $"T={connected.Length > 0 && connected[0]} B={connected.Length > 1 && connected[1]} C={connected.Length > 2 && connected[2]} " +
@@ -469,12 +469,13 @@ namespace MozaPlugin.Devices.MBooster
         public void SeedChainRoles(byte[]? locality)
         {
             if (locality == null || locality.Length == 0) return;
-            if (_roleLocality != null && !_roleLocalityIsSeed) return;
+            if (_slotLocality != null && !_roleLocalityIsSeed) return;
             bool any = false;
             foreach (var v in locality) if (v != LocalityUnknown) any = true;
             if (!any) return;
-            _roleLocality = (byte[])locality.Clone();
+            _slotLocality = (byte[])locality.Clone();
             _roleLocalityIsSeed = true;
+            RederiveAxisViews();
             MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} seeded pedal locality from cache: {LocalitySignature(locality)} (live heartbeat will confirm/override)");
             RecomputeChainRoleMap();
         }
@@ -849,6 +850,35 @@ namespace MozaPlugin.Devices.MBooster
                 || types[axisIndex] != 1)
                 return false;
             return TryCalibDeviceForAxis(axisIndex, out dev);
+        }
+
+        /// <summary>
+        /// Write the profile's role for the motor pedal on
+        /// <paramref name="axisIndex"/> to its unit when the unit's own 0x22
+        /// reads otherwise. The role is per profile in the plugin but one
+        /// register on the unit, so a profile switch or connect with a
+        /// different role left the unit reporting the old one (bug report
+        /// NPN9FR6W). Single-unit lanes only: there the unit is the host
+        /// whatever the role; on a chain the unit is found from the role,
+        /// which is exactly what disagrees. Skipped while the 0x22 read-back is
+        /// unknown or a role write is still waiting for the heartbeat. True if
+        /// written.
+        /// </summary>
+        public bool SyncPedalRole(int axisIndex, int roleIndex)
+        {
+            if (roleIndex < 0 || roleIndex > 2 || ActiveAxisCount != 1) return false;
+            var types = _axisTypes;
+            if (types == null || !AxisTypesComplete || axisIndex < 0 || axisIndex >= types.Length
+                || types[axisIndex] != 1)
+                return false;
+            byte dev = HostDeviceId;
+            int current = StatusValue(dev, "mbooster-status-22");
+            if (current < 1 || current > 3 || current == roleIndex + 1) return false;
+            lock (_pendingRoles)
+                foreach (var p in _pendingRoles.Values)
+                    if (p.Dev == dev) return false;
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} unit reports {RoleName(current - 1)}, profile says {RoleName(roleIndex)}");
+            return WritePedalRoleTo(dev, roleIndex);
         }
 
         /// <summary>Write <paramref name="newRoleIndex"/> to the unit
@@ -1416,7 +1446,7 @@ namespace MozaPlugin.Devices.MBooster
                 foreach (var kv in _deviceCalib)
                     devices.Add(new KeyValuePair<byte, int[]>(kv.Key, (int[])kv.Value.Clone()));
             }
-            var connected = _connectedAxes; // role-indexed [T,B,C]; null until PD Linked
+            var connected = _connectedAxes; // axis = hardware role (see _slotAxis); null until PD Linked
 
             var roleToDev = new Dictionary<int, byte>();
             var conflict = new HashSet<int>();
@@ -1651,6 +1681,8 @@ namespace MozaPlugin.Devices.MBooster
                     StoreOutputRegister(HostDeviceId, r.Name, r.IntValue);
                     StoreCalib(HostDeviceId, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
+                    if (r.Name == "mbooster-status-21" || r.Name == "mbooster-status-22" || r.Name == "mbooster-status-23")
+                        RederiveAxisViews();
                     break;
             }
         }
@@ -1791,9 +1823,8 @@ namespace MozaPlugin.Devices.MBooster
             // "PD Linked:[T 0 B 1 C 1]" — or, on newer firmware (device-type
             // 01-02-07-05, support bundle 2026-07-30), the long form "Pedals
             // connected state: [throttle 0 brake 1 clutch 0]". 1 = that pedal
-            // slot is physically connected. Slots map to axis index 0/1/2
-            // (throttle/brake/clutch), the same order the HID axes (Rx/Ry/Rz)
-            // sort into.
+            // slot is physically connected. Slots are the unit's channels; the
+            // HID axis each lands on comes from _slotAxis.
             bool shortForm = ascii.IndexOf("PD Linked", StringComparison.OrdinalIgnoreCase) >= 0;
             bool longForm = !shortForm && ascii.IndexOf("connected state", StringComparison.OrdinalIgnoreCase) >= 0;
             if (shortForm || longForm)
@@ -1804,7 +1835,8 @@ namespace MozaPlugin.Devices.MBooster
                 if (t >= 0 && b >= 0 && c >= 0)
                 {
                     var live = new[] { t == 1, b == 1, c == 1 };
-                    _connectedAxes = live;
+                    _slotConnected = live;
+                    RederiveAxisViews();
                     MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} connected pedals: T={t == 1} B={b == 1} C={c == 1}");
                     // Connectivity narrows which roles the calibration
                     // fingerprint may consider — re-derive with it known.
@@ -1824,10 +1856,11 @@ namespace MozaPlugin.Devices.MBooster
                     byte type = ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)0
                               : ascii.IndexOf("passive", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)2
                               : ascii.IndexOf("active", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)1 : (byte)0;
-                    var arr = _axisTypes != null ? (byte[])_axisTypes.Clone() : new byte[3];
+                    var arr = _slotTypes != null ? (byte[])_slotTypes.Clone() : new byte[3];
                     if (slot < arr.Length) arr[slot] = type;
-                    _axisTypes = arr;
+                    _slotTypes = arr;
                     if (slot < _axisTypeSeen.Length) _axisTypeSeen[slot] = true;
+                    RederiveAxisViews();
                     // Active/passive is what actually decides chain-ness (see
                     // ActiveAxisCount / MotorDeviceForCurrentAxis), so re-derive
                     // the role→motor map. The routing verdict itself waits for
@@ -1886,7 +1919,7 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (!_blockOpen) return;
             _blockOpen = false;
-            var connected = _connectedAxes;
+            var connected = _slotConnected;
             var loc = new byte[3];
             bool any = false;
             for (int r = 0; r < 3; r++)
@@ -1899,8 +1932,9 @@ namespace MozaPlugin.Devices.MBooster
             }
             if (any)
             {
-                _roleLocality = loc;
+                _slotLocality = loc;
                 _roleLocalityIsSeed = false;
+                RederiveAxisViews();
                 string sig = LocalitySignature(loc);
                 if (sig != _lastLocalityLogged)
                 {
@@ -1911,7 +1945,7 @@ namespace MozaPlugin.Devices.MBooster
                 }
                 RecomputeChainRoleMap();
             }
-            var types = _axisTypes;
+            var types = _slotTypes;
             if (types != null && AxisTypesComplete)
             {
                 string typeSig = string.Join(",", types);
@@ -1974,6 +2008,81 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         private string _lastRoutingLogged = "";
+
+        /// <summary>
+        /// Rebuild the axis-indexed views (<see cref="ConnectedAxes"/>,
+        /// <see cref="AxisTypes"/>, <see cref="TabAxisTypes"/>,
+        /// <see cref="RoleLocality"/>) from the channel-indexed heartbeat state
+        /// through the host's pedal-role map, and re-route when the map moved a
+        /// pedal to another axis — a role write moves the pedal's HID axis with
+        /// it.
+        /// </summary>
+        private void RederiveAxisViews()
+        {
+            var map = ResolveSlotAxis();
+            _connectedAxes = ToAxes(_slotConnected, map);
+            _axisTypes = ToAxes(_slotTypes, map);
+            _seededAxisTypes = ToAxes(_seededSlotTypes, map);
+            _roleLocality = ToAxes(_slotLocality, map);
+
+            string sig = string.Join(",", map);
+            if (sig == _lastSlotAxisLogged) return;
+            _lastSlotAxisLogged = sig;
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} pedal-role map moves channels to HID axes: "
+                + $"T→ax{map[0]} B→ax{map[1]} C→ax{map[2]}");
+            RecomputeChainRoleMap();
+            LogRoutingDecision();
+        }
+
+        /// <summary>
+        /// Channel → HID axis: the role (1 T, 2 B, 3 C) the host's 0x21/0x22/0x23
+        /// give each channel, once all three have answered. Kept when the read
+        /// is incomplete (a port bounce clears the status block). Identity when
+        /// two connected channels would share an axis — not captured, so the
+        /// map can't say where they report. USB lanes only: a routed lane has
+        /// no HID of its own, its positions are mirrored in by role.
+        /// </summary>
+        private int[] ResolveSlotAxis()
+        {
+            if (!_ownsConnection) return _slotAxis;
+            int t = StatusValue(HostDeviceId, "mbooster-status-21");
+            int b = StatusValue(HostDeviceId, "mbooster-status-22");
+            int c = StatusValue(HostDeviceId, "mbooster-status-23");
+            if (t >= 1 && t <= 3 && b >= 1 && b <= 3 && c >= 1 && c <= 3)
+                _slotAxis = new[] { t - 1, b - 1, c - 1 };
+            var map = _slotAxis;
+
+            var connected = _slotConnected;
+            var used = new bool[3];
+            for (int s = 0; s < 3; s++)
+            {
+                if (connected != null && (s >= connected.Length || !connected[s])) continue;
+                if (used[map[s]])
+                {
+                    LogChainEvidenceOnce($"pedal-role map {map[0] + 1}/{map[1] + 1}/{map[2] + 1} puts two connected channels on one axis — using channel order");
+                    return new[] { 0, 1, 2 };
+                }
+                used[map[s]] = true;
+            }
+            return map;
+        }
+
+        /// <summary>Channel-indexed array → axis-indexed through
+        /// <paramref name="map"/>. Only non-default entries move, so an
+        /// unconnected channel sharing an axis can't blank a connected one.</summary>
+        private static T[]? ToAxes<T>(T[]? slots, int[] map)
+        {
+            if (slots == null) return null;
+            var axes = new T[slots.Length];
+            var cmp = EqualityComparer<T>.Default;
+            for (int s = 0; s < slots.Length; s++)
+            {
+                if (cmp.Equals(slots[s], default!)) continue;
+                int a = s < map.Length ? map[s] : s;
+                if (a < axes.Length) axes[a] = slots[s];
+            }
+            return axes;
+        }
 
         /// <summary>Digit (0/1) immediately following the first <paramref name="slot"/>
         /// letter after a '[' in a "PD Linked:[T 0 B 1 C 1]" line; -1 if absent.</summary>

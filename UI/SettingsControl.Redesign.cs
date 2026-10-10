@@ -120,11 +120,9 @@ namespace MozaPlugin.UI
                     MBoosterY1Slider, MBoosterY2Slider, MBoosterY3Slider,
                     MBoosterY4Slider, MBoosterY5Slider, MBoosterY6Slider
                 });
-                BindEditorXToSliders(MBoosterCurveEditor, new[]
-                {
-                    MBoosterX1Slider, MBoosterX2Slider, MBoosterX3Slider,
-                    MBoosterX4Slider, MBoosterX5Slider, MBoosterX6Slider
-                });
+                // Only the endpoints carry X (range start/end); the four
+                // between them are evenly spaced (EndpointRangeMode).
+                BindEditorEndpointXToSliders(MBoosterCurveEditor, MBoosterRangeStartSlider, MBoosterRangeEndSlider);
                 BindEditorToSliders(MBoosterInputCurveEditor, new[]
                 {
                     MBoosterInputY1Slider, MBoosterInputY2Slider, MBoosterInputY3Slider,
@@ -283,8 +281,8 @@ namespace MozaPlugin.UI
 
         // Two-way bind a MozaCurveEditor's X dependency properties to sliders —
         // only meaningful when the editor has AllowHorizontalDrag="True". Accepts
-        // 6 sliders (mBooster Sim Input Mapping and Pedal Feel — all nodes
-        // draggable) or 4 (the wheelbase FFB curve, whose last node is pinned
+        // 6 sliders (mBooster Pedal Feel — all nodes draggable) or 4 (the
+        // wheelbase FFB curve, whose last node is pinned
         // at input=100 via LockLastNodeX so X5 keeps its DP default).
         // Horizontal drag isn't offered on the 6-band EQ.
         private void BindEditorXToSliders(MozaControls.MozaCurveEditor editor, Slider[] sliders)
@@ -305,6 +303,16 @@ namespace MozaPlugin.UI
                 };
                 BindingOperations.SetBinding(editor, xs[i], b);
             }
+        }
+
+        // Two-way bind a 6-node EndpointRangeMode editor's first and last X.
+        private static void BindEditorEndpointXToSliders(MozaControls.MozaCurveEditor editor, Slider start, Slider end)
+        {
+            if (editor == null || start == null || end == null) return;
+            BindingOperations.SetBinding(editor, MozaControls.MozaCurveEditor.X1Property,
+                new Binding(nameof(Slider.Value)) { Source = start, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+            BindingOperations.SetBinding(editor, MozaControls.MozaCurveEditor.X6Property,
+                new Binding(nameof(Slider.Value)) { Source = end, Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
         }
 
         // Called from existing RefreshBaseTab — pushes new live-display values.

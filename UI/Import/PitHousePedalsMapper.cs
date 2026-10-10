@@ -567,45 +567,33 @@ namespace MozaPlugin.UI.Import
                     c => set(c, nv));
             }
 
-            // PitHouse's own preset file format is fixed at 5 points
-            // (nonlinear1..5) at 20/40/60/80/100% — that's external and
-            // won't change. AZOM's CurveY is now 6 points at 100/6 * k
-            // (see MozaMBoosterRegistry.EvaluateCurveArbitraryX /
-            // MBoosterUiConstants.SimInputMappingNodeCount), so the
-            // imported 5-point shape is resampled at the 6 new breakpoints
-            // rather than mapped 1:1 onto the first 5 of 6 slots.
-            private static readonly float[] PitHouseOutputCurveX = { 20, 40, 60, 80, 100 };
-
-            /// <summary>Output curve: nonlinear1..5 → CurveY (resampled to 6 nodes).</summary>
+            /// <summary>Output curve: nonlinear1..5 → HardwareCurveY, the same
+            /// five device registers (mbooster-{role}-y1..y5). All five must be
+            /// present, as for CRP pedals.</summary>
             public void OutputCurve()
             {
-                var y5 = new float[5];
-                bool any = false;
+                var y = new float[5];
+                int found = 0;
                 for (int i = 0; i < 5; i++)
                 {
                     var v = Num("nonlinear" + (i + 1));
                     if (v == null) continue;
-                    y5[i] = (float)Clamp(v.Value, 0, 100);
-                    any = true;
+                    y[i] = (float)Clamp(v.Value, 0, 100);
+                    found++;
                 }
-                if (!any) return;
-
-                int n = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.SimInputMappingNodeCount;
-                var y = new float[n];
-                for (int i = 0; i < n; i++)
+                if (found == 0) return;
+                if (found < 5)
                 {
-                    double x = (i + 1) * 100.0 / 6.0;
-                    y[i] = (float)global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.EvaluateCurveArbitraryX(PitHouseOutputCurveX, y5, x);
+                    _plan.NotImported.Add($"{Key("nonlinear1..5")}    ({found} of 5 points present — curve needs all five)");
+                    return;
                 }
 
-                var oldCurve = _read.CurveY;
-                string oldDisplay = oldCurve == null || oldCurve.Length < n
-                    ? "(unset)"
-                    : string.Join("/", oldCurve.Take(n).Select(FormatCurvePoint));
+                var old = _read.HardwareCurveY != null && _read.HardwareCurveY.Length == 5 ? _read.HardwareCurveY : null;
+                string oldDisplay = old == null ? "(unset)" : string.Join("/", old.Select(FormatCurvePoint));
                 string newDisplay = string.Join("/", y.Select(FormatCurvePoint));
 
-                Add("Output curve (Y at 100/6% breakpoints)", oldDisplay, newDisplay,
-                    c => c.CurveY = (float[])y.Clone());
+                Add("Output curve (y1..y5)", oldDisplay, newDisplay,
+                    c => c.HardwareCurveY = (float[])y.Clone());
             }
 
             private static string FormatCurvePoint(float v) =>

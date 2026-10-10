@@ -184,6 +184,14 @@ namespace MozaPlugin
                     FixMBoosterCurveArraysSeventhsBug();
                 }
 
+                // The output curve moved onto the device; after the two
+                // passes above, which still operate on CurveY.
+                if (!_settings.MBoosterOutputCurveMovedToDevice)
+                {
+                    _settings.MBoosterOutputCurveMovedToDevice = true;
+                    MigrateMBoosterOutputCurveToDevice();
+                }
+
                 // Saved knob palettes that are entirely black were laundered from an
                 // unseeded _data mirror, not chosen — null them once so the wheel's
                 // own stored colours show and nothing re-writes black on apply.

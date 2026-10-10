@@ -192,10 +192,10 @@ namespace MozaPlugin.Devices.MBooster
         public const float SegDampDivider2ReleasedDefaultPct = 70f;
         public const float SegDampSegDefaultPct = 0f;
 
-        // Node counts for the two mBooster curve editors (both were 5-point
-        // originally). Sim Input Mapping (CurveY/CurveX) is purely host-side,
-        // no wire command — see MozaMBoosterRegistry.EvaluateCurveArbitraryX.
-        // Pedal Feel (InputCurveY) is a REAL hardware write, populating
+        // SimInputMappingNodeCount is the retired host-side output curve's
+        // node count (CurveY/CurveX), kept for the migrations that read it;
+        // the output curve is now HardwareCurveY. Pedal Feel (InputCurveY)
+        // is a REAL hardware write, populating
         // mbooster-brake-feelcurve-1..6 (cmdId 0xAB selectors 0x08-0x0D) —
         // see MozaMBoosterRegistry.ComputeFeelCurveY and
         // MBoosterDeviceController.PushFeelCurveResync. See
@@ -205,6 +205,11 @@ namespace MozaPlugin.Devices.MBooster
         // 8 points on the graph, matching selectors 0x07-0x0E one for one.
         public const int SimInputMappingNodeCount = 6;
         public const int PedalFeelNodeCount = 6;
+
+        // Least output-curve range (Max - Min), %: Pit House stopped the
+        // start point at 90 against an end at 100, and the end at 10 against
+        // a start at 0. MozaCurveEditor.MinEndpointGap's default matches.
+        public const int OutputCurveMinRangePct = 10;
     }
 
     /// <summary>
@@ -528,9 +533,10 @@ namespace MozaPlugin.Devices.MBooster
         int Direction { get; set; }
         int Min { get; set; }
         int Max { get; set; }
+        // Retired host-side output curve, migrated into HardwareCurveY.
         float[]? CurveY { get; set; }
         float[]? CurveX { get; set; }
-        // Passive pedal's 5-point hardware output curve (Pedals tab).
+        // Output curve: y1..y5 evenly spaced over Min..Max, on the device.
         float[]? HardwareCurveY { get; set; }
         // Sim Input Mapping
         float SensorOutputRatioPct { get; set; }
@@ -570,8 +576,8 @@ namespace MozaPlugin.Devices.MBooster
         public int Direction { get; set; } = -1;
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
-        public float[]? CurveY { get; set; } = null;   // 6-point output curve (host-side only)
-        public float[]? CurveX { get; set; } = null;   // draggable node X (null = fixed breakpoints)
+        public float[]? CurveY { get; set; } = null;   // retired, see MBoosterDeviceSettings.CurveY
+        public float[]? CurveX { get; set; } = null;
         public float[]? HardwareCurveY { get; set; } = null; // see MBoosterDeviceSettings.HardwareCurveY
 
         // Sim Input Mapping (see MBoosterDeviceSettings for the field semantics).
@@ -786,33 +792,23 @@ namespace MozaPlugin.Devices.MBooster
         public int Min { get; set; } = -1;
         public int Max { get; set; } = -1;
 
-        // Sim Input Mapping output curve (6-point) — PURELY host-side, no
-        // wire command at all. Remaps the pedal's raw HID position (which
-        // by this point already reflects Deadzone/Max Force/the Pedal Feel
-        // curve's hardware shaping) into what AZOM reports as game
-        // telemetry (MozaData.{Throttle,Brake,Clutch}Position) — see
-        // MozaMBoosterRegistry.OnHidAxisUpdate/EvaluateCurveArbitraryX and
-        // docs/protocol/devices/mbooster.md "Sim Input Mapping". CurveY
-        // holds the 6 node Y-values; CurveX (below) holds their X
-        // positions, draggable in the curve editor. Null = identity / no
-        // remapping — existing profiles are unaffected until the user
-        // opens this section.
+        // Retired host-side output curve: 6 node Y values (CurveY) at
+        // draggable X (CurveX, null = 100/6 * k), applied to AZOM's own
+        // telemetry only, never the device or the game. Read once by
+        // MozaPlugin.MigrateMBoosterOutputCurveToDevice into HardwareCurveY/
+        // Min/Max, then cleared.
         public float[]? CurveY { get; set; } = null;
-
-        // X position (0..100) of each output-curve node, draggable in the
-        // Sim Input Mapping curve editor. Null = default fixed breakpoints
-        // (100/6 * k for k=1..6, last node at 100% — see
-        // MozaMBoosterRegistry.DefaultCurveX).
         public float[]? CurveX { get; set; } = null;
 
-        // A PASSIVE pedal's 5-point output curve (Y at 20/40/60/80/100%),
-        // written to mbooster-{role}-y1..y5 — the same registers the Pedals
-        // tab writes for CRP pedals, and edited from that tab. Null = not set.
+        // The pedal's output curve, on the device: y1..y5 (0-100) at evenly
+        // spaced points from range start (Min) to range end (Max), written to
+        // mbooster-{role}-y1..y5 — Pit House's output curve. Edited on the
+        // mBooster tab, or the Pedals tab for a passive pedal. Null = not set.
         public float[]? HardwareCurveY { get; set; } = null;
 
         // Per-pedal calibration for the ADDITIONAL pedals on a chained mBooster
         // (axes 1+), keyed by HID axis index. Axis 0 (the master) keeps its
-        // calibration in the flat Direction/Min/Max/CurveY/CurveX fields above
+        // calibration in the flat Direction/Min/Max/HardwareCurveY fields above
         // (unchanged for the existing UI). Absent key = that pedal uses no
         // calibration override. See MozaPlugin.ApplyMBoosterToHardware, which
         // writes each pedal's calibration to its role-specific command.

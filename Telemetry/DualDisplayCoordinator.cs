@@ -262,6 +262,22 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        /// <summary>
+        /// Disconnected-event hook for a pipe: stop the CM2 lane now if it rides on
+        /// <paramref name="conn"/>. A port loss kills every session the dash held, and
+        /// the debounced teardown above can't see it when the reconnect re-detects the
+        /// dash inside <see cref="TeardownDwellMs"/> — the sender then stays Active on
+        /// dead sessions and the CM2 never gets telemetry again (bundle 7V463S7V).
+        /// The idle sender restarts through the fresh-start branch on re-detect.
+        /// </summary>
+        internal void OnConnectionLost(MozaSerialConnection? conn)
+        {
+            var cm2 = _plugin._cm2Sender;
+            if (cm2 == null || conn == null || !ReferenceEquals(cm2.ConnectionRef, conn)) return;
+            try { cm2.Stop(); }
+            catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2 lane stop on connection loss: {ex.Message}"); }
+        }
+
         // One-shot guard: re-assert the saved CM2 dashboard once per pipeline start.
         private bool _cm2ReassertAttempted;
         // Attempts made in the current pipeline lifetime. The one-shot is only claimed

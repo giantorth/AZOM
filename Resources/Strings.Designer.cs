@@ -854,5 +854,10 @@ namespace MozaPlugin.Resources
         public static string Status_DjsonConvertFailed => Get("Status_DjsonConvertFailed");
         public static string Status_DjsonHeavyLoss => Get("Status_DjsonHeavyLoss");
         public static string Label_NodeLimit => Get("Label_NodeLimit");
+        public static string SliderLabel_SoftLimitStrength => Get("SliderLabel_SoftLimitStrength");
+        public static string Option_SoftLimitSoft => Get("Option_SoftLimitSoft");
+        public static string Option_SoftLimitMiddle => Get("Option_SoftLimitMiddle");
+        public static string Option_SoftLimitHard => Get("Option_SoftLimitHard");
+        public static string SliderLabel_DeadzoneCompensation => Get("SliderLabel_DeadzoneCompensation");
     }
 }

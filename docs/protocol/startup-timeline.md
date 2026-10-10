@@ -1,6 +1,6 @@
 ## Complete telemetry startup timeline
 
-Two captures provide complementary views.
+Two captures provide complementary views. (The motion platform is a separate USB device with its own connect / power-up / game / shutdown sequences — [`motion/modes-and-control.md`](motion/modes-and-control.md) § Observed sequences.)
 
 ### Concurrent outbound streams during active telemetry
 

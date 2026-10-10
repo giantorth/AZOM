@@ -786,4 +786,9 @@
   <data name="Tooltip_SavedColor" xml:space="preserve"><value>Buried bone!</value></data>
   <data name="Button_FillOddLeds" xml:space="preserve"><value>YAP ODD!!</value></data>
   <data name="Button_FillEvenLeds" xml:space="preserve"><value>YAP EVEN!!</value></data>
+  <data name="SliderLabel_SoftLimitStrength" xml:space="preserve"><value>Woof woof!</value></data>
+  <data name="Option_SoftLimitSoft" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Option_SoftLimitHard" xml:space="preserve"><value>Grrr!</value></data>
+  <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Woof woof woof!</value></data>
 </root>
