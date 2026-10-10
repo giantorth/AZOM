@@ -67,8 +67,8 @@ namespace MozaControls
         // -------- X values (data-space 0..100, only meaningful when
         // AllowHorizontalDrag is true — 5-node curves default to the fixed
         // 20/40/60/80/100 breakpoints every other curve in this app uses;
-        // the 6-node Sim Input Mapping curve overwrites X1-X6 from its own
-        // seeding code (100/6 * k for k=1..6) immediately on load, so X6's
+        // the 6-node mBooster output curve overwrites X1/X6 from its own
+        // seeding code (range start/end) immediately on load, so X6's
         // own DP default below is cosmetic. A fresh instance renders
         // identically to one driven by NodeXFractions until the user
         // actually drags a node sideways. --------
@@ -93,12 +93,10 @@ namespace MozaControls
         public double X6 { get => (double)GetValue(X6Property); set => SetValue(X6Property, value); }
 
         // When true, nodes can be dragged horizontally (within their
-        // neighbours' bounds) as well as vertically — used only by the
-        // Sim Input Mapping output curve, so a moved node means "100%
-        // output is reached before 100% input" without needing a
-        // (nonexistent) hardware X-breakpoint command. Off by default so
-        // every other curve in the app (FFB, Handbrake, Pedals, Pedal Feel)
-        // keeps its existing fixed-X behaviour unchanged.
+        // neighbours' bounds) as well as vertically — the wheelbase FFB
+        // curve, Pedal Feel, and (endpoints only, see EndpointRangeMode) the
+        // mBooster output curve. Off by default so every other curve keeps
+        // its fixed-X behaviour.
         public static readonly DependencyProperty AllowHorizontalDragProperty =
             DependencyProperty.Register(nameof(AllowHorizontalDrag), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -108,37 +106,36 @@ namespace MozaControls
         // When true (with AllowHorizontalDrag), the LAST node is pinned in X and
         // can only move vertically — used by the wheelbase FFB output curve,
         // whose final point is fixed at input=100 (the hardware has x1..x4
-        // commands but no x5). Off by default so the mBooster curve, which
-        // resamples all five nodes host-side, keeps dragging its last node.
+        // commands but no x5). Off by default.
         public static readonly DependencyProperty LockLastNodeXProperty =
             DependencyProperty.Register(nameof(LockLastNodeX), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool LockLastNodeX { get => (bool)GetValue(LockLastNodeXProperty); set => SetValue(LockLastNodeXProperty, value); }
 
-        // When true (with AllowHorizontalDrag), only the FIRST and LAST nodes
-        // may move horizontally — every node in between is Y-only. Both
-        // endpoints move on both axes: the first node at Y=0 dragged right is
-        // an output deadzone (bug report 6SWSMJX0). Dragging either endpoint
-        // horizontally rescales all the in-between nodes' X in proportion to
-        // their old position between the two (old) endpoints, so the curve's
-        // shape (relative node spacing) is preserved rather than left behind.
-        // Used only by the Sim Input Mapping curve (MBoosterCurveEditor) —
-        // every other curve using AllowHorizontalDrag (e.g. the wheelbase FFB
-        // output curve) keeps its existing per-node drag behaviour unchanged.
-        public static readonly DependencyProperty EndpointsOnlyDraggableInXProperty =
-            DependencyProperty.Register(nameof(EndpointsOnlyDraggableInX), typeof(bool), typeof(MozaCurveEditor),
+        // Pit House's mBooster output curve (with AllowHorizontalDrag): the
+        // first node is the range start — X only, Y pinned at YMin — and the
+        // last is the range end, X and Y. The nodes between are Y-only and sit
+        // evenly spaced between the two, so X2..X(n-1) are derived and never
+        // written. Used by MBoosterCurveEditor; X1/X(n) bind to the pedal's
+        // Min/Max.
+        public static readonly DependencyProperty EndpointRangeModeProperty =
+            DependencyProperty.Register(nameof(EndpointRangeMode), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
-        public bool EndpointsOnlyDraggableInX { get => (bool)GetValue(EndpointsOnlyDraggableInXProperty); set => SetValue(EndpointsOnlyDraggableInXProperty, value); }
+        public bool EndpointRangeMode { get => (bool)GetValue(EndpointRangeModeProperty); set => SetValue(EndpointRangeModeProperty, value); }
+
+        // Least X distance between the two endpoints in EndpointRangeMode.
+        public static readonly DependencyProperty MinEndpointGapProperty =
+            DependencyProperty.Register(nameof(MinEndpointGap), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(10.0));
+        public double MinEndpointGap { get => (double)GetValue(MinEndpointGapProperty); set => SetValue(MinEndpointGapProperty, value); }
 
         // When true, every spline control point is clamped to YMin..YMax, so
         // (convex hull) the drawn curve never leaves the plot vertically — a
         // flat run of nodes at 0 stays flat instead of dipping below the axis.
-        // Must match the evaluator of whatever consumes the curve: the Sim
-        // Input Mapping curve's is MozaMBoosterRegistry.EvaluateCurveArbitraryX,
-        // which applies the same clamp. Off by default — hardware-evaluated
-        // curves keep their unclamped drawing.
+        // Off by default — hardware-evaluated curves keep their unclamped
+        // drawing.
         public static readonly DependencyProperty ClampSplineToPlotProperty =
             DependencyProperty.Register(nameof(ClampSplineToPlot), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -156,9 +153,8 @@ namespace MozaControls
         // neighbours' current Y (index-adjacent, same convention as the
         // existing X neighbour-clamp below) — the first/last node clamp
         // against YMin/YMax instead. Used by the Pedal Feel curve, where
-        // both axes are freely draggable (unlike Sim Input Mapping's
-        // endpoint-only-X nodes) so nothing else stops a node from being
-        // dragged past its neighbour's Y. Off by default so every other
+        // both axes are freely draggable so nothing else stops a node from
+        // being dragged past its neighbour's Y. Off by default so every other
         // curve keeps its existing unconstrained Y-drag behaviour.
         public static readonly DependencyProperty ClampYToAdjacentNodesProperty =
             DependencyProperty.Register(nameof(ClampYToAdjacentNodes), typeof(bool), typeof(MozaCurveEditor),
@@ -662,19 +658,6 @@ namespace MozaControls
         private bool _dragEndAnchor;
         private Canvas? _canvas;
 
-        // Endpoint-drag rescale baseline (see EndpointsOnlyDraggableInX) —
-        // captured ONCE at the start of an endpoint drag, not re-derived
-        // every tick from the current (already-rescaled, already-rounded)
-        // positions. Re-deriving it every tick let a middle node's fraction
-        // collapse to exactly 0 or 1 once heavy compression rounded its X
-        // onto an endpoint's own X: every later tick read frac=0 (or 1)
-        // again from that same now-stuck position, so the curve could
-        // compress but never re-expand — this fixes that by keeping the
-        // reference fractions stable for the whole drag gesture.
-        private double[]? _dragBaseFracs;
-        private double _dragBaseFirstX;
-        private double _dragBaseSpan;
-
         private void HookCanvas()
         {
             _canvas = GetTemplateChild("PART_Canvas") as Canvas;
@@ -698,23 +681,10 @@ namespace MozaControls
             if (_dragEndAnchor) _dragNode = -1;
             if (_dragNode >= 0 || _dragEndAnchor)
             {
-                int lastNode = ClampedNodeCount() - 1;
-                if (EndpointsOnlyDraggableInX && (_dragNode == 0 || _dragNode == lastNode))
-                    CaptureEndpointDragBaseline(lastNode);
                 _canvas.CaptureMouse();
                 ApplyDrag(p);
                 e.Handled = true;
             }
-        }
-
-        private void CaptureEndpointDragBaseline(int lastNode)
-        {
-            _dragBaseFirstX = GetX(0);
-            _dragBaseSpan = GetX(lastNode) - _dragBaseFirstX;
-            _dragBaseFracs = new double[lastNode + 1];
-            if (_dragBaseSpan > 0.0001)
-                for (int m = 1; m < lastNode; m++)
-                    _dragBaseFracs[m] = (GetX(m) - _dragBaseFirstX) / _dragBaseSpan;
         }
 
         private void OnMouseMove(object sender, MouseEventArgs e)
@@ -808,7 +778,7 @@ namespace MozaControls
             // half and leaves horizontal drag working.
             bool span = SpanMode;
             double spanRange = span ? SpanRange : 0;
-            bool canDragY = !span || spanRange > 0;
+            bool canDragY = (!span || spanRange > 0) && !(EndpointRangeMode && _dragNode == 0);
             if (canDragY)
             {
                 // Node values are stored in axis units, or as a percentage of
@@ -835,53 +805,49 @@ namespace MozaControls
                 SetY(_dragNode, v);
             }
 
-            // Horizontal drag (output curve only — see AllowHorizontalDrag).
-            // Clamped between immediate neighbours (min 1-unit gap) so nodes
-            // can never cross, which would make the curve's X non-monotonic
-            // and the Bezier-inversion evaluator
-            // (MozaMBoosterRegistry.EvaluateCurveArbitraryX) ill-defined.
+            // Horizontal drag (see AllowHorizontalDrag). Clamped between
+            // immediate neighbours (min 1-unit gap) so nodes can never cross
+            // and the curve's X stays monotonic; EndpointRangeMode clamps the
+            // two endpoints against each other instead.
             if (AllowHorizontalDrag && _dragNode >= 0 && _dragNode < 6
                 && !(LockLastNodeX && _dragNode == lastNode)
-                && !(EndpointsOnlyDraggableInX && !isEndpoint))
+                && !(EndpointRangeMode && !isEndpoint))
             {
                 double w = _canvas?.ActualWidth ?? ActualWidth;
                 double plotW = Math.Max(1, w - PadLeft - PadRight);
                 double x01 = (p.X - PadLeft) / (0.98 * plotW);
                 double dataX = x01 * 100.0;
 
-                // The top-right corner anchor is a real point of the curve
-                // (AnchorAtTopRight), so the last node owes it the same
-                // 1-unit gap every other neighbour pair gets — otherwise it
-                // can be dragged onto it, giving two points at X=100.
-                double lastHi = AnchorAtTopRight ? 99.0 : 100.0;
-                double lo = _dragNode == 0 ? 1.0 : GetX(_dragNode - 1) + 1.0;
-                double hi = _dragNode == lastNode ? lastHi : GetX(_dragNode + 1) - 1.0;
-                if (hi < lo) hi = lo;
-                dataX = Math.Round(Math.Max(lo, Math.Min(hi, dataX)));
-
-                if (EndpointsOnlyDraggableInX && isEndpoint)
+                double lo, hi;
+                if (EndpointRangeMode)
                 {
-                    // Rescale every in-between node's X to keep its
-                    // fractional position — captured once at drag start in
-                    // _dragBaseFracs, see CaptureEndpointDragBaseline — between
-                    // the two endpoints, so the curve's shape follows the
-                    // endpoint being dragged instead of being left bunched up
-                    // behind it.
-                    SetX(_dragNode, dataX);
-                    if (_dragBaseFracs != null && _dragBaseSpan > 0.0001)
-                    {
-                        double newFirstX = GetX(0);
-                        double newLastX = GetX(lastNode);
-                        double newSpan = newLastX - newFirstX;
-                        for (int m = 1; m < lastNode; m++)
-                            SetX(m, Math.Round(newFirstX + _dragBaseFracs[m] * newSpan));
-                    }
+                    double gap = Math.Max(0, MinEndpointGap);
+                    lo = _dragNode == 0 ? 0.0 : GetX(0) + gap;
+                    hi = _dragNode == 0 ? GetX(lastNode) - gap : 100.0;
                 }
                 else
                 {
-                    SetX(_dragNode, dataX);
+                    // The top-right corner anchor is a real point of the curve
+                    // (AnchorAtTopRight), so the last node owes it the same
+                    // 1-unit gap every other neighbour pair gets — otherwise it
+                    // can be dragged onto it, giving two points at X=100.
+                    double lastHi = AnchorAtTopRight ? 99.0 : 100.0;
+                    lo = _dragNode == 0 ? 1.0 : GetX(_dragNode - 1) + 1.0;
+                    hi = _dragNode == lastNode ? lastHi : GetX(_dragNode + 1) - 1.0;
                 }
+                if (hi < lo) hi = lo;
+                SetX(_dragNode, Math.Round(Math.Max(lo, Math.Min(hi, dataX))));
             }
+        }
+
+        // Node X in data space. In EndpointRangeMode the in-between nodes are
+        // evenly spaced between the two endpoints, whatever X2..X5 hold.
+        private double NodeDataX(int i, int nodeCount)
+        {
+            int last = nodeCount - 1;
+            if (!EndpointRangeMode || i <= 0 || i >= last) return GetX(i);
+            double first = GetX(0);
+            return first + i * (GetX(last) - first) / last;
         }
 
         // Park (or place) one end point's circle. Off-canvas when hidden so a
@@ -1017,10 +983,9 @@ namespace MozaControls
                 // fractions from X1..X6 instead of the fixed NodeXFractions
                 // string. Same 0.98 compression as Default5NodeFractions so
                 // a never-dragged node lands exactly where it always has.
-                double[] xs = { X1, X2, X3, X4, X5, X6 };
                 nodeFracs = new double[nodeCount];
                 for (int i = 0; i < nodeCount; i++)
-                    nodeFracs[i] = Math.Max(0, Math.Min(1, (xs[i] / 100.0) * 0.98));
+                    nodeFracs[i] = Math.Max(0, Math.Min(1, (NodeDataX(i, nodeCount) / 100.0) * 0.98));
             }
             else
             {
@@ -1300,8 +1265,9 @@ namespace MozaControls
                     // fraction, so linear interpolation between two known
                     // node pairs reproduces the true mapping exactly whether
                     // or not it's been dragged from its default.
-                    double[] dataXs = { X1, X2, X3, X4, X5, X6 };
-                    int n = Math.Min(nodePts.Length, dataXs.Length);
+                    int n = Math.Min(nodePts.Length, 6);
+                    var dataXs = new double[n];
+                    for (int i = 0; i < n; i++) dataXs[i] = NodeDataX(i, nodePts.Length);
                     // A curve with a top-right end point (AnchorAtTopRight —
                     // Pedal Feel) runs PAST its last draggable node to a fixed
                     // point at data X=100, so that point is one more (dataX,
@@ -1309,8 +1275,7 @@ namespace MozaControls
                     // last node's X — on the default breakpoints ~86% — and
                     // sticks one point short of full travel however hard the
                     // pedal is pressed. Curves without it still stop at their
-                    // last node, which IS their end (Sim Input Mapping
-                    // plateaus beyond it — see EvaluateCurveArbitraryX).
+                    // last node, which IS their end.
                     bool endAnchor = AnchorAtTopRight;
                     int pairs = endAnchor ? n + 1 : n;
                     double DataXAt(int i) => i < n ? dataXs[i] : 100.0;

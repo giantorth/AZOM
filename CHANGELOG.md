@@ -19,6 +19,11 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **The mBooster output curve is set on the pedal correctly.** Its start and end points set
+  the pedal's range, and the four points between stay evenly spaced.
+
+- **Switching profiles or reconnecting sets the mBooster to the profile's role.**
+
 - **Multiple standalone mBooster pedals read from the correct axis.**
 
 - **Dashboard data on session 0x01 is acknowledged again.** When the wheel skipped the open ack, its

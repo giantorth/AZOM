@@ -341,7 +341,7 @@ namespace MozaPlugin.UI
                 var fxLog = PeekMBoosterEffectTarget();
                 string Fmt(float[]? a) => a == null ? "null" : "[" + string.Join(",", a) + "]";
                 MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
-                    + $"CurveY={Fmt(fxLog?.CurveY)} CurveX={Fmt(fxLog?.CurveX)} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
+                    + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
             }
             using (_suppressor.Begin())
             {
@@ -712,20 +712,7 @@ namespace MozaPlugin.UI
             int max = fx?.Max ?? -1;
             MBoosterMaxSlider.Value = max >= 0 ? max : 0;
             SetValueText(MBoosterMaxValue, MBoosterMaxSlider.Value.ToString("F0"));
-            var curve = (fx?.CurveY != null && fx.CurveY.Length == MBoosterUiConstants.SimInputMappingNodeCount) ? fx.CurveY : MBoosterOutputCurveDefault;
-            MBoosterY1Slider.Value = curve[0]; SetValueText(MBoosterY1Value, curve[0].ToString("F0"));
-            MBoosterY2Slider.Value = curve[1]; SetValueText(MBoosterY2Value, curve[1].ToString("F0"));
-            MBoosterY3Slider.Value = curve[2]; SetValueText(MBoosterY3Value, curve[2].ToString("F0"));
-            MBoosterY4Slider.Value = curve[3]; SetValueText(MBoosterY4Value, curve[3].ToString("F0"));
-            MBoosterY5Slider.Value = curve[4]; SetValueText(MBoosterY5Value, curve[4].ToString("F0"));
-            MBoosterY6Slider.Value = curve[5]; SetValueText(MBoosterY6Value, curve[5].ToString("F0"));
-            var curveX = (fx?.CurveX != null && fx.CurveX.Length == MBoosterUiConstants.SimInputMappingNodeCount) ? fx.CurveX : MBoosterOutputCurveDefault;
-            MBoosterX1Slider.Value = curveX[0]; SetValueText(MBoosterX1Value, curveX[0].ToString("F0"));
-            MBoosterX2Slider.Value = curveX[1]; SetValueText(MBoosterX2Value, curveX[1].ToString("F0"));
-            MBoosterX3Slider.Value = curveX[2]; SetValueText(MBoosterX3Value, curveX[2].ToString("F0"));
-            MBoosterX4Slider.Value = curveX[3]; SetValueText(MBoosterX4Value, curveX[3].ToString("F0"));
-            MBoosterX5Slider.Value = curveX[4]; SetValueText(MBoosterX5Value, curveX[4].ToString("F0"));
-            MBoosterX6Slider.Value = curveX[5]; SetValueText(MBoosterX6Value, curveX[5].ToString("F0"));
+            SeedMBoosterOutputCurve(fx);
             // Sim Input Mapping
             float ratio = fx?.SensorOutputRatioPct ?? -1;
             MBoosterRatioSlider.Value = ratio >= 0 ? ratio : 0;

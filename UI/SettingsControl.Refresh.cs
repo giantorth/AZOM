@@ -165,15 +165,11 @@ namespace MozaPlugin.UI
             // Track the SELECTED pedal's own axis, not always the master's —
             // otherwise every pedal page showed the master (throttle) input.
             int idx = _mboosterEffectPedalIndex;
-            double preCurve = (idx >= 0 && idx < selected.LastAxisRawPercentPreCurve.Length)
-                ? selected.LastAxisRawPercentPreCurve[idx] : selected.LastRawPercentPreCurve;
             // TRUE raw reading — % of Max Force's own hardware ceiling, i.e.
             // the physical force the user is actually applying to the pedal,
             // captured in OnHidAxisUpdate BEFORE the host-side Max Threshold
             // rescale. This is the Pedal Feel curve's real input domain
-            // (Deadzone-Max Force span) and what "Input Force" should show —
-            // preCurve above is post-Threshold-rescale now (Sim Input
-            // Mapping's own, different domain), not this pedal's raw input.
+            // (Deadzone-Max Force span) and what "Input Force" should show.
             double rawInput = (idx >= 0 && idx < selected.LastAxisRawPercentPreThreshold.Length)
                 ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
 
@@ -183,17 +179,12 @@ namespace MozaPlugin.UI
             // no live TRUE "input to that curve" value to plot (that would
             // need the raw pre-reshape force, which AZOM never receives).
             // Best available proxy: rawInput — positionally correct against
-            // the curve's own Deadzone-Max Force X axis (unlike preCurve,
-            // which is now Threshold-rescaled and belongs to a different
-            // domain), even though it can't reflect the device's own
-            // internal reshaping.
-            // The Sim Input Mapping curve is the opposite: purely host-side
-            // (see EvaluateCurveArbitraryX), so its live marker uses
-            // preCurve exactly — the already-hardware-shaped, Threshold-
-            // rescaled position that's actually fed INTO this curve, not
-            // pct (which is the curve's own output).
+            // the curve's own Deadzone-Max Force X axis, even though it can't
+            // reflect the device's own internal reshaping.
+            // The output curve runs on the device too, and AZOM has no
+            // reading of its input to place on it.
             MBoosterInputCurveEditor.LiveX = hidConnected ? rawInput : double.NaN;
-            MBoosterCurveEditor.LiveX = preCurve;
+            MBoosterCurveEditor.LiveX = double.NaN;
 
             // Live "position % · kg force" readout above the Pedal Feel
             // curve editor (MBoosterPedalFeelLiveLabel) — the raw force the

@@ -334,13 +334,6 @@ namespace MozaPlugin.Devices.MBooster
         // registry; published as a property so the UI panel can show the bar.
         public double LastHidPosition { get; internal set; }
 
-        // Same signal, but BEFORE the input curve (i.e. after deadzone/max
-        // force only) — 0..100. Lets the UI place a live position marker on
-        // the Pedal Feel input curve showing exactly what it receives, since
-        // LastHidPosition is already past that point. See
-        // MozaMBoosterRegistry.OnHidAxisUpdate.
-        public double LastRawPercentPreCurve { get; internal set; }
-
         // GenericDesktop axis usages 0x30..0x37 — a chain host exposes at most
         // this many pedal axes on one HID report.
         public const int MaxAxes = 8;
@@ -354,24 +347,12 @@ namespace MozaPlugin.Devices.MBooster
         // torn sample costs one tick of a wrong amplitude, never a crash.
         public readonly double[] LastAxisPositions = new double[MaxAxes];
 
-        // Per-axis pre-input-curve percent (0..100) — the same signal as
-        // LastRawPercentPreCurve (after deadzone/max-force, before the input
-        // curve) but for EVERY pedal, so the settings tab's live curve markers
-        // track whichever pedal is selected, not just the master. NOTE: since
-        // MozaMBoosterRegistry.OnHidAxisUpdate added the host-side Max
-        // Threshold rescale, this is "% of Threshold's span" (the Sim Input
-        // Mapping curve's own input domain) — see LastAxisRawPercentPreThreshold
-        // below for the true raw reading (% of Max Force's span) instead.
-        public readonly double[] LastAxisRawPercentPreCurve = new double[MaxAxes];
-
         // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
         // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
         // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
         // force the user is actually applying to the pedal. This is the
         // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
-        // what the "Input Force" live label/marker should show — unlike
-        // LastAxisRawPercentPreCurve, which is now post-Threshold-rescale and
-        // represents the Sim Input Mapping curve's own (different) domain.
+        // what the "Input Force" live label/marker should show.
         public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
@@ -869,6 +850,35 @@ namespace MozaPlugin.Devices.MBooster
                 || types[axisIndex] != 1)
                 return false;
             return TryCalibDeviceForAxis(axisIndex, out dev);
+        }
+
+        /// <summary>
+        /// Write the profile's role for the motor pedal on
+        /// <paramref name="axisIndex"/> to its unit when the unit's own 0x22
+        /// reads otherwise. The role is per profile in the plugin but one
+        /// register on the unit, so a profile switch or connect with a
+        /// different role left the unit reporting the old one (bug report
+        /// NPN9FR6W). Single-unit lanes only: there the unit is the host
+        /// whatever the role; on a chain the unit is found from the role,
+        /// which is exactly what disagrees. Skipped while the 0x22 read-back is
+        /// unknown or a role write is still waiting for the heartbeat. True if
+        /// written.
+        /// </summary>
+        public bool SyncPedalRole(int axisIndex, int roleIndex)
+        {
+            if (roleIndex < 0 || roleIndex > 2 || ActiveAxisCount != 1) return false;
+            var types = _axisTypes;
+            if (types == null || !AxisTypesComplete || axisIndex < 0 || axisIndex >= types.Length
+                || types[axisIndex] != 1)
+                return false;
+            byte dev = HostDeviceId;
+            int current = StatusValue(dev, "mbooster-status-22");
+            if (current < 1 || current > 3 || current == roleIndex + 1) return false;
+            lock (_pendingRoles)
+                foreach (var p in _pendingRoles.Values)
+                    if (p.Dev == dev) return false;
+            MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} unit reports {RoleName(current - 1)}, profile says {RoleName(roleIndex)}");
+            return WritePedalRoleTo(dev, roleIndex);
         }
 
         /// <summary>Write <paramref name="newRoleIndex"/> to the unit

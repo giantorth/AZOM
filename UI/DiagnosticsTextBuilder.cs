@@ -431,8 +431,7 @@ namespace MozaPlugin.UI
                     $"dir={(cfg.Direction < 0 ? "—" : cfg.Direction.ToString())} " +
                     $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())} " +
                     $"max={(cfg.Max < 0 ? "—" : cfg.Max.ToString())} " +
-                    $"outCurve={(cfg.CurveY != null ? "set" : "—")} " +
-                    $"hwCurve={(cfg.HardwareCurveY != null ? "set" : "—")}");
+                    $"curve={(cfg.HardwareCurveY != null ? string.Join("/", cfg.HardwareCurveY.Select(v => v.ToString("F0", CultureInfo.InvariantCulture))) : "—")}");
                 sb.AppendLine(
                     $"             pedalFeel: deadzone={cfg.DeadzoneKg.ToString("F1", CultureInfo.InvariantCulture)}kg " +
                     $"maxForce={cfg.MaxForceKg.ToString("F0", CultureInfo.InvariantCulture)}kg " +
