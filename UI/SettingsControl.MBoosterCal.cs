@@ -178,11 +178,12 @@ namespace MozaPlugin.UI
         // and `virtual_damping_press1..3` / `_release1..3` for the segments,
         // out of the same Pit House write burst (2026-09-08 captures). Both
         // selectors are independent values here, unlike Natural Friction's
-        // two selectors which always carry the same number.
+        // two selectors which always carry the same number. Latest-wins
+        // against the segments, so the sliders only show — and only write —
+        // with Segmented Damping off.
         //
-        // One handler for both sliders — which one moved is read off the
-        // sender, so the pair stays a single push key and a drag on either
-        // coalesces the same way every other Pedal Feel write does.
+        // One handler for both sliders; both values go out together, so a
+        // drag on either coalesces to one push.
         private void MBoosterDampingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             bool isPress = ReferenceEquals(sender, MBoosterDampingPressSlider);
@@ -193,10 +194,14 @@ namespace MozaPlugin.UI
                 if (s == null) return;
                 if (isPress) s.DampingPressPct = v;
                 else s.DampingReleasePct = v;
-                int raw = global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(v);
-                string command = isPress ? "mbooster-brake-damping-press" : "mbooster-brake-damping-release";
-                QueueMBoosterPedalFeelPush(isPress ? "damping-press" : "damping-release",
-                    (c, dev) => c.SendIntWrite(command, raw, dev));
+                if (s.SegmentedDamping?.DampingEnabled ?? true) return;
+                var (press, release) = MBoosterPlainDampingRaw();
+                QueueMBoosterPedalFeelPush("plain-damping", (c, dev) =>
+                {
+                    // Turned back on before this flushed: segments must stay latest.
+                    if (s.SegmentedDamping?.DampingEnabled ?? true) return;
+                    c.SendPlainDamping(press, release, dev);
+                });
             });
         }
     }

@@ -165,6 +165,13 @@ namespace MozaPlugin
             if (deviceSourceLive && _connectionCoordinator?.WheellessBasePort != null && !_baseManager.IsConnected)
                 _connectionCoordinator?.TryConnectBase();
 
+            // Motion controller on its own port (0x2000) — same gate.
+            if (deviceSourceLive)
+            {
+                try { TryConnectMotion(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/Motion] Connect: {ex.Message}"); }
+            }
+
             // Slice I: reconnect-timer mBooster Refresh re-enabled.
             try { _mboosterRegistry?.Refresh(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Refresh: {ex.Message}"); }

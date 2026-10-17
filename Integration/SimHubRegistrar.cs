@@ -139,6 +139,12 @@ namespace MozaPlugin.Integration
             // regardless of UI language.
             _plugin.AttachDelegate("AZOM.Ab9Connected", () => (_plugin.Ab9Manager?.IsConnected ?? false) || _plugin.IsAb9Detected);
             _plugin.AttachDelegate("AZOM.Ab9Layout", () => Ab9LayoutLabel(CurrentAb9Layout()));
+
+            // MOZA Motion Controller (HMA150): lane phase, controller mode, last fault.
+            _plugin.AttachDelegate("AZOM.MotionConnected", () => _plugin.MotionController?.IsConnected ?? false);
+            _plugin.AttachDelegate("AZOM.MotionPhase", () => (_plugin.MotionController?.Phase ?? Devices.Motion.MotionLanePhase.Disconnected).ToString());
+            _plugin.AttachDelegate("AZOM.MotionMode", () => _plugin.MotionController?.ModeCurrent ?? -1);
+            _plugin.AttachDelegate("AZOM.MotionFault", () => _plugin.MotionController?.FaultReason ?? "");
         }
 
         internal void RegisterActions()

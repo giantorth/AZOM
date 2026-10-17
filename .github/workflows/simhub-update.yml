@@ -90,7 +90,8 @@ jobs:
             (Test-Path -path "C:\simhub\SimHub.Logging.dll" -PathType Leaf) -and
             (Test-Path -path "C:\simhub\SimHub.Plugins.dll" -PathType Leaf) -and
             (Test-Path -path "C:\simhub\SerialDash.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\BA63Driver.dll" -PathType Leaf)
+            (Test-Path -path "C:\simhub\BA63Driver.dll" -PathType Leaf) -and
+            (Test-Path -path "C:\simhub\SimHub.Plugins.Motion.dll" -PathType Leaf)
           )
 
           Start-Sleep -Seconds 3
@@ -106,6 +107,7 @@ jobs:
             C:/simhub/SimHub.Plugins.dll
             C:/simhub/SerialDash.dll
             C:/simhub/BA63Driver.dll
+            C:/simhub/SimHub.Plugins.Motion.dll
           retention-days: 1
           if-no-files-found: error
           compression-level: 0

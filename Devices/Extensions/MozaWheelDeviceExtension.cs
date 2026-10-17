@@ -156,7 +156,7 @@ namespace MozaPlugin.Devices.Extensions
             LedDriverInjection.Restore(_injectedSettings, _ledDriver, _originalDriver);
             _injectedSettings = null;
             _originalDriver = null;
-            try { _ledDriver?.Close(); } catch { }
+            try { _ledDriver?.Release(); } catch { }
             _ledDriver = null;
             _driverInjected = false;
         }

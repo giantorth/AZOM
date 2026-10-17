@@ -149,8 +149,6 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Độ cứng giới hạn đầu</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Độ cứng giới hạn cuối</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Mô phỏng một lực ma sát độc lập với đầu ra của game.</value></data>
-  <data name="Section_SegmentedDamping" xml:space="preserve"><value>GIẢM CHẤN PHÂN ĐOẠN</value></data>
-  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Lực giảm chấn độc lập với đầu ra của game, theo từng phân đoạn hành trình bàn đạp</value></data>
   <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Mô phỏng một lực giảm chấn độc lập với đầu ra trong game. Hành trình bàn đạp được chia thành nhiều phân đoạn, mỗi phân đoạn có phạm vi điều chỉnh riêng và độ giảm chấn tự nhiên riêng. Kéo đường chia để thay đổi kích thước phân đoạn; kéo bên trong phân đoạn để đặt mức giảm chấn.</value></data>
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Khi Đạp</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Khi Nhả</value></data>
@@ -477,7 +475,7 @@
   <data name="Import_CancelButton" xml:space="preserve"><value>HỦY</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>TIẾP</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>QUAY LẠI</value></data>
-  <data name="Import_BrowseDescription" xml:space="preserve"><value>Chọn một tệp JSON cài đặt PitHouse từ bất kỳ vị trí nào.</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Chọn một tệp JSON cài đặt PitHouse hoặc Motion Manager từ bất kỳ vị trí nào.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Tệp không phải JSON hợp lệ: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Loại cài đặt không hỗ trợ "{0}". Chỉ hỗ trợ cài đặt Motor và Pedals.</value></data>
   <data name="Status_Connected" xml:space="preserve"><value>Đã kết nối</value></data>
@@ -801,4 +799,66 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Trung bình</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Cứng</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Bù vùng chết trung tâm</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>Kết nối bộ điều khiển chuyển động của plugin AZOM không chạy.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>Chưa kết nối MOZA Motion Controller</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller vẫn đang khởi động</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Cổng bộ truyền động {0} chưa được gán góc</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Cổng bộ truyền động {0} dùng góc {1} đã được gán</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>Đã kết nối {0}/{1} bộ truyền động</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Cấu hình cổng đang chờ: chạy tự kiểm tra cổng</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Lỗi bộ điều khiển chuyển động: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Trước trái</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Trước phải</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Sau trái</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Sau phải</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Chưa gán</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Trạng thái</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Kết nối</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Chưa kết nối</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>Giai đoạn</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Chế độ bộ điều khiển</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Phần sụn</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Bộ truyền động</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Sự cố</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>Không có</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Cổng bộ truyền động</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Cổng {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Nhận diện</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Áp dụng góc và chạy tự kiểm tra cổng</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Chạy tự kiểm tra hành trình</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Thiết lập</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Hành trình tối đa khả dụng (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Khoảng cách bộ truyền động trước–sau (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Khoảng cách bộ truyền động trái–phải (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Áp dụng</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Đèn</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Độ sáng (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Màu vùng {0}</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Thay đổi</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Đã ngắt kết nối</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Đang khởi động</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Sẵn sàng</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Tự kiểm tra hành trình</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Đang vào chế độ trò chơi</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Đang chạy</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Đang dừng</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Tự kiểm tra cổng</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Lỗi</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion chưa được bật</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>MOZA Motion Controller đã kết nối nhưng plugin Motion của SimHub chưa được bật. Hãy bật trong Settings &gt; Plugins, sau đó thêm bộ điều khiển MOZA HMA150 trong Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>Chưa thêm MOZA HMA150 trong SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>MOZA Motion Controller đã kết nối nhưng thiết lập SimHub Motion hiện tại không có bộ điều khiển MOZA HMA150. Trong Motion, hãy thêm bộ điều khiển và chọn cấu hình sẵn MOZA HMA150.</value></data>
+  <data name="Banner_SimHubOutdated_Title" xml:space="preserve"><value>Cần cập nhật SimHub</value></data>
+  <data name="Banner_SimHubOutdated_BodyFmt" xml:space="preserve"><value>SimHub {0} cũ hơn {1}. Một số tính năng của plugin sẽ không hoạt động cho đến khi bạn cập nhật SimHub.</value></data>
+  <data name="Motion_Panel_Effects" xml:space="preserve"><value>Hiệu ứng chuyển động</value></data>
+  <data name="Motion_Panel_Intensity" xml:space="preserve"><value>Cường độ (%)</value></data>
+  <data name="Motion_Panel_Smoothness" xml:space="preserve"><value>Độ mượt (%)</value></data>
+  <data name="Motion_Effect_Pitch" xml:space="preserve"><value>Chúi</value></data>
+  <data name="Motion_Effect_Roll" xml:space="preserve"><value>Lắc ngang</value></data>
+  <data name="Motion_Effect_Heave" xml:space="preserve"><value>Nhấp nhô</value></data>
+  <data name="Motion_Effect_AccelPitch" xml:space="preserve"><value>Chúi theo gia tốc</value></data>
+  <data name="Motion_Effect_AccelRoll" xml:space="preserve"><value>Lắc ngang theo gia tốc</value></data>
+  <data name="Motion_Effect_RoadDetail" xml:space="preserve"><value>Chi tiết mặt đường</value></data>
+  <data name="Label_EnableSegmentedDamping" xml:space="preserve"><value>Bật giảm chấn phân đoạn</value></data>
+  <data name="Section_PedalDamping" xml:space="preserve"><value>GIẢM CHẤN BÀN ĐẠP</value></data>
 </root>

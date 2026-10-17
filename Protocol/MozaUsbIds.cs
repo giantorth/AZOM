@@ -25,6 +25,9 @@ namespace MozaPlugin.Protocol
         // concurrent effect slots per port. Reachable either on its own CDC port
         // or through a wheelbase/hub pipe via the extended-id envelope.
         PedalHaptics,
+        // MOZA Motion Controller (HMA150 platform, PID 0x2000) — its own bus,
+        // dev 0x12 + actuator ports 0x14..0x1B. Never probed by the wheel lanes.
+        Motion,
     }
 
     /// <summary>
@@ -57,6 +60,7 @@ namespace MozaPlugin.Protocol
         public const string PidStalks          = "0x0024";
         public const string PidDashboardCm2    = "0x0025";
         public const string PidPedalHaptics    = "0x002F";
+        public const string PidMotionController = "0x2000";
 
         // Single source of truth. ushort key keeps lookups allocation-
         // free on the cache-refresh hot path in MozaPortDiscovery.
@@ -92,6 +96,7 @@ namespace MozaPlugin.Protocol
                 // the wrong lane. Wire behaviour assumed identical to the AB9
                 // (docs/protocol/devices/ab9-shifter.md § AB6 sibling).
                 [0x1002] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB6 active shifter"),
+                [0x2000] = new InventoryEntry(MozaDeviceCategory.Motion,    "MOZA Motion Controller"),
             };
 
         // -------------------------------------------------------------
@@ -155,6 +160,8 @@ namespace MozaPlugin.Protocol
         public static bool IsStalksPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Stalks;
         public static bool IsPedalHapticsPid(string? pid) => Categorize(pid) == MozaDeviceCategory.PedalHaptics;
         public static bool IsPedalHapticsPid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.PedalHaptics;
+        public static bool IsMotionPid(string? pid)    => Categorize(pid) == MozaDeviceCategory.Motion;
+        public static bool IsMotionPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Motion;
 
         /// <summary>Short display name for the active-shifter lane, which the AB9
         /// and AB6 share. Returns the family label for an unknown/null PID —

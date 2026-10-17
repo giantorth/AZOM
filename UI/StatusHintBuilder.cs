@@ -27,12 +27,46 @@ namespace MozaPlugin.UI
         // race between probe responses and extension Init calls.
         private static readonly TimeSpan ProfileNotAddedSettling = TimeSpan.FromSeconds(5);
 
+        private const string MinimumSimHubVersion = "9.12.0";
+
+        private static bool s_simHubOutdatedChecked;
+        private static bool s_simHubOutdated;
+
+        // Compared with SimHub's own VersionParser so betas sort below their
+        // release, matching how the host gates device-definition minimums.
+        private static bool IsSimHubOutdated
+        {
+            get
+            {
+                if (s_simHubOutdatedChecked) return s_simHubOutdated;
+                try
+                {
+                    var host = SimHub.Plugins.Configuration.SimHubVersion;
+                    if (host == null) return false;
+                    s_simHubOutdated = host.CompareToVersion(MinimumSimHubVersion) < 0;
+                }
+                catch { s_simHubOutdated = false; }
+                s_simHubOutdatedChecked = true;
+                return s_simHubOutdated;
+            }
+        }
+
         public static IReadOnlyList<StatusHint> Build(MozaPlugin plugin, DateTime nowUtc)
         {
             if (plugin == null) return Array.Empty<StatusHint>();
 
             var list = new List<StatusHint>();
             var elapsed = nowUtc - plugin.StartupUtc;
+
+            // Rule 0: SimHubOutdated. Unknown host version → no banner.
+            if (IsSimHubOutdated)
+            {
+                list.Add(new StatusHint(
+                    StatusHintKind.SimHubOutdated,
+                    Strings.Banner_SimHubOutdated_Title,
+                    string.Format(Strings.Banner_SimHubOutdated_BodyFmt,
+                        DiagnosticsTextBuilder.GetSimHubVersion(), MinimumSimHubVersion)));
+            }
             var detection = plugin.DetectionState;
             var connection = plugin.Connection;
             var data = plugin.Data;
@@ -215,6 +249,31 @@ namespace MozaPlugin.UI
                         "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
                         + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
                         + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
+            }
+
+            // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —
+            // either the Motion plugin is off or its active setup has no HMA150 output.
+            // Presence, not connection: the lane only opens the port while motion runs.
+            var motionLane = plugin.MotionController;
+            if (elapsed >= ProfileNotAddedSettling
+                && motionLane != null
+                && motionLane.IsPresent)
+            {
+                switch (plugin.MotionSetupStatus)
+                {
+                    case Integration.Motion.MotionSetupStatus.MotionPluginDisabled:
+                        list.Add(new StatusHint(
+                            StatusHintKind.MotionPluginDisabled,
+                            Strings.Banner_MotionPluginDisabled_Title,
+                            Strings.Banner_MotionPluginDisabled_Body));
+                        break;
+                    case Integration.Motion.MotionSetupStatus.OutputNotAdded:
+                        list.Add(new StatusHint(
+                            StatusHintKind.ProfileNotAddedMotion,
+                            Strings.Banner_ProfileNotAddedMotion_Title,
+                            Strings.Banner_ProfileNotAddedMotion_Body));
+                        break;
+                }
             }
 
             return list;

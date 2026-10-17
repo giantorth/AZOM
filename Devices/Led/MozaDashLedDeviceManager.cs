@@ -183,10 +183,17 @@ namespace MozaPlugin.Devices.Led
 
         public object GetDriverInstance() => this;
 
-        // Clear the diagnostics static so a closed driver (and the SimHub
-        // LedModuleSettings it references) isn't pinned for the process
-        // lifetime after the dash extension ends.
-        public void Close()
+        // Set by SimHub's Close(), cleared by the next Display(). SimHub calls Close()
+        // every tick its LED module isn't running and later resumes Display() on this
+        // same instance, so Close() pauses the keepalive rather than dropping Latest.
+        private volatile bool _hostClosed;
+
+        public void Close() { _hostClosed = true; }
+
+        /// <summary>Clear the Latest static so this driver (and the SimHub
+        /// LedModuleSettings it references) isn't pinned for the process lifetime.
+        /// Called by the dash extension's End(), never by SimHub.</summary>
+        internal void Release()
         {
             if (ReferenceEquals(Latest, this)) Latest = null;
         }
@@ -244,6 +251,7 @@ namespace MozaPlugin.Devices.Led
             double matrixBrightness = 1.0)
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
+            _hostClosed = false;
 
             try
             {
@@ -504,7 +512,7 @@ namespace MozaPlugin.Devices.Led
         /// </summary>
         internal void TickKeepalive()
         {
-            if (MozaPlugin.IsShuttingDown) return;
+            if (MozaPlugin.IsShuttingDown || _hostClosed) return;
 
             var plugin = MozaPlugin.Instance;
             if (plugin == null || !plugin.Data.IsConnected || !plugin.IsDashDetected) return;

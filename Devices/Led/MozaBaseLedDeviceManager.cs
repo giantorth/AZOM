@@ -188,7 +188,16 @@ namespace MozaPlugin.Devices.Led
 
         public object GetDriverInstance() => this;
 
-        public void Close()
+        // Set by SimHub's Close(), cleared by the next Display(). SimHub calls Close()
+        // every tick its LED module isn't running and later resumes Display() on this
+        // same instance, so Close() pauses the keepalive rather than unregistering.
+        private volatile bool _hostClosed;
+
+        public void Close() { _hostClosed = true; }
+
+        /// <summary>Drop this driver from the keepalive registry. Called by the owning
+        /// extension's End(), never by SimHub.</summary>
+        internal void Release()
         {
             lock (s_instancesLock) s_instances.Remove(this);
         }
@@ -246,6 +255,7 @@ namespace MozaPlugin.Devices.Led
             double matrixBrightness = 1.0)
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
+            _hostClosed = false;
 
             // Released in the finally below; taken just before the send region.
             bool emitLockHeld = false;
@@ -368,7 +378,7 @@ namespace MozaPlugin.Devices.Led
         /// </summary>
         internal void TickKeepalive()
         {
-            if (MozaPlugin.IsShuttingDown) return;
+            if (MozaPlugin.IsShuttingDown || _hostClosed) return;
 
             var plugin = MozaPlugin.Instance;
             if (plugin == null || !plugin.Data.IsConnected || !plugin.IsBaseAmbientLedSupported) return;

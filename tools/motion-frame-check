@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Regression check for Protocol/MozaMotionProtocol.cs frame building.
+
+Mirrors the C# builders in Python and rebuilds every host->controller frame of the
+Motion Manager captures from its decoded fields; any byte difference is reported.
+Covers mode set/poll, status polls, run state, port role read/write, effect slots,
+road detail write/read, global read/write, rig-dimension read, device type, lighting read/write,
+notification ack, presence and the 0x22/00 telemetry frame (including frames whose
+body contains 0x7E, which exercise the doubled-0x7E checksum).
+
+Needs no hardware and no build:
+
+    tools/motion-frame-check [usb-capture/hma150/jsonl/*.jsonl]
+"""
+
+import glob
+import json
+import struct
+import sys
+
+DEV = 0x12
+
+
+def wire_checksum(frame):
+    s = 0x0D + sum(frame)
+    s += sum(0x7E for b in frame[2:] if b == 0x7E)
+    return s & 0xFF
+
+
+def build(group, dev, payload=b""):
+    f = bytes([0x7E, len(payload), group, dev]) + bytes(payload)
+    return f + bytes([wire_checksum(f)])
+
+
+def f32(v):
+    return struct.pack(">f", v)
+
+
+# Mirrors of MozaMotionProtocol builders --------------------------------------
+def set_mode(m):            return build(0x1E, DEV, bytes([0x03, m, 0, 0, 0]))
+def mode_poll():            return build(0x1F, DEV, bytes([0x03, 0, 0, 0, 0]))
+def controller_status():    return build(0x21, DEV, bytes([0x01]))
+def port_status(p):         return build(0x21, DEV, bytes([0x02, p]))
+def run_state_read():       return build(0x21, DEV, bytes([0x03]))
+def run_state(sub, arg=0):  return build(0x20, DEV, bytes([0x02, sub, arg]))
+def presence(dev):          return build(0x06, dev)
+def notification_ack(b1, code, b3): return build(0x0E, DEV, bytes([0x04, b1, code, b3]))
+def counts_read():          return build(0x1F, DEV, bytes([0x00, 0, 0]))
+def port_role_read(p):      return build(0x1F, DEV, bytes([0x02, p, 0, 0, 0]))
+def port_role_write(p, r):  return build(0x1E, DEV, bytes([0x02, p, 0x01, r, 0]))
+def effect_slot(s, a, b):   return build(0x1E, DEV, bytes([0x05, s]) + f32(a) + f32(b))
+def road_detail(a, b):      return build(0x1E, DEV, bytes([0x06]) + f32(a) + f32(b))
+def global_read(i):         return build(0x1F, DEV, bytes([0x04, i, 0, 0, 0, 0]))
+def global_write(i, v):     return build(0x1E, DEV, bytes([0x04, i]) + f32(v))
+def rig_read():             return build(0x1F, DEV, bytes([0x08]) + bytes(8))
+def road_detail_read():     return build(0x1F, DEV, bytes([0x06]) + bytes(8))
+def device_type():          return build(0x1E, DEV, bytes([0x0A, 0x01]))
+def lighting_write(z, p, v): return build(0x1E, DEV, bytes([0x0B, z, p]) + bytes(v))
+def lighting_read(z, p):
+    return build(0x1F, DEV, bytes([0x0B, z, 0, 0]) if z < 4 else bytes([0x0B, z, p, 0, 0, 0]))
+
+
+def telemetry(fields, brake, throttle, flags):
+    p = bytes([0x00]) + b"".join(f32(v) for v in fields) + bytes([brake, throttle, 0, flags])
+    return build(0x22, DEV, p)
+
+
+def unf32(b, off):
+    return struct.unpack_from(">f", b, off)[0]
+
+
+def rebuild(fr):
+    """Rebuild a captured h2b frame from its fields, or None if the lane never emits it."""
+    g, dev, p = fr[2], fr[3], fr[4:-1]
+    if g == 0x06 and not p:
+        return presence(dev)
+    if dev != DEV:
+        return None
+    c = p[0] if p else None
+    if g == 0x1E and c == 0x03 and len(p) == 5: return set_mode(p[1])
+    if g == 0x1F and c == 0x03 and len(p) == 5: return mode_poll()
+    if g == 0x21 and c == 0x01 and len(p) == 1: return controller_status()
+    if g == 0x21 and c == 0x02 and len(p) == 2: return port_status(p[1])
+    if g == 0x21 and c == 0x03 and len(p) == 1: return run_state_read()
+    if g == 0x20 and c == 0x02 and len(p) == 3: return run_state(p[1], p[2])
+    if g == 0x0E and c == 0x04 and len(p) == 4: return notification_ack(p[1], p[2], p[3])
+    if g == 0x1F and c == 0x00 and len(p) == 3: return counts_read()
+    if g == 0x1F and c == 0x02 and len(p) == 5: return port_role_read(p[1])
+    if g == 0x1E and c == 0x02 and len(p) == 5: return port_role_write(p[1], p[3])
+    if g == 0x1E and c == 0x05 and len(p) == 10: return effect_slot(p[1], unf32(p, 2), unf32(p, 6))
+    if g == 0x1E and c == 0x06 and len(p) == 9: return road_detail(unf32(p, 1), unf32(p, 5))
+    if g == 0x1F and c == 0x04 and len(p) == 6: return global_read(p[1])
+    if g == 0x1E and c == 0x04 and len(p) == 6: return global_write(p[1], unf32(p, 2))
+    if g == 0x1F and c == 0x08 and len(p) == 9: return rig_read()
+    if g == 0x1F and c == 0x06 and len(p) == 9: return road_detail_read()
+    if g == 0x1E and c == 0x0A and len(p) == 2: return device_type()
+    if g == 0x1E and c == 0x0B and len(p) >= 4: return lighting_write(p[1], p[2], p[3:])
+    if g == 0x1F and c == 0x0B and len(p) in (4, 6): return lighting_read(p[1], p[2])
+    if g == 0x22 and c == 0x00 and len(p) == 53:
+        fields = [unf32(p, 1 + 4 * i) for i in range(12)]
+        return telemetry(fields, p[49], p[50], p[52])
+    return None
+
+
+def main(paths):
+    checked = mismatched = 0
+    by_shape = {}
+    for path in paths:
+        for line in open(path):
+            r = json.loads(line)
+            if r["dir"] != "h2b":
+                continue
+            fr = bytes.fromhex(r["hex"])
+            if len(fr) < 5:
+                continue
+            want = rebuild(fr)
+            if want is None:
+                continue
+            shape = (fr[2], fr[4] if len(fr) > 5 else None)
+            by_shape[shape] = by_shape.get(shape, 0) + 1
+            checked += 1
+            if want != fr:
+                mismatched += 1
+                if mismatched <= 10:
+                    print(f"MISMATCH {path}\n  capture {fr.hex()}\n  rebuilt {want.hex()}")
+    for (g, c), n in sorted(by_shape.items(), key=lambda kv: (kv[0][0], kv[0][1] or 0)):
+        print(f"  group {g:02x} cmd {'--' if c is None else f'{c:02x}'}: {n} frames")
+    print(f"{checked} frames rebuilt, {mismatched} mismatches")
+    return 1 if mismatched or not checked else 0
+
+
+if __name__ == "__main__":
+    paths = sys.argv[1:] or sorted(glob.glob("usb-capture/hma150/jsonl/*.jsonl"))
+    sys.exit(main(paths))

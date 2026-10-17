@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Pair the motion controller's `Output Displacement` firmware snapshots with the 0x22/00 frames
+the host sent just before each one, and decompose the four actuator displacements.
+
+Input is the {"t","dir","hex"} JSONL written by tools/pcap-inventory --jsonl,
+tools/pcap_to_jsonl.py or tools/hma150-characterize.ps1. Protocol reference:
+docs/protocol/motion/game-stream-0x22.md § Controller output and heave.
+
+Per snapshot: the four displacements (mm), heave = mean, the two plane tilt terms, warp
+(0 for a rigid plane), the pitch/roll the controller logged, and the last frame's f0/f1/f6 and
+mean shock deflection (raw and minus its 1 s average).
+
+    tools/motion-displacement capture.jsonl
+"""
+from __future__ import annotations
+
+import bisect
+import json
+import re
+import struct
+import sys
+
+SHOCK_REST = (34.7 + 38.4 + 38.7 + 33.1) / 4
+LINE = re.compile(r"controller_model\.c:(\d+) (.*)")
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(__doc__)
+        return 2
+    frames, logs, partial, t0 = [], [], "", None
+    with open(sys.argv[1]) as fh:
+        for line in fh:
+            o = json.loads(line)
+            t0 = o["t"] if t0 is None else t0
+            fr = bytes.fromhex(o["hex"])
+            if len(fr) < 5:
+                continue
+            t = o["t"] - t0
+            if o["dir"] == "h2b" and fr[2] == 0x22 and fr[3] == 0x12 and fr[4] == 0x00 and len(fr) == 58:
+                frames.append((t, struct.unpack(">12f", fr[5:53])))
+            elif o["dir"] == "b2h" and fr[2] == 0x0E and fr[3] == 0x21 and fr[4] == 0x05:
+                partial += fr[5:-1].decode("ascii", "replace")
+                while "\n" in partial:
+                    text, partial = partial.split("\n", 1)
+                    logs.append((t, text.strip()))
+    ts = [f[0] for f in frames]
+    mean_shock = lambda f: sum(f[8:12]) / 4
+
+    print(f"{'t':>8} | {'d0':>7} {'d1':>7} {'d2':>7} {'d3':>7} | {'heave':>6} {'tiltA':>6} {'tiltB':>6} {'warp':>5}"
+          f" | {'logP':>7} {'logR':>7} | {'f0':>7} {'f1':>7} {'f6':>6} | {'shock':>6} {'hp1s':>6}")
+    disp = None
+    for t, text in logs:
+        m = LINE.search(text)
+        if not m:
+            continue
+        if m.group(1) == "61":
+            disp = (t, [float(x) for x in m.group(2).split(":")[1].split()])
+            continue
+        if m.group(1) != "75" or disp is None:
+            continue
+        pr = [float(x) for x in re.findall(r"-?\d+\.\d+", m.group(2))]
+        d = disp[1]
+        row = (f"{disp[0]:8.1f} | {' '.join(f'{x:7.2f}' for x in d)} | {sum(d) / 4:6.2f}"
+               f" {(d[0] + d[1] - d[2] - d[3]) / 2:6.2f} {(d[0] - d[1] - d[2] + d[3]) / 2:6.2f}"
+               f" {(d[0] - d[1] + d[2] - d[3]) / 2:5.2f} | {pr[0]:7.4f} {pr[1]:7.4f}")
+        k = bisect.bisect_right(ts, disp[0]) - 1
+        if k >= 0:
+            f = frames[k][1]
+            win = [mean_shock(x[1]) for x in frames[max(0, k - 200):k + 1] if disp[0] - x[0] <= 1.0]
+            row += (f" | {f[0]:7.4f} {f[1]:7.4f} {f[6]:6.2f} | {mean_shock(f) - SHOCK_REST:6.2f}"
+                    f" {mean_shock(f) - sum(win) / len(win):6.2f}")
+        print(row)
+        disp = None
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

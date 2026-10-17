@@ -135,6 +135,18 @@ namespace MozaPlugin.UI
             return field => haveDev ? c!.OutputRegisterValue(dev, $"mbooster-{prefix}-{field}") : -1;
         }
 
+        /// <summary>The selected pedal's Pedal Feel register (full command
+        /// name) as its unit reports it; -1 unknown, or when this pedal
+        /// doesn't own the unit's singleton registers.</summary>
+        private Func<string, int> MBoosterReportedPedalFeel()
+        {
+            var c = CurrentMBoosterController();
+            byte dev = 0;
+            bool haveDev = c != null && c.OwnsSingletonRegisters(_mboosterEffectPedalIndex)
+                && TryMBoosterCalibDevice(c, _mboosterEffectPedalIndex, out dev);
+            return name => haveDev ? c!.OutputRegisterValue(dev, name) : -1;
+        }
+
         private void MBoosterRangeStartSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SetMBoosterRangeEnd(true, e.NewValue);
         private void MBoosterRangeEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => SetMBoosterRangeEnd(false, e.NewValue);
 
@@ -669,17 +681,20 @@ namespace MozaPlugin.UI
         /// When <see cref="MBoosterSegmentedDampingSettings.DampingEnabled"/>
         /// is off, every segment field is forced to 0% regardless of what's
         /// stored/displayed — same wire effect as the user zeroing all six
-        /// sliders themselves.
+        /// sliders themselves — and the plain damping sliders' values follow,
+        /// since the two are latest-wins on the unit.
         /// </summary>
         private void PushSegmentedDamping(MBoosterSegmentedDampingSettings sd)
         {
             _plugin.SaveSettings();
 
             bool enabled = sd.DampingEnabled;
+            var (plainPress, plainRelease) = MBoosterPlainDampingRaw();
 
             // Built inside the parked action so the flush sends whatever the
             // plots hold when the drag settles, not a mid-drag snapshot.
             QueueMBoosterPedalFeelPush("segdamp", (c, dev) =>
+            {
                 c.SendSegmentedDampingIfChanged(global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
                     sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
                     sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
@@ -691,7 +706,21 @@ namespace MozaPlugin.UI
                     !enabled ? 0 : sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
                     !enabled ? 0 : sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
                     !enabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                    dev), dev));
+                    dev), dev);
+                if (!enabled) c.SendPlainDamping(plainPress, plainRelease, dev);
+            });
+        }
+
+        /// <summary>The plain damping sliders' values, wire-encoded (press, release).</summary>
+        private (int Press, int Release) MBoosterPlainDampingRaw() => (
+            global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(Math.Round(MBoosterDampingPressSlider.Value)),
+            global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(Math.Round(MBoosterDampingReleaseSlider.Value)));
+
+        // Segmented Damping on shows its plots; off shows the plain sliders.
+        private void ShowMBoosterDampingMode(bool segmented)
+        {
+            MBoosterSegDampPlotsPanel.Visibility = segmented ? Visibility.Visible : Visibility.Collapsed;
+            MBoosterPlainDampingPanel.Visibility = segmented ? Visibility.Collapsed : Visibility.Visible;
         }
 
         // Master on/off for the whole Segmented Damping feature — see
@@ -704,8 +733,24 @@ namespace MozaPlugin.UI
             if (s == null) return;
             var sd = s.SegmentedDamping ??= new MBoosterSegmentedDampingSettings();
             sd.DampingEnabled = MBoosterSegDampEnable.IsChecked == true;
-            MBoosterSegDampPressedPlot.IsEnabled = sd.DampingEnabled;
-            MBoosterSegDampReleasedPlot.IsEnabled = sd.DampingEnabled;
+            // Save the segments the toggle is about to send, so every later
+            // apply re-sends them (an all-unset profile sends no 0xB7, which
+            // would leave plain damping latest on the unit).
+            if (sd.DampingEnabled)
+            {
+                float Pin(float stored, double shown) => stored >= 0 ? stored : (float)shown;
+                sd.Divider1Pressed = Pin(sd.Divider1Pressed, MBoosterSegDampPressedPlot.Divider1);
+                sd.Divider2Pressed = Pin(sd.Divider2Pressed, MBoosterSegDampPressedPlot.Divider2);
+                sd.Seg1Pressed = Pin(sd.Seg1Pressed, MBoosterSegDampPressedPlot.Seg1Value);
+                sd.Seg2Pressed = Pin(sd.Seg2Pressed, MBoosterSegDampPressedPlot.Seg2Value);
+                sd.Seg3Pressed = Pin(sd.Seg3Pressed, MBoosterSegDampPressedPlot.Seg3Value);
+                sd.Divider1Released = Pin(sd.Divider1Released, MBoosterSegDampReleasedPlot.Divider1);
+                sd.Divider2Released = Pin(sd.Divider2Released, MBoosterSegDampReleasedPlot.Divider2);
+                sd.Seg1Released = Pin(sd.Seg1Released, MBoosterSegDampReleasedPlot.Seg1Value);
+                sd.Seg2Released = Pin(sd.Seg2Released, MBoosterSegDampReleasedPlot.Seg2Value);
+                sd.Seg3Released = Pin(sd.Seg3Released, MBoosterSegDampReleasedPlot.Seg3Value);
+            }
+            ShowMBoosterDampingMode(sd.DampingEnabled);
             PushSegmentedDamping(sd);
         }
 

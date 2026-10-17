@@ -330,6 +330,9 @@ namespace MozaPlugin.UI
             {
                 // The host's 0xB4 read-back can land after the seed.
                 if (s.SleepMinutes < 0) SeedMBoosterSleep(s, selected);
+                // So can the Pedal Feel read-backs.
+                using (_suppressor.Begin())
+                    SeedMBoosterPedalFeelRegisters(PeekMBoosterEffectTarget(), unsetOnly: true);
                 return;
             }
             // Diagnostic trail for the "curve values wrong until profile
@@ -779,43 +782,18 @@ namespace MozaPlugin.UI
             MBoosterInputX4Slider.Value = inputCurveX[3]; SetValueText(MBoosterInputX4Value, inputCurveX[3].ToString("F0"));
             MBoosterInputX5Slider.Value = inputCurveX[4]; SetValueText(MBoosterInputX5Value, inputCurveX[4].ToString("F0"));
             MBoosterInputX6Slider.Value = inputCurveX[5]; SetValueText(MBoosterInputX6Value, inputCurveX[5].ToString("F0"));
-            float ts = fx?.TravelStartMm ?? -1;
-            MBoosterTravelRangeSlider.LowValue = ts >= 0 ? ts : MBoosterUiConstants.TravelMinMm;
-            float te = fx?.TravelEndMm ?? -1;
-            MBoosterTravelRangeSlider.HighValue = te >= 0 ? te : MBoosterUiConstants.TravelDefaultEndMm;
-            float ef = fx?.EndstopFrontStiffness ?? -1;
-            MBoosterEndstopFrontSlider.Value = ef >= 0 ? ef : 1;
-            SetValueText(MBoosterEndstopFrontValue, MBoosterEndstopFrontSlider.Value.ToString("F0"));
-            float ee = fx?.EndstopEndStiffness ?? -1;
-            MBoosterEndstopEndSlider.Value = ee >= 0 ? ee : 1;
-            SetValueText(MBoosterEndstopEndValue, MBoosterEndstopEndSlider.Value.ToString("F0"));
-            float dz = fx?.DeadzoneKg ?? -1;
-            MBoosterDeadzoneSlider.Value = dz >= 0 ? dz : 0;
-            SetValueText(MBoosterDeadzoneValue, MBoosterDeadzoneSlider.Value.ToString("F1"));
             float mf = fx?.MaxForceKg ?? -1;
             MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));
-            float nf = fx?.NaturalFrictionPct ?? -1;
-            MBoosterNaturalFrictionSlider.Value = nf >= 0 ? nf : 0;
-            SetValueText(MBoosterNaturalFrictionValue, MBoosterNaturalFrictionSlider.Value.ToString("F0"));
             bool frictionEnabled = fx?.NaturalFrictionEnabled ?? true;
             MBoosterNaturalFrictionEnable.IsChecked = frictionEnabled;
             MBoosterNaturalFrictionSlider.IsEnabled = frictionEnabled;
-
-            // Plain Virtual Damping (0xAD) — separate registers from the 0xB7
-            // segments below; see MBoosterDeviceSettings.DampingPressPct.
-            float dp = fx?.DampingPressPct ?? -1;
-            MBoosterDampingPressSlider.Value = dp >= 0 ? dp : 0;
-            SetValueText(MBoosterDampingPressValue, MBoosterDampingPressSlider.Value.ToString("F0"));
-            float dr = fx?.DampingReleasePct ?? -1;
-            MBoosterDampingReleaseSlider.Value = dr >= 0 ? dr : 0;
-            SetValueText(MBoosterDampingReleaseValue, MBoosterDampingReleaseSlider.Value.ToString("F0"));
+            SeedMBoosterPedalFeelRegisters(fx, unsetOnly: false);
 
             var sd = fx?.SegmentedDamping;
             bool dampingEnabled = sd?.DampingEnabled ?? true;
             MBoosterSegDampEnable.IsChecked = dampingEnabled;
-            MBoosterSegDampPressedPlot.IsEnabled = dampingEnabled;
-            MBoosterSegDampReleasedPlot.IsEnabled = dampingEnabled;
+            ShowMBoosterDampingMode(dampingEnabled);
             MBoosterSegDampPressedPlot.Divider1 = (sd?.Divider1Pressed ?? -1) >= 0 ? sd!.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct;
             MBoosterSegDampPressedPlot.Divider2 = (sd?.Divider2Pressed ?? -1) >= 0 ? sd!.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct;
             MBoosterSegDampPressedPlot.Seg1Value = (sd?.Seg1Pressed ?? -1) >= 0 ? sd!.Seg1Pressed : MBoosterUiConstants.SegDampSegDefaultPct;
@@ -827,6 +805,58 @@ namespace MozaPlugin.UI
             MBoosterSegDampReleasedPlot.Seg1Value = (sd?.Seg1Released ?? -1) >= 0 ? sd!.Seg1Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg2Value = (sd?.Seg2Released ?? -1) >= 0 ? sd!.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct;
             MBoosterSegDampReleasedPlot.Seg3Value = (sd?.Seg3Released ?? -1) >= 0 ? sd!.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct;
+        }
+
+        /// <summary>Seed the Pedal Feel controls the unit reports back: the
+        /// profile's value, else the read-back, else the default.
+        /// <paramref name="unsetOnly"/> skips profile-set fields, so the
+        /// per-tick refresh can pick up late read-backs without touching a
+        /// control the user is editing.</summary>
+        private void SeedMBoosterPedalFeelRegisters(IMBoosterPedalConfig? fx, bool unsetOnly)
+        {
+            var reported = MBoosterReportedPedalFeel();
+            double Pick(float stored, string name, Func<int, double> decode, double fallback)
+            {
+                if (stored >= 0) return stored;
+                int raw = reported(name);
+                return raw >= 0 ? decode(raw) : fallback;
+            }
+
+            float ts = fx?.TravelStartMm ?? -1, te = fx?.TravelEndMm ?? -1;
+            if (!unsetOnly || ts < 0 || te < 0)
+            {
+                MBoosterTravelRangeSlider.LowValue = Math.Round(Pick(ts, "mbooster-brake-travel-start",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelMinMm), 1);
+                MBoosterTravelRangeSlider.HighValue = Math.Round(Pick(te, "mbooster-brake-travel-end",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelDefaultEndMm), 1);
+            }
+
+            void Int(Slider slider, TextBox box, float stored, string name, Func<int, double> decode, double fallback)
+            {
+                if (unsetOnly && stored >= 0) return;
+                slider.Value = Math.Round(Pick(stored, name, decode, fallback));
+                SetValueText(box, slider.Value.ToString("F0"));
+            }
+            Int(MBoosterEndstopFrontSlider, MBoosterEndstopFrontValue, fx?.EndstopFrontStiffness ?? -1,
+                "mbooster-brake-endstop-front", global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeEndstopStiffness, 1);
+            Int(MBoosterEndstopEndSlider, MBoosterEndstopEndValue, fx?.EndstopEndStiffness ?? -1,
+                "mbooster-brake-endstop-end", global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeEndstopStiffness, 1);
+            Int(MBoosterNaturalFrictionSlider, MBoosterNaturalFrictionValue, fx?.NaturalFrictionPct ?? -1,
+                "mbooster-brake-friction-0", global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeFrictionPct, 0);
+            // Plain Virtual Damping (0xAD) — separate registers from the 0xB7
+            // segments; see MBoosterDeviceSettings.DampingPressPct.
+            Int(MBoosterDampingPressSlider, MBoosterDampingPressValue, fx?.DampingPressPct ?? -1,
+                "mbooster-brake-damping-press", global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeFrictionPct, 0);
+            Int(MBoosterDampingReleaseSlider, MBoosterDampingReleaseValue, fx?.DampingReleasePct ?? -1,
+                "mbooster-brake-damping-release", global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeFrictionPct, 0);
+
+            float dz = fx?.DeadzoneKg ?? -1;
+            if (!unsetOnly || dz < 0)
+            {
+                MBoosterDeadzoneSlider.Value = Math.Round(Pick(dz, "mbooster-brake-deadzone",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeThresholdKg, 0), 1);
+                SetValueText(MBoosterDeadzoneValue, MBoosterDeadzoneSlider.Value.ToString("F1"));
+            }
         }
 
         private MBoosterDeviceController? CurrentMBoosterController()

@@ -120,7 +120,7 @@ The call raises the **internal** `ApplicationExitRequested` event carrying the `
 
 SimHub also ships an "Automatic restart" user setting (the strings `HasAutomaticRestartEnabled` and "Automatic restart delay (seconds):" are present in the assembly), but its owning type and gating are not on `PluginManager` and were not reverse-engineered — `RequestApplicationExit(true)` is the load-bearing call and works regardless. (Note: `RequestReload` is a method on `DevicesPlugin`, not `PluginManager`; it reloads device/dashboard definitions without a full process restart.)
 
-The MOZA plugin calls `RequestApplicationExit(true)` from `MozaPlugin.RestartSimHub()`, wired to the "Restart SimHub" button the update banner shows after an in-app update is installed.
+The MOZA plugin calls `RequestApplicationExit(true)` from `MozaPlugin.RestartSimHub()`, called automatically once an in-app update install succeeds; the update banner's "Restart SimHub" button is the fallback if that request can't be issued.
 
 ## Profile System (`SimHub.Plugins.ProfilesCommon`)
 
@@ -1384,11 +1384,15 @@ else
 
 How a plugin can supply its own motion-platform output to SimHub's **Motion** plugin (the
 licensed motion feature — `IsSimHubMotionLicenceInstalled` / `…Valid` live in `SimHub.Plugins.dll`).
-Decompiled with `ilspycmd` 10.1.1 from a SimHub **9.12.8** install on 2026-10-07. None of this is a
-documented API: type names, member signatures and even the namespace casing can change between
-releases. Recorded here as reference material only — whether the MOZA plugin should integrate the
-HMA150 this way is an open decision (the platform's own game mode takes *raw telemetry*, not
-per-actuator positions — see [`protocol/motion/game-stream-0x22.md`](protocol/motion/game-stream-0x22.md)).
+Decompiled with `ilspycmd` 10.1.1 from a SimHub **9.12.8** install on 2026-10-07 and re-checked
+against **9.13.2** on 2026-10-10: the output contract (`IMotionOutput`, `MotionOutputBase<T>`,
+`GeometryResult`, `Geometry6DOFsBypass`, `OutputWorker`, `ControllersAggregatorOutput`) is
+byte-identical; 9.12.9/9.13 only add the Hop-in pose (`MotionDevice.HopInPose`, a
+`GroupedMotionState` override that reaches outputs as an ordinary pose), a ping monitor on
+`GenericUDPOutputV2` and UI changes. None of this is a documented API — SimHub's official SDK
+(`PluginSdk/`) covers plugins, device extensions and LED effects only, and warns that undocumented
+components can break on update. The plugin implements the HMA150 output this way (see
+[Implementing a pose output](#implementing-a-pose-output-the-hma150)).
 
 ### Assembly and namespaces
 
@@ -1922,6 +1926,54 @@ PT-Actuator and Thanos outputs.
 
 `SimHub.WitMotion.dll` is an **input**: `MotionCompensation.WitMotionManager` reads a WitMotion IMU
 over serial (115200, 100 Hz) for VR motion compensation; it is not an output.
+
+### Implementing a pose output (the HMA150)
+
+`Integration/Motion/MozaHma150Output` is a `MotionOutputBase<OutputSettingsBase-derived>` paired
+with `GenericGeometry6DOFsBypass` (SimHub's manual: the bypass is for "controllers performing their
+own kinematics"). What the decompile requires of such an output:
+
+- **`Start` must return quickly.** `MotionDevice.StartOutput` calls `Output.Start()` on the motion
+  update thread, the aggregator's `StartInternal` waits on every child (`Task.WaitAll`), and
+  `MotionDevice.Enable` gives up after 20 s waiting for `IsConnected || IsFailed`. A slow
+  hardware handshake (the HMA150's travel self-check) runs in the background instead, and
+  `IsReadyForLiveMotionData()` is overridden to stay false until it finishes: while false,
+  `MotionDevice` keeps calling `Update` with a `NotReady`/`ExitPark` zero pose and shows the
+  device as *Starting*.
+- **Override `Park` / `Unpark`.** The base versions call `GetParkPositions`, which returns `null`
+  when the settings are not `IActuatorOrderingSettings`, and then `.All(...)` on it — an
+  `ArgumentNullException` on the first update. `YawVROutput` and `ControllersAggregatorOutput`
+  override both with no-ops.
+- **Pose source:** `geometryResult.PrimaryGeometryResult.MotionState` (`PitchDegrees`,
+  `RollDegrees`, `HeaveMm`, …). The bypass geometry already folds corner haptics into
+  pitch/roll/heave (`SixDofInput.GetHapticsPose`). Signs: `MotionPlugin` builds
+  `OrientationPitchDegrees = −GameData.OrientationPitch` and `OrientationRollDegrees =
+  +GameData.OrientationRoll`. The HMA150 output does **not** use it: its controller wants raw
+  physics like Motion Manager sends, so it streams `GameData` from the plugin's own
+  `DataUpdate` (`MotionInputData` is `internal`). `StatusDataBase.Acceleration{Surge,Sway,Heave}`
+  are m/s² with surge positive when braking — `GameManagerBase`'s fallback sets
+  `GlobalAccelerationG = −AccelerationSurge` and derives it from Δspeed(m/s)/Δt.
+- **Configuration errors gate enabling, not running.** `MotionDevice.Enable` runs
+  `CheckAndShowConfigurationErrors` before `IsEnabled = true`; at runtime only `IsValid`
+  (geometry and output exist) can switch a device off. So an output whose hardware port is
+  opened on `Start` must not report "not connected" just because the port is closed — the
+  HMA150 reports only absence from USB and the last session's port-map problems.
+- **Failure:** set `ConnectionState = Failure` + `LastErrorMessage` from `UpdateInternal` /
+  `KeepAliveInternal`; `OutputWorker.ApplyState` then skips the output and `MotionDevice`
+  freezes the pose. `Enable` calls `RearmAfterFailure` before restarting.
+- **Idle:** `KeepAlive` → `BeforeStartingIdle` once, then `KeepAliveInternal` every tick
+  (`AllowIdling` defaults to true); leaving idle calls `BeforeStoppingIdle`.
+- **Detecting the active setup** (status banner): `PluginManager.GetPlugin<MotionPlugin>()` is
+  null when the Motion plugin is not enabled; otherwise
+  `MotionPluginSettings.CurrentDevice.Output.AggregatedOutputs` lists the configured
+  controllers (`AggregatedOutput.IsEnabled`, `.Output`).
+- **Registration:** a `Motion\Presets\*.shmotioncontroller` (needs `CustomName`) and a
+  `Motion\MotionHardwarePresets\<dir>\{preset.json, config.shmotionoutput}`; both folders are
+  read when the picker / wizard opens (paths are relative to SimHub's working directory). Leave
+  `OutputId` out of a preset so each import keeps its constructor-generated id.
+
+All Motion-typed calls in the plugin go through `Integration/Motion/MotionIntegration`, which
+catches a type-load mismatch once and disables the integration rather than the plugin.
 
 ### Generic template language (`GenericSerialOutputV2` / `GenericUDPOutputV2`)
 

@@ -491,23 +491,18 @@ namespace MozaPlugin.Telemetry
         /// resolves 0 overrides and the catalog-keyed dedup then pins the
         /// mapping-less profile until a dashboard switch forces a re-synth — the
         /// reported "custom mappings don't load until I switch dashboards" bug.
-        /// Re-applying here closes that race with no tier-def re-emit: only the
+        /// Re-resolving here closes that race with no tier-def re-emit: only the
         /// per-channel SimHubProperty binding changes, picked up on the next value
         /// frame (see <see cref="TelemetryFrameBuilder"/>'s live property read).
-        /// Idempotent when mappings were already applied or none are configured.
+        /// The rebind is in place, which the channel-mapping grid's refresh
+        /// signature can't see, so the UI is notified when a binding changed.
         /// </summary>
         internal void ReapplyUserChannelMappingsAfterConfigJson()
         {
             // Wheel lane only: id → name now resolves, so rewrite legacy mapping keys.
             if (MappingDashKeys == null)
                 MozaPlugin.Instance?.ChannelMapping.MigrateLegacyWheelKeys();
-            var profile = _profile;
-            if (profile == null || profile.Tiers.Count == 0) return;
-            int n = ApplyUserChannelMappings(profile);
-            if (n > 0)
-                MozaLog.Debug(
-                    $"[AZOM] Re-applied {n} user channel mapping(s) to live \"{profile.Name}\" " +
-                    "after configJson state arrived (cold-start catalog-before-configJson race)");
+            ReResolveActiveDashboardMappings(onlyIfChanged: true);
         }
 
         /// <summary>
@@ -538,8 +533,10 @@ namespace MozaPlugin.Telemetry
         /// (the builder reads SimHubProperty live per frame), no wire writes — so the
         /// value stream picks up the new bindings on the next frame and the wedge can't
         /// fire. No-op until the wheel has committed a catalog generation.
+        /// <paramref name="onlyIfChanged"/> skips the log + UI notify when nothing
+        /// was rebound (the configJson path runs on every state push).
         /// </summary>
-        internal void ReResolveActiveDashboardMappings()
+        internal void ReResolveActiveDashboardMappings(bool onlyIfChanged = false)
         {
             var profile = _profile;
             if (profile == null || profile.Tiers.Count == 0) return;
@@ -606,6 +603,7 @@ namespace MozaPlugin.Telemetry
                 }
             }
 
+            if (onlyIfChanged && changed == 0) return;
             MozaLog.Debug(
                 $"[AZOM] ReResolveActiveDashboardMappings: rebound {changed} live channel " +
                 $"binding(s) to active dashboard for \"{profile.Name}\" (catalog={catalog.Count})");

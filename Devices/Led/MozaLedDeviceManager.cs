@@ -130,7 +130,7 @@ namespace MozaPlugin.Devices.Led
         /// registered driver matches the attached wheel. Ages are seconds; -1 = never.
         /// </summary>
         internal static (int HoldSec, double SrcQuietSec, double RpmFedSec, double BtnFedSec,
-                         double KnobFedSec, int Skips, int KnobActiveMask)? LiveKeepaliveSnapshot()
+                         double KnobFedSec, int Skips, int KnobActiveMask, bool HostClosed)? LiveKeepaliveSnapshot()
         {
             MozaLedDeviceManager[] snapshot;
             lock (s_instancesLock)
@@ -150,7 +150,8 @@ namespace MozaPlugin.Devices.Led
                         AgeSeconds(now, Interlocked.Read(ref inst._btnFedUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._knobFedUtcTicks)),
                         Volatile.Read(ref inst._keepaliveSkips),
-                        Volatile.Read(ref inst._lastKnobBitmask));
+                        Volatile.Read(ref inst._lastKnobBitmask),
+                        inst._hostClosed);
             }
             return null;
         }
@@ -204,6 +205,12 @@ namespace MozaPlugin.Devices.Led
         {
             RegisterInstance();
         }
+
+        // Set by SimHub's Close(), cleared by the next Display(). SimHub calls Close()
+        // every tick its LED module isn't running (device disabled, monitor-off suspend,
+        // primary device missing) and later resumes Display() on this same instance, so
+        // Close() pauses the keepalive rather than dropping us from the registry.
+        private volatile bool _hostClosed;
 
         private Color[]? _lastLeds;
         private Color[]? _lastButtons;
@@ -282,7 +289,7 @@ namespace MozaPlugin.Devices.Led
         //     when the knob effect halts, so engaged = the channel is still arriving
         //     (_knobDrivenUtc, stamped every frame it is present). Display() releases 0/0
         //     the frame the channel goes missing; the keepalive does it KnobStreamEndMs
-        //     after SimHub stops calling Display() at all. No hold, no game-active bypass.
+        //     after SimHub stops calling Display() at all, unless a game is active. No hold.
         private long _rpmChangedUtcTicks;
         private long _rpmFedUtcTicks;
         private long _btnChangedUtcTicks;
@@ -526,7 +533,11 @@ namespace MozaPlugin.Devices.Led
 
         public object GetDriverInstance() => this;
 
-        public void Close() { UnregisterInstance(); }
+        public void Close() { _hostClosed = true; }
+
+        /// <summary>Drop this driver from the keepalive registry. Called by the owning
+        /// extension's End(), never by SimHub (see <see cref="_hostClosed"/>).</summary>
+        internal void Release() { UnregisterInstance(); }
 
         // Allocation-free Color[] equality. SequenceEqual allocates two
         // enumerators per call; this runs on every Display() frame.
@@ -675,6 +686,7 @@ namespace MozaPlugin.Devices.Led
             double matrixBrightness = 1.0)
         {
             BeforeDisplay?.Invoke(this, EventArgs.Empty);
+            _hostClosed = false;
 
             // Released in the finally below. Taken just before the send region so the
             // keepalive timer can't interleave its replay between a colour chunk and the
@@ -1350,7 +1362,7 @@ namespace MozaPlugin.Devices.Led
         /// </summary>
         internal void TickKeepalive()
         {
-            if (MozaPlugin.IsShuttingDown) return;
+            if (MozaPlugin.IsShuttingDown || _hostClosed) return;
 
             var plugin = MozaPlugin.Instance;
             if (plugin == null || !plugin.Data.IsConnected) return;
@@ -1405,15 +1417,17 @@ namespace MozaPlugin.Devices.Led
             bool btnDue = isNewWheel && buttons != null && GroupRendersLiveFrames(btnLedMode)
                 && (gameActive || AnyLit(buttons) || WithinHold(kaNow, Interlocked.Read(ref _btnChangedUtcTicks), holdSec))
                 && DueAfter(kaNow, Interlocked.Read(ref _btnFedUtcTicks), KeepaliveIntervalSeconds);
-            // Knobs take neither the game-active nor the lit bypass, nor the hold: effects
-            // punch through, so once SimHub stops sending the encoders channel the ring is
-            // handed straight back to its stored colours with an explicit 0/0. Replaying the
-            // last mask would pin those knobs to a frame the pipeline has finished with.
+            // Knobs take neither the lit bypass nor the hold: effects punch through, so once
+            // SimHub stops sending the encoders channel the ring is handed straight back to
+            // its stored colours with an explicit 0/0. Display() does that itself when the
+            // channel goes missing from a frame. The release here covers Display() going
+            // silent altogether, which mid-game is a stalled LED pipeline, not an ended
+            // effect — so while a game is active keep re-feeding instead.
             bool knobLive = isNewWheel && knobs != null && modelInfo?.KnobCount > 0
                 && GroupRendersLiveFrames(knobLedMode);
             long knobDriven = Interlocked.Read(ref _knobDrivenUtcTicks);
             long knobReleaseTicks = (long)(KnobStreamEndMs * TimeSpan.TicksPerMillisecond);
-            bool knobRelease = knobLive && knobDriven != 0 && kaNow - knobDriven >= knobReleaseTicks;
+            bool knobRelease = knobLive && !gameActive && knobDriven != 0 && kaNow - knobDriven >= knobReleaseTicks;
             bool knobDue = knobLive && !knobRelease
                 && DueAfter(kaNow, Interlocked.Read(ref _knobFedUtcTicks), KeepaliveIntervalSeconds);
             if (!rpmDue && !btnDue && !knobDue && !knobRelease) return;

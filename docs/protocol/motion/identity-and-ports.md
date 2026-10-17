@@ -18,6 +18,11 @@ then `0x1F` reads (`00`, `03`, `04 00`, `04 01`, `09`, `06`, `08`) and the first
 Ports are enrolled ~2.7 s later with the same probe set plus `0x0F 02`, `0x0F 03`, `0x07 02`
 and `0x27 00`; the four ports are probed back-to-back (one frame each, interleaved).
 
+The controller answers roughly one request per 13 ms and silently drops what overflows its
+queue: Motion Manager re-sends unanswered probes ~0.5 s later (`Startup-Shutdown`), and a plugin
+enrol that sent ~35 reads in one burst got no reply to `0x05`, `0x07 01`, `0x08 02` or
+`0x1F/00` (bundle `CS-V2 20261010-204539`).
+
 ## Identity strings
 
 All strings are 16-byte zero-padded ASCII as on every other MOZA device.

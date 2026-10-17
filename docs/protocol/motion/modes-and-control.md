@@ -21,7 +21,7 @@ mode:N`; every actuator follows with `Actuator Set curr mode:N`.
 | `0` | idle | host write, and the default after calibration / self-test | no motion; motors stay enabled | every capture |
 | `1` | **game** | host write when the user presses *Start* / a game is detected | controller consumes the `0x22` streams; `ModelMode Set CtrlMode:5` | `100_STROKE` 18.4 s, `spa`, `nurburgring` 46 s |
 | `2` | manual motion test | host write when the "Manual Motion Test" toggle is on | controller follows `0x1E/07` setpoints | `Pitch±5`, `roll±5`, `Heave±5`, `±100` (poll reads `02 02` throughout) |
-| `3` | position calibration (provisional) | host write right after mode 7 completes | `ModelMode Set CtrlMode:2`; firmware prints `Device Type : 1, eeprom data: 1`, `Output Displacement : 0 0 0 0`, `Calib Length/Width`; actuators enter mode 3 ~3 s later | `Startup-Shutdown` 39.3 s, `nurburgring` 9.0 s |
+| `3` | ready (provisional) | host write right after mode 7 completes; also passed through for ~3.3 s on every `set mode 1` | `ModelMode Set CtrlMode:2`; platform held at the 0 mm ready position (the 60 s `Output Displacement` line reads `0 0 0 0` here — it is a timer, not printed on entry); actuators enter mode 3 ~3 s later | `Startup-Shutdown` 39.3 s, `nurburgring` 9.0 s, bench run 2.9 s → mode 1 at 6.2 s |
 | `4` | (transient) | never written; seen as `current` for one poll after leaving game mode, with flag `0x01` | — | `100_STROKE` 62.8 s |
 | `5` | armed (transitional) | never written directly; the controller passes through 5 on the way to 1, 7, 8 or 13 (`Controller Set curr mode:5` always precedes the target) | — | all captures |
 | `7` | travel self-check | host write 3–10 s after the config push on connect (`100_STROKE` begins mid-session with one) | `CtrlMode:6`; error 259 "Travel Not Check" raised then cleared on `selfCheckSuccess`; firmware prints `pitch_offset / roll_offset`; flag `0x80` while running; ~1.6–2 s | `Startup-Shutdown` 37.3 s, `nurburgring` 7.0 s, `100_STROKE` 2.9 s |
@@ -79,7 +79,7 @@ Polled at 2 Hz each; replies are fixed 13-byte records.
 |------|--------|---------|
 | present | `01` / `00` | actuator answers on this port |
 | slave | `06`..`09` (= low nibble of the slave id), `00` when absent | — |
-| w0..w3 | zero outside game mode; in mode 1 a changing 32-bit word — `BF C9 6A 16` (the IEEE-754 pattern of the current yaw, −1.5736) and `84 80 00 59` were seen | unknown; per-port live word during motion |
+| w0..w3 | zero outside game mode; in mode 1 a changing 32-bit word — `BF C9 6A 16` (the IEEE-754 pattern of the current yaw, −1.5736) and `84 80 00 59` were seen | unknown; stayed `00000000` through a plugin game session that sent f2 (yaw) = 0, so probably an echo of f2 rather than actuator position |
 
 The host polls only the populated ports once the map is known (`02 03`..`02 06`), all eight
 during enrol.
@@ -151,7 +151,8 @@ stop with it. The platform stays powered in standby.
 |------|------|------|
 | 259 | `error_code 259 occurs` / `err_diag_svr.c:69 Travel Not Check` | raised on entering mode 7, cleared by `selfCheckSuccess` |
 | 260 | `error_code 260 clear` | cleared 9 s after a controller power-up (actuators back) |
-| 269 | `error_code 269 occurs` / `clear` | raised at controller boot (`Controller ErrCode:8`), cleared when Motion Manager connects |
+| 269 | `error_code 269 occurs` / `clear` | raised at controller boot (`Controller ErrCode:8`), cleared when Motion Manager connects — or any host traffic: plugin 1.6.2's AB9 lane, which sent no `0x1F/03` / `0x21/01` polls, cleared it and it stayed clear |
+| `Controller ErrCode:512` | — | with current mode 9, see [`firmware-log-0x0E.md`](firmware-log-0x0E.md) |
 | `Controller ErrCode:4` | — | reported every 5 s while actuators are missing after power-up |
 
 On the cold start the controller dumped `=========== Fault Pre-Data (100 samples) ===========`

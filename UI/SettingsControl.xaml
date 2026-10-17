@@ -2221,19 +2221,16 @@
                             <!-- Another brake-named singleton hardware write (cmdId 0xB7) — hidden
                                  for a passive pedal, same as Travel / End Stop / Natural Friction. -->
                             <ctrl:SectionCard x:Name="MBoosterSegDampCard"
-                                              Title="{x:Static res:Strings.Section_SegmentedDamping}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_SegmentedDamping}"
+                                              Title="{x:Static res:Strings.Section_PedalDamping}"
                                               Icon="{StaticResource IconDamper}"
                                               IsCollapsible="True">
                                 <StackPanel>
-                                    <ctrl:OffOnToggle x:Name="MBoosterSegDampEnable" Content="{x:Static res:Strings.Label_Enable}" VerticalAlignment="Center" Margin="0,0,0,12" Checked="MBoosterSegDampEnable_Changed" Unchecked="MBoosterSegDampEnable_Changed"/>
+                                    <ctrl:OffOnToggle x:Name="MBoosterSegDampEnable" Content="{x:Static res:Strings.Label_EnableSegmentedDamping}" VerticalAlignment="Center" Margin="0,0,0,12" Checked="MBoosterSegDampEnable_Changed" Unchecked="MBoosterSegDampEnable_Changed"/>
                                     <!-- Plain (non-segmented) Virtual Damping, cmdId 0xAD selectors
-                                         0/1. A register set of its own that Pit House writes in the
-                                         same burst as the 0xB7 segments below — the firmware logs
-                                         `virtual_damping_press`/`_release` for these and
-                                         `virtual_damping_press1..3` for the segments. Same card
-                                         because it is the same feature family, so it inherits this
-                                         card's passive-pedal gating. -->
+                                         0/1. Latest-wins against the 0xB7 segments on the unit, so
+                                         it is shown (and applied) only with Segmented Damping off.
+                                         Same card, so it inherits the passive-pedal gating. -->
+                                    <StackPanel x:Name="MBoosterPlainDampingPanel">
                                     <Grid Margin="0,0,0,6">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -2260,6 +2257,8 @@
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="0"/>
                                     </Grid>
+                                    </StackPanel>
+                                    <StackPanel x:Name="MBoosterSegDampPlotsPanel">
                                     <TextBlock Text="{x:Static res:Strings.Section_SegmentedDampingPressed}" Style="{StaticResource SectionTitleText}" Margin="0,0,0,12"/>
                                     <ctrl:MozaSegmentedBarEditor x:Name="MBoosterSegDampPressedPlot" Height="220" Margin="0,0,0,4"
                                                                   ToolTip="{x:Static res:Strings.Hint_SegmentedDampingExperimental}"
@@ -2278,6 +2277,7 @@
                                                                   Divider2Max="{x:Static mbooster:MBoosterUiConstants.SegDampDivider2MaxPct}"
                                                                   MinGap="{x:Static mbooster:MBoosterUiConstants.SegDampDividerMinGapPct}"
                                                                   ValuesChanged="MBoosterSegDampReleasedPlot_ValuesChanged"/>
+                                    </StackPanel>
                                 </StackPanel>
                             </ctrl:SectionCard>
                             <ctrl:SectionCard Title="{x:Static res:Strings.Section_Effects}"

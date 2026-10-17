@@ -149,8 +149,6 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Жёсткость переднего упора</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Жёсткость заднего упора</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Имитирует силу трения, не зависящую от игрового вывода.</value></data>
-  <data name="Section_SegmentedDamping" xml:space="preserve"><value>СЕГМЕНТИРОВАННОЕ ДЕМПФИРОВАНИЕ</value></data>
-  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Сила демпфирования, не зависящая от игрового вывода, по сегментам хода педали</value></data>
   <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Имитирует силу демпфирования, не зависящую от игрового вывода. Ход педали делится на несколько сегментов, каждый с регулируемым диапазоном и собственным естественным демпфированием. Перетащите разделитель, чтобы изменить размер сегмента; перетащите внутри сегмента, чтобы задать величину демпфирования.</value></data>
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>При Нажатии</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>При Отпускании</value></data>
@@ -477,7 +475,7 @@
   <data name="Import_CancelButton" xml:space="preserve"><value>ОТМЕНА</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>ДАЛЕЕ</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>НАЗАД</value></data>
-  <data name="Import_BrowseDescription" xml:space="preserve"><value>Выберите JSON-файл пресета PitHouse в любом месте системы.</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Выберите JSON-файл пресета PitHouse или Motion Manager в любом месте системы.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Файл не является корректным JSON: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Неподдерживаемый тип пресета «{0}». Поддерживаются только пресеты Motor и Pedals.</value></data>
   <data name="Status_Connected" xml:space="preserve"><value>Подключено</value></data>
@@ -801,4 +799,66 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Средний</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Жёсткий</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Компенсация мёртвой зоны в центре</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>Подключение плагина AZOM к контроллеру движения не запущено.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>MOZA Motion Controller не подключён</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller ещё запускается</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Порту актуатора {0} не назначен угол</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Порт актуатора {0} использует угол {1}, который уже назначен</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>Подключено актуаторов: {0} из {1}</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Настройка портов не завершена: запустите самотест портов</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Сбой контроллера движения: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Передний левый</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Передний правый</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Задний левый</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Задний правый</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Не назначен</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Состояние</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Подключение</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Не подключён</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>Этап</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Режим контроллера</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Прошивка</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Актуаторы</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Проблемы</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>Нет</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Порты актуаторов</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Порт {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Определить</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Применить углы и запустить самотест портов</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Запустить самопроверку хода</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Настройка</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Максимальный доступный ход (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Расстояние между актуаторами спереди–сзади (мм)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Расстояние между актуаторами слева–справа (мм)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Применить</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Подсветка</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Яркость (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Цвет зоны {0}</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Изменить</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Отключён</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Запуск</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Готов</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Самопроверка хода</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Переход в игровой режим</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Работает</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Остановка</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Самотест портов</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Сбой</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion не включён</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>MOZA Motion Controller подключён, но плагин Motion в SimHub не включён. Включите его в Settings &gt; Plugins, затем добавьте контроллер MOZA HMA150 в Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 не добавлен в SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>MOZA Motion Controller подключён, но в активной конфигурации SimHub Motion нет контроллера MOZA HMA150. В Motion добавьте контроллер и выберите пресет MOZA HMA150.</value></data>
+  <data name="Banner_SimHubOutdated_Title" xml:space="preserve"><value>Требуется обновление SimHub</value></data>
+  <data name="Banner_SimHubOutdated_BodyFmt" xml:space="preserve"><value>SimHub {0} старше версии {1}. Некоторые функции плагина не будут работать, пока вы не обновите SimHub.</value></data>
+  <data name="Motion_Panel_Effects" xml:space="preserve"><value>Эффекты движения</value></data>
+  <data name="Motion_Panel_Intensity" xml:space="preserve"><value>Интенсивность (%)</value></data>
+  <data name="Motion_Panel_Smoothness" xml:space="preserve"><value>Сглаживание (%)</value></data>
+  <data name="Motion_Effect_Pitch" xml:space="preserve"><value>Тангаж</value></data>
+  <data name="Motion_Effect_Roll" xml:space="preserve"><value>Крен</value></data>
+  <data name="Motion_Effect_Heave" xml:space="preserve"><value>Вертикальное смещение</value></data>
+  <data name="Motion_Effect_AccelPitch" xml:space="preserve"><value>Тангаж от ускорения</value></data>
+  <data name="Motion_Effect_AccelRoll" xml:space="preserve"><value>Крен от ускорения</value></data>
+  <data name="Motion_Effect_RoadDetail" xml:space="preserve"><value>Детали дороги</value></data>
+  <data name="Label_EnableSegmentedDamping" xml:space="preserve"><value>Включить сегментированное демпфирование</value></data>
+  <data name="Section_PedalDamping" xml:space="preserve"><value>ДЕМПФИРОВАНИЕ ПЕДАЛИ</value></data>
 </root>

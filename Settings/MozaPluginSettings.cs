@@ -205,6 +205,7 @@ namespace MozaPlugin.Settings
         public string LastHubPort { get; set; } = "";
         // Port the dedicated base-aux pipe last bound (broken base + wheel on hub).
         public string LastBaseAuxPort { get; set; } = "";
+        public string LastMotionPort { get; set; } = "";
 
         // Durable device identity per lane (VID:PID:serial — see
         // MozaPortDiscovery.DurableId), saved alongside the port name and tried
@@ -217,6 +218,7 @@ namespace MozaPlugin.Settings
         public string LastDashboardDeviceId { get; set; } = "";
         public string LastHubDeviceId { get; set; } = "";
         public string LastBaseAuxDeviceId { get; set; } = "";
+        public string LastMotionDeviceId { get; set; } = "";
 
         // Active-shifter (AB9 / AB6) lane. Off = the plugin never opens the
         // shifter's port, and switching it off releases a port already held.

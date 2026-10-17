@@ -2,6 +2,26 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.0]
+
+## Added
+
+- **MOZA HMA150 motion platform in SimHub Motion (preview).** Pick the MOZA HMA150 preset in
+  Motion; it streams game telemetry like Motion Manager, and port setup, self-tests, motion
+  effects, stroke and lighting are in its settings. The COM port is free while motion is off.
+  Motion effects are saved per profile, and Motion Manager presets import from the Import tab.
+- **Banner warns when SimHub is older than 9.12,** since some plugin features need it.
+- **In-app updates restart SimHub automatically** once the install finishes.
+
+## Fixed
+
+- **mBooster damping no longer flips between the plain and segmented settings;** the plain sliders replace the graphs when segmented damping is off.
+- **mBooster Pedal Feel shows the pedal's own values** when the profile hasn't set them, chained units included.
+- **The MOZA Motion Controller is no longer probed as a wheelbase or AB9.**
+- **Dashboard channel mappings show at launch,** not only after switching dashboards.
+- **Wheel, dash and base LEDs no longer drop to the idle effect** after SimHub pauses the LED
+  device; knob LEDs also hold through LED pipeline stalls while a game is running.
+
 ## [1.6.4]
 
 ## Added

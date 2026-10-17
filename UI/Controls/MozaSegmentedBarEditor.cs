@@ -292,8 +292,35 @@ namespace MozaControls
                 _canvas.MouseLeftButtonDown += OnMouseDown;
                 _canvas.MouseMove += OnMouseMove;
                 _canvas.MouseLeftButtonUp += OnMouseUp;
-                _canvas.LostMouseCapture += (_, __) => _dragTarget = -1;
+                _canvas.LostMouseCapture += (_, e) =>
+                {
+                    _dragTarget = -1;
+                    UpdateHoverCursor(e.GetPosition(_canvas));
+                };
             }
+        }
+
+        /// <summary>Drag target under <paramref name="p"/> (same encoding as <see cref="_dragTarget"/>), or -1.</summary>
+        private int HitTest(Point p)
+        {
+            double d1x = Divider1X, d2x = Divider2X;
+            if (Math.Abs(p.X - d1x) <= DividerHitRadius) return 0;
+            if (Math.Abs(p.X - d2x) <= DividerHitRadius) return 1;
+
+            double plotLeft = EdgePad, plotRight = Math.Max(plotLeft, ActualWidth - EdgePad);
+            double plotTop = TopPad, plotBottom = Math.Max(plotTop, ActualHeight - BottomPad);
+            if (p.X < plotLeft || p.X > plotRight || p.Y < plotTop || p.Y > plotBottom) return -1;
+
+            return p.X < d1x ? 2 : (p.X < d2x ? 3 : 4);
+        }
+
+        // Dividers move horizontally, segment values vertically.
+        private static Cursor? CursorFor(int target) =>
+            target < 0 ? null : target <= 1 ? Cursors.SizeWE : Cursors.SizeNS;
+
+        private void UpdateHoverCursor(Point p)
+        {
+            if (_canvas != null) _canvas.Cursor = CursorFor(HitTest(p));
         }
 
         private void OnMouseDown(object sender, MouseButtonEventArgs e)
@@ -301,42 +328,24 @@ namespace MozaControls
             if (_canvas == null) return;
             var p = e.GetPosition(_canvas);
 
-            double d1x = Divider1X, d2x = Divider2X;
-            if (Math.Abs(p.X - d1x) <= DividerHitRadius)
-            {
-                _dragTarget = 0;
-                _canvas.CaptureMouse();
-                ApplyDividerDrag(0, p.X);
-                e.Handled = true;
-                return;
-            }
-            if (Math.Abs(p.X - d2x) <= DividerHitRadius)
-            {
-                _dragTarget = 1;
-                _canvas.CaptureMouse();
-                ApplyDividerDrag(1, p.X);
-                e.Handled = true;
-                return;
-            }
-
-            double plotLeft = EdgePad, plotRight = Math.Max(plotLeft, ActualWidth - EdgePad);
-            double plotTop = TopPad, plotBottom = Math.Max(plotTop, ActualHeight - BottomPad);
-            if (p.X < plotLeft || p.X > plotRight || p.Y < plotTop || p.Y > plotBottom) return;
-
-            int seg = p.X < d1x ? 2 : (p.X < d2x ? 3 : 4);
-            // Segments only respond once an actual drag starts (no jump on a
-            // plain click) — capture the mouse here but don't apply a value
-            // until OnMouseMove sees real movement.
-            _dragTarget = seg;
+            int target = HitTest(p);
+            if (target < 0) return;
+            _dragTarget = target;
+            _canvas.Cursor = CursorFor(target);
             _canvas.CaptureMouse();
+            // Segments only respond once an actual drag starts (no jump on a
+            // plain click) — don't apply a value until OnMouseMove sees real
+            // movement. Dividers snap to the click immediately.
+            if (target <= 1) ApplyDividerDrag(target, p.X);
             e.Handled = true;
         }
 
         private void OnMouseMove(object sender, MouseEventArgs e)
         {
-            if (_dragTarget < 0 || _canvas == null) return;
-            if (e.LeftButton != MouseButtonState.Pressed) { _dragTarget = -1; _canvas.ReleaseMouseCapture(); return; }
+            if (_canvas == null) return;
             var p = e.GetPosition(_canvas);
+            if (_dragTarget < 0) { UpdateHoverCursor(p); return; }
+            if (e.LeftButton != MouseButtonState.Pressed) { _dragTarget = -1; _canvas.ReleaseMouseCapture(); UpdateHoverCursor(p); return; }
             if (_dragTarget <= 1) ApplyDividerDrag(_dragTarget, p.X);
             else ApplySegmentDrag(_dragTarget - 2, p.Y);
         }

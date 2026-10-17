@@ -160,8 +160,6 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Front Limit Stiffness</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>End Limit Stiffness</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simulate a frictional force that is independent of the game output.</value></data>
-  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTED DAMPING</value></data>
-  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Damping force independent of game output, per pedal-travel segment</value></data>
   <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simulate a damping force independent of in-game output. Pedal travel is divided into multiple segments, each with an adjustable range and its own natural damping. Drag a divider to resize a segment; drag inside a segment to set its damping amount.</value></data>
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>When Pressed</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>When Released</value></data>
@@ -506,7 +504,7 @@
   <data name="Import_CancelButton" xml:space="preserve"><value>CANCEL</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>NEXT</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>BACK</value></data>
-  <data name="Import_BrowseDescription" xml:space="preserve"><value>Pick a PitHouse preset JSON file from anywhere on your system.</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Pick a PitHouse or Motion Manager preset JSON file from anywhere on your system.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>File is not valid JSON: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Unsupported preset type "{0}". Only Motor and Pedals presets are supported.</value></data>
   <data name="Status_Connected" xml:space="preserve"><value>Connected</value></data>
@@ -808,4 +806,66 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Middle</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Hard</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Center Deadzone Compensation</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>The AZOM plugin's motion controller connection is not running.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>MOZA Motion Controller not connected</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller is still starting up</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Actuator port {0} has no corner assigned</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Actuator port {0} uses corner {1}, which is already assigned</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>{0} of {1} actuators connected</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Port configuration pending: run the port self-test</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Motion controller fault: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Front left</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Front right</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Rear left</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Rear right</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Unassigned</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>State</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Controller mode</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Firmware</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Actuators</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Problems</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>None</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Actuator ports</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Port {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Identify</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Apply corners and run port self-test</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Run travel self-check</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Setup</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Max available stroke (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Actuator distance front to rear (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Actuator distance left to right (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Lighting</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Brightness (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Zone {0} colour</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Change</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Starting up</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Travel self-check</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Entering game mode</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Running</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Stopping</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Port self-test</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Fault</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion is not enabled</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>A MOZA Motion Controller is connected, but SimHub's Motion plugin is not enabled. Enable it under Settings &gt; Plugins, then add the MOZA HMA150 controller in Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 not added in SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>A MOZA Motion Controller is connected, but the active SimHub Motion setup has no MOZA HMA150 controller. In Motion, add a controller and pick the MOZA HMA150 preset.</value></data>
+  <data name="Banner_SimHubOutdated_Title" xml:space="preserve"><value>SimHub update required</value></data>
+  <data name="Banner_SimHubOutdated_BodyFmt" xml:space="preserve"><value>SimHub {0} is older than {1}. Some plugin features won't work until you update SimHub.</value></data>
+  <data name="Motion_Panel_Effects" xml:space="preserve"><value>Motion effects</value></data>
+  <data name="Motion_Panel_Intensity" xml:space="preserve"><value>Intensity (%)</value></data>
+  <data name="Motion_Panel_Smoothness" xml:space="preserve"><value>Smoothness (%)</value></data>
+  <data name="Motion_Effect_Pitch" xml:space="preserve"><value>Pitch</value></data>
+  <data name="Motion_Effect_Roll" xml:space="preserve"><value>Roll</value></data>
+  <data name="Motion_Effect_Heave" xml:space="preserve"><value>Heave</value></data>
+  <data name="Motion_Effect_AccelPitch" xml:space="preserve"><value>Acceleration pitch</value></data>
+  <data name="Motion_Effect_AccelRoll" xml:space="preserve"><value>Acceleration roll</value></data>
+  <data name="Motion_Effect_RoadDetail" xml:space="preserve"><value>Road detail</value></data>
+  <data name="Label_EnableSegmentedDamping" xml:space="preserve"><value>Enable segmented damping</value></data>
+  <data name="Section_PedalDamping" xml:space="preserve"><value>PEDAL DAMPING</value></data>
 </root>

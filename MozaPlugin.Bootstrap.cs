@@ -500,6 +500,9 @@ namespace MozaPlugin
                 _baseManager.MessageReceived += OnBaseMessageReceived;
                 _baseManager.Connection.Disconnected += OnBaseDisconnected;
 
+                // MOZA Motion Controller (PID 0x2000) — its own bus, own lane.
+                InitMotionLane();
+
                 // System sleep/resume recovery. On resume the wheel firmware has
                 // power-cycled and silently dropped its display/telemetry sessions,
                 // but the host serial tty can stay .IsOpen==true (half-open) — or
@@ -955,6 +958,7 @@ namespace MozaPlugin
             // Dispose every standalone-peripheral connection (drops ownership +
             // closes each dedicated pipe).
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
+            DisposeMotionLane();
 
             // Tear down SDK emulation BEFORE the wire / data layers so the
             // CoAP receive thread can't dispatch into half-disposed handlers.

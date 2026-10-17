@@ -154,8 +154,6 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Frontgrense-stivhet</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Sluttgrense-stivhet</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Simulerer en friksjonskraft som er uavhengig av spillutgangen.</value></data>
-  <data name="Section_SegmentedDamping" xml:space="preserve"><value>SEGMENTERT DEMPING</value></data>
-  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Dempekraft uavhengig av spillutgangen, per pedalbevegelse-segment</value></data>
   <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Simulerer en dempekraft som er uavhengig av spillutgangen. Pedalbevegelsen deles inn i flere segmenter, hver med justerbart område og sin egen naturlige demping. Dra en delelinje for å endre størrelsen på et segment; dra inne i et segment for å angi dempemengden.</value></data>
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Ved Nedtrykking</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ved Utløsning</value></data>
@@ -482,7 +480,7 @@
   <data name="Import_CancelButton" xml:space="preserve"><value>AVBRYT</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>NESTE</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>TILBAKE</value></data>
-  <data name="Import_BrowseDescription" xml:space="preserve"><value>Velg en PitHouse-forhåndsinnstillings-JSON-fil fra et sted på systemet ditt.</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Velg en PitHouse- eller Motion Manager-forhåndsinnstillings-JSON-fil fra et sted på systemet ditt.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Filen er ikke gyldig JSON: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Forhåndsinnstillings-typen «{0}» støttes ikke. Bare Motor- og Pedaler-forhåndsinnstillinger støttes.</value></data>
   <data name="Status_Connected" xml:space="preserve"><value>Tilkoblet</value></data>
@@ -806,4 +804,66 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Middels</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Hard</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Kompensasjon for dødsone i midten</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>AZOM-pluginens tilkobling til bevegelseskontrolleren kjører ikke.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>MOZA Motion Controller er ikke tilkoblet</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller starter fortsatt opp</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Aktuatorport {0} har ikke fått tildelt et hjørne</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Aktuatorport {0} bruker hjørnet {1}, som allerede er tildelt</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>{0} av {1} aktuatorer tilkoblet</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Portkonfigurasjon venter: kjør port-selvtesten</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Feil i bevegelseskontrolleren: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Foran venstre</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Foran høyre</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Bak venstre</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Bak høyre</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Ikke tildelt</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Tilkobling</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Ikke tilkoblet</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>Tilstand</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Kontrollermodus</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Fastvare</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Aktuatorer</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Problemer</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>Ingen</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Aktuatorporter</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Port {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Identifiser</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Bruk hjørner og kjør port-selvtest</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Kjør selvsjekk av vandring</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Oppsett</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Maks tilgjengelig vandring (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Aktuatoravstand foran–bak (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Aktuatoravstand venstre–høyre (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Bruk</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Belysning</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Lysstyrke (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Farge sone {0}</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Endre</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Frakoblet</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Starter opp</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Klar</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Selvsjekk av vandring</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Går til spillmodus</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Kjører</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Stopper</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Port-selvtest</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Feil</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion er ikke aktivert</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>En MOZA Motion Controller er tilkoblet, men SimHubs Motion-plugin er ikke aktivert. Aktiver den under Settings &gt; Plugins, og legg deretter til kontrolleren MOZA HMA150 i Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 er ikke lagt til i SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>En MOZA Motion Controller er tilkoblet, men det aktive SimHub Motion-oppsettet har ingen MOZA HMA150-kontroller. Legg til en kontroller i Motion og velg forhåndsinnstillingen MOZA HMA150.</value></data>
+  <data name="Banner_SimHubOutdated_Title" xml:space="preserve"><value>SimHub må oppdateres</value></data>
+  <data name="Banner_SimHubOutdated_BodyFmt" xml:space="preserve"><value>SimHub {0} er eldre enn {1}. Noen plugin-funksjoner virker ikke før du oppdaterer SimHub.</value></data>
+  <data name="Motion_Panel_Effects" xml:space="preserve"><value>Bevegelseseffekter</value></data>
+  <data name="Motion_Panel_Intensity" xml:space="preserve"><value>Intensitet (%)</value></data>
+  <data name="Motion_Panel_Smoothness" xml:space="preserve"><value>Utjevning (%)</value></data>
+  <data name="Motion_Effect_Pitch" xml:space="preserve"><value>Stamping</value></data>
+  <data name="Motion_Effect_Roll" xml:space="preserve"><value>Rulling</value></data>
+  <data name="Motion_Effect_Heave" xml:space="preserve"><value>Hiv</value></data>
+  <data name="Motion_Effect_AccelPitch" xml:space="preserve"><value>Akselerasjonsstamping</value></data>
+  <data name="Motion_Effect_AccelRoll" xml:space="preserve"><value>Akselerasjonsrulling</value></data>
+  <data name="Motion_Effect_RoadDetail" xml:space="preserve"><value>Veidetaljer</value></data>
+  <data name="Label_EnableSegmentedDamping" xml:space="preserve"><value>Aktiver segmentert demping</value></data>
+  <data name="Section_PedalDamping" xml:space="preserve"><value>PEDALDEMPING</value></data>
 </root>

@@ -255,6 +255,22 @@ namespace MozaPlugin.UI.Import
                     PopulatePedalTargets(Plan);
                 }
             }
+            else if (string.Equals(preset.DeviceType, PitHousePresetReader.MotionDeviceType, StringComparison.OrdinalIgnoreCase))
+            {
+                var profile = _plugin?.Settings?.ProfileStore?.CurrentProfile;
+                if (profile == null)
+                {
+                    System.Windows.MessageBox.Show(Window.GetWindow(this),
+                        Strings.Import_NoActiveProfile,
+                        Strings.Import_DialogTitle,
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                SelectedPreset = preset;
+                Plan = PitHouseMotionMapper.BuildPlan(preset, profile);
+                _pedalControllers = Array.Empty<MBoosterDeviceController>();
+                PopulatePedalTargets(null);
+            }
             else
             {
                 System.Windows.MessageBox.Show(Window.GetWindow(this),

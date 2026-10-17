@@ -7,6 +7,7 @@ using System.Text;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Devices.Motion;
 using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.UI
@@ -51,22 +52,24 @@ namespace MozaPlugin.UI
             catch { return "unknown"; }
         }
 
-        /// <summary>Host SimHub version (SimHubWPF.exe file version); "—" when unavailable.</summary>
-        public static string GetSimHubVersion() => s_simHubVersion ??= ComputeSimHubVersion();
+        /// <summary>Host SimHub version (SimHub.Plugins.Configuration.SimHubVersion); "—" when unavailable.</summary>
+        public static string GetSimHubVersion()
+        {
+            if (s_simHubVersion != null) return s_simHubVersion;
+            string v = ComputeSimHubVersion();
+            if (v != "—") s_simHubVersion = v;
+            return v;
+        }
 
         private static string? s_simHubVersion;
 
         private static string ComputeSimHubVersion()
         {
+            // SimHubWPF.exe's PE version resource is always 1.0.0.0; the real
+            // release string is published by the host at startup.
             try
             {
-                string? path = Assembly.GetEntryAssembly()?.Location;
-                if (string.IsNullOrEmpty(path))
-                    path = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                if (string.IsNullOrEmpty(path)) return "—";
-                var fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(path!);
-                string? v = fvi.ProductVersion;
-                if (string.IsNullOrWhiteSpace(v)) v = fvi.FileVersion;
+                string? v = SimHub.Plugins.Configuration.SimHubVersion?.Version;
                 return string.IsNullOrWhiteSpace(v) ? "—" : v!.Trim();
             }
             catch { return "—"; }
@@ -659,7 +662,8 @@ namespace MozaPlugin.UI
                 sb.Append($"LED keepalive:  hold={ka.Value.HoldSec}s srcQuiet={Secs(ka.Value.SrcQuietSec)} "
                           + $"fed rpm={Secs(ka.Value.RpmFedSec)} btn={Secs(ka.Value.BtnFedSec)} "
                           + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips} "
-                          + $"knobActive={(ka.Value.KnobActiveMask < 0 ? "—" : $"0x{ka.Value.KnobActiveMask:X2}")}");
+                          + $"knobActive={(ka.Value.KnobActiveMask < 0 ? "—" : $"0x{ka.Value.KnobActiveMask:X2}")} "
+                          + $"hostClosed={(ka.Value.HostClosed ? "yes" : "no")} game={(plugin.IsGameActive ? "yes" : "no")}");
             }
 
             // LED lane: frames / colour entries / bitmasks written per zone, and how long
@@ -1268,6 +1272,55 @@ namespace MozaPlugin.UI
                 }
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// MOZA Motion Controller lane (HMA150 platform): lifecycle phase, controller mode
+        /// and flags, port map, setup values and the tail of the controller's own log.
+        /// </summary>
+        public static string BuildMotionController(MozaPlugin plugin)
+        {
+            var lane = plugin.MotionController;
+            if (lane == null) return "(motion lane not created)";
+            var s = lane.Snapshot();
+            if (!s.Present)
+                return "(no MOZA Motion Controller — this lane claims PID 0x2000 from the registry)";
+            if (!s.Connected)
+                return "(MOZA Motion Controller present, port released — opened only while SimHub Motion or its settings hold it)"
+                    + (s.FaultReason != null ? $"  fault=\"{s.FaultReason}\"" : "");
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Port:           {s.PortName ?? "-"}  phase={s.Phase}"
+                + (s.FaultReason != null ? $"  fault=\"{s.FaultReason}\"" : ""));
+            sb.AppendLine($"Identity:       {s.ModelName}  hw {s.HardwareId} {s.HardwareRevision}  "
+                + $"fw {s.FirmwareVersion}  hwver {s.HardwareVersion}  uid {s.Uid}");
+            sb.AppendLine($"Mode:           target={s.ModeTarget} current={s.ModeCurrent} flags=0x{s.Flags:X2} "
+                + $"runState={s.RunState} selfCheckPassed={s.SelfCheckPassed}");
+            sb.AppendLine($"Actuators:      supported={s.SupportedActuators} ports={s.PortCount} "
+                + $"present={s.ActuatorsPresent} enrolled={s.ActuatorsEnrolled}  "
+                + $"errors={(s.ActiveErrorCodes.Count == 0 ? "none" : string.Join(",", s.ActiveErrorCodes))}");
+            sb.AppendLine($"Setup:          maxStroke={Fmt(s.MaxStroke)} haptic={Fmt(s.HapticIntensity)} "
+                + $"rig={Fmt(s.RigLengthMm)} x {Fmt(s.RigWidthMm)} mm  framesSent={s.FramesSent}");
+            var effects = new List<string>();
+            for (int i = 0; i < s.Effects.Length; i++)
+                effects.Add($"{MozaMotionProtocol.EffectSlots[i]:X2}={FmtEffect(s.Effects[i])}");
+            effects.Add($"road={FmtEffect(s.RoadDetail)}");
+            sb.AppendLine("Effects:        " + string.Join(" ", effects));
+            foreach (var p in s.Ports)
+            {
+                if (p.Present != true && p.Role is null or MotionCorner.None) continue;
+                sb.AppendLine($"  port {p.Port}: present={p.Present?.ToString() ?? "?"} slave={p.Slave} "
+                    + $"role={p.Role?.ToString() ?? "?"} word=0x{p.StatusWord:X8}");
+            }
+            var errors = lane.GetConfigurationErrors();
+            if (errors.Count > 0) sb.AppendLine("Config errors:  " + string.Join("; ", errors));
+            int from = Math.Max(0, s.RecentLog.Count - 40);
+            for (int i = from; i < s.RecentLog.Count; i++)
+                sb.AppendLine("  " + s.RecentLog[i]);
+            return sb.ToString();
+
+            static string Fmt(float? v) => v.HasValue ? v.Value.ToString("0.###", CultureInfo.InvariantCulture) : "?";
+            static string FmtEffect(MotionEffect? e) => e.HasValue ? $"{Fmt(e.Value.Intensity)}/{Fmt(e.Value.Smoothness)}" : "?";
         }
     }
 }

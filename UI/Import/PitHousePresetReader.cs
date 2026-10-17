@@ -21,8 +21,12 @@ namespace MozaPlugin.UI.Import
         {
             if (string.IsNullOrEmpty(deviceType)) return false;
             return string.Equals(deviceType, "Motor", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(deviceType, "Pedals", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(deviceType, "Pedals", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(deviceType, MotionDeviceType, StringComparison.OrdinalIgnoreCase);
         }
+
+        /// <summary>Motion Manager presets (HMA150) carry this under <c>tags.deviceType</c>.</summary>
+        public const string MotionDeviceType = "GMotion";
 
         /// <summary>
         /// Read + validate. On success returns a populated preset and empty
@@ -36,7 +40,9 @@ namespace MozaPlugin.UI.Import
             if (root == null)
                 return (null, string.Format(Strings.Import_Error_InvalidJson, loadError));
 
-            var deviceType = (string?)root["deviceType"] ?? "";
+            // Pit House puts deviceType / devices at the top level, Motion Manager under "tags".
+            var tags = root["tags"] as JObject;
+            var deviceType = (string?)root["deviceType"] ?? (string?)tags?["deviceType"] ?? "";
             if (!IsSupportedDeviceType(deviceType))
                 return (null, string.Format(Strings.Import_Error_UnsupportedType, deviceType));
 
@@ -53,7 +59,7 @@ namespace MozaPlugin.UI.Import
                 SourcePath = path,
             };
 
-            var devicesArr = root["devices"] as JArray;
+            var devicesArr = root["devices"] as JArray ?? tags?["devices"] as JArray;
             if (devicesArr != null)
             {
                 foreach (var d in devicesArr)

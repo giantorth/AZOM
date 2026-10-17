@@ -179,23 +179,6 @@ namespace MozaPlugin.Hardware
                     controller.SendIntWrite("mbooster-brake-friction-0", frictionRaw, dev);
                     controller.SendIntWrite("mbooster-brake-friction-1", frictionRaw, dev);
                 }
-                // Plain Virtual Damping (cmdId 0xAD, press/release selectors).
-                // A register set of its own, separate from Segmented Damping
-                // below — real Pit House pushes BOTH on every config apply, so
-                // omitting this left the pedal on whatever damping was last
-                // written by Pit House itself. Sentinel-guarded per selector so
-                // an untouched profile still writes nothing. See
-                // docs/protocol/devices/mbooster.md "Pedal Feel".
-                if (ownsPedalFeelHardware && cfg.DampingPressPct >= 0)
-                {
-                    controller.SendIntWrite("mbooster-brake-damping-press",
-                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.DampingPressPct), dev);
-                }
-                if (ownsPedalFeelHardware && cfg.DampingReleasePct >= 0)
-                {
-                    controller.SendIntWrite("mbooster-brake-damping-release",
-                        global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(cfg.DampingReleasePct), dev);
-                }
                 // Segmented Damping (both "When Pressed" and "When
                 // Released" — see cfg.SegmentedDamping). One wire command
                 // carries the whole feature's state at once, so a fresh
@@ -228,6 +211,20 @@ namespace MozaPlugin.Hardware
                         !sdEnabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : c,
                         dev);
                     controller.SendSegmentedDampingIfChanged(frame, dev);
+                }
+                // Plain Virtual Damping (0xAD) applies only with Segmented
+                // Damping off. The two are latest-wins, so it goes after the
+                // zeroed 0xB7 above. An unset value keeps the unit's own
+                // read-back; with neither known yet a later apply retries.
+                if (sd != null && !sd.DampingEnabled)
+                {
+                    int Raw(float pct, string name) => pct >= 0
+                        ? global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeFrictionPct(pct)
+                        : controller.OutputRegisterValue(dev, name);
+                    int press = Raw(cfg.DampingPressPct, "mbooster-brake-damping-press");
+                    int release = Raw(cfg.DampingReleasePct, "mbooster-brake-damping-release");
+                    if (press >= 0 && release >= 0)
+                        controller.SendPlainDamping(press, release, dev);
                 }
                 // Load-cell registers like the ones above: only from the axis
                 // that owns them, never a passive Brake-role pedal's config.

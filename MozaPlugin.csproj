@@ -57,6 +57,10 @@
       <HintPath>libs\SimHub\BA63Driver.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="SimHub.Plugins.Motion">
+      <HintPath>libs\SimHub\SimHub.Plugins.Motion.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="HidSharp">
       <HintPath>libs\SimHub\HidSharp.dll</HintPath>
       <Private>false</Private>

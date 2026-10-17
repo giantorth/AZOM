@@ -1,0 +1,104 @@
+<UserControl x:Class="MozaPlugin.Integration.Motion.MozaHma150SettingsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:res="clr-namespace:MozaPlugin.Resources">
+    <UserControl.Resources>
+        <Style x:Key="Header" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Margin" Value="0,14,0,6"/>
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="Width" Value="260"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Value" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="Row" TargetType="StackPanel">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="NumberBox" TargetType="TextBox">
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,3"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel Margin="4">
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Status}" Margin="0,0,0,6"/>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Connection}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="ConnectionValue"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_State}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="StateValue"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Mode}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="ModeValue"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Firmware}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="FirmwareValue"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Actuators}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="ActuatorsValue"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Errors}"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="ErrorsValue" MaxWidth="520"/>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Ports}"/>
+        <StackPanel x:Name="PortRows"/>
+        <StackPanel Style="{StaticResource Row}" Margin="0,8,0,0">
+            <Button x:Name="PortSelfTestButton" Content="{x:Static res:Strings.Motion_Panel_RunPortSelfTest}" Click="PortSelfTest_Click"/>
+            <Button x:Name="TravelSelfCheckButton" Content="{x:Static res:Strings.Motion_Panel_RunTravelSelfCheck}" Click="TravelSelfCheck_Click"/>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Setup}"/>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_MaxStroke}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="MaxStrokeBox"/>
+            <Button x:Name="MaxStrokeApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="MaxStrokeApply_Click"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_RigLength}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="RigLengthBox"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_RigWidth}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="RigWidthBox"/>
+            <Button x:Name="RigApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="RigApply_Click"/>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Effects}"/>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <TextBlock Width="88" Text="{x:Static res:Strings.Motion_Panel_Intensity}"/>
+            <TextBlock Width="88" Text="{x:Static res:Strings.Motion_Panel_Smoothness}"/>
+        </StackPanel>
+        <StackPanel x:Name="EffectRows"/>
+        <StackPanel Style="{StaticResource Row}" Margin="0,6,0,0">
+            <Button x:Name="EffectsApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="EffectsApply_Click"/>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Lighting}"/>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_Brightness}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="BrightnessBox"/>
+            <Button x:Name="BrightnessApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="BrightnessApply_Click"/>
+        </StackPanel>
+        <StackPanel x:Name="ZoneRows"/>
+    </StackPanel>
+</UserControl>

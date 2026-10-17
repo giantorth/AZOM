@@ -149,8 +149,6 @@
   <data name="SliderLabel_EndstopFrontStiffness" xml:space="preserve"><value>Σκληρότητα εμπρός ορίου</value></data>
   <data name="SliderLabel_EndstopEndStiffness" xml:space="preserve"><value>Σκληρότητα τελικού ορίου</value></data>
   <data name="Hint_NaturalFrictionPedalFeel" xml:space="preserve"><value>Προσομοιώνει μια δύναμη τριβής ανεξάρτητη από την έξοδο του παιχνιδιού.</value></data>
-  <data name="Section_SegmentedDamping" xml:space="preserve"><value>ΤΜΗΜΑΤΟΠΟΙΗΜΕΝΗ ΑΠΟΣΒΕΣΗ</value></data>
-  <data name="Subtitle_SegmentedDamping" xml:space="preserve"><value>Δύναμη απόσβεσης ανεξάρτητη από την έξοδο του παιχνιδιού, ανά τμήμα διαδρομής πεντάλ</value></data>
   <data name="Hint_SegmentedDampingExperimental" xml:space="preserve"><value>Προσομοιώνει μια δύναμη απόσβεσης ανεξάρτητη από την έξοδο του παιχνιδιού εντός του παιχνιδιού. Η διαδρομή του πεντάλ χωρίζεται σε πολλά τμήματα, το καθένα με ρυθμιζόμενο εύρος και τη δική του φυσική απόσβεση. Σύρετε ένα διαχωριστικό για να αλλάξετε το μέγεθος ενός τμήματος· σύρετε μέσα σε ένα τμήμα για να ορίσετε την ποσότητα απόσβεσής του.</value></data>
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Κατά το Πάτημα</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Κατά την Απελευθέρωση</value></data>
@@ -476,7 +474,7 @@
   <data name="Import_CancelButton" xml:space="preserve"><value>ΑΚΥΡΩΣΗ</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>ΕΠΟΜΕΝΟ</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>ΠΙΣΩ</value></data>
-  <data name="Import_BrowseDescription" xml:space="preserve"><value>Επιλέξτε ένα αρχείο JSON preset PitHouse από οπουδήποτε στο σύστημά σας.</value></data>
+  <data name="Import_BrowseDescription" xml:space="preserve"><value>Επιλέξτε ένα αρχείο JSON preset PitHouse ή Motion Manager από οπουδήποτε στο σύστημά σας.</value></data>
   <data name="Import_Error_InvalidJson" xml:space="preserve"><value>Το αρχείο δεν είναι έγκυρο JSON: {0}</value></data>
   <data name="Import_Error_UnsupportedType" xml:space="preserve"><value>Μη υποστηριζόμενος τύπος preset "{0}". Υποστηρίζονται μόνο presets Βάσης και Πεντάλ.</value></data>
   <data name="Status_Connected" xml:space="preserve"><value>Συνδεδεμένο</value></data>
@@ -800,4 +798,66 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Μεσαίο</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Σκληρό</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Αντιστάθμιση νεκρής ζώνης κέντρου</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>Η σύνδεση του ελεγκτή κίνησης του πρόσθετου AZOM δεν εκτελείται.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>Ο MOZA Motion Controller δεν είναι συνδεδεμένος</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>Ο MOZA Motion Controller ξεκινά ακόμα</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Η θύρα ενεργοποιητή {0} δεν έχει αντιστοιχισμένη γωνία</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Η θύρα ενεργοποιητή {0} χρησιμοποιεί τη γωνία {1}, η οποία έχει ήδη αντιστοιχιστεί</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>{0} από {1} ενεργοποιητές συνδεδεμένοι</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Εκκρεμεί η διαμόρφωση θυρών: εκτελέστε τον αυτοέλεγχο θυρών</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Σφάλμα ελεγκτή κίνησης: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Εμπρός αριστερά</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Εμπρός δεξιά</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Πίσω αριστερά</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Πίσω δεξιά</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Χωρίς αντιστοίχιση</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Κατάσταση</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Σύνδεση</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Μη συνδεδεμένο</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>Φάση</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Λειτουργία ελεγκτή</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Υλικολογισμικό</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Ενεργοποιητές</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Προβλήματα</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>Κανένα</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Θύρες ενεργοποιητών</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Θύρα {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Αναγνώριση</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Εφαρμογή γωνιών και εκτέλεση αυτοελέγχου θυρών</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Εκτέλεση αυτοελέγχου διαδρομής</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Ρύθμιση</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Μέγιστη διαθέσιμη διαδρομή (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Απόσταση ενεργοποιητών εμπρός–πίσω (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Απόσταση ενεργοποιητών αριστερά–δεξιά (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Εφαρμογή</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Φωτισμός</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Φωτεινότητα (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Χρώμα ζώνης {0}</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Αλλαγή</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Αποσυνδεδεμένο</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Εκκίνηση</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Έτοιμο</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Αυτοέλεγχος διαδρομής</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Μετάβαση σε λειτουργία παιχνιδιού</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Σε λειτουργία</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Διακοπή</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Αυτοέλεγχος θυρών</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Σφάλμα</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>Το SimHub Motion δεν είναι ενεργοποιημένο</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>Ένας MOZA Motion Controller είναι συνδεδεμένος, αλλά το πρόσθετο Motion του SimHub δεν είναι ενεργοποιημένο. Ενεργοποιήστε το στο Settings &gt; Plugins και, στη συνέχεια, προσθέστε τον ελεγκτή MOZA HMA150 στο Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>Το MOZA HMA150 δεν έχει προστεθεί στο SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>Ένας MOZA Motion Controller είναι συνδεδεμένος, αλλά η ενεργή διάταξη του SimHub Motion δεν περιέχει ελεγκτή MOZA HMA150. Στο Motion, προσθέστε έναν ελεγκτή και επιλέξτε την προεπιλογή MOZA HMA150.</value></data>
+  <data name="Banner_SimHubOutdated_Title" xml:space="preserve"><value>Απαιτείται ενημέρωση του SimHub</value></data>
+  <data name="Banner_SimHubOutdated_BodyFmt" xml:space="preserve"><value>Το SimHub {0} είναι παλαιότερο από το {1}. Ορισμένες λειτουργίες του πρόσθετου δεν θα λειτουργούν μέχρι να ενημερώσετε το SimHub.</value></data>
+  <data name="Motion_Panel_Effects" xml:space="preserve"><value>Εφέ κίνησης</value></data>
+  <data name="Motion_Panel_Intensity" xml:space="preserve"><value>Ένταση (%)</value></data>
+  <data name="Motion_Panel_Smoothness" xml:space="preserve"><value>Εξομάλυνση (%)</value></data>
+  <data name="Motion_Effect_Pitch" xml:space="preserve"><value>Πρόνευση</value></data>
+  <data name="Motion_Effect_Roll" xml:space="preserve"><value>Διατοιχισμός</value></data>
+  <data name="Motion_Effect_Heave" xml:space="preserve"><value>Κατακόρυφη κίνηση</value></data>
+  <data name="Motion_Effect_AccelPitch" xml:space="preserve"><value>Πρόνευση επιτάχυνσης</value></data>
+  <data name="Motion_Effect_AccelRoll" xml:space="preserve"><value>Διατοιχισμός επιτάχυνσης</value></data>
+  <data name="Motion_Effect_RoadDetail" xml:space="preserve"><value>Λεπτομέρεια δρόμου</value></data>
+  <data name="Label_EnableSegmentedDamping" xml:space="preserve"><value>Ενεργοποίηση τμηματοποιημένης απόσβεσης</value></data>
+  <data name="Section_PedalDamping" xml:space="preserve"><value>ΑΠΟΣΒΕΣΗ ΠΕΝΤΑΛ</value></data>
 </root>

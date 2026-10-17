@@ -627,6 +627,11 @@ namespace MozaPlugin.Settings
         // dropdown; "" = none/custom). Persisted so the dropdown remembers its pick.
         public string BaseLfePresetName { get; set; } = "";
 
+        // ===== HMA150 motion platform effects =====
+        // Null until set from the HMA150 panel or a Motion Manager preset import; the
+        // controller then keeps its own values. Not captured from device reads.
+        public MotionEffectsSettings? MotionEffects { get; set; }
+
         // ===== mBooster Pedals (per-device) =====
         // Per-device settings keyed by USB device instance ID (stable across
         // reconnects). One entry per physical mBooster the user has touched
@@ -823,6 +828,7 @@ namespace MozaPlugin.Settings
             Ab9 = p.Ab9?.Clone();
             BaseLfe = p.BaseLfe?.Clone();
             BaseLfePresetName = p.BaseLfePresetName;
+            MotionEffects = p.MotionEffects?.Clone();
 
             // mBooster — deep-copy each per-device settings entry.
             MBoosterSettings = new Dictionary<string, MBoosterDeviceSettings>(StringComparer.OrdinalIgnoreCase);

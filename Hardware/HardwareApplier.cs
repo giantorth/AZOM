@@ -1801,6 +1801,17 @@ namespace MozaPlugin.Hardware
             ApplySgpToHardware(profile);
             ApplyAb9ToHardware(profile);
             ApplyMBoosterToHardware(profile);
+            ApplyMotionToHardware(profile);
+        }
+
+        /// <summary>
+        /// HMA150 Motion Effects. The lane keeps them and writes them once its port is
+        /// open and the controller's current values are read, so this needs no connection.
+        /// </summary>
+        public void ApplyMotionToHardware(MozaProfile? profile)
+        {
+            if (!ProfileWritesAllowed) return;
+            _plugin.MotionController?.SetDesiredEffects(MozaPlugin.ToDesiredEffects(profile?.MotionEffects));
         }
 
         /// <summary>

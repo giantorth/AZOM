@@ -1768,7 +1768,15 @@ Threshold's effect is applied host-side.
 
 Every calibration here uses the shared `-1`/`null` "not yet set / no
 override" sentinel, so a fresh profile never overwrites what is already
-on the device; the editor then shows the unit's own read-back.
+on the device; the editor then shows the unit's own read-back. Pedal Feel
+does the same (`SeedMBoosterPedalFeelRegisters`) for Travel, End Stop,
+Friction, plain Damping (`0xAD`) and Deadzone, re-checked every tab tick
+since the read-backs can land after the seed. It reads the cache of the
+unit the selected pedal writes to, and only when that pedal owns the
+singleton registers. Max Force, the feel-curve nodes and Segmented Damping
+(`0xB7`) are not in the read set, so they still show defaults. The singleton
+set and status block are read from every unit the roles map to
+(`ReadUnitRegisters`), so a chained unit seeds from its own read-back.
 
 ## Pedal Feel
 
@@ -1795,15 +1803,29 @@ Those two decodes give the **physical full scales: 12.0 press, 10.0
 release** (40 % of 12 = 4.8; 25 % of 10 = 2.5). Units unstated by the
 firmware.
 
-Pit House pushes both selectors on **every** config apply, and reads both
-back every cycle, so `ApplyMBoosterToHardware` does too
-(`MBoosterDeviceSettings.DampingPressPct`/`DampingReleasePct`, `-1` = no
-override as everywhere else). The two selectors are independent values here,
-unlike Natural Friction's pair which always carries the same number.
+The two selectors are independent values, unlike Natural Friction's pair
+which always carries the same number.
 
-In the 2026-09-08 captures `0xAD` and all three `0xB7` segments held the same
-40 %/25 %, so **which of the two wins when they disagree is not determined** —
-but replicating what Pit House writes needs no answer to that.
+Pit House 1.4.1.13 has no control for `0xAD` (moza-simulator, 2026-10-17). It
+writes a fixed default per role — Throttle 2/2, Brake 40/25, Clutch 13/4 —
+on connect and on every role change, and reads both selectors back every
+cycle. Segment edits send only `0xB7`; turning Segmented Damping off sends
+an all-zero `0xB7`. On launch it sends the saved `0xB7`, then the `0xAD`
+default, then `0xB7` again.
+
+User testing found the two are **latest-wins**: whichever of `0xAD` / `0xB7`
+was written last is the damping the pedal applies. So AZOM picks one by the
+Segmented Damping toggle (`SegmentedDamping.DampingEnabled`):
+
+- **On** — the plots show and only `0xB7` is written; the plain sliders are
+  hidden and their saved values are not applied.
+- **Off** — the plain sliders show. `0xB7` goes out all-zero, then `0xAD`
+  (`DampingPressPct`/`DampingReleasePct`, an unset one taken from the unit's
+  read-back) after it.
+
+`MBoosterDeviceController` tracks which of the two went out last per unit
+and forces the other through its skip-if-unchanged check when it has to
+become the latest (`SendSegmentedDampingIfChanged` / `SendPlainDamping`).
 
 ### `0xB2` is `softlimit_hardness`, and the value is a 0–1 fraction
 

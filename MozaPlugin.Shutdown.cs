@@ -86,6 +86,8 @@ namespace MozaPlugin
             // Pedal-haptics units — Dispose stops each motor loop, which sends
             // the disable frames before the pipe goes away.
             try { _pedalHapticsRegistry?.Dispose(); _pedalHapticsRegistry = null; } catch { }
+            // Motion controller — drops a running platform to standby before closing.
+            DisposeMotionLane();
             // Standalone pedals/handbrake connections — close before MozaData
             // teardown so the response path (which writes to _data) can't race.
             try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
