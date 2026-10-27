@@ -102,6 +102,12 @@ namespace MozaPlugin.Integration
             _plugin.AttachDelegate("AZOM.TelemetryState", () => (_plugin.TelemetrySender?.Phase ?? PipelinePhase.Idle).ToString());
             _plugin.AttachDelegate("AZOM.DashboardBound", () => (_plugin.TelemetrySender?.Phase ?? PipelinePhase.Idle) == PipelinePhase.Active);
 
+            // Active plugin profile, and the dashboard on the active display — the
+            // wheel's screen, else a CM1/CM2 dash (same target as DashboardNext/Prev
+            // for CM1). "" when nothing is known.
+            _plugin.AttachDelegate("AZOM.ProfileName", () => _plugin.Settings?.ProfileStore?.CurrentProfile?.Name ?? "");
+            _plugin.AttachDelegate("AZOM.DashboardName", () => CurrentDashboardName());
+
             // Live physical-input positions read directly from the device HID
             // surface (independent of any game telemetry — these update even with
             // no sim running, see issue #59). HidReader is constructed later in
@@ -752,6 +758,40 @@ namespace MozaPlugin.Integration
             _plugin.SaveSettings();
             _plugin.OnDashboardSwitched((uint)target);
             MozaLog.Debug($"[AZOM] Dashboard cycle {(delta > 0 ? "next" : "prev")} → slot {target} \"{selected}\" via action");
+        }
+
+        // Page labels match DashboardManagementControl's combo for FSR1/CM1.
+        private string CurrentDashboardName()
+        {
+            if (_plugin.IsFsr1DisplayWheel)
+                return $"Dashboard {_plugin.GetActiveFsr1Index() + 1}";
+            if (_plugin.WheelUsesTierDefDisplaySender)
+                return TierDefDashboardName(_plugin.TelemetrySender, _plugin.ActiveTelemetryProfileName);
+            if (_plugin.DashIsCm1)
+                return $"Dashboard {_plugin.GetActiveCm1Index()}";
+            var cm2 = _plugin.ActiveCm2Sender;
+            if (cm2 != null)
+                return TierDefDashboardName(cm2, _plugin.ActiveCm2DashboardName);
+            return "";
+        }
+
+        // Same preference as the dashboard combo: the device-reported slot once it
+        // matches our latest switch, else the saved name, else the stale reported slot.
+        private static string TierDefDashboardName(TelemetrySender? sender, string? savedName)
+        {
+            var list = sender?.WheelState?.ConfigJsonList;
+            int slot = sender?.WheelReportedSlot ?? -1;
+            string? reported = (list != null && slot >= 0 && slot < list.Count) ? list[slot] : null;
+            if (!string.IsNullOrEmpty(reported) && slot == sender!.LastEmittedKind4Slot)
+                return reported!;
+            if (!string.IsNullOrEmpty(savedName))
+            {
+                if (list == null || list.Count == 0) return savedName!;
+                foreach (var name in list)
+                    if (string.Equals(name, savedName, StringComparison.OrdinalIgnoreCase))
+                        return name;
+            }
+            return reported ?? savedName ?? "";
         }
     }
 }

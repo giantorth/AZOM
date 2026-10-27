@@ -7,6 +7,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **Sync Status LED can be turned off or recoloured** from the dashboard page's Display card.
+- **`AZOM.ProfileName` and `AZOM.DashboardName` properties** show the active profile and the dashboard on screen.
 
 ## Fixed
 
