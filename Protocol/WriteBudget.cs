@@ -19,52 +19,41 @@ namespace MozaPlugin.Protocol
         // Below this threshold the gate stays at 0 ms — no impact on steady state.
         private const int SoftThresholdBytes = 9500;
 
-        private const long TicksPerMillisecond = TimeSpan.TicksPerMillisecond;
-        private const long WindowTicks = 1000 * TicksPerMillisecond;
+        // 1 s window as 50 × 20 ms time buckets: bounded memory with no cap on
+        // frames per window (unpaced stream/priority lanes push well past 256/s).
+        private const int BucketCount = 50;
 
         private readonly object _lock = new object();
-        private readonly long _stopwatchTicksPerWindow;
-        // Ring of the last N (timestamp, bytes) entries — keeps memory bounded
-        // even under burst storms. 256 is generous; at 250 frames/sec one-shot
-        // ceiling that's a full second of granularity.
-        private const int RingSize = 256;
-        private readonly long[] _ringTs = new long[RingSize];
-        private readonly int[] _ringBytes = new int[RingSize];
-        private int _ringHead;     // next write position
-        private int _ringTail;     // oldest entry still in window
-        private int _bytesInWindow;
+        private readonly long _bucketTicks;
+        private readonly long[] _bucketId = new long[BucketCount];
+        private readonly int[] _bucketBytes = new int[BucketCount];
 
-        // Peak bytes/sec observed since last GetSnapshot snapshot reset; rolling
-        // visible-only metric for the diagnostics surface.
+        // Peak bytes/sec observed since last ResetPeak; diagnostics only.
         private int _peakBytesInWindow;
 
         public WriteBudget()
         {
-            _stopwatchTicksPerWindow = Stopwatch.Frequency;
+            _bucketTicks = Math.Max(1, Stopwatch.Frequency / BucketCount);
+            for (int i = 0; i < BucketCount; i++) _bucketId[i] = long.MinValue;
         }
 
         /// <summary>Record bytes written to the wire (post-stuffing).</summary>
         public void Record(int wireBytes)
         {
             if (wireBytes <= 0) return;
-            long now = Stopwatch.GetTimestamp();
+            long id = Stopwatch.GetTimestamp() / _bucketTicks;
             lock (_lock)
             {
-                Trim(now);
-                _ringTs[_ringHead] = now;
-                _ringBytes[_ringHead] = wireBytes;
-                _ringHead = (_ringHead + 1) % RingSize;
-                if (_ringHead == _ringTail)
+                int slot = (int)(id % BucketCount);
+                if (_bucketId[slot] != id)
                 {
-                    // Ring overflow — evict oldest before its window expires.
-                    // Loses precision on the trailing edge but never blocks; in
-                    // practice 256 slots covers any plausible burst.
-                    _bytesInWindow -= _ringBytes[_ringTail];
-                    _ringTail = (_ringTail + 1) % RingSize;
+                    _bucketId[slot] = id;
+                    _bucketBytes[slot] = 0;
                 }
-                _bytesInWindow += wireBytes;
-                if (_bytesInWindow > _peakBytesInWindow)
-                    _peakBytesInWindow = _bytesInWindow;
+                _bucketBytes[slot] += wireBytes;
+                int total = SumWindow(id);
+                if (total > _peakBytesInWindow)
+                    _peakBytesInWindow = total;
             }
         }
 
@@ -77,10 +66,7 @@ namespace MozaPlugin.Protocol
         {
             int total;
             lock (_lock)
-            {
-                Trim(Stopwatch.GetTimestamp());
-                total = _bytesInWindow + wireBytes;
-            }
+                total = SumWindow(CurrentBucketId()) + wireBytes;
             if (total <= SoftThresholdBytes) return 0;
             if (total <= TargetBytesPerWindow)
             {
@@ -106,9 +92,8 @@ namespace MozaPlugin.Protocol
         {
             lock (_lock)
             {
-                Trim(Stopwatch.GetTimestamp());
-                int pct = PercentOf(_bytesInWindow);
-                return new Snapshot(_bytesInWindow, pct, _peakBytesInWindow);
+                int bytes = SumWindow(CurrentBucketId());
+                return new Snapshot(bytes, PercentOf(bytes), _peakBytesInWindow);
             }
         }
 
@@ -117,34 +102,28 @@ namespace MozaPlugin.Protocol
         /// burst event without reloading the plugin.</summary>
         public void ResetPeak()
         {
-            lock (_lock) _peakBytesInWindow = _bytesInWindow;
+            lock (_lock) _peakBytesInWindow = SumWindow(CurrentBucketId());
         }
 
         /// <summary>Non-mutating peek used by the WriteLoop's periodic warn
         /// check, so it can't clobber the peak that the diagnostics UI is
         /// about to read.</summary>
-        public Snapshot PeekSnapshot()
-        {
-            lock (_lock)
-            {
-                Trim(Stopwatch.GetTimestamp());
-                return new Snapshot(_bytesInWindow, PercentOf(_bytesInWindow), _peakBytesInWindow);
-            }
-        }
+        public Snapshot PeekSnapshot() => GetSnapshot();
 
         private static int PercentOf(int bytes)
             => TargetBytesPerWindow == 0 ? 0 : (int)((long)bytes * 100 / TargetBytesPerWindow);
 
-        /// <summary>Drop ring entries older than the 1-second window.</summary>
-        private void Trim(long now)
+        private long CurrentBucketId() => Stopwatch.GetTimestamp() / _bucketTicks;
+
+        /// <summary>Bytes in the buckets of the last second ending at <paramref name="id"/>.</summary>
+        private int SumWindow(long id)
         {
-            long cutoff = now - _stopwatchTicksPerWindow;
-            while (_ringTail != _ringHead && _ringTs[_ringTail] < cutoff)
-            {
-                _bytesInWindow -= _ringBytes[_ringTail];
-                _ringTail = (_ringTail + 1) % RingSize;
-            }
-            if (_bytesInWindow < 0) _bytesInWindow = 0;
+            long oldest = id - BucketCount + 1;
+            int total = 0;
+            for (int i = 0; i < BucketCount; i++)
+                if (_bucketId[i] >= oldest && _bucketId[i] <= id)
+                    total += _bucketBytes[i];
+            return total;
         }
 
         public readonly struct Snapshot

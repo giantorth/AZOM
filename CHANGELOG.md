@@ -11,6 +11,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Fixed
 
 - **mBooster G-Force pushes the right way and scales with real G,** instead of slamming to full travel in reverse.
+- **Diagnostics bandwidth reading no longer caps out near 4.3 KB/s** under heavy traffic such as pedal haptics.
 
 ## [1.7.1]
 
