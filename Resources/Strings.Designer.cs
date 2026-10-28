@@ -531,7 +531,7 @@ namespace MozaPlugin.Resources
         public static string Edit_Scale => Get("Edit_Scale");
         public static string Edit_Bias => Get("Edit_Bias");
         public static string Section_Display => Get("Section_Display");
-        public static string SliderLabel_DisplayBrightness => Get("SliderLabel_DisplayBrightness");
+        public static string Status_RenderingPreview => Get("Status_RenderingPreview");
         public static string SliderLabel_StandbyTime => Get("SliderLabel_StandbyTime");
         public static string SliderLabel_SyncStatusLed => Get("SliderLabel_SyncStatusLed");
         public static string Option_Time1Min => Get("Option_Time1Min");
@@ -948,5 +948,6 @@ namespace MozaPlugin.Resources
         public static string Motion_Effect_EngineVibration => Get("Motion_Effect_EngineVibration");
         public static string Motion_Effect_TactileFeedback => Get("Motion_Effect_TactileFeedback");
         public static string SliderLabel_StalkDebounce => Get("SliderLabel_StalkDebounce");
+        public static string Status_PreviewUnavailable => Get("Status_PreviewUnavailable");
     }
 }

@@ -27,8 +27,8 @@ namespace MozaPlugin.UI
     /// disk. Nothing here has to reconcile folders.
     ///
     /// <para>Creating a new dashboard uses <c>--create-by-idealDeviceInfos &lt;json&gt;</c>.
-    /// <c>--update-preview-image</c> also exists but is a headless batch mode
-    /// with no UI — never pass it.</para>
+    /// The headless <c>--update-preview-image</c> mode is driven by
+    /// <see cref="DashboardPreviewRenderer"/>, not from here.</para>
     ///
     /// <para>This class only ever READS MOZA-owned files (settings.ini, the
     /// registry). It never writes them.</para>

@@ -375,15 +375,15 @@
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// affectation du stick directionnel</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Aucune configuration de joystick n'a encore été rapportée par le volant. Connectez le volant et attendez la fin de la sonde d'identité.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Activer la télémétrie du tableau de bord</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Télémétrie</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>CHARGER .MZDASH…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>CHOISIR DOSSIER…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DÉTECTER</value></data>
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Charger un fichier .mzdash local pour l'appariement des canaux tier-def</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Définir un dossier de fichiers .mzdash comme bibliothèque de tableaux de bord</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Détecter automatiquement le dossier de tableaux de bord pour le volant connecté</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ ENVOYER UN MOTIF DE TEST</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ ARRÊT</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>ARRÊT</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>AFFECTATIONS DES CANAUX</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Crayon pour choisir une propriété, ou le bouton de formule pour une expression NCalc / js:</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Chargement des affectations de canaux…</value></data>
@@ -415,9 +415,9 @@
   <data name="Edit_Scale" xml:space="preserve"><value>Échelle</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Décalage</value></data>
   <data name="Section_Display" xml:space="preserve"><value>AFFICHAGE</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Luminosité de l'affichage</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Rendu en cours…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Délai de veille</value></data>
-  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED d'état de synchronisation</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED de synchro</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minute</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutes</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 minutes</value></data>
@@ -615,7 +615,7 @@ Id : {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Simulation de vol</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Délai de keepalive</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Durée pendant laquelle les LED conservent leur dernier état après l'arrêt des effets, avant que le volant ne revienne à son propre éclairage.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotation de l'écran</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotation</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Fluide</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Immédiate</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Commodos</value></data>
@@ -890,4 +890,5 @@ Id : {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Vibration moteur</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Retour tactile</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Anti-rebond des boutons (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Aperçu non disponible</value></data>
 </root>

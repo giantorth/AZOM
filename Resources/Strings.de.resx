@@ -375,15 +375,15 @@
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Richtungs-Stick-Zuweisung</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Das Lenkrad hat noch keine Joystick-Konfiguration gemeldet. Lenkrad anschließen und auf den Abschluss der Identity-Probe warten.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Dashboard-Telemetrie aktivieren</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetrie</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>.MZDASH LADEN…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ORDNER WÄHLEN…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-ERKENNUNG</value></data>
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Lokale .mzdash-Datei für Tier-Def-Kanalabgleich laden</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Einen Ordner mit .mzdash-Dateien als Dashboard-Bibliothek festlegen</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Den Dashboard-Ordner für das verbundene Lenkrad automatisch erkennen</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ TESTMUSTER SENDEN</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ STOPP</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANAL-ZUORDNUNGEN</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Stift zum Wählen einer Eigenschaft, oder die Formel-Schaltfläche für einen NCalc- / js:-Ausdruck</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Lade Kanal-Zuordnungen…</value></data>
@@ -415,9 +415,9 @@
   <data name="Edit_Scale" xml:space="preserve"><value>Skalierung</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Versatz</value></data>
   <data name="Section_Display" xml:space="preserve"><value>ANZEIGE</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Display-Helligkeit</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Wird gerendert…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-Zeit</value></data>
-  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync-Status-LED</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 Minute</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 Minuten</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 Minuten</value></data>
@@ -615,7 +615,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flugsimulation</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-Timeout</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Wie lange die LEDs ihren letzten Zustand halten, nachdem die Effekte enden, bevor das Lenkrad zu seiner eigenen Beleuchtung zurückkehrt.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Displayrotation</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Drehung</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Sanft</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Sofort</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Hebel</value></data>
@@ -890,4 +890,5 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Motorvibration</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktiles Feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Tasten-Entprellung (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Vorschau nicht verfügbar</value></data>
 </root>

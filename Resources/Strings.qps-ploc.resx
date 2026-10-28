@@ -442,7 +442,7 @@
   <data name="Edit_Scale" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Section_Display" xml:space="preserve"><value>WOOF!!</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Wan!</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Sniff sniff…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Awoo!</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Yip!</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>Boof!</value></data>
@@ -880,4 +880,5 @@
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Grr Brrr</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Boop Woof</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Whimper…</value></data>
 </root>

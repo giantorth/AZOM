@@ -375,15 +375,15 @@
   <data name="Section_Joystick" xml:space="preserve"><value>조이스틱</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// 방향 스틱 할당</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>휠이 아직 조이스틱 구성을 보고하지 않았습니다. 휠을 연결하고 식별 프로브가 완료될 때까지 기다리세요.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>대시보드 텔레메트리 사용</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>텔레메트리</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>.MZDASH 로드…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>폴더 설정…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>자동 감지</value></data>
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>티어 정의 채널 매칭용 로컬 .mzdash 파일을 로드합니다</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>.mzdash 파일 폴더를 대시보드 라이브러리로 설정합니다</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>연결된 휠의 대시보드 폴더를 자동으로 감지합니다</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ 테스트 패턴 전송</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ 정지</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>테스트</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>정지</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>채널 매핑</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>연필로 속성 선택, 또는 수식 버튼으로 NCalc / js: 식 작성</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>채널 매핑 로드 중…</value></data>
@@ -415,9 +415,9 @@
   <data name="Edit_Scale" xml:space="preserve"><value>배율</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>바이어스</value></data>
   <data name="Section_Display" xml:space="preserve"><value>디스플레이</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>디스플레이 밝기</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>렌더링 중…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>대기 시간</value></data>
-  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>동기화 상태 LED</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>동기화 LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1분</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2분</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3분</value></data>
@@ -614,7 +614,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>비행 시뮬레이션</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>킵얼라이브 시간 제한</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>효과가 멈춘 뒤 휠이 자체 조명으로 돌아가기 전까지 LED가 마지막 상태를 유지하는 시간입니다.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>디스플레이 회전</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>회전</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>부드럽게</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>즉시</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>스토크</value></data>
@@ -889,4 +889,5 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>엔진 진동</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>촉각 피드백</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>버튼 디바운스 (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>미리보기를 사용할 수 없음</value></data>
 </root>

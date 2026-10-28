@@ -375,15 +375,15 @@
   <data name="Section_Joystick" xml:space="preserve"><value>ΧΕΙΡΙΣΤΗΡΙΟ</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Διαμόρφωση Joystick</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση Joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Ενεργοποίηση τηλεμετρίας οθόνης</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Τηλεμετρία</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>ΦΟΡΤΩΣΗ .MZDASH…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΦΑΚΕΛΟΥ…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>ΑΥΤΟΜΑΤΗ ΑΝΙΧΝΕΥΣΗ</value></data>
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Φόρτωση τοπικού αρχείου .mzdash για αντιστοίχιση καναλιών tier-def</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Ορισμός φακέλου .mzdash ως βιβλιοθήκη οθονών</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Αυτόματη ανίχνευση φακέλου οθόνης για το συνδεδεμένο τιμόνι</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ ΑΠΟΣΤΟΛΗ ΔΟΚΙΜΑΣΤΙΚΟΥ ΜΟΤΙΒΟΥ</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ ΔΙΑΚΟΠΗ</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>ΔΟΚΙΜΗ</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>ΔΙΑΚΟΠΗ</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΕΙΣ ΚΑΝΑΛΙΩΝ</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Μολύβι για επιλογή ιδιότητας ή το κουμπί τύπου για έκφραση NCalc / js:</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Φόρτωση αντιστοιχίσεων καναλιών…</value></data>
@@ -415,9 +415,9 @@
   <data name="Edit_Scale" xml:space="preserve"><value>Κλίμακα</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Μετατόπιση</value></data>
   <data name="Section_Display" xml:space="preserve"><value>ΟΘΟΝΗ</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Φωτεινότητα Οθόνης</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Απόδοση…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Χρόνος Αναμονής</value></data>
-  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED Κατάστασης Συγχρονισμού</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED συγχρονισμού</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 λεπτό</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 λεπτά</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 λεπτά</value></data>
@@ -614,7 +614,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Προσομοίωση πτήσης</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Χρονικό όριο Keepalive</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Για πόση ώρα τα LED διατηρούν την τελευταία τους κατάσταση μετά τη διακοπή των εφέ, πριν το τιμόνι επιστρέψει στον δικό του φωτισμό.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Περιστροφή οθόνης</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Περιστροφή</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Ομαλή</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Άμεση</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Διακόπτες</value></data>
@@ -889,4 +889,5 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Δόνηση κινητήρα</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Απτική ανάδραση</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce κουμπιών (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Η προεπισκόπηση δεν είναι διαθέσιμη</value></data>
 </root>

@@ -380,15 +380,15 @@
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
   <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// retningstildeling for stick</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Rattet har ikke rapportert joystick-konfigurasjon ennå. Koble til rattet og vent til identitetsprøven er ferdig.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Aktiver dashboard-telemetri</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetri</value></data>
   <data name="Button_LoadMzdash" xml:space="preserve"><value>LAST INN .MZDASH…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>VELG MAPPE…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DETEKTER</value></data>
   <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Last inn en lokal .mzdash-fil for tier-def-kanaltilpasning</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Velg en mappe med .mzdash-filer som dashboard-bibliotek</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Auto-detekter dashboard-mappen for det tilkoblede rattet</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ SEND TESTMØNSTER</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ STOPP</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANALTILPASNINGER</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Blyant for å velge en egenskap, eller formelknappen for et NCalc- / js:-uttrykk</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Laster kanaltilpasninger…</value></data>
@@ -420,9 +420,9 @@
   <data name="Edit_Scale" xml:space="preserve"><value>Skala</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Forskyvning</value></data>
   <data name="Section_Display" xml:space="preserve"><value>SKJERM</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Skjermlysstyrke</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Gjengir…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-tid</value></data>
-  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Synkroniseringsstatus-LED</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Synk-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minutt</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutter</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 minutter</value></data>
@@ -620,7 +620,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flysimulering</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-tidsavbrudd</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene beholder sin siste tilstand etter at effektene stopper, før rattet går tilbake til sin egen belysning.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Skjermrotasjon</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotasjon</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Spaker</value></data>
@@ -895,4 +895,5 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Motorvibrasjon</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktil tilbakemelding</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Knapp-debounce (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Forhåndsvisning ikke tilgjengelig</value></data>
 </root>
