@@ -56,6 +56,9 @@ namespace MozaPlugin.Devices.Haptics
         // attenuated" model was wrong — intensity rides the 0x0A 0x05 amplitude
         // field, not the pulse rate. amp16 stays constant 0x2328.
         private const double PulsePairRateHz = 48.0;
+        // Max change per second of the pulse-pair damper coefficient; the
+        // fastest PitHouse slews it is ~11,400/s. Guards against RPM jumps.
+        private const double PulseCoefficientSlewPerSec = 12000.0;
         // Amplitude fade on stop: the 0x0A 0x05 intensity field is the device-
         // side amplitude, so ramp IT (not the pulse rate) down to 0 on game
         // pause / engine-off / slider-to-zero to avoid an abrupt cut. ~500 ms
@@ -82,7 +85,8 @@ namespace MozaPlugin.Devices.Haptics
         private long _latestMaxRpmBits;
         private volatile bool _latestGameRunning;
         private int _tickCount;
-        private ushort _pulsePhase;
+        // Slew-limited damper coefficient for the 0x0B pulse pair.
+        private double _pulseCoefficient = MozaAb9DeviceManager.EnginePulseCoefficientFullScale;
         // Slew-limited effective intensity (0..100). Rise is instant; fall
         // decays at IntensityFadePerSec so stopping fades the amplitude rather
         // than cutting it. Drives the 0x0A 0x05 intensity field.
@@ -203,6 +207,9 @@ namespace MozaPlugin.Devices.Haptics
             // field carries the (faded) slider value linearly; period sets the
             // pitch.
             uint period;
+            // Pulse-pair damper coefficient falls from full scale at 0 RPM to 0
+            // at redline; held through a fade like the period.
+            double coefficientTarget = _pulseCoefficient;
             if (rawActive)
             {
                 // audible = freqSlider × (rpm/maxRpm), floored at MinAudibleHz;
@@ -212,6 +219,7 @@ namespace MozaPlugin.Devices.Haptics
                 // convention (see EngineVibrationMath.RedlineFraction — the same
                 // model MBoosterEffectWorker.UpdateEngineRequest uses for Engine).
                 double fraction = EngineVibrationMath.RedlineFraction(rpm, maxRpm);
+                coefficientTarget = MozaAb9DeviceManager.EnginePulseCoefficientFullScale * (1.0 - fraction);
                 double audibleHz = freqHz * fraction;
                 double floorHz = Math.Min(MinAudibleHz, freqHz);
                 if (audibleHz < floorHz) audibleHz = floorHz;
@@ -239,6 +247,8 @@ namespace MozaPlugin.Devices.Haptics
 
             if (effectiveStreaming != _active)
             {
+                // Stream (re)starting: no slew from a stale value.
+                if (effectiveStreaming) _pulseCoefficient = coefficientTarget;
                 _active = effectiveStreaming;
                 MozaLog.Debug($"[AZOM/AB9] engine-vib {(effectiveStreaming ? "active" : "silent")} "
                               + $"(rpm={rpm:F0}/{maxRpm:F0} freq={freqHz:F1}Hz period={period} "
@@ -261,6 +271,12 @@ namespace MozaPlugin.Devices.Haptics
             if (tick % KeepalivePairBaseTicks == 0)
                 _ab9.SendKeepalivePair();
 
+            double maxCoefficientStep = PulseCoefficientSlewPerSec * TickPeriodMs / 1000.0;
+            double coefficientDelta = coefficientTarget - _pulseCoefficient;
+            if (coefficientDelta > maxCoefficientStep) coefficientDelta = maxCoefficientStep;
+            else if (coefficientDelta < -maxCoefficientStep) coefficientDelta = -maxCoefficientStep;
+            _pulseCoefficient += coefficientDelta;
+
             // 0x0B 0x02/03 engine-pulse pair — CONSTANT ~48 Hz, independent of
             // RPM and intensity (ground-truth capture 2026-05-31). amp16 is held
             // at constant 0x2328 by passing 100 to SendEnginePulsePair —
@@ -271,9 +287,7 @@ namespace MozaPlugin.Devices.Haptics
             while (_pulseAccumulator >= 1.0)
             {
                 _pulseAccumulator -= 1.0;
-                ushort step = (ushort)Math.Min(0xFFFF, (int)(32 + 78 * Math.Min(1.0, rpmFactor / 10.0)));
-                unchecked { _pulsePhase += step; }
-                _ab9.SendEnginePulsePair(_pulsePhase, intensity0to100: 100);
+                _ab9.SendEnginePulsePair((int)Math.Round(_pulseCoefficient), intensity0to100: 100);
             }
 
             // RPM-tracked restart of the sine effect.

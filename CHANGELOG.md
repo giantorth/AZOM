@@ -16,6 +16,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Diagnostics bandwidth reading no longer caps out near 4.3 KB/s** under heavy traffic such as pedal haptics.
 - **A failed dashboard upload no longer blocks later uploads** until the CM2 or wheel is power-cycled.
 - **mBooster Threshold no longer vibrates when stopped;** it now needs the car to be moving.
+- **AB9 no longer goes wild every ~35 s during engine vibration;** engine damping now follows RPM.
 
 ## [1.7.1]
 
