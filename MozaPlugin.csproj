@@ -134,6 +134,7 @@
       <ManifestResourceName>MozaPlugin.Resources.Strings.qps-ploc</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Data\Telemetry.json" LogicalName="MozaPlugin.Data.Telemetry.json" />
+    <EmbeddedResource Include="CHANGELOG.md" LogicalName="MozaPlugin.CHANGELOG.md" />
     <!-- Wheel track-map outline names + bounds + iRacing lines (tools/gen_track_outlines.py).
          Single extension only: as "TrackOutlinePoints.bin.gz" the Windows CI DLL lacked it
          (likely culture inference: "bin" = Bini), while the Linux build had it. -->

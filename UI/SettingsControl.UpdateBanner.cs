@@ -41,6 +41,8 @@ namespace MozaPlugin.UI
             {
                 if (UpdateCheckEnabledToggle == null) return; // legacy XAML — nothing to do
 
+                LoadChangelog();
+
                 var s = _plugin?.Settings;
                 if (s == null) return;
 
@@ -156,10 +158,29 @@ namespace MozaPlugin.UI
             if (UpdateReleaseNotesBox != null
                 && !string.Equals(_renderedReleaseNotes, notes, StringComparison.Ordinal))
             {
-                UpdateReleaseNotesBox.Document = BuildReleaseNotesDocument(notes);
+                UpdateReleaseNotesBox.Document = BuildReleaseNotesDocument(notes, UpdateReleaseNotesBox);
                 _renderedReleaseNotes = notes;
             }
             UpdateReleaseNotesPanel.Visibility = Visibility.Visible;
+        }
+
+        // Renders the CHANGELOG.md embedded at build time into the right half
+        // of the Updates card.
+        private void LoadChangelog()
+        {
+            if (ChangelogBox == null) return;
+            try
+            {
+                using var stream = typeof(SettingsControl).Assembly
+                    .GetManifestResourceStream("MozaPlugin.CHANGELOG.md");
+                if (stream == null) return;
+                using var reader = new StreamReader(stream);
+                ChangelogBox.Document = BuildReleaseNotesDocument(reader.ReadToEnd(), ChangelogBox);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[UpdateBanner] changelog load failed: {ex.Message}");
+            }
         }
 
         // ----- Lightweight markdown → FlowDocument renderer -----
@@ -178,18 +199,15 @@ namespace MozaPlugin.UI
             @"|(?<url>https?://[^\s)]+)",
             RegexOptions.Compiled);
 
-        private FlowDocument BuildReleaseNotesDocument(string md)
+        private FlowDocument BuildReleaseNotesDocument(string md, RichTextBox target)
         {
             var doc = new FlowDocument
             {
                 PagePadding = new Thickness(0),
                 TextAlignment = TextAlignment.Left,
+                FontFamily = target.FontFamily,
+                FontSize = target.FontSize,
             };
-            if (UpdateReleaseNotesBox != null)
-            {
-                doc.FontFamily = UpdateReleaseNotesBox.FontFamily;
-                doc.FontSize = UpdateReleaseNotesBox.FontSize;
-            }
             double baseSize = doc.FontSize > 0 ? doc.FontSize : 12.0;
 
             if (string.IsNullOrEmpty(md)) return doc;

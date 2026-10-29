@@ -3730,107 +3730,135 @@
                                           Title="{x:Static res:Strings.Section_Updates}"
                                           Subtitle="{x:Static res:Strings.Subtitle_Updates}"
                                           Icon="{StaticResource IconRefresh}">
-                            <StackPanel>
-                                <Border x:Name="UpdateBannerBorder"
-                                        Visibility="Collapsed"
-                                        BorderBrush="{StaticResource CyanBrush}"
-                                        BorderThickness="1"
-                                        Background="{StaticResource BgDeepBrush}"
-                                        Padding="12,10"
-                                        Margin="0,0,0,14">
-                                    <StackPanel>
-                                        <TextBlock x:Name="UpdateBannerText"
-                                                   FontFamily="{StaticResource FontUi}"
-                                                   FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="{StaticResource CyanBrush}"
-                                                   TextWrapping="Wrap"
-                                                   Margin="0,0,0,8"/>
-                                        <TextBlock x:Name="UpdateBannerProgressText"
-                                                   Style="{StaticResource MutedHintText}"
-                                                   TextWrapping="Wrap"
-                                                   Visibility="Collapsed"
-                                                   Margin="0,0,0,8"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <Button x:Name="UpdateBannerInstallButton"
-                                                    Content="{x:Static res:Strings.Button_InstallUpdate}"
-                                                    Click="UpdateBanner_Install_Click"
-                                                    Margin="0,0,8,0"/>
-                                            <Button x:Name="UpdateBannerRestartButton"
-                                                    Content="{x:Static res:Strings.Button_RestartSimHub}"
-                                                    Click="UpdateBanner_Restart_Click"
-                                                    Visibility="Collapsed"
-                                                    Margin="0,0,8,0"/>
-                                            <Button x:Name="UpdateBannerOpenButton"
-                                                    Content="{x:Static res:Strings.Button_OpenReleaseNotes}"
-                                                    Click="UpdateBanner_OpenNotes_Click"
-                                                    Margin="0,0,8,0"/>
-                                            <Button x:Name="UpdateBannerSkipButton"
-                                                    Content="{x:Static res:Strings.Button_SkipThisVersion}"
-                                                    Click="UpdateBanner_Skip_Click"
-                                                    Margin="0,0,8,0"/>
-                                            <Button x:Name="UpdateBannerDismissButton"
-                                                    Content="{x:Static res:Strings.Button_DismissUpdate}"
-                                                    Click="UpdateBanner_Dismiss_Click"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- Release notes for the latest available version
-                                     (GitHub release body, rendered as selectable
-                                     plain text). Shown only when notes are cached
-                                     and an update is available / pending restart. -->
-                                <StackPanel x:Name="UpdateReleaseNotesPanel"
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- MaxWidth bounds the wrapping banner + release-notes box,
+                                     which would otherwise measure unconstrained in the Auto column. -->
+                                <StackPanel x:Name="UpdatesSettingsPanel" Grid.Column="0" Margin="0,0,10,0"
+                                            MaxWidth="520">
+                                    <Border x:Name="UpdateBannerBorder"
                                             Visibility="Collapsed"
-                                            Margin="0,0,0,14">
-                                    <TextBlock x:Name="UpdateReleaseNotesHeader"
-                                               Style="{StaticResource SectionTitleText}"
-                                               Margin="0,0,0,6"/>
-                                    <Border BorderBrush="{StaticResource BorderBrush}"
+                                            BorderBrush="{StaticResource CyanBrush}"
                                             BorderThickness="1"
                                             Background="{StaticResource BgDeepBrush}"
-                                            CornerRadius="4" Padding="2">
-                                        <RichTextBox x:Name="UpdateReleaseNotesBox"
-                                                     IsReadOnly="True"
-                                                     IsDocumentEnabled="True"
-                                                     Background="Transparent"
-                                                     BorderThickness="0"
-                                                     Foreground="{StaticResource TextDimBrush}"
-                                                     FontFamily="{StaticResource FontUi}"
-                                                     FontSize="12"
-                                                     Padding="8"
-                                                     MaxHeight="220"
-                                                     VerticalScrollBarVisibility="Auto"/>
+                                            Padding="12,10"
+                                            Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock x:Name="UpdateBannerText"
+                                                       FontFamily="{StaticResource FontUi}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource CyanBrush}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,8"/>
+                                            <TextBlock x:Name="UpdateBannerProgressText"
+                                                       Style="{StaticResource MutedHintText}"
+                                                       TextWrapping="Wrap"
+                                                       Visibility="Collapsed"
+                                                       Margin="0,0,0,8"/>
+                                            <WrapPanel>
+                                                <Button x:Name="UpdateBannerInstallButton"
+                                                        Content="{x:Static res:Strings.Button_InstallUpdate}"
+                                                        Click="UpdateBanner_Install_Click"
+                                                        Margin="0,0,8,6"/>
+                                                <Button x:Name="UpdateBannerRestartButton"
+                                                        Content="{x:Static res:Strings.Button_RestartSimHub}"
+                                                        Click="UpdateBanner_Restart_Click"
+                                                        Visibility="Collapsed"
+                                                        Margin="0,0,8,6"/>
+                                                <Button x:Name="UpdateBannerOpenButton"
+                                                        Content="{x:Static res:Strings.Button_OpenReleaseNotes}"
+                                                        Click="UpdateBanner_OpenNotes_Click"
+                                                        Margin="0,0,8,6"/>
+                                                <Button x:Name="UpdateBannerSkipButton"
+                                                        Content="{x:Static res:Strings.Button_SkipThisVersion}"
+                                                        Click="UpdateBanner_Skip_Click"
+                                                        Margin="0,0,8,6"/>
+                                                <Button x:Name="UpdateBannerDismissButton"
+                                                        Content="{x:Static res:Strings.Button_DismissUpdate}"
+                                                        Click="UpdateBanner_Dismiss_Click"
+                                                        Margin="0,0,0,6"/>
+                                            </WrapPanel>
+                                        </StackPanel>
                                     </Border>
-                                </StackPanel>
 
-                                <ctrl:OffOnToggle x:Name="UpdateCheckEnabledToggle"
-                                          Content="{x:Static res:Strings.Label_CheckForUpdates}"
-                                          Click="UpdateCheckEnabled_Click"
-                                          Margin="0,0,0,10"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
-                                    <TextBlock Text="{x:Static res:Strings.Label_ReleaseChannel}"
-                                               Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,10,0"/>
-                                    <ComboBox x:Name="UpdateChannelCombo"
-                                              MinWidth="160"
-                                              SelectionChanged="UpdateChannelCombo_SelectionChanged"
-                                              DropDownOpened="UpdateChannelCombo_DropDownOpened"/>
+                                    <!-- Release notes for the latest available version
+                                         (GitHub release body, rendered as selectable
+                                         plain text). Shown only when notes are cached
+                                         and an update is available / pending restart. -->
+                                    <StackPanel x:Name="UpdateReleaseNotesPanel"
+                                                Visibility="Collapsed"
+                                                Margin="0,0,0,14">
+                                        <TextBlock x:Name="UpdateReleaseNotesHeader"
+                                                   Style="{StaticResource SectionTitleText}"
+                                                   Margin="0,0,0,6"/>
+                                        <Border BorderBrush="{StaticResource BorderBrush}"
+                                                BorderThickness="1"
+                                                Background="{StaticResource BgDeepBrush}"
+                                                CornerRadius="4" Padding="2">
+                                            <RichTextBox x:Name="UpdateReleaseNotesBox"
+                                                         IsReadOnly="True"
+                                                         IsDocumentEnabled="True"
+                                                         Background="Transparent"
+                                                         BorderThickness="0"
+                                                         Foreground="{StaticResource TextDimBrush}"
+                                                         FontFamily="{StaticResource FontUi}"
+                                                         FontSize="12"
+                                                         Padding="8"
+                                                         MaxHeight="220"
+                                                         VerticalScrollBarVisibility="Auto"/>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <ctrl:OffOnToggle x:Name="UpdateCheckEnabledToggle"
+                                              Content="{x:Static res:Strings.Label_CheckForUpdates}"
+                                              Click="UpdateCheckEnabled_Click"
+                                              Margin="0,0,0,10"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Static res:Strings.Label_ReleaseChannel}"
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,10,0"/>
+                                        <ComboBox x:Name="UpdateChannelCombo"
+                                                  MinWidth="160"
+                                                  SelectionChanged="UpdateChannelCombo_SelectionChanged"
+                                                  DropDownOpened="UpdateChannelCombo_DropDownOpened"/>
+                                    </StackPanel>
+                                    <ctrl:OffOnToggle x:Name="FollowBetaToggle"
+                                              Content="{x:Static res:Strings.Label_FollowBetaChannel}"
+                                              Click="FollowBeta_Click"
+                                              Margin="0,0,0,10"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button x:Name="UpdateCheckNowButton"
+                                                Content="{x:Static res:Strings.Button_CheckNow}"
+                                                Click="UpdateCheckNow_Click"
+                                                Margin="0,0,12,0"/>
+                                        <TextBlock x:Name="UpdateLastCheckedText"
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
                                 </StackPanel>
-                                <ctrl:OffOnToggle x:Name="FollowBetaToggle"
-                                          Content="{x:Static res:Strings.Label_FollowBetaChannel}"
-                                          Click="FollowBeta_Click"
-                                          Margin="0,0,0,10"/>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Button x:Name="UpdateCheckNowButton"
-                                            Content="{x:Static res:Strings.Button_CheckNow}"
-                                            Click="UpdateCheckNow_Click"
-                                            Margin="0,0,12,0"/>
-                                    <TextBlock x:Name="UpdateLastCheckedText"
-                                               Style="{StaticResource MutedHintText}"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </StackPanel>
+                                <!-- Bundled CHANGELOG.md; height tracks the left column. -->
+                                <Border Grid.Column="1" Margin="10,0,0,0" MinHeight="220"
+                                        Height="{Binding ActualHeight, ElementName=UpdatesSettingsPanel}"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1"
+                                        Background="{StaticResource BgDeepBrush}"
+                                        CornerRadius="4" Padding="2">
+                                    <RichTextBox x:Name="ChangelogBox"
+                                                 IsReadOnly="True"
+                                                 IsDocumentEnabled="True"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Foreground="{StaticResource TextDimBrush}"
+                                                 FontFamily="{StaticResource FontUi}"
+                                                 FontSize="12"
+                                                 Padding="8"
+                                                 VerticalScrollBarVisibility="Auto"/>
+                                </Border>
+                            </Grid>
                         </ctrl:SectionCard>
 
                         <!-- Hidden: dashboard upload/download UI collapsed while the feature is
