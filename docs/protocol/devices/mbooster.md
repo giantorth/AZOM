@@ -1154,6 +1154,11 @@ already had more moving parts than a simple frequency+intensity pair:
   120ms); 100 drops to silence immediately after the burst, for a
   short, sharp tick instead of a sustained buzz.
 
+Real gameplay is gated on `GameRunning` and a 1 m/s vehicle-speed
+floor (`ThresholdMinSpeedMs`): LMU reports Brake = 1.0 while the car
+sits in the garage, which latched the effect indefinitely (bundle
+7A5GZQRD). The Test toggle skips both gates.
+
 The sustained Test toggle shares the *same* rising-edge hysteresis as
 real gameplay — `_thresholdLatched` and the trigger/release thresholds
 are computed once per tick and used by both the test and real paths,

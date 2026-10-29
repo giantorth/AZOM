@@ -44,7 +44,8 @@ namespace MozaPlugin.Devices.MBooster
         private const double AbsScaleMax       = 0.10;
         private const double LockupScaleMax    = 0.15;
         private const double ThresholdScaleMax = 0.10;
-        private const double EngineScaleMax    = 0.10;
+        private const double ThresholdMinSpeedMs = 1.0;
+        private const double EngineScaleMax   = 0.10;
         // Custom effects share Engine's verified wire shape (see
         // ProcessCustomEffect) so they share a scale cap too — a
         // continuous-mode custom effect (no Threshold gate) can run
@@ -1121,7 +1122,9 @@ namespace MozaPlugin.Devices.MBooster
             // Same GameRunning gate Engine/Lockup use — games commonly report
             // a stale/nonzero Brake baseline outside an active session (menu,
             // garage, replay), which would otherwise latch this immediately.
-            if (!snap.GameRunning)
+            // Speed floor: LMU reports full brake while parked in the garage
+            // (bundle 7A5GZQRD).
+            if (!snap.GameRunning || Math.Abs(snap.VehicleSpeedMs) < ThresholdMinSpeedMs)
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;
