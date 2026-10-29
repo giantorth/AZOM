@@ -993,6 +993,7 @@ namespace MozaPlugin.Telemetry
                 getConfigJsonState: () => _configJson.LastState,
                 sendSessionAck: _sessionLife.SendSessionAck,
                 sendSessionEnd: _sessionLife.SendSessionEnd,
+                sendStaleSessionClose: _sessionLife.SendSessionClose,
                 sendAndTrackChunk: SendAndTrackChunk,
                 sendSessionOpen: _sessionLife.SendSessionOpen,
                 sendFileTransferActivate: _sessionLife.SendFileTransferActivate,

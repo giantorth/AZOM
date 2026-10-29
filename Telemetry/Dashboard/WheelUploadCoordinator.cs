@@ -40,6 +40,12 @@ namespace MozaPlugin.Telemetry.Dashboard
         private readonly Action<byte, ushort> _sendSessionAck;
         private readonly Action<byte, ushort> _sendSessionEnd;
         /// <summary>
+        /// Send the seq-0 stale-session close (<c>SessionLifecycle.SendSessionClose</c>)
+        /// used to reclaim a session the device still holds from an earlier,
+        /// failed attempt.
+        /// </summary>
+        private readonly Action<byte> _sendStaleSessionClose;
+        /// <summary>
         /// Send a host-initiated session-open frame
         /// (<c>7c 00 &lt;sess&gt; 81 &lt;port:2 LE&gt; &lt;port:2 LE&gt; fd 02</c>). Without
         /// this, the wheel-side ack session (typically 0x04) is left half-open —
@@ -93,6 +99,12 @@ namespace MozaPlugin.Telemetry.Dashboard
         // FT-eligible sessions the wheel device-inited. ChooseUploadSession
         // prefers 0x04 (legacy), then walks up looking for the first match.
         private readonly HashSet<byte> _ftCandidateSessions = new();
+        // FT sessions the device currently holds open (device-init or inbound
+        // chunk seen, no device CLOSE since) → Environment.TickCount of the
+        // latest evidence.
+        private readonly Dictionary<byte, int> _ftDeviceOpen = new();
+        // Device FT keepalives arrive every ~3.4 s (CM2, bundle GMGHEQND).
+        private const int FtOpenEvidenceMs = 15000;
         // Session number currently in use for upload. Updated by NoteDeviceInit
         // for legacy non-09/0a sessions (matches prior TelemetrySender behavior)
         // and by SendDashboardUpload at upload-start.
@@ -293,6 +305,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             Func<WheelDashboardState?> getConfigJsonState,
             Action<byte, ushort> sendSessionAck,
             Action<byte, ushort> sendSessionEnd,
+            Action<byte> sendStaleSessionClose,
             Action<byte[]> sendAndTrackChunk,
             Action<byte, byte> sendSessionOpen,
             Action<byte> sendFileTransferActivate,
@@ -308,6 +321,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             _getConfigJsonState = getConfigJsonState;
             _sendSessionAck = sendSessionAck;
             _sendSessionEnd = sendSessionEnd;
+            _sendStaleSessionClose = sendStaleSessionClose;
             _sendAndTrackChunk = sendAndTrackChunk;
             _sendSessionOpen = sendSessionOpen;
             _sendFileTransferActivate = sendFileTransferActivate;
@@ -336,6 +350,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             if (session < 0x04 || session > 0x0b) return;
             lock (_ftCandidateSessions) _ftCandidateSessions.Add(session);
+            NoteFtSessionOpenEvidence(session);
             if (session == _acquireTarget) _acquireOpenSeq = openSeq;
             try { _sessionOpened.Set(); } catch (ObjectDisposedException) { }
             // While an upload is mid-flight the coordinator's session is pinned:
@@ -390,6 +405,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public bool NoteInboundChunk(byte session, int seq, byte[] chunkPayload)
         {
+            NoteFtSessionOpenEvidence(session);
             bool isAckSession = session == UploadAckSession && _isUploadInFlight;
             bool isActive = session == ActiveSession;
             if (!isAckSession && !isActive) return false;
@@ -683,10 +699,60 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// <see cref="RunBackgroundUpload"/> call.</summary>
         public void NoteEndMarker(byte session)
         {
+            lock (_ftDeviceOpen) _ftDeviceOpen.Remove(session);
             if (session == ActiveSession)
             {
                 try { _endReceived.Set(); } catch (ObjectDisposedException) { }
             }
+        }
+
+        private void NoteFtSessionOpenEvidence(byte session)
+        {
+            lock (_ftDeviceOpen) _ftDeviceOpen[session] = Environment.TickCount;
+        }
+
+        private bool IsFtSessionDeviceOpen(byte session)
+        {
+            lock (_ftDeviceOpen)
+                return _ftDeviceOpen.TryGetValue(session, out int t)
+                    && unchecked(Environment.TickCount - t) < FtOpenEvidenceMs;
+        }
+
+        /// <summary>
+        /// Close the upload session at the end of an attempt. A device that
+        /// ignores the in-sequence CLOSE keeps the session open and then refuses
+        /// every later FT-ACT for it (CM2, bundle GMGHEQND: one SubMsg1AckTimeout,
+        /// then sess 0x04 keepalives for 8+ min and NoFtSession on every retry),
+        /// so fall back to the stale-session close when it does not echo.
+        /// </summary>
+        private void CloseUploadSession(byte sess)
+        {
+            try { _endReceived.Reset(); } catch (ObjectDisposedException) { return; }
+            _sendSessionEnd(sess, (ushort)_outboundSeq);
+            bool echoed;
+            try { echoed = _endReceived.Wait(1500); } catch (ObjectDisposedException) { return; }
+            if (echoed || !IsFtSessionDeviceOpen(sess)) return;
+            MozaLog.Warn(
+                $"[AZOM] Session 0x{sess:X2} not closed by device after CLOSE seq={_outboundSeq} — " +
+                "sending stale-session close");
+            ReclaimStaleFtSession(sess);
+        }
+
+        /// <summary>
+        /// Send the seq-0 stale-session close for an FT session the device still
+        /// holds and wait briefly for its own CLOSE. Returns true when it echoed.
+        /// </summary>
+        private bool ReclaimStaleFtSession(byte sess)
+        {
+            try { _endReceived.Reset(); } catch (ObjectDisposedException) { return false; }
+            _sendStaleSessionClose(sess);
+            bool closed;
+            try { closed = _endReceived.Wait(1500); } catch (ObjectDisposedException) { return false; }
+            if (closed)
+                MozaLog.Debug($"[AZOM] Stale session 0x{sess:X2} closed by device");
+            else
+                MozaLog.Warn($"[AZOM] Stale session 0x{sess:X2}: device did not echo the close within 1500ms");
+            return closed;
         }
 
         /// <summary>Reset all upload state. Called by TelemetrySender.Stop()
@@ -699,6 +765,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             try { _ackProgress.Reset(); } catch (ObjectDisposedException) { }
             try { _endReceived.Reset(); } catch (ObjectDisposedException) { }
             lock (_ftCandidateSessions) _ftCandidateSessions.Clear();
+            lock (_ftDeviceOpen) _ftDeviceOpen.Clear();
             ActiveSession = 0x04;
             _inboundSeq = 0;
             _outboundSeq = 0;
@@ -1032,11 +1099,24 @@ namespace MozaPlugin.Telemetry.Dashboard
                 try { _sessionOpened.Reset(); } catch (ObjectDisposedException) { }
                 const int AcquireAttempts = 5;
                 const int AcquireWaitMs = 3000;
+                bool reclaimed = false;
                 for (int attempt = 0; attempt < AcquireAttempts && !_shouldAbort(); attempt++)
                 {
                     _sendFileTransferActivate(uploadSess);
                     _sessionOpened.Wait(AcquireWaitMs);
                     if (_acquireOpenSeq >= 0) break;
+                    // The device won't re-init a session it still holds open
+                    // (CM2 keeps a failed attempt's session alive, bundle
+                    // GMGHEQND) — close it once, then re-activate.
+                    if (!reclaimed && IsFtSessionDeviceOpen(uploadSess) && !_shouldAbort())
+                    {
+                        reclaimed = true;
+                        MozaLog.Warn(
+                            $"[AZOM] FT-activate for session 0x{uploadSess:X2} unanswered while the " +
+                            "device still holds it open — closing the stale session");
+                        ReclaimStaleFtSession(uploadSess);
+                        _acquireOpenSeq = -1;
+                    }
                     // Woken by a device-init on some other FT session (or
                     // timed out) — re-arm and re-activate. The wheel tolerates
                     // repeated FT-ACTs (PitHouse spams them ~1/s at connect).
@@ -1047,7 +1127,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 {
                     MozaLog.Warn(
                         $"[AZOM] FT-activate for session 0x{uploadSess:X2} got no device-init " +
-                        $"after {AcquireAttempts} attempts — aborting upload");
+                        $"after {AcquireAttempts} attempts" +
+                        (reclaimed ? " (stale-session close tried)" : "") + " — aborting upload");
                     return UploadOutcome.NoFtSession;
                 }
                 // Rebase outbound seq: EmitSubMsg starts at _outboundSeq + 1,
@@ -1226,7 +1307,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     // Sending content is guaranteed to fail; just close the
                     // session cleanly so the wheel doesn't sit in a half-open
                     // upload state.
-                    _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
+                    CloseUploadSession(uploadSess);
                     return UploadOutcome.SubMsg1AckTimeout;
                 }
             }
@@ -1342,7 +1423,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                             $"[AZOM] Session 0x{uploadSess:X2} sub-msg 2 chunk {chunkIdx + 1}/{upload.SubMsg2Chunks.Count}: " +
                             $"wheel stopped fc-acking ({backlog} chunks unacked, no ack for {BacklogStallTimeoutMs}ms) — aborting upload");
                         _outboundSeq = seq2;
-                        _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
+                        CloseUploadSession(uploadSess);
                         return UploadOutcome.SubMsg2AckTimeout;
                     }
                 }
@@ -1397,7 +1478,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                         MozaLog.Warn(
                             $"[AZOM] Session 0x{uploadSess:X2} completion timeout " +
                             $"(last bw={LastBytesWritten} total={LastTotalSize}) — aborting upload");
-                        _sendSessionEnd(uploadSess, (ushort)_outboundSeq);
+                        CloseUploadSession(uploadSess);
                         return UploadOutcome.SubMsg2AckTimeout;
                     }
                 }

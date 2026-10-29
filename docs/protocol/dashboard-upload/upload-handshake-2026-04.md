@@ -97,6 +97,18 @@ sessions carry file transfers (uploads 0x04, config files 0x06, downloads
 0x0B/0x0C). An upload targeting an odd display session gets no device-init —
 the wheel won't re-init a session the display owns.
 
+**Standalone CM2 (USB PID 0x0025, dev 0x12) does not re-init a held session** (bundle
+GMGHEQND, dash SW V2.23.5.0 / install 1.2.7.14). FT-ACT(6,4) got a device-init (open-seq 4)
+and the dash log shows `remove all tmp file from "/var/volatile/tmp" and "/home/root"`, but
+no ready-ack arrived for the metadata on either wire format. After the host's in-sequence
+CLOSE the dash kept sess 0x04 open — empty type=0x01 keepalives every ~3.4 s for 8+ min —
+and every later FT-ACT(6,4) went unanswered. Unlike the W17, the CM2 won't fresh-open
+a session it still holds. Plugin: on an unanswered FT-ACT while the target session shows
+device traffic, or a CLOSE the device doesn't echo, send the seq-0 stale-session close and
+re-activate (`WheelUploadCoordinator.ReclaimStaleFtSession`). Whether the CM2 honours the
+seq-0 close on sess 0x04 is unverified. Why the metadata went unacked is unknown: that
+window fell between the bundle's startup and rolling captures.
+
 Small-file flow (2025-11 firmware, `pithouse-switch-list-delete-upload-reupload.pcapng`, ~1.9KB mzdash):
 
 1. Session 0x04 already open (from device_init). Host sends type=0x08 dir-listing probe with `/home/root`.
