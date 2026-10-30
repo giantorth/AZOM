@@ -976,36 +976,7 @@ namespace MozaPlugin.Devices.Ui
         private void TelemetryTestToggle_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-
-            bool turningOn = !_plugin.DashboardTestPatternActive;
-            // Drives every display pipeline: tier-def senders via TestMode, the
-            // standalone FSR1/CM1 drivers via the shared flag (they pick it up on
-            // their next tick — no start needed while they're already running).
-            _plugin.SetDashboardTestPattern(turningOn);
-
-            // A tier-def DISPLAY wheel (W17/W18) renders only while its sender is
-            // Active; bring it up on demand. Never start it for an FSR1 (its screen
-            // is the 0x42 driver — starting the idle wheel sender kicks a phantom
-            // cold-start) or for a wheel whose screen isn't the tier-def sender.
-            var active = _plugin.TelemetrySender;
-            if (active != null && _plugin.WheelUsesTierDefDisplaySender && !_plugin.ActiveTelemetryEnabled)
-            {
-                if (turningOn && !active.IsActive)
-                {
-                    _plugin.ApplyTelemetrySettings();
-                    // An exception escaping a pool work item terminates the process.
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        try { active.Start(); }
-                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Test-pattern sender start failed: {ex.Message}"); }
-                    });
-                }
-                else if (!turningOn && active.IsActive)
-                {
-                    active.Stop();
-                }
-            }
-
+            _plugin.ToggleDashboardTestPattern();
             RefreshTelemetryStatus();
         }
 

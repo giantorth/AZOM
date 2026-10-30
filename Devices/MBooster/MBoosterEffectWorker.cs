@@ -138,31 +138,17 @@ namespace MozaPlugin.Devices.MBooster
         private long _brakeFadeTravelEndLastWriteTicks;
         private float _brakeFadeAppliedThresholdKg = -1;
         private long _brakeFadeThresholdLastWriteTicks;
-        private volatile bool _brakeFadeTestActive;
         // Set while a calibration routine owns the pedal — see SetSuspended.
         private volatile bool _suspended;
 
-        // Engine's, ABS's, Road Texture's, Lockup's, and Threshold's Test
-        // toggles all run indefinitely while on, live-tracking Frequency/
-        // Intensity/Smoothness/Decay from settings every tick (no snapshot)
-        // so slider drags are felt immediately during a test. Set via
-        // MBoosterDeviceController.SetEngineTestActive/SetAbsTestActive/
-        // SetRoadTextureTestActive/SetLockupTestActive/
-        // SetThresholdTestActive. (The old fire-and-forget 1s TestPulse
-        // mechanism this replaced across all five effects has been removed
-        // entirely — nothing constructs one anymore.)
-        private volatile bool _engineTestSustained;
-        private volatile bool _absTestSustained;
-        private volatile bool _tcTestSustained;
-        private volatile bool _wheelSpinTestSustained;
-        private volatile bool _gearShiftTestSustained;
-        private volatile bool _roadTextureTestSustained;
-        private volatile bool _lockupTestSustained;
-        private volatile bool _thresholdTestSustained;
-        private volatile bool _gforceTestSustained;
-        private volatile bool _bitePointTestSustained;
+        // Built-in sustained Test toggles, one MBoosterTestEffect bit each.
+        // A test runs indefinitely while on, live-tracking Frequency/
+        // Intensity/Smoothness/Decay from settings every tick so slider drags
+        // are felt immediately. Set from the UI thread, read here every tick;
+        // one word so StopAllTests clears every test at once.
+        private int _testMask;
 
-        // Custom effects' sustained Test toggles — same semantics as the five
+        // Custom effects' sustained Test toggles — same semantics as the
         // built-ins above (runs indefinitely, live-tracks Frequency/Intensity,
         // bypasses Enabled/Formula/Threshold entirely), but keyed by
         // MBoosterCustomEffect.Id since the count is unbounded. A
@@ -397,35 +383,26 @@ namespace MozaPlugin.Devices.MBooster
             lock (_telemetryLock) _latest = snap;
         }
 
-        /// <summary>Turn Engine's sustained test toggle on/off. See <see cref="_engineTestSustained"/>.</summary>
-        public void SetEngineTestSustained(bool on) => _engineTestSustained = on;
+        /// <summary>Turn one built-in sustained test toggle on/off. See <see cref="_testMask"/>.</summary>
+        public void SetTestSustained(MBoosterTestEffect test, bool on)
+        {
+            int bit = (int)test, cur, next;
+            do
+            {
+                cur = Volatile.Read(ref _testMask);
+                next = on ? cur | bit : cur & ~bit;
+            }
+            while (Interlocked.CompareExchange(ref _testMask, next, cur) != cur);
+        }
 
-        /// <summary>Turn ABS's sustained test toggle on/off. See <see cref="_absTestSustained"/>.</summary>
-        public void SetAbsTestSustained(bool on) => _absTestSustained = on;
-        /// <summary>Turn Traction Control's sustained test toggle on/off. See <see cref="_tcTestSustained"/>.</summary>
-        public void SetTcTestSustained(bool on) => _tcTestSustained = on;
-        /// <summary>Turn Wheel Spin's sustained test toggle on/off. See <see cref="_wheelSpinTestSustained"/>.</summary>
-        public void SetWheelSpinTestSustained(bool on) => _wheelSpinTestSustained = on;
-        /// <summary>Turn Gear Shift's sustained test toggle on/off. See <see cref="_gearShiftTestSustained"/>.</summary>
-        public void SetGearShiftTestSustained(bool on) => _gearShiftTestSustained = on;
+        /// <summary>Turn off every sustained test on this worker, built-in and custom.</summary>
+        public void StopAllTests()
+        {
+            Interlocked.Exchange(ref _testMask, 0);
+            _customEffectTestSustained.Clear();
+        }
 
-        /// <summary>Turn Road Texture's sustained test toggle on/off. See <see cref="_roadTextureTestSustained"/>.</summary>
-        public void SetRoadTextureTestSustained(bool on) => _roadTextureTestSustained = on;
-
-        /// <summary>Turn Lockup's sustained test toggle on/off. See <see cref="_lockupTestSustained"/>.</summary>
-        public void SetLockupTestSustained(bool on) => _lockupTestSustained = on;
-
-        /// <summary>Turn Threshold's sustained test toggle on/off. See <see cref="_thresholdTestSustained"/>.</summary>
-        public void SetThresholdTestSustained(bool on) => _thresholdTestSustained = on;
-
-        /// <summary>Turn Bite Point's sustained test toggle on/off. See <see cref="_bitePointTestSustained"/>.</summary>
-        public void SetBitePointTestSustained(bool on) => _bitePointTestSustained = on;
-
-        /// <summary>Turn G-Force's sustained test toggle on/off. See <see cref="_gforceTestSustained"/>.</summary>
-        public void SetGForceTestSustained(bool on) => _gforceTestSustained = on;
-
-        /// <summary>Turn Brake Fade's sustained test toggle on/off. See <see cref="_brakeFadeTestActive"/>.</summary>
-        public void SetBrakeFadeTestSustained(bool on) => _brakeFadeTestActive = on;
+        private bool TestOn(MBoosterTestEffect test) => (Volatile.Read(ref _testMask) & (int)test) != 0;
 
         /// <summary>
         /// Park this worker's effect + Brake Fade output while a hardware
@@ -670,7 +647,7 @@ namespace MozaPlugin.Devices.MBooster
             // drags are felt immediately while testing. Games aren't
             // guaranteed to be running during a test, so play the redline
             // tone rather than an RPM-scaled one.
-            if (_engineTestSustained)
+            if (TestOn(MBoosterTestEffect.Engine))
             {
                 st.IntensityRequest = Clamp01((effects?.Engine?.IntensityPct ?? 0) / 100.0) * EngineScaleMax;
                 st.FreqHz = ClampEngineFreq(EngineRedlineFreqHz);
@@ -733,7 +710,7 @@ namespace MozaPlugin.Devices.MBooster
             // snapshotting them. Gated at 60% brake (not any nonzero press)
             // so the test only fires once you're pressing hard enough to
             // plausibly trigger real ABS, not on a light tap.
-            if (_absTestSustained)
+            if (TestOn(MBoosterTestEffect.Abs))
             {
                 double brakeT = brakeSignal;
                 if (brakeT < 0.6)
@@ -797,7 +774,7 @@ namespace MozaPlugin.Devices.MBooster
             // signal to press against outside a real intervention, and gating
             // on the throttle stranded every lane whose motorized pedal isn't
             // the throttle.
-            if (_tcTestSustained)
+            if (TestOn(MBoosterTestEffect.TractionControl))
             {
                 if (testPress < 0.6)
                 {
@@ -856,7 +833,7 @@ namespace MozaPlugin.Devices.MBooster
             // wheelspin heuristic (there's no live wheelspin signal to press
             // against outside a real spin event) — same substitution Traction
             // Control's test makes, at the same gate.
-            if (_wheelSpinTestSustained)
+            if (TestOn(MBoosterTestEffect.WheelSpin))
             {
                 if (testPress < 0.6)
                 {
@@ -931,7 +908,7 @@ namespace MozaPlugin.Devices.MBooster
             // every other effect's test toggle makes (there's no live
             // "gear just changed" signal to press against outside a real
             // shift).
-            if (_gearShiftTestSustained)
+            if (TestOn(MBoosterTestEffect.GearShift))
             {
                 double testScale = ((effects?.GearShift?.IntensityPct ?? 0) / 100.0) * GearShiftScaleMax;
                 st.IntensityRequest = Clamp01(testScale);
@@ -1014,7 +991,7 @@ namespace MozaPlugin.Devices.MBooster
             // position for it — same substitution the old 1s test pulse
             // used — just indefinite, and live-tracking Frequency/Intensity
             // every tick instead of snapshotting them.
-            if (_lockupTestSustained)
+            if (TestOn(MBoosterTestEffect.Lockup))
             {
                 double brakeT = brakeSignal;
                 if (brakeT <= 0.01)
@@ -1091,7 +1068,7 @@ namespace MozaPlugin.Devices.MBooster
             // 1s-pulse snapshot the old mechanism used; the hysteresis logic
             // itself (and _thresholdLatched) is shared with the real path
             // below since only one of the two runs per tick.
-            if (_thresholdTestSustained)
+            if (TestOn(MBoosterTestEffect.Threshold))
             {
                 double brakeT = brakeSignal;
                 if (!_thresholdLatched && brakeT >= triggerLevel)
@@ -1202,7 +1179,7 @@ namespace MozaPlugin.Devices.MBooster
             // live-tracked from settings; the hysteresis logic itself (and
             // _bitePointLatched) is shared with the real path below since
             // only one of the two runs per tick.
-            if (_bitePointTestSustained)
+            if (TestOn(MBoosterTestEffect.BitePoint))
             {
                 if (!_bitePointLatched && pedalPos <= triggerLevel)
                     _bitePointLatched = true;
@@ -1299,7 +1276,7 @@ namespace MozaPlugin.Devices.MBooster
 
         private void UpdateRoadTextureRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
-            if (_roadTextureTestSustained)
+            if (TestOn(MBoosterTestEffect.RoadTexture))
             {
                 st.IntensityRequest = 1;
                 st.RoadTextureRoughness01 = 1;
@@ -1340,7 +1317,7 @@ namespace MozaPlugin.Devices.MBooster
 
         private void UpdateGForceRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
-            if (_gforceTestSustained)
+            if (TestOn(MBoosterTestEffect.GForce))
             {
                 st.ElapsedSec += TickPeriodSec;
                 double cycle = st.ElapsedSec % (GForceTestPhaseSec * 2);
@@ -1399,7 +1376,7 @@ namespace MozaPlugin.Devices.MBooster
             // brake-temperature reading, not one per axis.
             var bf = lane?.BrakeFade;
             double ramp01;
-            if (_brakeFadeTestActive) ramp01 = 1.0;
+            if (TestOn(MBoosterTestEffect.BrakeFade)) ramp01 = 1.0;
             else if (bf == null || !bf.Enabled) ramp01 = 0.0;
             else ramp01 = Clamp01((snap.BrakeTempC - bf.BrakeFadeOnsetC) / BrakeFadeSpanC);
 

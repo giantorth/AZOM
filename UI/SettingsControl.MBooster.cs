@@ -333,20 +333,22 @@ namespace MozaPlugin.UI
                 MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
                     + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
             }
+            // The seed below shows every Test toggle off (custom-effect rows
+            // are rebuilt off too), so nothing may keep running behind them —
+            // a profile switch, settings re-key, import or role move reseeds
+            // without a selection change.
+            StopMBoosterPedalTests();
             using (_suppressor.Begin())
             {
                 // Role is seeded per-row by the device rows block above (each
                 // MBoosterDeviceRow owns its own Role), not here.
                 // _mboosterEffectPedalIndex is resolved/validated by the device
                 // rows block above too — here we just seed whichever pedal it
-                // settled on. (Test toggles are never persisted;
-                // SeedMBoosterEffectControls always clears them.)
+                // settled on.
                 SeedMBoosterEffectControls(PeekMBoosterEffectTarget());
                 MBoosterBrakeFadeEnable.IsChecked = s.BrakeFade?.Enabled ?? false;
                 MBoosterBrakeFadeOnsetSlider.Value = s.BrakeFade?.BrakeFadeOnsetC ?? 550;
                 SetValueText(MBoosterBrakeFadeOnsetValue, MBoosterBrakeFadeOnsetSlider.Value.ToString("F0"));
-                // Never persisted — always starts off for a freshly-shown tab.
-                MBoosterBrakeFadeTestToggle.IsChecked = false;
                 SeedMBoosterConfigControls(PeekMBoosterEffectTarget());
             }
             SeedMBoosterSleep(s, selected);
@@ -379,34 +381,35 @@ namespace MozaPlugin.UI
             OnMBoosterDeviceRowSelected(row.Identity, row.AxisIndex);
         }
 
-        /// <summary>Stop any sustained Engine/ABS/Traction Control/Wheel Spin/
-        /// Gear Shift/Road Texture/Lockup/Threshold/Brake Fade/G-Force/custom
-        /// test on the currently selected pedal. Call before the selection
-        /// moves off it — otherwise it keeps buzzing with no visible toggle
-        /// left to turn it off (the new pedal's reseed clears the toggles).</summary>
+        /// <summary>Stop every sustained test on the selected lane and show
+        /// every Test toggle off. Call before the selection moves off the
+        /// pedal, before a reseed (it clears the toggles) and on unload —
+        /// otherwise a test keeps running with no visible toggle left to turn
+        /// it off. Must run while <see cref="CurrentMBoosterController"/> is
+        /// still the lane that ran it.</summary>
         private void StopMBoosterPedalTests()
         {
-            if (MBoosterEngineTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterAbsTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetAbsTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterTcTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetTcTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterWheelSpinTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetWheelSpinTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterGearShiftTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetGearShiftTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterRoadTextureTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterLockupTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetLockupTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterThresholdTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterBrakeFadeTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
-            if (MBoosterGForceTestToggle.IsChecked == true)
-                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
+            CurrentMBoosterController()?.StopAllTests();
+            using (_suppressor.Begin())
+                ClearMBoosterTestToggles();
             StopAllCustomEffectTests();
+        }
+
+        /// <summary>Show every built-in Test toggle off. Never persisted, so
+        /// every seed starts from here too.</summary>
+        private void ClearMBoosterTestToggles()
+        {
+            MBoosterTcTestToggle.IsChecked = false;
+            MBoosterWheelSpinTestToggle.IsChecked = false;
+            MBoosterGearShiftTestToggle.IsChecked = false;
+            MBoosterAbsTestToggle.IsChecked = false;
+            MBoosterLockupTestToggle.IsChecked = false;
+            MBoosterThresholdTestToggle.IsChecked = false;
+            MBoosterBitePointTestToggle.IsChecked = false;
+            MBoosterEngineTestToggle.IsChecked = false;
+            MBoosterRoadTextureTestToggle.IsChecked = false;
+            MBoosterGForceTestToggle.IsChecked = false;
+            MBoosterBrakeFadeTestToggle.IsChecked = false;
         }
 
         /// <summary>Row selection logic — fires when a pedal row's label Button
@@ -632,9 +635,9 @@ namespace MozaPlugin.UI
             if (c.RoleMapVersion == version) return;
             _mboosterRoleFollow = null;
             if (!string.Equals(identity, _mboosterSelectedIdentity, StringComparison.OrdinalIgnoreCase)) return;
-            if (_mboosterEffectPedalIndex == a) _mboosterEffectPedalIndex = b;
-            else if (_mboosterEffectPedalIndex == b) _mboosterEffectPedalIndex = a;
-            else return;
+            if (_mboosterEffectPedalIndex != a && _mboosterEffectPedalIndex != b) return;
+            StopMBoosterPedalTests();
+            _mboosterEffectPedalIndex = _mboosterEffectPedalIndex == a ? b : a;
             _mboosterUiSeeded = false;
         }
 
@@ -718,18 +721,17 @@ namespace MozaPlugin.UI
         /// per-lane (master pedal only).</summary>
         private void SeedMBoosterEffectControls(IMBoosterEffects? fx)
         {
+            ClearMBoosterTestToggles();
             MBoosterTcEnable.IsChecked       = fx?.TractionControl?.Enabled          ?? false;
             MBoosterTcFrequencySlider.Value  = fx?.TractionControl?.FrequencyHz      ?? MBoosterUiConstants.TractionControlFreqMinHz;
             SetValueText(MBoosterTcFrequencyValue, MBoosterTcFrequencySlider.Value.ToString("F0"));
             MBoosterTcIntensity.Value        = fx?.TractionControl?.IntensityPct     ?? 50;
             SetValueText(MBoosterTcIntensityValue, (fx?.TractionControl?.IntensityPct ?? 50).ToString());
-            MBoosterTcTestToggle.IsChecked = false;
             MBoosterWheelSpinEnable.IsChecked       = fx?.WheelSpin?.Enabled          ?? false;
             MBoosterWheelSpinFrequencySlider.Value  = fx?.WheelSpin?.FrequencyHz      ?? MBoosterUiConstants.WheelSpinFreqMinHz;
             SetValueText(MBoosterWheelSpinFrequencyValue, MBoosterWheelSpinFrequencySlider.Value.ToString("F0"));
             MBoosterWheelSpinIntensity.Value        = fx?.WheelSpin?.IntensityPct     ?? 50;
             SetValueText(MBoosterWheelSpinIntensityValue, (fx?.WheelSpin?.IntensityPct ?? 50).ToString());
-            MBoosterWheelSpinTestToggle.IsChecked = false;
             MBoosterGearShiftEnable.IsChecked       = fx?.GearShift?.Enabled          ?? false;
             MBoosterGearShiftFrequencySlider.Value  = fx?.GearShift?.FrequencyHz      ?? MBoosterUiConstants.GearShiftFreqMinHz;
             SetValueText(MBoosterGearShiftFrequencyValue, MBoosterGearShiftFrequencySlider.Value.ToString("F0"));
@@ -739,7 +741,6 @@ namespace MozaPlugin.UI
             int gearShiftDebounceMs = fx?.GearShift?.DebounceMs ?? 500;
             MBoosterGearShiftDebounceSlider.Value = gearShiftDebounceMs;
             MBoosterGearShiftDebounceValue.Text = $"{gearShiftDebounceMs} ms";
-            MBoosterGearShiftTestToggle.IsChecked = false;
             MBoosterAbsEnable.IsChecked       = fx?.Abs?.Enabled          ?? false;
             MBoosterAbsFrequencySlider.Value  = fx?.Abs?.FrequencyHz      ?? MBoosterUiConstants.AbsFreqMinHz;
             SetValueText(MBoosterAbsFrequencyValue, MBoosterAbsFrequencySlider.Value.ToString("F0"));
@@ -747,13 +748,11 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterAbsIntensityValue, (fx?.Abs?.IntensityPct ?? 50).ToString());
             MBoosterAbsSmoothness.Value       = fx?.Abs?.SmoothnessPct    ?? 100;
             SetValueText(MBoosterAbsSmoothnessValue, (fx?.Abs?.SmoothnessPct ?? 100).ToString());
-            MBoosterAbsTestToggle.IsChecked = false;
             MBoosterLockupEnable.IsChecked = fx?.Lockup?.Enabled ?? false;
             MBoosterLockupFrequencySlider.Value = fx?.Lockup?.FrequencyHz ?? MBoosterUiConstants.LockupFreqMinHz;
             SetValueText(MBoosterLockupFrequencyValue, MBoosterLockupFrequencySlider.Value.ToString("F0"));
             MBoosterLockupIntensity.Value = fx?.Lockup?.IntensityPct ?? 50;
             SetValueText(MBoosterLockupIntensityValue, (fx?.Lockup?.IntensityPct ?? 50).ToString());
-            MBoosterLockupTestToggle.IsChecked = false;
             MBoosterThresholdEnable.IsChecked = fx?.Threshold?.Enabled ?? false;
             MBoosterThresholdTriggerLevel.Value = fx?.Threshold?.TriggerLevelPct ?? 60;
             SetValueText(MBoosterThresholdTriggerLevelValue, (fx?.Threshold?.TriggerLevelPct ?? 60).ToString());
@@ -763,7 +762,6 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterThresholdIntensityValue, (fx?.Threshold?.IntensityPct ?? 50).ToString());
             MBoosterThresholdDecay.Value = fx?.Threshold?.DecayPct ?? 20;
             SetValueText(MBoosterThresholdDecayValue, (fx?.Threshold?.DecayPct ?? 20).ToString());
-            MBoosterThresholdTestToggle.IsChecked = false;
             MBoosterBitePointEnable.IsChecked = fx?.BitePoint?.Enabled ?? false;
             MBoosterBitePointTriggerLevel.Value = fx?.BitePoint?.TriggerLevelPct ?? 50;
             SetValueText(MBoosterBitePointTriggerLevelValue, (fx?.BitePoint?.TriggerLevelPct ?? 50).ToString());
@@ -773,11 +771,9 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterBitePointSmoothnessValue, (fx?.BitePoint?.SmoothnessPct ?? 100).ToString());
             MBoosterBitePointIntensity.Value = fx?.BitePoint?.IntensityPct ?? 50;
             SetValueText(MBoosterBitePointIntensityValue, (fx?.BitePoint?.IntensityPct ?? 50).ToString());
-            MBoosterBitePointTestToggle.IsChecked = false;
             MBoosterEngineEnable.IsChecked    = fx?.Engine?.Enabled       ?? false;
             MBoosterEngineIntensity.Value     = fx?.Engine?.IntensityPct  ?? 50;
             SetValueText(MBoosterEngineIntensityValue, (fx?.Engine?.IntensityPct ?? 50).ToString());
-            MBoosterEngineTestToggle.IsChecked = false;
             MBoosterRoadTextureEnable.IsChecked = fx?.RoadTexture?.Enabled ?? false;
             MBoosterRoadTextureIntensity.Value = fx?.RoadTexture?.IntensityPct ?? 50;
             SetValueText(MBoosterRoadTextureIntensityValue, (fx?.RoadTexture?.IntensityPct ?? 50).ToString());
@@ -785,13 +781,11 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterRoadTextureSmoothnessValue, (fx?.RoadTexture?.SmoothnessPct ?? 50).ToString());
             MBoosterRoadTextureGain.Value = fx?.RoadTexture?.GainPct ?? 100;
             SetValueText(MBoosterRoadTextureGainValue, (fx?.RoadTexture?.GainPct ?? 100).ToString());
-            MBoosterRoadTextureTestToggle.IsChecked = false;
             MBoosterGForceEnable.IsChecked = fx?.GForce?.Enabled ?? false;
             MBoosterGForceMaxTravel.Value = fx?.GForce?.MaxTravelMm ?? 10;
             SetValueText(MBoosterGForceMaxTravelValue, MBoosterGForceMaxTravel.Value.ToString("0.#"));
             MBoosterGForceResponseSpeed.Value = fx?.GForce?.ResponseSpeedPct ?? 50;
             SetValueText(MBoosterGForceResponseSpeedValue, (fx?.GForce?.ResponseSpeedPct ?? 50).ToString());
-            MBoosterGForceTestToggle.IsChecked = false;
         }
 
         /// <summary>Seed the Calibration, Sim Input Mapping and Pedal Feel controls

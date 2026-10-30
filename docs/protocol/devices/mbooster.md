@@ -827,9 +827,13 @@ Threshold still use — ABS used to fire the same kind of one-shot 1s
 pulse (`MBoosterEffectWorker.FireTestPulse`, a `TestPulse` with a fixed
 deadline) before its own rebuild below, but Engine has no brake
 modulation to preview against a live pedal press, so a timed pulse
-didn't fit it well. Instead, `Test` turns `_engineTestSustained` on/off
-(`MBoosterEffectWorker.SetEngineTestSustained`, wired through
-`MBoosterDeviceController.SetEngineTestActive`); while on, the effect
+didn't fit it well. Instead, `Test` turns the `MBoosterTestEffect.Engine`
+bit of the worker's `_testMask` on/off
+(`MBoosterEffectWorker.SetTestSustained`, wired through
+`MBoosterDeviceController.SetEngineTestActive` → `SetTestActive`). Every
+built-in test is one bit of that mask, so `MBoosterDeviceController.StopAllTests`
+(called by the UI before the selected pedal changes, before a reseed and on
+unload) clears all of them, custom-effect tests included; while on, the effect
 runs indefinitely at the fixed redline frequency (there's no guarantee
 a game is running to supply RPM during a test) and live-reads Intensity
 from settings every tick (not a snapshot) so slider drags are felt
@@ -864,7 +868,7 @@ input now. At `smoothness01 = 0` (0%) `depth = 0.5`, matching
 `SynthesizeEngine`'s full 0..1 swing for a sharper, choppier pulse.
 
 ABS also gets Engine's sustained Test toggle pattern
-(`_absTestSustained`/`SetAbsTestSustained`/`SetAbsTestActive`, replacing
+(`MBoosterTestEffect.Abs`/`SetAbsTestActive`, replacing
 the old 1s `FireTestPulse` path for this effect only) — since ABS has
 no live "how hard is ABS engaging" signal to preview against outside a
 real ABS event, the toggle substitutes live brake position for

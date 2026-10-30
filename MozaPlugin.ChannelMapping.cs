@@ -97,12 +97,11 @@ namespace MozaPlugin
         /// Rebind, so dashboard session frames reach it once the sender is bound here.)</summary>
         private void OnDashboardMessageReceived(byte[] data) => OnMessageReceived(data, fromDashboard: true);
 
-        /// <summary>Dashboard USB unplugged — pause the sender so the next tick rebinds
-        /// it back to the wheelbase (and the base-bridged 0x14 path takes over if present).</summary>
+        /// <summary>Dashboard USB unplugged — stop the CM2 lane riding that pipe. The
+        /// main sender is wheelbase-only and is left running.</summary>
         private void OnDashboardDisconnected()
         {
             if (IsShuttingDown) return;
-            try { _telemetrySender?.Pause(); } catch { }
             _dualDisplay?.OnConnectionLost(_dashboardManager?.Connection);
             DetectionState.DashDetected = false;
             _data.IsDashboardConnected = false;

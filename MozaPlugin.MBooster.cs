@@ -573,8 +573,7 @@ namespace MozaPlugin
         /// the phantom-axis guard, and blanks it during the unseeded window
         /// otherwise. Healed across ALL profiles: the proof is physical
         /// (device-reported wiring), not a per-profile preference. Runs on the
-        /// connection read thread, at most once per distinct diagnostic line
-        /// per session.
+        /// connection read thread, on the first live reading and on change.
         /// </summary>
         private void OnMBoosterConnectivityResolved(string identity, bool[] connected)
         {

@@ -280,9 +280,13 @@ namespace MozaPlugin.Integration
             // later toggle-on restores it instead of a fixed default.
             _plugin.AddAction("AZOM.DisplayToggle", (a, b) => ToggleDisplay());
 
-            // Toggle telemetry test mode (synthetic signal sweep) for the active
-            // wheel page, mirroring the Test Start/Stop buttons in the UI.
-            _plugin.AddAction("AZOM.TestModeToggle", (a, b) => ToggleTestMode());
+            // Toggle the dashboard test pattern on every display pipeline — same
+            // path as the dashboard UI's Send Test Pattern / Stop Test button.
+            _plugin.AddAction("AZOM.TestModeToggle", (a, b) =>
+            {
+                bool on = _plugin.ToggleDashboardTestPattern();
+                MozaLog.Debug($"[AZOM] Test pattern → {(on ? "on" : "off")} via action");
+            });
 
             // FSR V1 single-byte probe diagnostic: step the probed payload offset with
             // wheel buttons so the boundaries can be walked hands-on while watching the
@@ -329,37 +333,6 @@ namespace MozaPlugin.Integration
                 SetDisplayBrightness(restore);
                 MozaLog.Debug($"[AZOM] Display on → {restore}% via action");
             }
-        }
-
-        // Flip telemetry test mode for the active wheel page. Mirrors
-        // DashboardManagementControl's Test Start/Stop: when the active overlay
-        // doesn't already have live telemetry enabled, test mode owns the sender
-        // lifecycle (start on a worker thread when turning on, stop when turning
-        // off) so the synthetic sweep runs without flipping the persisted
-        // per-page telemetry-enabled flag.
-        private void ToggleTestMode()
-        {
-            var active = _plugin.TelemetrySender;
-            if (active == null)
-            {
-                MozaLog.Debug("[AZOM] Test mode toggle ignored: no telemetry sender");
-                return;
-            }
-            bool turningOn = !active.TestMode;
-            active.TestMode = turningOn;
-            if (!_plugin.ActiveTelemetryEnabled)
-            {
-                if (turningOn)
-                {
-                    _plugin.ApplyTelemetrySettings();
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ => active.Start());
-                }
-                else
-                {
-                    active.Stop();
-                }
-            }
-            MozaLog.Debug($"[AZOM] Test mode → {(turningOn ? "on" : "off")} via action");
         }
 
         // ===== Display brightness step/set helpers =====

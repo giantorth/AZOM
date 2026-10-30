@@ -878,7 +878,7 @@ namespace MozaPlugin
         // tier-def senders consume it via their own TestMode; the standalone FSR1
         // (0x42) / CM1 (0x35) drivers read this flag in their tick and synthesise a
         // sweep (see Telemetry/DashboardTestPattern). Volatile: written from the UI
-        // thread, read from the driver/sender timer threads.
+        // and SimHub action threads, read from the driver/sender timer threads.
         private volatile bool _dashboardTestPattern;
 
         /// <summary>True while the dashboard test pattern is active (any display type).</summary>
@@ -893,6 +893,41 @@ namespace MozaPlugin
             if (_telemetrySender != null) _telemetrySender.TestMode = on;
             if (_cm2Sender != null) _cm2Sender.TestMode = on;
             if (on) _fsr1Probe?.DisarmAll(); // exclusive with both probes
+        }
+
+        /// <summary>Flip the test pattern on every display pipeline. Shared by the
+        /// dashboard UI's test button and the <c>AZOM.TestModeToggle</c> action.
+        /// Thread-agnostic (no WPF access). Returns the new state.</summary>
+        internal bool ToggleDashboardTestPattern()
+        {
+            bool turningOn = !_dashboardTestPattern;
+            // The standalone FSR1/CM1 drivers pick the flag up on their next tick —
+            // no start needed while they're already running.
+            SetDashboardTestPattern(turningOn);
+
+            // A tier-def DISPLAY wheel (W17/W18) renders only while its sender is
+            // Active; bring it up on demand. Never start it for an FSR1 (its screen
+            // is the 0x42 driver — starting the idle wheel sender kicks a phantom
+            // cold-start) or for a wheel whose screen isn't the tier-def sender.
+            var active = _telemetrySender;
+            if (active != null && WheelUsesTierDefDisplaySender && !ActiveTelemetryEnabled)
+            {
+                if (turningOn && !active.IsActive)
+                {
+                    ApplyTelemetrySettings();
+                    // An exception escaping a pool work item terminates the process.
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try { active.Start(); }
+                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Test-pattern sender start failed: {ex.Message}"); }
+                    });
+                }
+                else if (!turningOn && active.IsActive)
+                {
+                    active.Stop();
+                }
+            }
+            return turningOn;
         }
 
         // Build the 3-byte payload shared by per-effect speed commands:

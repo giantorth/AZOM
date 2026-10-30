@@ -200,32 +200,10 @@ namespace MozaPlugin.UI
             }
 
             UnsubscribeStalks();
-            // Closing the settings panel takes the sustained Engine/ABS/
-            // Traction Control/Wheel Spin/Gear Shift/Road Texture/Lockup/
-            // Threshold/Brake Fade test toggles out of view — stop them so
-            // a forgotten toggle doesn't leave the pedal buzzing
-            // indefinitely with no UI left to turn it off.
-            if (MBoosterEngineTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetEngineTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterAbsTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetAbsTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterTcTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetTcTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterWheelSpinTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetWheelSpinTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterGearShiftTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetGearShiftTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterRoadTextureTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetRoadTextureTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterLockupTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetLockupTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterThresholdTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetThresholdTestActive(false, _mboosterEffectPedalIndex);
-            if (MBoosterBrakeFadeTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetBrakeFadeTestActive(false);
-            if (MBoosterGForceTestToggle?.IsChecked == true)
-                CurrentMBoosterController()?.SetGForceTestActive(false, _mboosterEffectPedalIndex);
-            StopAllCustomEffectTests();
+            // Closing the settings panel takes every mBooster Test toggle out
+            // of view — stop them so a forgotten toggle doesn't leave the
+            // pedal buzzing indefinitely with no UI left to turn it off.
+            StopMBoosterPedalTests();
             if (ReferenceEquals(Instance, this)) Instance = null;
         }
 

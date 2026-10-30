@@ -29,11 +29,6 @@ namespace MozaPlugin
     public partial class MozaPlugin
     {
 
-        // Fires from MozaSerialConnection.HandleIoFailure on the read or
-        // write thread once the port has been force-closed. Pause telemetry
-        // and reset wheel detection right now rather than waiting for the
-        // next reconnect-timer tick — otherwise the sender keeps firing and
-        // accumulating ack waiters / catalog state for ~5 s.
         // System power-state notification (sleep/resume). Fires on the dedicated
         // SystemEvents notification thread — keep it non-blocking. Only Resume is
         // handled: after sleep the wheel power-cycles and drops its display/
@@ -133,12 +128,20 @@ namespace MozaPlugin
             }
         }
 
+        // Fires from MozaSerialConnection on whichever thread closed the port
+        // (read/write thread, or a ForceReconnect caller). Stop telemetry and reset wheel detection
+        // right now rather than waiting for the next reconnect-timer tick —
+        // otherwise the sender keeps firing and accumulating ack waiters /
+        // catalog state for ~5 s.
         private void OnSerialDisconnected()
         {
             if (IsShuttingDown) return;
-            // Pause first so the sender's next tick sees the timer stopped
-            // before ResetWheelDetection issues its full Stop().
-            try { _telemetrySender?.Pause(); } catch { }
+            // The main sender's sessions died with the port. Stop it here, not
+            // only via ResetWheelDetection below (skipped when an earlier rim
+            // reset already cleared the wheel flags), and clear the start latch
+            // so the reconnect's wheel detect cold-starts it.
+            try { _telemetrySender?.Stop(); } catch { }
+            Interlocked.Exchange(ref _telemetryStartRequested, 0);
             // A bus CM2 lane on this pipe lost its sessions too.
             _dualDisplay?.OnConnectionLost(_connection);
             // Drop pending response watches — the wheel/port we sent to is

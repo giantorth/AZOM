@@ -230,6 +230,30 @@ namespace MozaPlugin.Devices.MBooster
     }
 
     /// <summary>
+    /// The built-in sustained Test toggles an mBooster effect worker can run,
+    /// one bit each so <see cref="MBoosterDeviceController.StopAllTests"/>
+    /// clears every one at once. Custom effects' tests are keyed by effect id
+    /// instead (unbounded count). Brake Fade is lane-wide — see
+    /// <see cref="MBoosterDeviceController.SetTestActive"/>.
+    /// </summary>
+    [Flags]
+    public enum MBoosterTestEffect
+    {
+        None            = 0,
+        Engine          = 1 << 0,
+        Abs             = 1 << 1,
+        TractionControl = 1 << 2,
+        WheelSpin       = 1 << 3,
+        GearShift       = 1 << 4,
+        RoadTexture     = 1 << 5,
+        Lockup          = 1 << 6,
+        Threshold       = 1 << 7,
+        BitePoint       = 1 << 8,
+        GForce          = 1 << 9,
+        BrakeFade       = 1 << 10,
+    }
+
+    /// <summary>
     /// Per-effect knobs the user can tweak. Originally frequency was computed
     /// at runtime per protocol note § 4 telemetry pseudocode with only
     /// enable + intensity surfaced in the UI — ABS, Lockup, and Threshold

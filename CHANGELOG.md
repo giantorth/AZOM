@@ -18,6 +18,11 @@ All notable changes to the AZOM plugin are documented here.
 - **A failed dashboard upload no longer blocks later uploads** until the CM2 or wheel is power-cycled.
 - **mBooster Threshold no longer vibrates when stopped;** it now needs the car to be moving.
 - **AB9 no longer goes wild every ~35 s during engine vibration;** engine damping now follows RPM.
+- **Unplugging a dashboard's USB no longer freezes the wheel display.**
+- **A re-plugged mBooster pedal reconnects** instead of staying disconnected until SimHub restarts.
+- **mBooster Test toggles all stop when switching pedals or closing the panel,** Bite Point no longer keeps vibrating.
+- **CM2 Files tab lists and deletes the CM2's dashboards,** not the wheel's.
+- **`AZOM.TestModeToggle` action matches the dashboard page's Test button** and can no longer crash SimHub.
 
 ## [1.7.1]
 

@@ -490,15 +490,5 @@ namespace MozaPlugin.Telemetry
         /// the sender itself is left running (telemetry remains enabled).
         /// </summary>
         public void FlushPendingOutput() => _connection.FlushPendingWrites();
-
-        /// <summary>
-        /// Stop the tick timer without tearing down session state. Use for UI
-        /// Test Stop so the wheel goes quiet immediately; call Resume to kick
-        /// the timer back on. Full Stop() is the destructive teardown path.
-        /// </summary>
-        public void Pause() => _sendTimer?.Stop();
-
-        /// <summary>Re-enable a paused tick timer. No-op if never started.</summary>
-        public void Resume() => _sendTimer?.Start();
     }
 }

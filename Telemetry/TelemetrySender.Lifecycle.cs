@@ -32,8 +32,11 @@ namespace MozaPlugin.Telemetry
             // alive); a Stop+Start cycle here would close sessions and
             // pay the 11s sess=0x09 settle wait, defeating the whole point
             // of keeping the wire persistent. Short-circuit when already
-            // Active and connected.
-            if (_state == TelemetryState.Active && _connection.IsConnected)
+            // Active, connected, and still ticking — an Active state whose tick
+            // timer is gone (a Stop racing the preamble's Active transition)
+            // is not running and must take the full start.
+            if (_state == TelemetryState.Active && Volatile.Read(ref _sendTimer) != null
+                && _connection.IsConnected)
             {
                 MozaLog.Debug(
                     "[AZOM] Start() skipped — sender already Active with live connection " +
