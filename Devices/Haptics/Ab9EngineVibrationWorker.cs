@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading;
 using MozaPlugin.Settings;
 
@@ -139,33 +138,15 @@ namespace MozaPlugin.Devices.Haptics
         }
 
         private void Loop()
-        {
-            long stopwatchFreq = Stopwatch.Frequency;
-            long periodTicks = stopwatchFreq * TickPeriodMs / 1000;
-            long next = Stopwatch.GetTimestamp() + periodTicks;
-            while (!_stop)
-            {
-                try { Tick(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM/AB9] engine-vib tick: {ex.Message}"); }
+            => PacedWorkerLoop.Run(TickPeriodMs, () => _stop, IsActive, Tick, "[AZOM/AB9] engine-vib tick");
 
-                long now = Stopwatch.GetTimestamp();
-                long delta = next - now;
-                if (delta <= 0)
-                {
-                    // Fell behind by >1 tick; reset deadline so we don't burst.
-                    next = now + periodTicks;
-                    continue;
-                }
-                int sleepMs = (int)Math.Min(50, Math.Max(1, delta * 1000 / stopwatchFreq));
-                Thread.Sleep(sleepMs);
-                next += periodTicks;
-            }
-        }
+        // False exactly when Tick is a no-op; the loop idles instead of ticking.
+        private bool IsActive()
+            => !_isShuttingDown() && _ab9 != null && _ab9.IsConnected && _detectionState.Ab9Detected;
 
         private void Tick()
         {
-            if (_isShuttingDown()) return;
-            if (_ab9 == null || !_ab9.IsConnected || !_detectionState.Ab9Detected) return;
+            if (!IsActive()) return;
 
             // A null lookup means the active profile has no Ab9 block; use
             // factory defaults (intensity 0 → silent) so engine vibration

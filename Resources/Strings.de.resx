@@ -892,4 +892,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktiles Feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Tasten-Entprellung (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Vorschau nicht verfügbar</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Gedrückt</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Losgelassen</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Eigene Farbtonauswahl</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Pastellrot</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Pastellorange</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Pastellgelb</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Pastellgrün</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Pastellcyan</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Pastellblau</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Pastelllila</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Pastellmagenta</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse-Voreinstellung (*.mzpreset;*.json)|*.mzpreset;*.json|Alle Dateien (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>„{0}“ auf das aktive Profil angewendet</value></data>
 </root>

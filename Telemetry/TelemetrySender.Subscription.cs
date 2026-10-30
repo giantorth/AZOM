@@ -66,9 +66,9 @@ namespace MozaPlugin.Telemetry
         ///     incoming profile in-place so the immediately-following
         ///     `new TelemetryFrameBuilder(tier, …)` loop builds sized-
         ///     correctly buffers against the filtered Channels list.
-        ///   * ApplySubscription (post-catalog-grow): mutate the live
-        ///     profile and then rebuild <see cref="_tiers"/> Builders via
-        ///     <see cref="RebuildFrameBuildersFromProfile"/>.
+        ///   * ApplySubscription (post-catalog-grow): the tier-list swap and
+        ///     the Builder rebuild happen together under ProfileSetLock in
+        ///     <see cref="TierDefinitionEmitter.RefilterLiveTiers"/>.
         /// </summary>
         
         /// <summary>
@@ -102,6 +102,13 @@ namespace MozaPlugin.Telemetry
             // its identity probe. After this returns, _policy is the final
             // policy used for tier-def emission and value-frame routing.
             ResolveAutoPolicy();
+
+            // New tier-def generation — including every Start's preamble→Active
+            // apply: forget what strings were sent so the first poll re-pushes
+            // them (the wheel's prior copy belongs to a closed session or a
+            // superseded binding). Tick thread, like every other user of the dict.
+            if (!reuseFlagBase)
+                _stringChannelState.Clear();
 
             MaybeSwapProfileForCatalog(force: force);
             if (_profile == null || _profile.Tiers.Count == 0)
@@ -309,7 +316,7 @@ namespace MozaPlugin.Telemetry
             // end (0x00→0x3F over 64 emissions) and let partial re-advertisements
             // collapse the bound channel set. A real dashboard switch always
             // changes count or signature, so content-keying still catches it.
-            ulong catalogHash = ComputeCatalogHash(catalog);
+            ulong catalogHash = CatalogHashFor(catalog);
             if (currentIsSynthesised
                 && _catalogCountAtSynthesis == catalog.Count
                 && _catalogHashAtSynthesis == catalogHash

@@ -59,6 +59,9 @@ namespace MozaPlugin.Hardware
 
         private readonly object _gate = new object();
         private bool _timerRaised;   // timeBeginPeriod(1) currently held
+        private bool _timerWanted;   // gameplay request (SetTimerResolution)
+        private int _timerHolds;     // outstanding AcquireTimerResolution tokens
+        private bool _disposed;
         private bool _execOptOut;    // EcoQoS execution-speed opt-out requested
 
         // Last power-throttling word *requested*, not the one the OS accepted: Win10
@@ -70,28 +73,69 @@ namespace MozaPlugin.Hardware
         /// <summary>
         /// Hold (or release) the 1 ms multimedia timer and keep it honoured in the
         /// background. Idempotent; balances <c>timeBeginPeriod</c>/<c>timeEndPeriod</c>.
+        /// Outstanding <see cref="AcquireTimerResolution"/> holds keep it raised.
         /// </summary>
         public void SetTimerResolution(bool wanted)
         {
             lock (_gate)
             {
-                if (wanted != _timerRaised)
-                {
-                    try
-                    {
-                        if (wanted) timeBeginPeriod(PeriodMs); else timeEndPeriod(PeriodMs);
-                        _timerRaised = wanted;
-                        MozaLog.Info(wanted
-                            ? "Responsiveness: timer resolution raised to 1ms"
-                            : "Responsiveness: timer resolution released");
-                    }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Warn($"Responsiveness: time{(wanted ? "Begin" : "End")}Period failed: {ex.Message}");
-                    }
-                }
+                _timerWanted = wanted;
+                ReconcileTimerLocked();
                 ReconcilePowerThrottlingLocked();
             }
+        }
+
+        /// <summary>
+        /// Hold the 1 ms timer independently of gameplay, for work paced with short
+        /// <c>Thread.Sleep</c>s. Ref-counted; dispose the token to release.
+        /// </summary>
+        public IDisposable AcquireTimerResolution()
+        {
+            lock (_gate)
+            {
+                if (_disposed) return new TimerHold(null);
+                _timerHolds++;
+                ReconcileTimerLocked();
+                ReconcilePowerThrottlingLocked();
+            }
+            return new TimerHold(this);
+        }
+
+        private void ReleaseTimerHold()
+        {
+            lock (_gate)
+            {
+                if (_disposed || _timerHolds == 0) return;
+                _timerHolds--;
+                ReconcileTimerLocked();
+                ReconcilePowerThrottlingLocked();
+            }
+        }
+
+        // Must hold _gate.
+        private void ReconcileTimerLocked()
+        {
+            bool wanted = !_disposed && (_timerWanted || _timerHolds > 0);
+            if (wanted == _timerRaised) return;
+            try
+            {
+                if (wanted) timeBeginPeriod(PeriodMs); else timeEndPeriod(PeriodMs);
+                _timerRaised = wanted;
+                MozaLog.Info(wanted
+                    ? "Responsiveness: timer resolution raised to 1ms"
+                    : "Responsiveness: timer resolution released");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"Responsiveness: time{(wanted ? "Begin" : "End")}Period failed: {ex.Message}");
+            }
+        }
+
+        private sealed class TimerHold : IDisposable
+        {
+            private ProcessResponsivenessManager? _owner;
+            public TimerHold(ProcessResponsivenessManager? owner) => _owner = owner;
+            public void Dispose() => System.Threading.Interlocked.Exchange(ref _owner, null)?.ReleaseTimerHold();
         }
 
         /// <summary>
@@ -177,6 +221,7 @@ namespace MozaPlugin.Hardware
         {
             lock (_gate)
             {
+                _disposed = true;
                 if (_timerRaised)
                 {
                     try { timeEndPeriod(PeriodMs); } catch { /* best-effort on teardown */ }

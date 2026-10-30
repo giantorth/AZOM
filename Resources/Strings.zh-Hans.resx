@@ -892,4 +892,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>触觉反馈</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>按键去抖 (毫秒)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>预览不可用</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>已按下</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>已松开</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>自定义色调选择器</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>品红色</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>淡红色</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>淡橙色</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>淡黄色</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>淡绿色</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>淡青色</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>淡蓝色</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>淡紫色</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>淡品红色</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 预设 (*.mzpreset;*.json)|*.mzpreset;*.json|所有文件 (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>已将“{0}”应用到活动配置</value></data>
 </root>

@@ -891,4 +891,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>촉각 피드백</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>버튼 디바운스 (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>미리보기를 사용할 수 없음</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>눌림</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>놓임</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>사용자 지정 색조 선택기</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>자홍</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>파스텔 빨강</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>파스텔 주황</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>파스텔 노랑</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>파스텔 초록</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>파스텔 청록</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>파스텔 파랑</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>파스텔 보라</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>파스텔 자홍</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 프리셋 (*.mzpreset;*.json)|*.mzpreset;*.json|모든 파일 (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>활성 프로필에 “{0}” 적용됨</value></data>
 </root>

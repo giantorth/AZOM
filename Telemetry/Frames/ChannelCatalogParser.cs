@@ -34,13 +34,19 @@ namespace MozaPlugin.Telemetry.Frames
     /// re-announcing all of them, so back-refs are heavy at switch time and the
     /// merge step preserves prior idx→URL bindings unless the wheel overrides them.
     ///
-    /// All public methods are thread-safe via an internal lock on the buffer map.
-    /// The parsed catalog is published via a volatile field so observers see
-    /// monotonically-grown lists without external synchronisation.
+    /// Locking: <c>_bufferLock</c> guards the per-session buffers and reassembly
+    /// state (the read thread appends under it). <c>_parseLock</c> serialises
+    /// <see cref="TryParse"/>, <see cref="ClearBuffer"/>,
+    /// <see cref="BeginCatalogEpoch"/> and <see cref="Reset"/>, which own the
+    /// generation state (pending/committed markers, live set, epoch flags); it is
+    /// never taken on the read thread and is always acquired before
+    /// <c>_bufferLock</c>. The parsed catalogs are published via volatile fields
+    /// so readers need no lock.
     /// </summary>
     internal sealed class ChannelCatalogParser
     {
         private readonly object _bufferLock = new object();
+        private readonly object _parseLock = new object();
         // Per-session byte buffers. Session 0x01 (mgmt) and FlagByte/0x02
         // (telemetry) can both carry catalog chunks depending on firmware.
         // Keeping them split prevents cross-session corruption when one
@@ -354,21 +360,17 @@ namespace MozaPlugin.Telemetry.Frames
         /// Used by quiet-window waits.</summary>
         public int LastActivityMs => _lastActivityMs;
 
-        /// <summary>True when at least one session is holding out-of-order
-        /// chunks behind an unfilled hole. The tick loop polls this so the stall
-        /// escape stays reachable when the head is stuck and the buffer is
-        /// therefore NOT growing — the growth-gated TryParse call alone would
-        /// never run in that state.</summary>
-        public bool HasPendingChunks
+        /// <summary>Run the stall escape for sessions holding chunks behind an
+        /// unfilled hole. Returns true when a head was skipped forward, i.e. a
+        /// parse now has something new to read. The tick loop calls this so the
+        /// escape stays reachable while the head is stuck and the buffer is NOT
+        /// growing, without re-parsing the unchanged buffer every tick.</summary>
+        public bool TryEscapePendingStall()
         {
-            get
+            lock (_bufferLock)
             {
-                lock (_bufferLock)
-                {
-                    foreach (var kv in _pendingChunks)
-                        if (kv.Value.Count > 0) return true;
-                    return false;
-                }
+                if (_headBlockedSinceTickMs.Count == 0) return false;
+                return EscapePendingStallLocked();
             }
         }
 
@@ -637,9 +639,11 @@ namespace MozaPlugin.Telemetry.Frames
 
         /// <summary>Give up on a hole that never filled and resume from the
         /// lowest held chunk, so one permanently-lost chunk can't wedge a
-        /// session forever. Caller holds <c>_bufferLock</c>.</summary>
-        private void EscapePendingStallLocked()
+        /// session forever. Caller holds <c>_bufferLock</c>. Returns true if any
+        /// session's head was skipped forward.</summary>
+        private bool EscapePendingStallLocked()
         {
+            bool escaped = false;
             int now = Environment.TickCount;
             foreach (var session in _sessionOrder.ToArray())
             {
@@ -661,7 +665,9 @@ namespace MozaPlugin.Telemetry.Frames
                     + $"skipping to seq={resumeAt}; that generation stays incomplete until the wheel re-sends");
                 _nextExpectedSeq[session] = resumeAt;
                 DrainPendingLocked(session);
+                escaped = true;
             }
+            return escaped;
         }
 
         /// <summary>Reset the per-session buffers (typically on session restart
@@ -678,22 +684,25 @@ namespace MozaPlugin.Telemetry.Frames
         /// sessions; the wheel closed 0x02 and never bound.</summary>
         public void ClearBuffer()
         {
-            lock (_bufferLock)
+            lock (_parseLock)
             {
-                _buffersBySession.Clear();
-                _sessionOrder.Clear();
-                // Drop seq-dedup tracking too — fresh buffer means fresh
-                // session, retransmit memory should not bleed across.
-                _appendedSeqs.Clear();
-                _nextExpectedSeq.Clear();
-                _pendingChunks.Clear();
-                _headBlockedSinceTickMs.Clear();
-                _lastAppendTickMs.Clear();
-                _lastProgressTickMs.Clear();
-                _endMarkerBySession.Clear();
-                _sessionsWithValidUrls.Clear();
+                lock (_bufferLock)
+                {
+                    _buffersBySession.Clear();
+                    _sessionOrder.Clear();
+                    // Drop seq-dedup tracking too — fresh buffer means fresh
+                    // session, retransmit memory should not bleed across.
+                    _appendedSeqs.Clear();
+                    _nextExpectedSeq.Clear();
+                    _pendingChunks.Clear();
+                    _headBlockedSinceTickMs.Clear();
+                    _lastAppendTickMs.Clear();
+                    _lastProgressTickMs.Clear();
+                    _endMarkerBySession.Clear();
+                    _sessionsWithValidUrls.Clear();
+                }
+                _lastParseLen = 0;
             }
-            _lastParseLen = 0;
         }
 
         /// <summary>Hard-limit safety net: wipe any session buffer that
@@ -829,23 +838,29 @@ namespace MozaPlugin.Telemetry.Frames
         /// </summary>
         public void BeginCatalogEpoch()
         {
-            _committedEndMarker = 0;
-            _committedMarkers.Clear();
-            _pendingIdxs.Clear();
-            _lastSeenArmCount = -1;
-            _epochFirstCommitPending = true;
+            lock (_parseLock)
+            {
+                _committedEndMarker = 0;
+                _committedMarkers.Clear();
+                _pendingIdxs.Clear();
+                _lastSeenArmCount = -1;
+                _epochFirstCommitPending = true;
+            }
         }
 
         /// <summary>Reset both buffers AND parsed catalog. Use only on full session
         /// restart (StartInner) where prior bindings are stale.</summary>
         public void Reset()
         {
-            ClearBuffer();
-            _catalog = null;
-            _idxByUrl = null;
-            _lastActivityMs = 0;
-            _liveCatalog = null;
-            BeginCatalogEpoch();
+            lock (_parseLock)
+            {
+                ClearBuffer();
+                _catalog = null;
+                _idxByUrl = null;
+                _lastActivityMs = 0;
+                _liveCatalog = null;
+                BeginCatalogEpoch();
+            }
         }
 
         /// <summary>Returns the total buffer length (across sessions) the last
@@ -903,6 +918,11 @@ namespace MozaPlugin.Telemetry.Frames
         /// buffer contains URL records.
         /// </summary>
         public void TryParse()
+        {
+            lock (_parseLock) TryParseLocked();
+        }
+
+        private void TryParseLocked()
         {
             // Snapshot all session buffers under lock, in arrival order, then
             // release the lock before parsing (parsing is purely CPU work on

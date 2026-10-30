@@ -225,9 +225,12 @@ connect-time apply skipped axis 1, and `AxisTypesComplete` — sized by the
 HID count — was satisfied by the first type line of the next heartbeat,
 which declared "1 active → single unit" and flashed the throttle's Pedal Feel
 into the brake unit (`maxforce = 8192` = 25kg) 40 ms before the block
-corrected it. Fixes: the HID reader now polls for Moza HID paths it has not
-seen every 2 s while its wait runs and opens them alongside the live devices
-(`HasUnknownMozaHid`); `AxisTypesComplete` always requires the three T/B/C
+corrected it. Fixes: the HID reader now polls the present Moza HID paths
+(`MozaHidPaths`, a cheap path-only enumeration) every 2 s while its wait runs
+and opens new ones alongside the live devices — devices that refused to open
+are retried directly, and interfaces skipped by design (PID not read, no
+tracked usage) are remembered and never descriptor-walked again while they
+stay plugged in; `AxisTypesComplete` always requires the three T/B/C
 lines; `AxisSlotCount` (max of HID axes and connectivity slots) replaces the
 raw HID count as the loop bound in the row list, the apply, the merge and
 the role resolvers. The host also logged `diag_svr_event.c:86 error_code 50
@@ -403,7 +406,7 @@ routed lanes work. Writes go through the controller to
 | Reverse direction  | `mbooster-{role}-dir` |
 | Range start / end  | `mbooster-{role}-min` / `-max` (0–100 %, as `pedals-*`) |
 | Output curve       | `mbooster-{role}-y1..y5` (float, write group 36) |
-| Start calibration  | `mbooster-{role}-cal-start`, then `-cal-stop` after the countdown, **param 1** |
+| Start calibration  | `mbooster-{role}-cal-start`, then `-cal-stop` after the countdown, **param 1** (every start is paired with its stop: each pedal's countdown runs on its own timer, survives the panel unloading, and a second click while one runs is ignored) |
 
 The calibration uses the CRP pedals-bus param 1, not the `0x0000` Pit House
 sends for the motor sweep; no capture of a passive-pedal calibration on an
@@ -759,6 +762,24 @@ says "the motor plays the instantaneous amplitude you send".
 Keepalives go via the one-shot FIFO (`MozaSerialConnection.Send`) so
 they aren't coalesced.
 
+Settings reads and writes — including the calibration start/stop and
+soft-reboot frames the calibration runner sends through the controller's
+`SendIntWrite` — go through `MBoosterDeviceController.SendSettingsFrame`
+onto the device-command lane (`MozaSerialConnection.SendDeviceCommand`):
+the same paced FIFO, but kept by `FlushPendingWrites`, so a telemetry Stop
+on a shared base/hub pipe can't drop a routed lane's config or calibration
+frame. Motor, keepalive and disable frames stay on the flushable lanes so a
+Stop still silences them.
+
+While a calibration routine owns the pedal, `SetEffectsSuspended` parks
+every worker on the lane. `MBoosterEffectWorker.SetSuspended` runs under the
+same output lock as the tick's output pass: it restores any Brake Fade
+override, queues a disable for every effect id to the pedal's current unit
+(plus the playing effects' unit if that differs), and resets every effect
+state, so no tick frame can follow the disables and effects restart from
+their activation edge after the routine. The 500 ms keepalive keeps
+flowing throughout, as Pit House's does.
+
 ## Effect synthesis
 
 [`MBoosterEffectSynthesizer.cs`](../../../Devices/MBooster/MBoosterEffectSynthesizer.cs)
@@ -843,7 +864,11 @@ off so a forgotten toggle can't leave the pedal buzzing: switching the
 selected mBooster device in the dropdown, closing the settings panel
 (`OnUnloadedStopTimers`), and — same as always — `SendAllDisableFrames`
 on controller dispose sends the wire-level disable regardless of this
-flag's state.
+flag's state: one disable frame per effect wire id
+(`MozaMBoosterProtocol.AllEffectIds` — ABS, Lockup, Threshold, Engine,
+Road Texture and G-Force; the effects that share Engine's id are covered
+by its frame) to every motor id, sent after the workers have stopped so
+no tick can stream a motor frame behind it.
 
 **ABS rebuild**: three sliders — **Frequency (Hz)** (5–30,
 `MBoosterEffectSettings.FrequencyHz`, bounds in
@@ -1250,10 +1275,17 @@ each once) to get the full combined effect.
 the app is force-quit or crashes while brake temp is above onset (an
 override is live), the device can be left holding the extended
 Travel End / raised Max Threshold indefinitely — there is no watchdog
-outside this worker's own tick loop. `MBoosterEffectWorker.Stop()`
-makes a best-effort restore attempt (`TryRestoreBrakeFadeOnStop`)
-covering both calibrations on the common clean-disconnect/
-plugin-shutdown path, but this cannot cover an abrupt process kill. If
+outside this worker's own tick loop. `MBoosterEffectWorker.RestoreBrakeFade`
+writes both calibrations back to their base values on the unit that holds
+the override (the unit they were written to, tracked separately from the
+pedal's current target), and runs whenever the override would otherwise be
+orphaned: on `Stop()` (the common clean-disconnect/plugin-shutdown path), on
+calibration suspension, when the pedal's role moves off Brake or its axis
+gate closes, and before fading a different unit after the pedal's target
+changes. An override is dropped once its restore is queued (or when there is
+no configured base to restore to); one whose write couldn't go out
+(disconnected) stays applied and is retried. None of this can cover an
+abrupt process kill. If
 the pedal ever feels permanently "long and soft" after an unclean exit,
 dragging the respective slider once (which always writes) fixes it
 immediately.
@@ -1787,8 +1819,10 @@ Threshold's effect is applied host-side.
   is skipped when the unit already reports that value by read-back or
   write echo: the per-role output registers, the sensor ratio, Max
   Threshold, the Pedal Feel registers (travel, end stops, friction,
-  damping, deadzone / curve / max force) and the sleep timeout. A
-  Segmented Damping frame (no named read-back) is skipped when identical
+  damping, deadzone / curve / max force) and the sleep timeout. Float
+  registers (`y1..y5`, the sensor ratio) are compared against the
+  unrounded float the unit reported, within 0.01; the rest against the
+  integer value. A Segmented Damping frame (no named read-back) is skipped when identical
   to the last one sent since connect. So the launch, base-detect and
   wheel-detect applies (three in the first ~5 s) write each value once,
   and an unchanged profile switch writes nothing. A dropped write leaves

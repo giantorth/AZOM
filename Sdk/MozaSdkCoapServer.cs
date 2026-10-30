@@ -62,9 +62,8 @@ namespace MozaPlugin.Sdk
         private int _boundPort;
 
 
-        // Per-URI sampling counters for noisy resources (Feedforward etc.).
-        // Sampled at the same N=60 ratio as the Motor agent's emitter so
-        // server-side trace cadence matches handler-side trace cadence.
+        // Per-URI sampling counters for noisy resources (Feedforward etc.);
+        // the only log of these requests (handlers don't log them).
         private const int NoisySampleEvery = 60;
         private static readonly HashSet<string> NoisyUriTrailingSegments = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -153,6 +152,7 @@ namespace MozaPlugin.Sdk
                     // setting is honoured implicitly (true is the only path).
                     var endpoint = new IPEndPoint(IPAddress.Loopback, desiredPort);
                     var udp = new UdpClient(endpoint);
+                    LoopbackUdpSocket.DisableConnectionReset(udp, "[Sdk]");
 
                     // No ReceiveTimeout: ReceiveLoop uses Socket.Poll for
                     // its 200 ms wake-up budget. ReceiveTimeout-based
@@ -351,20 +351,33 @@ namespace MozaPlugin.Sdk
                 return;
             }
 
-            // CoAP CON ping: Code=0 and Type=CON. Reply with empty RST echoing
-            // the MID (no token, no payload). RFC 7252 §4.2.
-            if (request.Code == CoapCode.Empty && request.Type == CoapCode.TypeCon)
+            // Anything that is not a CON/NON request (empty message, response
+            // code, ACK/RST type) is never answered with a response (RFC 7252
+            // §4.2/§4.3); replying NON 4.04 could ping-pong with a client that
+            // RSTs unexpected NONs. A CON is rejected with an empty RST echoing
+            // the MID — this is also the CoAP ping (Code=0, Type=CON) reply.
+            if (!IsRequest(request))
             {
-                var rst = new CoapMessage
+                if (request.Type == CoapCode.TypeCon)
                 {
-                    Type = CoapCode.TypeRst,
-                    Code = CoapCode.Empty,
-                    MessageId = request.MessageId,
-                    Token = Array.Empty<byte>(),
-                    Payload = Array.Empty<byte>(),
-                };
-                SendSafe(udp, rst, remote);
-                LogRequest("Ping", "/(ping)", null, CoapCode.Empty, null, (int)sw.ElapsedMilliseconds);
+                    var rst = new CoapMessage
+                    {
+                        Type = CoapCode.TypeRst,
+                        Code = CoapCode.Empty,
+                        MessageId = request.MessageId,
+                        Token = Array.Empty<byte>(),
+                        Payload = Array.Empty<byte>(),
+                    };
+                    SendSafe(udp, rst, remote);
+                }
+                if (request.Code == CoapCode.Empty && request.Type == CoapCode.TypeCon)
+                    LogRequest("Ping", "/(ping)", null, CoapCode.Empty, null, (int)sw.ElapsedMilliseconds);
+                else
+                    MozaLog.DebugIfChanged("sdk:coap-non-request", string.Format(
+                        CultureInfo.InvariantCulture,
+                        "[Sdk] CoAP non-request ignored{0}: type={1} code={2}",
+                        request.Type == CoapCode.TypeCon ? " (RST sent)" : string.Empty,
+                        request.Type, CoapCode.Format(request.Code)));
                 return;
             }
 
@@ -473,6 +486,7 @@ namespace MozaPlugin.Sdk
                 CoapMessage req;
                 try { req = CoapMessage.Decode(datagram); }
                 catch { return; }
+                if (!IsRequest(req)) return;
 
                 var resp = new CoapMessage
                 {
@@ -486,6 +500,12 @@ namespace MozaPlugin.Sdk
             }
             catch { /* swallow — last-ditch error path */ }
         }
+
+        /// <summary>A CON or NON message carrying a request-class code (0.01-0.31).</summary>
+        private static bool IsRequest(CoapMessage m) =>
+            m.Code != CoapCode.Empty
+            && CoapCode.Class(m.Code) == 0
+            && (m.Type == CoapCode.TypeCon || m.Type == CoapCode.TypeNon);
 
         private static void SendSafe(UdpClient udp, CoapMessage msg, IPEndPoint remote)
         {
@@ -545,21 +565,27 @@ namespace MozaPlugin.Sdk
                 return;
             }
 
-            // Everything else: always log. POST writes/actions carry their value
-            // and surface at Info; rejected/failed requests (4.xx/5.xx) at Warn so
-            // a bad CoAP-driven command stands out; reads (GET) stay at Debug.
+            // Everything else. POST writes/actions carry their value and surface
+            // at Info; rejected/failed requests (4.xx/5.xx) at Warn so a bad
+            // CoAP-driven command stands out; reads (GET) and pings go to Debug,
+            // repeat-suppressed per verb+URI so a polling client can't evict the
+            // ring. The suppression state excludes the duration.
+            string payloadText = DescribePayload(payload);
+            string reasonText = string.IsNullOrEmpty(reason) ? string.Empty : $" [{reason}]";
             string line = string.Format(
                 CultureInfo.InvariantCulture,
                 "[Sdk] {0} {1}{2} -> {3} ({4}ms){5}",
-                verb, uriPath, DescribePayload(payload), CoapCode.Format(responseCode), durationMs,
-                string.IsNullOrEmpty(reason) ? string.Empty : $" [{reason}]");
+                verb, uriPath, payloadText, CoapCode.Format(responseCode), durationMs, reasonText);
 
             if (CoapCode.Class(responseCode) >= 4)
                 MozaLog.Warn(line);
             else if (string.Equals(verb, "POST", StringComparison.Ordinal))
                 MozaLog.Info(line);
             else
-                MozaLog.Debug(line);
+                MozaLog.DebugIfChanged(
+                    "sdk:" + verb + " " + uriPath,
+                    payloadText + " " + CoapCode.Format(responseCode) + reasonText,
+                    line);
         }
 
         /// <summary>Increment and return the per-key request counter (liveness/noisy sampling).</summary>

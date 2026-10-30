@@ -259,7 +259,7 @@ namespace MozaPlugin
                         ? BitConverter.ToString(data, 2, showLen)
                         : "(empty)";
                     MozaLog.Debug(
-                        $"[AZOM] Unmatched #{_unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
+                        $"[AZOM] Unmatched #{unmatched}: rawGroup=0x{data[0]:X2} group=0x{grp:X2} " +
                         $"rawDev=0x{data[1]:X2} dev={dev} len={data.Length} " +
                         $"payload={payload}");
                 }

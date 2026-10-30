@@ -52,6 +52,8 @@ namespace MozaPlugin.Devices.Extensions
         // in DataUpdate stops constructing a manager per frame.
         private bool _injectionGaveUp;
 
+        private string DeviceName => LinkedDevice?.DeviceDescriptor?.Name ?? "?";
+
         private void InjectLedDriver()
         {
             if (_driverInjected || _injectionGaveUp) return;
@@ -78,11 +80,14 @@ namespace MozaPlugin.Devices.Extensions
                         return;
                     }
                 }
-                MozaLog.Debug("[AZOM] No LedModuleDevice found on dash device instance");
+                // Retried every DataUpdate until injected, so repeat-suppressed.
+                MozaLog.DebugIfChanged("dash-ext-nolmd:" + DeviceName,
+                    $"[AZOM] No LedModuleDevice found on dash device instance ({DeviceName})");
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[AZOM] Error injecting dash LED driver: {ex.Message}");
+                MozaLog.ErrorIfChanged("dash-ext-inject:" + DeviceName,
+                    $"[AZOM] Error injecting dash LED driver ({DeviceName}): {ex.Message}");
             }
         }
 

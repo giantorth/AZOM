@@ -138,8 +138,17 @@ namespace MozaPlugin.Devices.MBooster
         private long _brakeFadeTravelEndLastWriteTicks;
         private float _brakeFadeAppliedThresholdKg = -1;
         private long _brakeFadeThresholdLastWriteTicks;
+        // Unit the Brake Fade overrides were written to; meaningful while one is applied.
+        private byte _brakeFadeDevice;
+        // Unit the Active effect states' frames went to.
+        private byte _effectsDevice;
         // Set while a calibration routine owns the pedal — see SetSuspended.
         private volatile bool _suspended;
+
+        // Held by the tick's output pass, SetSuspended and Stop's restore, so the
+        // effect states, Brake Fade tracking and TargetDevice memo have one
+        // writer at a time and no tick frame can follow a suspend's disables.
+        private readonly object _outputLock = new object();
 
         // Built-in sustained Test toggles, one MBoosterTestEffect bit each.
         // A test runs indefinitely while on, live-tracking Frequency/
@@ -169,6 +178,7 @@ namespace MozaPlugin.Devices.MBooster
         // Fade, which rewrites the brake's calibration once per lane).
         private readonly int _pedalAxisIndex;
         private readonly bool _isPrimary;
+        private readonly string _tickErrorLogKey;
 
         /// <summary>
         /// The motor device id THIS worker's frames are addressed to. Resolved
@@ -323,6 +333,7 @@ namespace MozaPlugin.Devices.MBooster
             _customEffectFormulaEvaluator = customEffectFormulaEvaluator ?? (_ => 0.0);
             _pedalAxisIndex = pedalAxisIndex;
             _isPrimary = isPrimary;
+            _tickErrorLogKey = "mbooster-tick:" + device.Identity + ":" + pedalAxisIndex;
         }
 
         public void Start()
@@ -354,25 +365,34 @@ namespace MozaPlugin.Devices.MBooster
             // cooled (or the user re-applies their Pedal Feel Travel slider
             // / Sim Input Mapping Max Threshold slider), since there is no
             // watchdog outside this worker's own tick loop.
-            TryRestoreBrakeFadeOnStop();
+            lock (_outputLock) RestoreBrakeFade();
         }
 
-        private void TryRestoreBrakeFadeOnStop()
+        private bool BrakeFadeApplied => _brakeFadeAppliedTravelEndMm >= 0 || _brakeFadeAppliedThresholdKg >= 0;
+
+        /// <summary>
+        /// Write Brake Fade's overridden calibrations back to their base values
+        /// on the unit they were written to. An override is dropped once its
+        /// restore is queued, or when there is no base to restore; one whose
+        /// write didn't go out (disconnected) stays applied for a retry.
+        /// </summary>
+        private void RestoreBrakeFade()
         {
+            if (!BrakeFadeApplied) return;
             var pedalConfig = PedalEffects(_settingsLookup());
             if (_brakeFadeAppliedTravelEndMm >= 0)
             {
                 float baseMm = pedalConfig?.TravelEndMm ?? -1;
-                if (baseMm >= 0 && Math.Abs(_brakeFadeAppliedTravelEndMm - baseMm) >= 0.01f
-                    && _device.SendIntWrite("mbooster-brake-travel-end", MozaMBoosterProtocol.EncodeTravelMm(baseMm), TargetDevice))
-                    _brakeFadeAppliedTravelEndMm = baseMm;
+                if (baseMm < 0 || Math.Abs(_brakeFadeAppliedTravelEndMm - baseMm) < 0.01f
+                    || _device.SendIntWrite("mbooster-brake-travel-end", MozaMBoosterProtocol.EncodeTravelMm(baseMm), _brakeFadeDevice))
+                    _brakeFadeAppliedTravelEndMm = -1;
             }
             if (_brakeFadeAppliedThresholdKg >= 0)
             {
                 float baseKg = pedalConfig?.MaxThresholdKg ?? -1;
-                if (baseKg >= 0 && Math.Abs(_brakeFadeAppliedThresholdKg - baseKg) >= 0.5f
-                    && _device.SendIntWrite("mbooster-brake-threshold", MozaMBoosterProtocol.EncodeThresholdKg(baseKg), TargetDevice))
-                    _brakeFadeAppliedThresholdKg = baseKg;
+                if (baseKg < 0 || Math.Abs(_brakeFadeAppliedThresholdKg - baseKg) < 0.5f
+                    || _device.SendIntWrite("mbooster-brake-threshold", MozaMBoosterProtocol.EncodeThresholdKg(baseKg), _brakeFadeDevice))
+                    _brakeFadeAppliedThresholdKg = -1;
             }
         }
 
@@ -421,19 +441,81 @@ namespace MozaPlugin.Devices.MBooster
         /// Brake Fade's overrides are restored to their base values on the way
         /// in (same path <see cref="Stop"/> uses) so the calibration doesn't
         /// measure against a fade-extended Travel End.
+        ///
+        /// Runs under the tick's output lock, so the disables and the restore
+        /// are queued before the caller's next frame (the calibration start)
+        /// and no tick frame follows them.
         /// </summary>
         public void SetSuspended(bool on)
         {
-            if (on == _suspended) return;
-            _suspended = on;
-            if (!on) return;
-            try { TryRestoreBrakeFadeOnStop(); } catch { }
-            if (!_device.IsConnected) return;
-            foreach (MBoosterEffectId id in Enum.GetValues(typeof(MBoosterEffectId)))
+            lock (_outputLock)
             {
-                try { _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice)); }
-                catch { }
+                if (on == _suspended) return;
+                _suspended = on;
+                if (!on) return;
+                // Resolve TargetDevice now, not from the last tick's memo.
+                unchecked { _tickSeq++; }
+                try { RestoreBrakeFade(); } catch { }
+                if (_device.IsConnected)
+                {
+                    byte dev = TargetDevice;
+                    if (dev != _effectsDevice) SilenceEffects();
+                    foreach (var id in MozaMBoosterProtocol.AllEffectIds)
+                    {
+                        try { _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, dev)); }
+                        catch { }
+                    }
+                }
+                ResetEffectStates();
             }
+        }
+
+        /// <summary>
+        /// Disable every active effect on the unit its frames went to
+        /// (<see cref="_effectsDevice"/>), one frame per wire id, and reset
+        /// the states — the effect gate closed or the pedal's unit changed.
+        /// </summary>
+        private void SilenceEffects()
+        {
+            int mask = 0;
+            if (_abs.Active) mask |= 1 << (int)MBoosterEffectId.Abs;
+            if (_lockup.Active) mask |= 1 << (int)MBoosterEffectId.Lockup;
+            if (_threshold.Active) mask |= 1 << (int)MBoosterEffectId.Threshold;
+            if (_roadTexture.Active) mask |= 1 << (int)MBoosterEffectId.RoadTexture;
+            if (_gforce.Active) mask |= 1 << (int)MBoosterEffectId.GForce;
+            // Engine's wire slot carries every effect without a verified id of its own.
+            bool engine = _engine.Active || _tc.Active || _wheelSpin.Active || _gearShift.Active || _bitePoint.Active;
+            if (!engine)
+                foreach (var st in _customEffectStates.Values)
+                    if (st.Active) { engine = true; break; }
+            if (engine) mask |= 1 << (int)MBoosterEffectId.Engine;
+            if (mask == 0) return;
+            foreach (var id in MozaMBoosterProtocol.AllEffectIds)
+                if ((mask & (1 << (int)id)) != 0)
+                    _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, _effectsDevice));
+            ResetEffectStates();
+        }
+
+        private void ResetEffectStates()
+        {
+            ResetEffectState(ref _abs);
+            ResetEffectState(ref _tc);
+            ResetEffectState(ref _wheelSpin);
+            ResetEffectState(ref _gearShift);
+            ResetEffectState(ref _lockup);
+            ResetEffectState(ref _threshold);
+            ResetEffectState(ref _engine);
+            ResetEffectState(ref _roadTexture);
+            ResetEffectState(ref _gforce);
+            ResetEffectState(ref _bitePoint);
+            _customEffectStates.Clear();
+        }
+
+        private static void ResetEffectState(ref EffectState st)
+        {
+            st.Active = false;
+            st.PhaseRad = 0;
+            st.ElapsedSec = 0;
         }
 
         /// <summary>
@@ -456,7 +538,13 @@ namespace MozaPlugin.Devices.MBooster
             while (!_stop)
             {
                 try { Tick(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] worker tick: {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    // Repeat-suppressed per worker: a persistent throw would
+                    // otherwise log at the 50 Hz tick rate.
+                    MozaLog.DebugIfChanged(_tickErrorLogKey,
+                        $"[AZOM/mBooster] worker tick ({MBoosterDeviceController.ShortIdentity(_device.Identity)} axis {_pedalAxisIndex}): {ex.GetType().Name}: {ex.Message}");
+                }
 
                 long now = Stopwatch.GetTimestamp();
                 long delta = next - now;
@@ -473,10 +561,14 @@ namespace MozaPlugin.Devices.MBooster
 
         private void Tick()
         {
-            unchecked { _tickSeq++; }
             if (_isShuttingDown()) return;
             if (!_device.IsConnected) return;
+            lock (_outputLock) TickOutput();
+        }
 
+        private void TickOutput()
+        {
+            unchecked { _tickSeq++; }
             var lane = _settingsLookup();
 
             MBoosterTelemetrySnapshot snap;
@@ -495,8 +587,18 @@ namespace MozaPlugin.Devices.MBooster
             // the 500ms keepalive stays primary-only/lane-wide unconditionally
             // — including while _suspended, matching Pit House, which keeps
             // sending it right through a calibration routine (see SetSuspended).
-            if (IsPedalAxisConnected() && !_suspended)
+            bool gate = IsPedalAxisConnected() && !_suspended;
+            if (gate)
             {
+                // The pedal's unit moved (role change, role map or locality
+                // resolved): stop what is playing on the old one first.
+                byte dev = TargetDevice;
+                if (dev != _effectsDevice)
+                {
+                    SilenceEffects();
+                    _effectsDevice = dev;
+                }
+
                 var effects = PedalEffects(lane);
 
                 // Brake/throttle signal for THIS pedal: the game's value, rising to
@@ -587,6 +689,12 @@ namespace MozaPlugin.Devices.MBooster
                 ProcessGearShiftEffect(ref _gearShift);
                 ProcessBitePointEffect(ref _bitePoint);
             }
+            else
+            {
+                // Axis went passive/unconnected (or suspended, which already
+                // silenced everything): nothing else would disable what plays.
+                SilenceEffects();
+            }
 
             // Brake Fade is NOT a vibration effect — it rewrites the ACTUAL
             // brake pedal's Travel End/Max Threshold hardware calibration, so
@@ -600,8 +708,22 @@ namespace MozaPlugin.Devices.MBooster
             // base values it ramps, and the device id its calibration writes
             // are addressed to (TargetDevice), are THIS axis's own. See
             // UpdateBrakeFade.
-            if (IsPedalAxisConnected() && !_suspended && PedalRole(lane) == MBoosterRole.Brake)
-                UpdateBrakeFade(lane, PedalEffects(lane), snap);
+            if (gate && PedalRole(lane) == MBoosterRole.Brake)
+            {
+                // An override lives on the unit it was written to: restore it
+                // there before fading another (retried while the write can't go out).
+                byte dev = TargetDevice;
+                if (BrakeFadeApplied && dev != _brakeFadeDevice) RestoreBrakeFade();
+                if (!BrakeFadeApplied) _brakeFadeDevice = dev;
+                if (_brakeFadeDevice == dev)
+                    UpdateBrakeFade(lane, PedalEffects(lane), snap);
+            }
+            else if (!_suspended)
+            {
+                // Role moved off Brake or the axis dropped out: nothing would
+                // ever restore the override otherwise. Suspension restored it already.
+                RestoreBrakeFade();
+            }
 
             // --- 500 ms keepalive (separate from motor frames) -------------
             // Primary worker only, and to ALL of this lane's motor device ids
@@ -1414,7 +1536,7 @@ namespace MozaPlugin.Devices.MBooster
                 : delta >= BrakeFadeWriteMinDeltaMm && sinceLastWriteSec >= BrakeFadeWriteMinIntervalSec;
             if (!shouldWrite) return;
 
-            if (!_device.SendIntWrite("mbooster-brake-travel-end", MozaMBoosterProtocol.EncodeTravelMm(targetMm), TargetDevice))
+            if (!_device.SendIntWrite("mbooster-brake-travel-end", MozaMBoosterProtocol.EncodeTravelMm(targetMm), _brakeFadeDevice))
                 return; // not connected — nothing written, don't update tracking state
 
             _brakeFadeAppliedTravelEndMm = targetMm;
@@ -1445,7 +1567,7 @@ namespace MozaPlugin.Devices.MBooster
                 : delta >= BrakeFadeWriteMinDeltaKg && sinceLastWriteSec >= BrakeFadeWriteMinIntervalSec;
             if (!shouldWrite) return;
 
-            if (!_device.SendIntWrite("mbooster-brake-threshold", MozaMBoosterProtocol.EncodeThresholdKg(targetKg), TargetDevice))
+            if (!_device.SendIntWrite("mbooster-brake-threshold", MozaMBoosterProtocol.EncodeThresholdKg(targetKg), _brakeFadeDevice))
                 return;
 
             _brakeFadeAppliedThresholdKg = targetKg;
@@ -1465,14 +1587,18 @@ namespace MozaPlugin.Devices.MBooster
         /// Engine's wire slot) call that overload directly instead.
         /// </summary>
         private void ProcessEffect(MBoosterEffectId id, ref EffectState st) =>
-            ProcessEffect(id, ref st, s => id switch
-            {
-                MBoosterEffectId.Abs       => MBoosterEffectSynthesizer.SynthesizeAbs(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01),
-                MBoosterEffectId.Lockup    => MBoosterEffectSynthesizer.SynthesizeLockup(s.IntensityRequest, s.ElapsedSec),
-                MBoosterEffectId.Threshold => MBoosterEffectSynthesizer.SynthesizeThreshold(s.IntensityRequest, s.ElapsedSec, s.ThresholdDecayRequest01),
-                MBoosterEffectId.Engine    => MBoosterEffectSynthesizer.SynthesizeEngine(s.IntensityRequest, s.PhaseRad),
-                _                          => 0.0,
-            });
+            ProcessEffect(id, ref st, WireNativeSynthesizer(id));
+
+        // Non-capturing lambdas, so each is one cached delegate rather than a
+        // closure + delegate per call.
+        private static Func<EffectState, double> WireNativeSynthesizer(MBoosterEffectId id) => id switch
+        {
+            MBoosterEffectId.Abs       => s => MBoosterEffectSynthesizer.SynthesizeAbs(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01),
+            MBoosterEffectId.Lockup    => s => MBoosterEffectSynthesizer.SynthesizeLockup(s.IntensityRequest, s.ElapsedSec),
+            MBoosterEffectId.Threshold => s => MBoosterEffectSynthesizer.SynthesizeThreshold(s.IntensityRequest, s.ElapsedSec, s.ThresholdDecayRequest01),
+            MBoosterEffectId.Engine    => s => MBoosterEffectSynthesizer.SynthesizeEngine(s.IntensityRequest, s.PhaseRad),
+            _                          => s => 0.0,
+        };
 
         /// <summary>
         /// Shared activation-edge + phase-oscillator + frame-emission core

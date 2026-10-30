@@ -23,6 +23,34 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster Test toggles all stop when switching pedals or closing the panel,** Bite Point no longer keeps vibrating.
 - **CM2 Files tab lists and deletes the CM2's dashboards,** not the wheel's.
 - **`AZOM.TestModeToggle` action matches the dashboard page's Test button** and can no longer crash SimHub.
+- **HID devices that fail to open are retried,** e.g. pedals coming back after an mBooster calibration reboot.
+- **Wine: a stuck port warm-up no longer stalls reconnects,** and the settings panel no longer hitches resolving the COM port.
+- **Turning Connection off and on no longer force-reconnects the wheel;** stale display and watchdog state is cleared on disable.
+- **Shifter and pedal tabs follow the hub** when it is unplugged or the primary connection moves.
+- **Unanswered polled reads stop retrying after 60 s** instead of retransmitting forever.
+- **Gear-shift bumps no longer fire on re-enable or at session start.**
+- **Pedal-haptics restart banner no longer shows on every detection,** and moving a rim to another base refreshes its device definition.
+- **Motion platform reliably enters standby on shutdown.**
+- **Base LFE gearshift in Level mode no longer backs up the serial queue.**
+- **Track and car name channels refresh right after a restart,** no more 15 s lag.
+- **Dashboards without fast channels keep the wheel engaged,** and radar/track-map dashboards no longer back up the serial queue.
+- **Cold-start wedge recovery no longer sends a doomed tier-def** before re-provoking.
+- **Dashboard list updates and session acks are no longer lost** when the wheel sends them back to back.
+- **SimHub dashboard import no longer freezes the window or bundles unrelated images.**
+- **Dashboard uploads pace consistently** outside of games.
+- **mBooster effects and Brake Fade stop when a pedal changes role or unit,** and G-Force is switched off on shutdown.
+- **mBooster settings writes survive stopping telemetry,** and fractional curve/sensor-ratio values are no longer re-sent or skipped.
+- **Calibration no longer gets stuck** when starting a second one or leaving the page mid-countdown.
+- **Typing in slider value boxes sticks** instead of being overwritten mid-edit.
+- **Check now stays usable** after leaving the page during an update check.
+- **More text translated:** hub port status, handbrake button state, LED palette tooltips and PitHouse import.
+- **Settings page is lighter;** hidden tabs and graphs no longer redraw in the background.
+- **Dash flag-brightness slider no longer writes flash on every tick.**
+- **CM1 dashboard list scrolls again** instead of jumping back every half second.
+- **AB9 and display-brightness button actions stop resending at their limits.**
+- **RSF steering-lock writes work right after a plugin reload.**
+- **PitHouse import applies values whose rounded display matches,** e.g. FFB 75.5% vs 75%.
+- **Base ambient LED settings are only re-sent when changed.**
 
 ## [1.7.1]
 

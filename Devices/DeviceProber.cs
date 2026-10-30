@@ -381,6 +381,7 @@ namespace MozaPlugin.Devices
         {
             if (_detectionState.DashDetected) return;
             _detectionState.DashDetected = true;
+            _plugin.HardwareApplier.ForgetDashFlagsBrightness();
 
             // A dash reached through the primary pipe (base or hub) is the meter at
             // 0x14 (0x12 is the base main). PitHouse cm2.pcapng drives this CM2's
@@ -565,16 +566,34 @@ namespace MozaPlugin.Devices
         // to elimination. Rounds are driven by the PollStatus presence probe (~5 s apart),
         // so this is a handful of seconds, not a race with the first reply.
         private const int RelayShifterIdentityGraceRounds = 3;
-        private int _relayShifterProbeRounds;
+        // Volatile: advanced on this pipe's dispatch thread, reset by
+        // ReleasePeripheralOwnership from timer / disconnect / UI threads.
+        private volatile int _relayShifterProbeRounds;
         // Set by any group-0x51 settings answer from this pipe's shifter. Evidence that a
         // shifter is there and talking — NOT evidence of which model, which is exactly the
         // conflation that made a relayed HGP report as an SGP.
-        private bool _relayShifterAnsweredSettingsRead;
+        private volatile bool _relayShifterAnsweredSettingsRead;
         // Edge guard so the elimination fallback logs + latches at most once per pipe.
         // NOT a "stop probing" latch: the owner gate at the top of ProbeRelayedShifter is
         // the only thing that ends the probe, so a pipe whose shifter is replaced still
         // re-resolves once the flags clear.
-        private bool _relayShifterFallbackTried;
+        private volatile bool _relayShifterFallbackTried;
+
+        /// <summary>
+        /// This pipe no longer reaches the peripherals it detected (unplugged,
+        /// disabled, or rebound to a different device): drop their detection and
+        /// ownership so they re-detect wherever they answer next, and restart the
+        /// relayed-shifter identification — stale rounds + settings-read evidence
+        /// would otherwise fire the SGP elimination fallback on the next shifter's
+        /// first probe round, before its model name can answer.
+        /// </summary>
+        internal void ReleasePeripheralOwnership()
+        {
+            _relayShifterProbeRounds = 0;
+            _relayShifterAnsweredSettingsRead = false;
+            _relayShifterFallbackTried = false;
+            _detectionState.ClearPeripheralsOwnedBy(_deviceManager);
+        }
 
         /// <summary>Resolve a base/hub-relayed shifter's model from its self-describing
         /// model name — the only measured discriminator on a lane with no PID. Logs the

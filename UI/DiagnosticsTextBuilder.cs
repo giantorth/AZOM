@@ -648,7 +648,7 @@ namespace MozaPlugin.UI
                 Cfg("wheel-knob-led-mode"), Bri(d.WheelKnobIdleEffect),
                 Bri(d.KnobRingBrightness), Bri(plugin.WheelLedBrightnessKnob),
                 Bri(plugin.WheelLedAppliedBrightnessKnob), Cfg("wheel-knob-brightness")));
-            sb.Append($"Flags (meter):  wheel={Bri(d.WheelFlagsBrightness)} "
+            sb.Append($"Flags (meter):  wheel={Bri(d.DashFlagsBrightness)} "
                       + $"cache/want={Cfg("dash-flags-brightness")}  (dev 0x14, not a wheel LED group)");
 
             // LED keepalive. srcQuiet is how long since SimHub's LED pipeline last

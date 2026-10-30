@@ -153,7 +153,7 @@ namespace MozaPlugin.Devices.Extensions
                 }
 
                 Directory.CreateDirectory(deviceDir);
-                WriteAllTextAtomic(deviceJsonPath, GeneratePedalHapticsDeviceJson(guid, productName, motorsCount, pid));
+                AtomicFile.WriteAllText(deviceJsonPath, GeneratePedalHapticsDeviceJson(guid, productName, motorsCount, pid));
                 EnsureThumbnail(deviceDir, PedalHapticsThumbnailKey);
 
                 MozaLog.Info(
@@ -215,9 +215,9 @@ namespace MozaPlugin.Devices.Extensions
                     return true;
                 if ((existing["SchemaVersion"]?.Value<int>() ?? 0) != GeneratedPedalHapticsSchemaVersion)
                     return true;
-                if (!string.Equals(
+                if (!PidEquals(
                         existing.SelectToken("HardwareInterface.HardwareInterface.DeviceDetection.Pid")?.Value<string>(),
-                        pid, StringComparison.OrdinalIgnoreCase))
+                        pid))
                     return true;
 
                 return false;

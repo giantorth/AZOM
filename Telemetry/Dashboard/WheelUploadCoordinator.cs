@@ -95,6 +95,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// <c>SessionRetransmitter.HoldSession</c>.</summary>
         private readonly Action<byte> _holdRetransmitSession;
         private readonly Action<byte> _releaseRetransmitSession;
+        /// <summary>Take a 1 ms timer-resolution hold for the attempt (null when
+        /// unavailable). The emit loops pace with <c>Thread.Sleep</c>, which Windows
+        /// otherwise rounds up to 15.6 ms outside gameplay.</summary>
+        private readonly Func<IDisposable?> _acquireTimerResolution;
 
         // FT-eligible sessions the wheel device-inited. ChooseUploadSession
         // prefers 0x04 (legacy), then walks up looking for the first match.
@@ -123,6 +127,9 @@ namespace MozaPlugin.Telemetry.Dashboard
         // Wait events for the upload state machine. ManualResetEventSlim so the
         // background upload thread can block briefly between phases.
         private readonly ManualResetEventSlim _sessionOpened = new(false);
+        // Set only by a device-init of _acquireTarget, so the Type02 FT-ACT
+        // acquisition loop counts attempts by timeout, not by unrelated FT inits.
+        private readonly ManualResetEventSlim _acquireOpened = new(false);
         private readonly ManualResetEventSlim _subMsg1Response = new(false);
         private readonly ManualResetEventSlim _subMsg2Response = new(false);
         /// <summary>
@@ -313,7 +320,8 @@ namespace MozaPlugin.Telemetry.Dashboard
             Func<long> getAckedChunkCount,
             Func<long> getHeldRetransmitCount,
             Action<byte> holdRetransmitSession,
-            Action<byte> releaseRetransmitSession)
+            Action<byte> releaseRetransmitSession,
+            Func<IDisposable?> acquireTimerResolution)
         {
             _connection = connection;
             _shouldAbort = shouldAbort;
@@ -330,6 +338,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             _getHeldRetransmitCount = getHeldRetransmitCount;
             _holdRetransmitSession = holdRetransmitSession;
             _releaseRetransmitSession = releaseRetransmitSession;
+            _acquireTimerResolution = acquireTimerResolution;
         }
 
         // Session-acquisition handshake state (Type02): _acquireTarget is the
@@ -351,7 +360,18 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (session < 0x04 || session > 0x0b) return;
             lock (_ftCandidateSessions) _ftCandidateSessions.Add(session);
             NoteFtSessionOpenEvidence(session);
-            if (session == _acquireTarget) _acquireOpenSeq = openSeq;
+            if (session == _acquireTarget)
+            {
+                // Fresh open = fresh inbound seq space (wheel replies start at
+                // open-seq + 1): drop stale reassembly state so they don't collide
+                // with a previous burst's high-water mark. Done here, on the read
+                // thread, so it can't interleave with a walk in NoteInboundChunk.
+                // ActiveSession is pinned to the target while the upload is in flight.
+                try { _inbox.Clear(); } catch { }
+                _inboxAckWalkOffset = 0;
+                _acquireOpenSeq = openSeq;
+                try { _acquireOpened.Set(); } catch (ObjectDisposedException) { }
+            }
             try { _sessionOpened.Set(); } catch (ObjectDisposedException) { }
             // While an upload is mid-flight the coordinator's session is pinned:
             // a stray device-init on another FT session must not re-route the
@@ -440,7 +460,8 @@ namespace MozaPlugin.Telemetry.Dashboard
             // blobs, whose bursts legitimately restart the seq low and MUST
             // still reach the reassembler's restart path. See
             // IsUploadRetransmit.
-            if (_isUploadInFlight && IsUploadRetransmit(_inbox, seq)) return true;
+            bool uploadInFlight = _isUploadInFlight;
+            if (uploadInFlight && IsUploadRetransmit(_inbox, seq)) return true;
 
             // ActiveSession path. Dir-listing reassembler — wheel pushes a
             // zlib-compressed directory listing on the upload session both
@@ -461,13 +482,16 @@ namespace MozaPlugin.Telemetry.Dashboard
             // The walker only fires events on type=0x01/0x11, so running it
             // on dir-listing-only buffers is a cheap no-op (bad pad bytes
             // make it break out of the loop early).
-            if (_isUploadInFlight)
+            if (uploadInFlight)
             {
                 if (_inbox.Length < prevInboxLen) _inboxAckWalkOffset = 0;
                 WalkAckSubMsgs(_inbox, ref _inboxAckWalkOffset);
             }
 
-            byte[]? dirBlob = addOk ? _inbox.TryDecompress() : null;
+            // Not while an upload is in flight: the walker owns the buffer
+            // offsets then (a dir listing is just a type=0x0a sub-msg to it),
+            // and consuming or clearing under it desyncs the ack stream.
+            byte[]? dirBlob = addOk && !uploadInFlight ? _inbox.TryDecompress() : null;
             if (dirBlob != null)
             {
                 _inbox.Clear();
@@ -760,6 +784,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         public void Reset()
         {
             try { _sessionOpened.Reset(); } catch (ObjectDisposedException) { }
+            try { _acquireOpened.Reset(); } catch (ObjectDisposedException) { }
             try { _subMsg1Response.Reset(); } catch (ObjectDisposedException) { }
             try { _subMsg2Response.Reset(); } catch (ObjectDisposedException) { }
             try { _ackProgress.Reset(); } catch (ObjectDisposedException) { }
@@ -800,11 +825,13 @@ namespace MozaPlugin.Telemetry.Dashboard
             // rather than racing the handle disposal. RunBackgroundUpload's
             // catch(Exception) is the backstop if the race is still lost.
             try { _sessionOpened.Set(); } catch (ObjectDisposedException) { }
+            try { _acquireOpened.Set(); } catch (ObjectDisposedException) { }
             try { _subMsg1Response.Set(); } catch (ObjectDisposedException) { }
             try { _subMsg2Response.Set(); } catch (ObjectDisposedException) { }
             try { _ackProgress.Set(); } catch (ObjectDisposedException) { }
             try { _endReceived.Set(); } catch (ObjectDisposedException) { }
             try { _sessionOpened.Dispose(); } catch { }
+            try { _acquireOpened.Dispose(); } catch { }
             try { _subMsg1Response.Dispose(); } catch { }
             try { _subMsg2Response.Dispose(); } catch { }
             try { _ackProgress.Dispose(); } catch { }
@@ -968,12 +995,15 @@ namespace MozaPlugin.Telemetry.Dashboard
             // must stay at the ack frontier instead of re-blasting the whole
             // unacked span.
             _holdRetransmitSession(uploadSess);
+            IDisposable? timerHold = null;
             try
             {
+                timerHold = _acquireTimerResolution();
                 return SendDashboardUploadInner(content, uploadSess);
             }
             finally
             {
+                timerHold?.Dispose();
                 _isUploadInFlight = false;
                 // Release the hold AND drop the queue: whatever is still
                 // unacked belongs to an attempt that is over, and left in place
@@ -1095,15 +1125,15 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // pairing, no host-side session-open, no dir-probe: PitHouse
                 // sends none of those at upload time on this firmware).
                 _acquireOpenSeq = -1;
+                try { _acquireOpened.Reset(); } catch (ObjectDisposedException) { }
                 _acquireTarget = uploadSess;
-                try { _sessionOpened.Reset(); } catch (ObjectDisposedException) { }
                 const int AcquireAttempts = 5;
                 const int AcquireWaitMs = 3000;
                 bool reclaimed = false;
                 for (int attempt = 0; attempt < AcquireAttempts && !_shouldAbort(); attempt++)
                 {
                     _sendFileTransferActivate(uploadSess);
-                    _sessionOpened.Wait(AcquireWaitMs);
+                    _acquireOpened.Wait(AcquireWaitMs);
                     if (_acquireOpenSeq >= 0) break;
                     // The device won't re-init a session it still holds open
                     // (CM2 keeps a failed attempt's session alive, bundle
@@ -1116,14 +1146,14 @@ namespace MozaPlugin.Telemetry.Dashboard
                             "device still holds it open — closing the stale session");
                         ReclaimStaleFtSession(uploadSess);
                         _acquireOpenSeq = -1;
+                        try { _acquireOpened.Reset(); } catch (ObjectDisposedException) { }
                     }
-                    // Woken by a device-init on some other FT session (or
-                    // timed out) — re-arm and re-activate. The wheel tolerates
-                    // repeated FT-ACTs (PitHouse spams them ~1/s at connect).
-                    try { _sessionOpened.Reset(); } catch (ObjectDisposedException) { }
+                    // Timed out — re-activate. The wheel tolerates repeated
+                    // FT-ACTs (PitHouse spams them ~1/s at connect).
                 }
                 _acquireTarget = 0;
-                if (_acquireOpenSeq < 0)
+                int openSeq = _acquireOpenSeq;
+                if (openSeq < 0)
                 {
                     MozaLog.Warn(
                         $"[AZOM] FT-activate for session 0x{uploadSess:X2} got no device-init " +
@@ -1132,15 +1162,11 @@ namespace MozaPlugin.Telemetry.Dashboard
                     return UploadOutcome.NoFtSession;
                 }
                 // Rebase outbound seq: EmitSubMsg starts at _outboundSeq + 1,
-                // and the first data chunk must go out at open-seq + 3.
-                _outboundSeq = _acquireOpenSeq + 2;
-                // Fresh open = fresh inbound seq space; drop stale reassembly
-                // state so the wheel's replies (starting open-seq + 1) don't
-                // collide with a previous burst's seq high-water mark.
-                try { _inbox.Clear(); } catch { }
-                _inboxAckWalkOffset = 0;
+                // and the first data chunk must go out at open-seq + 3. The
+                // inbound reassembler was reset by NoteDeviceInit.
+                _outboundSeq = openSeq + 2;
                 MozaLog.Debug(
-                    $"[AZOM] FT session 0x{uploadSess:X2} acquired (open-seq={_acquireOpenSeq}); " +
+                    $"[AZOM] FT session 0x{uploadSess:X2} acquired (open-seq={openSeq}); " +
                     $"first data chunk at seq {_outboundSeq + 1}");
             }
             else
@@ -1175,6 +1201,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             // Slower on paper, faster in practice: at 6 ms the acked payload
             // advanced ~2 kB/s while the host pushed 10.7 kB/s, a 5:1 waste
             // ratio that is retransmit churn from the losses saturation causes.
+            // Assumes a 1 ms timer (held for the attempt in SendDashboardUpload).
             const int InterFrameDelayMs = 8;
             // PitHouse's per-round flow control: after each type=0x03 sub-msg
             // the wheel emits a type=0x01 progress ack (with bytes_written

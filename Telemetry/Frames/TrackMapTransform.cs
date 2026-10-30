@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -111,11 +112,22 @@ namespace MozaPlugin.Telemetry.Frames
             };
         }
 
+        // Per-track result of ResolveMapIniUncached, null included. Every track-map
+        // builder resolves on its first frame and on track change, so without this
+        // each one re-reads map.ini on the tick thread. Transforms are immutable.
+        private static readonly ConcurrentDictionary<string, TrackMapTransform?> s_mapIniByTrack =
+            new ConcurrentDictionary<string, TrackMapTransform?>(StringComparer.Ordinal);
+
         /// <summary>Resolve the transform for an AC track folder (e.g. "ks_zandvoort")
         /// from its map.ini; null when there is none (other games).</summary>
         public static TrackMapTransform? ResolveMapIni(string? trackFolder)
         {
             if (string.IsNullOrEmpty(trackFolder)) return null;
+            return s_mapIniByTrack.GetOrAdd(trackFolder!, ResolveMapIniUncached);
+        }
+
+        private static TrackMapTransform? ResolveMapIniUncached(string trackFolder)
+        {
             // TEST (temporary): exact PitHouse-fitted transform for ks_zandvoort
             // (R^2 ~1.0 against the radar6 capture). Confirms whether the radar's
             // static is the Location transform before generalising the formula.
@@ -131,7 +143,7 @@ namespace MozaPlugin.Telemetry.Frames
             }
             try
             {
-                string? ini = FindMapIni(trackFolder!);
+                string? ini = FindMapIni(trackFolder);
                 if (ini == null)
                 {
                     MozaLog.Info($"[AZOM] track transform: no map.ini for '{trackFolder}'");
@@ -182,26 +194,37 @@ namespace MozaPlugin.Telemetry.Frames
             return null;
         }
 
-        private static string? _acContentCache;
-        private static bool _acResolved;
+        // Only a found path is cached; a miss is retried on the next track lookup.
+        private static volatile string? _acContentCache;
 
         // Locate AC's content/ directory: a running AC process, else Steam libraries.
         private static string? FindAcContentPath()
         {
-            if (_acResolved) return _acContentCache;
-            _acResolved = true;
-            try
+            var cached = _acContentCache;
+            if (cached != null) return cached;
+            foreach (var name in new[] { "acs", "AssettoCorsa" })
             {
-                foreach (var name in new[] { "acs", "AssettoCorsa" })
-                    foreach (var proc in Process.GetProcessesByName(name))
+                Process[] procs;
+                try { procs = Process.GetProcessesByName(name); }
+                catch { continue; }
+                string? found = null;
+                foreach (var proc in procs)
+                {
+                    // Each process gets its own try (MainModule throws across bitness)
+                    // and is always disposed, including the ones after a match.
+                    try
                     {
+                        if (found != null) continue;
                         string? exe = proc.MainModule?.FileName;
                         if (string.IsNullOrEmpty(exe)) continue;
                         string c = Path.Combine(Path.GetDirectoryName(exe)!, "content");
-                        if (Directory.Exists(c)) return _acContentCache = c;
+                        if (Directory.Exists(c)) found = c;
                     }
+                    catch { }
+                    finally { proc.Dispose(); }
+                }
+                if (found != null) return _acContentCache = found;
             }
-            catch { }
             try
             {
                 string? steam =
@@ -223,7 +246,7 @@ namespace MozaPlugin.Telemetry.Frames
                 }
             }
             catch { }
-            return _acContentCache = null;
+            return null;
         }
     }
 }

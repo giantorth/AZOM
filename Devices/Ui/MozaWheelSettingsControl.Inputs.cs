@@ -24,13 +24,21 @@ namespace MozaPlugin.Devices.Ui
     // hidden and its handlers no longer fire.
     public partial class MozaWheelSettingsControl
     {
-        internal static MozaWheelSettingsControl? Instance { get; private set; }
-
         // 33Hz timer just for live paddle + button display — too fast for the
         // 500ms RefreshWheel tick, separate from it so HID input feels live
         // even when no telemetry is streaming.
         private DispatcherTimer? _inputsLiveTimer;
         private readonly DateTime[] _wiButtonLastPressed = new DateTime[MozaData.MaxButtons];
+
+        // Run the live timer only while the Inputs tab is showing (the ES wheel's
+        // headerless single page is the Inputs tab too).
+        private void UpdateInputsLiveTimer()
+        {
+            if (IsLoaded && ReferenceEquals(WheelTabs.SelectedItem, InputsTab))
+                EnsureInputsLiveTimer();
+            else
+                StopInputsLiveTimer();
+        }
 
         private void EnsureInputsLiveTimer()
         {
@@ -51,14 +59,6 @@ namespace MozaPlugin.Devices.Ui
         }
 
         // ── Live paddle bars + active buttons ──────────────────────────
-
-        // Fed by the plugin pane's own 30 Hz HID timer; while this page's live
-        // timer is running that would be a second 30 Hz driver of the same text.
-        internal void PushInputsLiveData(MozaData data)
-        {
-            if (_inputsLiveTimer != null) return;
-            RefreshInputsLive();
-        }
 
         // Signature of the last rendered button list ("3,7*," — star = pressed) so
         // the Inlines are only rebuilt when the visible content changes.

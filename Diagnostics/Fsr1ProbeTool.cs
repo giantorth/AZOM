@@ -184,7 +184,7 @@ namespace MozaPlugin.Diagnostics
 
         // ── FSR1 live numeric visualization channel ─────────────────────────
         // When the channel-mapping panel is showing an FSR1 wheel, it asks the driver to
-        // publish a per-tick snapshot of the data it streams (each field's resolved span,
+        // publish a periodic (~100 ms) snapshot of the data it streams (each field's resolved span,
         // raw bytes, post-scale value) so the UI can draw a live byte strip. Volatile
         // single-writer (driver) / single-reader (UI 2 Hz timer), matching driver threading.
         private volatile bool _vizActive;

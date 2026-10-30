@@ -571,9 +571,10 @@ namespace MozaPlugin.Devices
 
         // ============================================================
         // Wheelbase LFE (low-frequency effects) host-rendered streams —
-        // cmd 0x2D/0x77 on the base (dev 0x13). Engine/ABS ride their own
-        // latest-wins stream lanes; the discrete gearshift burst and the
-        // disable edge go out the paced one-shot FIFO. See MozaBaseLfeProtocol.
+        // cmd 0x2D/0x77 on the base (dev 0x13). Engine/ABS, and the gearshift
+        // slot when it runs continuously (Level mode), ride their own latest-wins
+        // stream lanes; the discrete gearshift burst and the disable edge go out
+        // the paced one-shot FIFO. See MozaBaseLfeProtocol.
         // Only valid on the base primary connection (base == primary pipe).
         // ============================================================
 
@@ -604,9 +605,9 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt only). The three LFE
-        // slots are identical oscillators — plugin LFE mode happens to drive id 0 as
-        // a one-shot gearshift burst, but nothing stops it streaming like ids 1/2.
+        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt). The three LFE slots
+        // are identical oscillators — plugin LFE mode drives id 0 as the gearshift
+        // channel (fixed GearshiftPeriod), but nothing stops it streaming like ids 1/2.
         // Period is a timing hint on a host-modulated tone (per wheelbase-0x13.md);
         // reuse the engine ParamK so all three continuous tones encode it the same.
         public bool SendBaseLfeOsc0Stream(bool playing, double freqHz, double amp01)
@@ -621,26 +622,47 @@ namespace MozaPlugin.Devices
             return true;
         }
 
+        // Gearshift burst (OnChange bumps, test bumps): one-shot FIFO, not coalesced.
         public bool SendBaseLfeGearshiftBurst(double freqHz, double amp01)
         {
             if (!_connection.IsConnected) return false;
-            // Gearshift burst: fixed placeholder period, freq+amplitude from the
-            // channel. One-shot FIFO (not coalesced).
-            var f = MozaBaseLfeProtocol.BuildFrame(
+            _connection.Send(BuildBaseLfeGearshiftFrame(freqHz, amp01));
+            return true;
+        }
+
+        // The same gearshift frame while the slot runs continuously (Level mode):
+        // latest-wins, so a write stall can't back stale frames up in the FIFO.
+        public bool SendBaseLfeGearshiftStream(double freqHz, double amp01)
+        {
+            if (!_connection.IsConnected) return false;
+            _connection.SendStream(StreamKind.BaseLfeOsc0, BuildBaseLfeGearshiftFrame(freqHz, amp01));
+            return true;
+        }
+
+        // Fixed placeholder period, freq + amplitude from the channel.
+        private static byte[] BuildBaseLfeGearshiftFrame(double freqHz, double amp01)
+            => MozaBaseLfeProtocol.BuildFrame(
                 MozaBaseLfeProtocol.LfeEffect.Gearshift, playing: true,
                 MozaBaseLfeProtocol.GearshiftPeriod,
                 MozaMBoosterProtocol.EncodeFreq(freqHz),
                 MozaMBoosterProtocol.EncodeAmp(amp01));
-            _connection.Send(f);
-            return true;
-        }
 
         public bool SendBaseLfeDisable(MozaBaseLfeProtocol.LfeEffect id)
         {
             if (!_connection.IsConnected) return false;
+            // Drop the effect's pending stream frame first: stream slots drain after
+            // the FIFO item, so it would replay the tone after the disable.
+            _connection.ClearStreamSlots((int)BaseLfeStreamSlot(id), 1);
             _connection.Send(MozaBaseLfeProtocol.BuildDisable(id));
             return true;
         }
+
+        private static StreamKind BaseLfeStreamSlot(MozaBaseLfeProtocol.LfeEffect id) => id switch
+        {
+            MozaBaseLfeProtocol.LfeEffect.Engine => StreamKind.BaseLfeEngine,
+            MozaBaseLfeProtocol.LfeEffect.Abs => StreamKind.BaseLfeAbs,
+            _ => StreamKind.BaseLfeOsc0,
+        };
 
         public void ReadSettings(params string[] commandNames)
         {

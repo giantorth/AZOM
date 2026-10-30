@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -189,11 +190,11 @@ namespace MozaPlugin.Telemetry.Frames
 
             // 64-bit (caller uses BitConverter on raw double; encode returns the bits)
             Add(new Entry("double", 0x0A, 64,
-                v => BitConverter.ToUInt64(BitConverter.GetBytes(Sanitize(v)), 0),
+                v => (ulong)BitConverter.DoubleToInt64Bits(Sanitize(v)),
                 (0, 200)));
             // PitHouse emits code 0x09 width 64 for patch/Location_* (was 0x0B).
             Add(new Entry("location_t", 0x09, 64,
-                v => BitConverter.ToUInt64(BitConverter.GetBytes(Sanitize(v)), 0),
+                v => (ulong)BitConverter.DoubleToInt64Bits(Sanitize(v)),
                 (0, 1)));
             Add(new Entry("int64_t", 0x0C, 64,
                 v => (ulong)(long)Sanitize(v), (-1000, 1000)));
@@ -216,7 +217,7 @@ namespace MozaPlugin.Telemetry.Frames
         // IEEE-754 single-precision bits, packed into the low 32 bits. Shared by
         // every channel emitted as code 0x07 width 32.
         private static ulong EncodeFloatBits(double v)
-            => BitConverter.ToUInt32(BitConverter.GetBytes((float)Sanitize(v)), 0);
+            => FloatBits.ToUInt32((float)Sanitize(v));
 
         // Public lookups. Both throw if name/code is unknown — callers should
         // pre-validate via TryGet against the Telemetry.json catalog at load time.

@@ -82,6 +82,8 @@ namespace MozaPlugin.Telemetry
         // BuildWireLibraryList). Short TTL bounds ghost-manufacture when the
         // wheel never answers at all.
         private const long IntentTtlTicks = TimeSpan.TicksPerMinute * 2;
+        // Settle margin before a still-disabled enable intent counts as refused.
+        private const int EnableRefusalMarginSeconds = 45;
 
         /// <summary>
         /// Build the library list actually sent to the wheel. The list is the
@@ -123,7 +125,7 @@ namespace MozaPlugin.Telemetry
                 // margin killed healthy enables (2026-08-16 evening: uploads
                 // stuck disabled); keep it comfortably beyond one reconnect
                 // cycle.
-                long refusalMarginTicks = TimeSpan.TicksPerSecond * 45;
+                long refusalMarginTicks = TimeSpan.TicksPerSecond * EnableRefusalMarginSeconds;
                 long stateTicks = state.CapturedAt.Ticks;
                 foreach (var e in state.DisabledDashboards)
                 {
@@ -134,7 +136,7 @@ namespace MozaPlugin.Telemetry
                         _intentionalEnables.TryRemove(e.DirName, out _);
                         MozaLog.Info(
                             $"[AZOM] Enable intent for \"{e.DirName}\" expired — still classified " +
-                            "disabled 3s+ after declaration (enable-confirm delta may have been " +
+                            $"disabled {EnableRefusalMarginSeconds}s+ after declaration (enable-confirm delta may have been " +
                             "lost, or the wheel declined); click Enable to retry. Intent dropped " +
                             "rather than re-declared to avoid manufacturing a ghost slot");
                     }

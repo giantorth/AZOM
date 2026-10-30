@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using MozaPlugin.Hardware;
 
 namespace MozaPlugin.Sdk.Resources.Motor
@@ -21,14 +20,8 @@ namespace MozaPlugin.Sdk.Resources.Motor
     /// </summary>
     internal sealed class MotorFeedforwardResource : CoapResourceHandler
     {
-        // iRacing sends one POST per session today, but the resource was
-        // historically sampled in case a future client streams; keep the
-        // throttle so an accidental hot-loop doesn't flood the diagnostics
-        // buffer.
-        private const int LogEvery = 60;
-
+        // Logged (sampled) by MozaSdkCoapServer.LogRequest.
         private readonly HardwareApplier _hardware;
-        private int _counter;
 
         public MotorFeedforwardResource(HardwareApplier hardware)
         {
@@ -41,11 +34,6 @@ namespace MozaPlugin.Sdk.Resources.Motor
                 return CoapResourceResponse.BadRequest("expected 4-byte LE int32");
 
             _hardware.WriteIfBaseConnected("base-feedforward", value);
-
-            int n = Interlocked.Increment(ref _counter);
-            if ((n % LogEvery) == 1)
-                MozaLog.Debug($"[AZOM.Sdk] Feedforward POST id={req.DeviceId} value={value} (sample 1/{LogEvery})");
-
             return CoapResourceResponse.Valid();
         }
 

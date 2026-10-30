@@ -605,16 +605,18 @@ namespace MozaPlugin.Telemetry.Dashboard
                     lock (_builtinLock)
                     {
                         if (_builtinProfiles == null)
-                            LoadBuiltinProfiles();
+                            _builtinProfiles = LoadBuiltinProfiles();
                     }
                 }
                 return _builtinProfiles!;
             }
         }
 
-        private void LoadBuiltinProfiles()
+        // Returns the fully built list; the getter publishes it only once complete,
+        // since its unlocked null check hands the field straight to other threads.
+        private List<MultiStreamProfile> LoadBuiltinProfiles()
         {
-            _builtinProfiles = new List<MultiStreamProfile>();
+            var profiles = new List<MultiStreamProfile>();
             var assembly = Assembly.GetExecutingAssembly();
 
             foreach (var resourceName in assembly.GetManifestResourceNames())
@@ -636,7 +638,7 @@ namespace MozaPlugin.Telemetry.Dashboard
 
                     var profile = ParseMzdashContent(displayName, content);
                     if (profile != null)
-                        _builtinProfiles.Add(profile);
+                        profiles.Add(profile);
                 }
                 catch (Exception ex)
                 {
@@ -649,6 +651,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             // (i.e. neither a TestSignalOverrides entry nor a parseable
             // Telemetry.json range). Helps identify gaps to plug.
             TestSignalCatalog.FlushFallbackLog();
+            return profiles;
         }
 
         /// <summary>

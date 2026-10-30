@@ -1118,28 +1118,28 @@ namespace MozaPlugin
 
             // Color commands need at least 3 bytes (R, G, B)
             // Wheel RPM colors
-            if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
+            if (commandName.StartsWith("wheel-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-rpm-color");
                 if (idx >= 0 && idx < WheelRpmColors.Length && data.Length >= 3)
                     SetColor(WheelRpmColors[idx], data);
             }
             // Wheel button colors
-            else if (commandName.StartsWith("wheel-button-color"))
+            else if (commandName.StartsWith("wheel-button-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-button-color");
                 if (idx >= 0 && idx < WheelButtonMax && data.Length >= 3)
                     SetColor(WheelButtonColors[idx], data);
             }
             // Wheel flag colors
-            else if (commandName.StartsWith("wheel-flag-color"))
+            else if (commandName.StartsWith("wheel-flag-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-flag-color");
                 if (idx >= 0 && idx < 6 && data.Length >= 3)
                     SetColor(WheelFlagColors[idx], data);
             }
             // Old wheel RPM colors
-            else if (commandName.StartsWith("wheel-old-rpm-color"))
+            else if (commandName.StartsWith("wheel-old-rpm-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-old-rpm-color");
                 if (idx >= 0 && idx < 10 && data.Length >= 3)
@@ -1176,7 +1176,7 @@ namespace MozaPlugin
             // Per-LED idle palette: base-ambient-led-color-strip{s}-mode{m}-led{l}.
             // Mode is the standby-mode number; only 1 (constant) and 2 (breathing)
             // carry a palette.
-            else if (commandName.StartsWith("base-ambient-led-color-strip"))
+            else if (commandName.StartsWith("base-ambient-led-color-strip", StringComparison.Ordinal))
             {
                 if (data.Length >= 3
                     && TryParseBaseAmbientLedName(commandName, out int strip, out int mode, out int led))
@@ -1190,7 +1190,7 @@ namespace MozaPlugin
                 }
             }
             // Per-LED sleep palette: base-ambient-sleep-led-color-strip{s}-led{l}.
-            else if (commandName.StartsWith("base-ambient-sleep-led-color-strip"))
+            else if (commandName.StartsWith("base-ambient-sleep-led-color-strip", StringComparison.Ordinal))
             {
                 if (data.Length >= 3
                     && TryParseBaseAmbientLedName(commandName, out int strip, out _, out int led))
@@ -1203,21 +1203,21 @@ namespace MozaPlugin
             // Shifter (SGP) LEDs + relayed device-type are model-aware — routed via
             // UpdateShifterArray/TryUpdateShifter, not this shared method.
             // Dash RPM colors
-            else if (commandName.StartsWith("dash-rpm-color") && !commandName.Contains("blink"))
+            else if (commandName.StartsWith("dash-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
             {
                 int idx = ParseTrailingIndex(commandName, "dash-rpm-color");
                 if (idx >= 0 && idx < 10 && data.Length >= 3)
                     SetColor(DashRpmColors[idx], data);
             }
             // Dash flag colors
-            else if (commandName.StartsWith("dash-flag-color") && commandName != "dash-flag-colors")
+            else if (commandName.StartsWith("dash-flag-color", StringComparison.Ordinal) && commandName != "dash-flag-colors")
             {
                 int idx = ParseTrailingIndex(commandName, "dash-flag-color");
                 if (idx >= 0 && idx < 6 && data.Length >= 3)
                     SetColor(DashFlagColors[idx], data);
             }
             // Per-LED knob ring background colors (cmd 0x1F 0x03 0x01).
-            else if (commandName.StartsWith("wheel-knob-bg-color"))
+            else if (commandName.StartsWith("wheel-knob-bg-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-knob-bg-color");
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
@@ -1226,14 +1226,14 @@ namespace MozaPlugin
             // Per-knob Active LED color (cmd 0x27, role=0). Command name shape
             // is "wheel-knob{N}-active-color" with N in 1..5. Cheap StartsWith
             // gate keeps the parse off the hot path for unrelated frames.
-            else if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+            else if (commandName.StartsWith("wheel-knob", StringComparison.Ordinal) && commandName.EndsWith("-active-color", StringComparison.Ordinal))
             {
                 // Extract the knob index between "wheel-knob" (10 chars) and
                 // "-active-color" (13 chars).
                 int start = "wheel-knob".Length;
                 int end = commandName.Length - "-active-color".Length;
-                if (end > start && data.Length >= 3
-                    && int.TryParse(commandName.Substring(start, end - start), out int knob1)
+                int knob1 = ParseDigits(commandName, start, end);
+                if (data.Length >= 3
                     && knob1 >= 1 && knob1 <= WheelKnobPrimaryColors.Length)
                 {
                     SetColor(WheelKnobPrimaryColors[knob1 - 1], data);
@@ -1509,10 +1509,23 @@ namespace MozaPlugin
 
         private static int ParseTrailingIndex(string commandName, string prefix)
         {
-            var numStr = commandName.Substring(prefix.Length);
-            if (int.TryParse(numStr, out int num))
-                return num - 1; // Convert 1-based to 0-based
-            return -1;
+            int num = ParseDigits(commandName, prefix.Length, commandName.Length);
+            return num >= 0 ? num - 1 : -1; // Convert 1-based to 0-based
+        }
+
+        // Decimal value of s[start, end); -1 when the span is empty, too long for
+        // an int, or holds anything but digits.
+        private static int ParseDigits(string s, int start, int end)
+        {
+            if (start >= end || end - start > 9) return -1;
+            int value = 0;
+            for (int i = start; i < end; i++)
+            {
+                char c = s[i];
+                if (c < '0' || c > '9') return -1;
+                value = value * 10 + (c - '0');
+            }
+            return value;
         }
 
         // Lock around the 3-byte copy so Display() / PackColors callers never
@@ -1537,13 +1550,13 @@ namespace MozaPlugin
         private static bool IsWheelLedColorCommand(string commandName)
         {
             // wheel-rpm-color{N} (but not wheel-rpm-blink-color)
-            if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
+            if (commandName.StartsWith("wheel-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
                 return true;
-            if (commandName.StartsWith("wheel-button-color")) return true;
-            if (commandName.StartsWith("wheel-flag-color")) return true;
-            if (commandName.StartsWith("wheel-knob-bg-color")) return true;
+            if (commandName.StartsWith("wheel-button-color", StringComparison.Ordinal)) return true;
+            if (commandName.StartsWith("wheel-flag-color", StringComparison.Ordinal)) return true;
+            if (commandName.StartsWith("wheel-knob-bg-color", StringComparison.Ordinal)) return true;
             // wheel-knob{N}-active-color
-            if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+            if (commandName.StartsWith("wheel-knob", StringComparison.Ordinal) && commandName.EndsWith("-active-color", StringComparison.Ordinal))
                 return true;
             return false;
         }

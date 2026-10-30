@@ -892,4 +892,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Phản hồi xúc giác</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Chống dội nút (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Không có bản xem trước</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Đang nhấn</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Đã nhả</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Bộ chọn sắc độ tùy chỉnh</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Đỏ tươi</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Đỏ nhạt</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Cam nhạt</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Vàng nhạt</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Xanh lá nhạt</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Lục lam nhạt</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Xanh dương nhạt</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Tím nhạt</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Đỏ tươi nhạt</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Cài đặt sẵn PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tất cả tệp (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>đã áp dụng “{0}” cho hồ sơ đang hoạt động</value></data>
 </root>

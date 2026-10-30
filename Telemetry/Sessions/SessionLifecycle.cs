@@ -25,14 +25,29 @@ namespace MozaPlugin.Telemetry.Sessions
             _sender = sender;
         }
 
-        // Port probing state. _lastAckedSeq=-1 signals "ack present but seq unknown"
-        // (5-byte fc:00 form). See docs/protocol/sessions/chunk-format.md.
-        // Written directly by Lifecycle.TelemetryInboundDispatcher on the serial
-        // read thread; volatile, never lock these.
-        internal volatile byte _lastAckedSession;
-        internal volatile int _lastAckedSeq = -1;
+        // fc:00 ack bookkeeping, written by NoteAck on the serial read thread;
+        // lock-free, never lock these. Per-session generation counters let an
+        // open/close waiter detect ITS ack without resetting state another
+        // session's ack may have just written. _ackSeqBySession = -1 signals
+        // "ack present but seq unknown" (5-byte fc:00 form); see
+        // docs/protocol/sessions/chunk-format.md. _ackReceived is only the
+        // wake-up signal (set by the dispatcher after NoteAck).
+        private readonly int[] _ackGen = new int[256];
+        private readonly int[] _ackSeqBySession = new int[256];
+        private volatile byte _lastAckedSession;
         private readonly ManualResetEventSlim _ackReceived = new ManualResetEventSlim(false);
         internal ManualResetEventSlim AckReceived => _ackReceived;
+
+        /// <summary>Record a wheel fc:00 ack for <paramref name="session"/>.
+        /// Serial read thread; the caller sets <see cref="AckReceived"/> after.</summary>
+        internal void NoteAck(byte session, int ackSeq)
+        {
+            Volatile.Write(ref _ackSeqBySession[session], ackSeq);
+            _lastAckedSession = session;
+            Interlocked.Increment(ref _ackGen[session]);
+        }
+
+        private int AckGen(byte session) => Volatile.Read(ref _ackGen[session]);
 
         // Wheel session-layer readiness latch. Set by TelemetryInboundDispatcher
         // when the wheel pushes its first spontaneous sess=0x09 device-init
@@ -393,8 +408,13 @@ namespace MozaPlugin.Telemetry.Sessions
                 }
             }
 
+            // Baselines for the extended wait below, taken as each open goes out:
+            // an ack that lands after that open's own budget expired still
+            // counts as its late ack.
+            int mgmtAckGen0 = AckGen(MgmtSession);
             byte mgmtPort = TryOpenSession(MgmtSession, OpenAckTimeoutMs);
             if (_sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
+            int telemAckGen0 = AckGen(TelemSession);
             byte telemetryPort = TryOpenSession(TelemSession, OpenAckTimeoutMs);
 
             // Slow-bring-up hardware (CS-Pro on Universal Hub): wheel takes
@@ -434,6 +454,12 @@ namespace MozaPlugin.Telemetry.Sessions
                 {
                     if (cancel.IsCancellationRequested
                         || _sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
+                    // An open-ack whose Set the Reset above swallowed.
+                    if (AckGen(MgmtSession) != mgmtAckGen0 || AckGen(TelemSession) != telemAckGen0)
+                    {
+                        gotLateAck = true;
+                        break;
+                    }
                     try
                     {
                         if (_ackReceived.Wait(ExtendedAckSliceMs, cancel))
@@ -448,12 +474,16 @@ namespace MozaPlugin.Telemetry.Sessions
                 }
                 if (_sender.StateIsIdle || !_sender.ConnectionRef.IsConnected) return;
                 // Belt-and-suspenders: even if the Wait timed out, the
-                // dispatcher may have flipped _wheelReadyObserved in the
-                // microseconds between timeout-fire and our read. Honour it.
-                byte ackedSession = _lastAckedSession;
-                bool wheelReadyWake = _wheelReadyObserved
-                    && ackedSession != MgmtSession
-                    && ackedSession != TelemSession;
+                // dispatcher may have flipped _wheelReadyObserved (or landed an
+                // ack) in the microseconds between timeout-fire and our read.
+                // Honour it.
+                bool lateMgmtAck = AckGen(MgmtSession) != mgmtAckGen0;
+                bool lateTelemAck = AckGen(TelemSession) != telemAckGen0;
+                gotLateAck |= lateMgmtAck || lateTelemAck;
+                byte ackedSession = lateTelemAck ? TelemSession
+                    : lateMgmtAck ? MgmtSession
+                    : _lastAckedSession;
+                bool wheelReadyWake = _wheelReadyObserved && !lateMgmtAck && !lateTelemAck;
                 if (wheelReadyWake)
                 {
                     // Wheel just came online via sess=0x09 device-init in
@@ -480,8 +510,8 @@ namespace MozaPlugin.Telemetry.Sessions
                     MozaLog.Info(
                         $"[AZOM] Late ack on sess=0x{ackedSession:X2} after extended wait " +
                         "— wheel is alive, proceeding with cold-start");
-                    if (ackedSession == MgmtSession) mgmtPort = MgmtSession;
-                    else if (ackedSession == TelemSession) telemetryPort = TelemSession;
+                    if (lateMgmtAck) mgmtPort = MgmtSession;
+                    if (lateTelemAck) telemetryPort = TelemSession;
                     // Retry the still-unacked side with a 1 s budget — wheel
                     // should ack promptly now that it's awake. CS-Pro famously
                     // never acks sess=0x01, so the mgmt retry will time out
@@ -614,7 +644,7 @@ namespace MozaPlugin.Telemetry.Sessions
         /// speculative: under normal conditions the wheel acks promptly, and
         /// genuine drops cause the wheel itself to retransmit its own opens.
         ///
-        /// The wheel's echoed ack_seq is parsed (<see cref="_lastAckedSeq"/>)
+        /// The wheel's echoed ack_seq is parsed (<see cref="_ackSeqBySession"/>)
         /// for diagnostic logging but not used to gate the open — firmware
         /// variants legitimately echo non-matching seqs and rejecting those
         /// breaks disable+re-enable recovery in the field.
@@ -622,39 +652,45 @@ namespace MozaPlugin.Telemetry.Sessions
         internal byte TryOpenSession(byte session, int timeoutMs)
         {
             try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
-            _lastAckedSession = 0;
-            _lastAckedSeq = -1;
+            int gen0 = AckGen(session);
 
             SendSessionOpen(session, session);
 
+            if (!WaitForAck(session, gen0, timeoutMs, "OpenSession")) return 0;
+            int gotAckSeq = Volatile.Read(ref _ackSeqBySession[session]);
+            if (gotAckSeq != -1 && gotAckSeq != session)
+            {
+                MozaLog.Debug(
+                    $"[AZOM] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
+                    $"(expected {session}); accepting (firmware may use own port counter)");
+            }
+            return session;
+        }
+
+        /// <summary>
+        /// Wait until an fc:00 ack for <paramref name="session"/> lands after
+        /// the <paramref name="gen0"/> snapshot, up to <paramref name="timeoutMs"/>.
+        /// Acks for other sessions only wake the loop. Order per round is
+        /// check → Reset → re-check → Wait, so a Set that the Reset swallows is
+        /// still seen through the counter. False on timeout or dispose.
+        /// </summary>
+        private bool WaitForAck(byte session, int gen0, int timeoutMs, string? staleLogTag)
+        {
             var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
             while (true)
             {
+                if (AckGen(session) != gen0) return true;
                 int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
-                if (remaining <= 0) return 0;
+                if (remaining <= 0) return false;
+                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return false; }
+                if (AckGen(session) != gen0) return true;
 
                 bool gotSignal;
                 try { gotSignal = _ackReceived.Wait(remaining); }
-                catch (ObjectDisposedException) { return 0; }
-                if (!gotSignal) return 0;
-
-                if (_lastAckedSession == session)
-                {
-                    int gotAckSeq = _lastAckedSeq;
-                    if (gotAckSeq != -1 && gotAckSeq != session)
-                    {
-                        MozaLog.Debug(
-                            $"[AZOM] OpenSession 0x{session:X2}: ack_seq={gotAckSeq} " +
-                            $"(expected {session}); accepting (firmware may use own port counter)");
-                    }
-                    return session;
-                }
-
-                // Stale ack (different session) — discard and keep waiting.
-                MozaLog.Debug(
-                    $"[AZOM] OpenSession 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
-                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return 0; }
-                _lastAckedSession = 0;
+                catch (ObjectDisposedException) { return false; }
+                if (gotSignal && staleLogTag != null && AckGen(session) == gen0)
+                    MozaLog.Debug(
+                        $"[AZOM] {staleLogTag} 0x{session:X2}: ignoring stale ack for 0x{_lastAckedSession:X2}");
             }
         }
 
@@ -673,28 +709,11 @@ namespace MozaPlugin.Telemetry.Sessions
         internal bool TryCloseSession(byte session, int timeoutMs)
         {
             try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return false; }
-            _lastAckedSession = 0;
-            _lastAckedSeq = -1;
+            int gen0 = AckGen(session);
 
             SendSessionClose(session);
 
-            var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-            while (true)
-            {
-                int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
-                if (remaining <= 0) return false;
-
-                bool gotSignal;
-                try { gotSignal = _ackReceived.Wait(remaining); }
-                catch (ObjectDisposedException) { return false; }
-                if (!gotSignal) return false;
-
-                if (_lastAckedSession == session) return true;
-
-                // Stale ack for a different session — discard and keep waiting.
-                try { _ackReceived.Reset(); } catch (ObjectDisposedException) { return false; }
-                _lastAckedSession = 0;
-            }
+            return WaitForAck(session, gen0, timeoutMs, null);
         }
 
         /// <summary>

@@ -374,7 +374,9 @@ namespace MozaPlugin.Integration
 
         private void StepDisplayBrightness(int delta)
         {
-            int val = ClampStep(CurrentDisplayBrightness(), delta, 0, 100);
+            int current = CurrentDisplayBrightness();
+            int val = ClampStep(current, delta, 0, 100);
+            if (val == current) return; // saturated — skip the redundant push
             SetDisplayBrightness(val);
             MozaLog.Debug($"[AZOM] Display brightness → {val}% via action");
         }
@@ -533,7 +535,9 @@ namespace MozaPlugin.Integration
         {
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
-            ab9.EngineVibrationIntensity = (byte)ClampStep(ab9.EngineVibrationIntensity, delta, 0, 100);
+            int v = ClampStep(ab9.EngineVibrationIntensity, delta, 0, 100);
+            if (v == ab9.EngineVibrationIntensity) return; // saturated — skip the redundant save
+            ab9.EngineVibrationIntensity = (byte)v;
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] AB9 engine vibration intensity → {ab9.EngineVibrationIntensity} via action");
         }
@@ -542,7 +546,9 @@ namespace MozaPlugin.Integration
         {
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
-            ab9.EngineVibrationFrequency = (ushort)ClampStep(ab9.EngineVibrationFrequency, delta, 0, 200);
+            int v = ClampStep(ab9.EngineVibrationFrequency, delta, 0, 200);
+            if (v == ab9.EngineVibrationFrequency) return; // saturated — skip the redundant save
+            ab9.EngineVibrationFrequency = (ushort)v;
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] AB9 engine vibration frequency → {ab9.EngineVibrationFrequency} Hz via action");
         }
@@ -554,6 +560,7 @@ namespace MozaPlugin.Integration
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
             int v = ClampStep(ab9.GearShiftVibrationIntensity, delta, 0, 100);
+            if (v == ab9.GearShiftVibrationIntensity) return; // saturated — skip the redundant config write
             ab9.GearShiftVibrationIntensity = (byte)v;
             _plugin.Ab9Manager?.SendGearShiftVibrationIntensity(v);
             _plugin.SaveSettings();

@@ -1,4 +1,5 @@
 using System;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -76,19 +77,15 @@ namespace MozaPlugin.Telemetry.Frames
         /// <summary>Write 32-bit IEEE 754 float.</summary>
         public void WriteFloat(float value)
         {
-            byte[] bytes = BitConverter.GetBytes(value);
-            uint bits = BitConverter.ToUInt32(bytes, 0);
-            WriteBits(bits, 32);
+            WriteBits(FloatBits.ToUInt32(value), 32);
         }
 
         /// <summary>Write 64-bit IEEE 754 double as two 32-bit halves (little-endian).</summary>
         public void WriteDouble(double value)
         {
-            byte[] bytes = BitConverter.GetBytes(value);
-            uint lo = BitConverter.ToUInt32(bytes, 0);
-            uint hi = BitConverter.ToUInt32(bytes, 4);
-            WriteBits(lo, 32);
-            WriteBits(hi, 32);
+            ulong bits = (ulong)BitConverter.DoubleToInt64Bits(value);
+            WriteBits((uint)bits, 32);
+            WriteBits((uint)(bits >> 32), 32);
         }
 
         public byte[] GetBuffer() => _buffer;

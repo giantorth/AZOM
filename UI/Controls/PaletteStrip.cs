@@ -108,7 +108,7 @@ namespace MozaControls
                 BorderThickness = new Thickness(1),
                 Margin = ChipMargin(gapBefore: true),
                 Cursor = Cursors.Hand,
-                ToolTip = "Custom hue picker",
+                ToolTip = Strings.Tooltip_CustomHuePicker,
             };
             customBorder.SetResourceReference(Border.BorderBrushProperty, "BorderBrightBrush");
             // Rainbow conic-ish background — approximate with a horizontal hue gradient
@@ -210,7 +210,7 @@ namespace MozaControls
             }
             else
             {
-                _savedSwatch.Tag = new MozaPalette.Swatch("saved", Strings.Tooltip_SavedColor, saved.Value);
+                _savedSwatch.Tag = new MozaPalette.Swatch("saved", saved.Value);
                 _savedSwatch.Background = new SolidColorBrush(saved.Value);
                 _savedSwatch.Visibility = Visibility.Visible;
             }

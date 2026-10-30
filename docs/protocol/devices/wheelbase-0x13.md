@@ -290,6 +290,16 @@ Per-effect behaviour (from `lfe-in-game-test.pcapng`):
 - **Gearshift** (p1=`00`) — a short burst (~2 frames) on each gear change; fixed
   placeholder period `0x000F`, freq + intensity from the sliders.
 
+Plugin transport (`MozaDeviceManager.SendBaseLfe*`): engine and ABS stream on
+their own latest-wins stream slots (`BaseLfeEngine` / `BaseLfeAbs`). Effect id 0
+goes out on the paced one-shot FIFO as a discrete burst (OnChange and test
+bumps, which must not coalesce), and on the `BaseLfeOsc0` stream slot whenever
+it runs continuously — the plugin's gearshift channel in Level trigger mode
+(same placeholder-period frame) and the ShakeIt haptics device's third tone.
+The all-zero disable rides the FIFO; it first clears that effect's pending
+stream slot, because stream slots drain after the FIFO item and a queued tone
+would otherwise replay after the disable.
+
 **Firmware detection.** The numeric base firmware version is read on **group
 `0x04`** addressed to device `0x12` (main). The request carries a 4-byte zero
 payload: `7E 04 04 12 00 00 00 00 A5` (length `0x04`). Reply `84 21 <4 version

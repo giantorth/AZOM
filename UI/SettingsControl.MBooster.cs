@@ -99,6 +99,11 @@ namespace MozaPlugin.UI
             if (registry == null) { MBoosterTab.Visibility = Visibility.Collapsed; return; }
             FollowMBoosterRoleSwap(registry);
             var devices = registry.Devices;
+            // Role-follow, selection validation and the device panel's
+            // Visibility (which gates the 30 Hz trace feed) run every tick; the
+            // rows, role/passive visibility and seeding only while the tab is
+            // shown (MainTabs_SelectionChanged repaints it on selection).
+            bool tabShown = MBoosterTab.IsSelected;
             if (devices.Count == 0)
             {
                 _mboosterUiSeeded = false;
@@ -110,7 +115,7 @@ namespace MozaPlugin.UI
                     // control handler no-ops (each guards on a null effect target /
                     // null controller), so nothing reaches hardware. The tab's own
                     // visibility is owned by ApplyShowAllTabs.
-                    ShowMBoosterDemoPanels();
+                    if (tabShown) ShowMBoosterDemoPanels();
                     return;
                 }
                 MBoosterTab.Visibility = Visibility.Collapsed;
@@ -127,19 +132,24 @@ namespace MozaPlugin.UI
             // one row per detected axis, not one row for the whole connection
             // (see MBoosterDeviceRow.cs — this replaces the old trio of Device
             // combo + per-axis Pedal Roles panel + Configure-pedal combo).
-            var sigBuilder = new System.Text.StringBuilder();
-            foreach (var c in devices)
+            string? rowsSignature = null;
+            bool rowsStale = false;
+            if (tabShown)
             {
-                int sigAxisCount = c.AxisSlotCount;
-                sigBuilder.Append(c.Identity).Append('|').Append(sigAxisCount).Append('|');
-                var sigConnected = c.ConnectedAxes;
-                if (sigConnected != null)
-                    for (int k = 0; k < sigConnected.Length; k++) sigBuilder.Append(sigConnected[k] ? '1' : '0');
-                sigBuilder.Append('|').Append(string.Join(",", MBoosterTabAxes(registry, c)));
-                sigBuilder.Append(';');
+                var sigBuilder = new System.Text.StringBuilder();
+                foreach (var c in devices)
+                {
+                    int sigAxisCount = c.AxisSlotCount;
+                    sigBuilder.Append(c.Identity).Append('|').Append(sigAxisCount).Append('|');
+                    var sigConnected = c.ConnectedAxes;
+                    if (sigConnected != null)
+                        for (int k = 0; k < sigConnected.Length; k++) sigBuilder.Append(sigConnected[k] ? '1' : '0');
+                    sigBuilder.Append('|').Append(string.Join(",", MBoosterTabAxes(registry, c)));
+                    sigBuilder.Append(';');
+                }
+                rowsSignature = sigBuilder.ToString();
+                rowsStale = !string.Equals(rowsSignature, _mboosterDeviceRowsSignature, StringComparison.Ordinal);
             }
-            string rowsSignature = sigBuilder.ToString();
-            bool rowsStale = !string.Equals(rowsSignature, _mboosterDeviceRowsSignature, StringComparison.Ordinal);
 
             using (_suppressor.Begin())
             {
@@ -209,6 +219,7 @@ namespace MozaPlugin.UI
                     }
                 }
 
+                // Only ever stale while the tab is shown (see above).
                 if (rowsStale)
                 {
                     _mboosterDeviceRowsSignature = rowsSignature;
@@ -239,7 +250,7 @@ namespace MozaPlugin.UI
                     }
                     MBoosterDeviceRowsList.ItemsSource = _mboosterDeviceRows;
                 }
-                else
+                else if (tabShown)
                 {
                     foreach (var row in _mboosterDeviceRows)
                     {
@@ -262,6 +273,7 @@ namespace MozaPlugin.UI
             }
 
             MBoosterDevicePanel.Visibility = Visibility.Visible;
+            if (!tabShown) return;
 
             // Live position marker (on the curve editors) is updated at
             // 30 Hz from UpdateHidInputDisplays (UpdateMBoosterCurveMarkers)

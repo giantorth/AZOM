@@ -422,15 +422,7 @@ namespace MozaPlugin.Devices
                     Directory.CreateDirectory(dir);
 
                 var json = JsonConvert.SerializeObject(snapshot, Formatting.Indented);
-
-                // Atomic write: stage to a sibling .tmp first, then move into place.
-                // A crash mid-WriteAllText would otherwise truncate the existing
-                // registry to garbage and lose the GUID-to-prefix map on next load.
-                var tmpPath = _registryPath + ".tmp";
-                File.WriteAllText(tmpPath, json);
-                if (File.Exists(_registryPath))
-                    File.Delete(_registryPath);
-                File.Move(tmpPath, _registryPath);
+                AtomicFile.WriteAllText(_registryPath, json);
             }
             catch (Exception ex)
             {

@@ -891,4 +891,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Feedback tátil</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce dos botões (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Pré-visualização indisponível</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Pressionado</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Solto</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Seletor de tom personalizado</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Vermelho pastel</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Laranja pastel</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Amarelo pastel</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Verde pastel</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Ciano pastel</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Azul pastel</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Roxo pastel</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Magenta pastel</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset do PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Todos os ficheiros (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>“{0}” aplicado ao perfil ativo</value></data>
 </root>

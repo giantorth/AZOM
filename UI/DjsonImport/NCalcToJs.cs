@@ -55,7 +55,11 @@ namespace MozaPlugin.UI.DjsonImport
         /// be handed to SimHub on a borrowed channel. False for targets that need text —
         /// a borrowed channel is numeric, so a colour would arrive as a number and render
         /// black, which is worse than leaving the design-time value in place.</param>
-        public TranspileResult Translate(string? expression, bool allowOffload = true)
+        /// <param name="declaredJavaScript">The formula's own interpreter flag
+        /// (<c>Formula.Interpreter</c>, 1 = JavaScript), or null when the file doesn't
+        /// carry one.</param>
+        public TranspileResult Translate(string? expression, bool allowOffload = true,
+                                         bool? declaredJavaScript = null)
         {
             string src = (expression ?? "").Trim();
             if (src.Length == 0) return TranspileResult.Fail("empty expression");
@@ -63,22 +67,13 @@ namespace MozaPlugin.UI.DjsonImport
             // SimHub-flavoured JavaScript ($prop(...), custom plugin functions, multi-
             // statement bodies) cannot run on the wheel — but SimHub itself can evaluate
             // it, so hand the whole expression to a borrowed channel rather than dropping
-            // the widget. SimHub auto-detects JS without the `js:` prefix, so both shapes
-            // route the same way.
-            bool isJavaScript = src.StartsWith("js:", StringComparison.OrdinalIgnoreCase)
-                             || LooksLikeJavaScript(src);
-            if (isJavaScript)
-            {
-                if (!allowOffload)
-                {
-                    return TranspileResult.Fail(
-                        "SimHub-side JavaScript, and this target needs text — "
-                        + "a borrowed channel is numeric and cannot carry it");
-                }
-                return Offload(src, isJavaScript: true,
-                    "SimHub-side JavaScript, evaluated by SimHub on a borrowed channel");
-            }
+            // the widget.
+            if (declaredJavaScript == true || src.StartsWith("js:", StringComparison.OrdinalIgnoreCase))
+                return OffloadJavaScript(src, allowOffload);
 
+            // A failed parse may already have borrowed channels for the properties it
+            // resolved; none of them is read if the formula isn't carried as parsed.
+            var mark = _channels.MarkAllocations();
             var result = new TranspileResult();
             try
             {
@@ -94,6 +89,13 @@ namespace MozaPlugin.UI.DjsonImport
                 result.Ok = false;
                 result.Problems.Add(ex.Message);
             }
+            _channels.RollbackAllocations(mark);
+
+            // No interpreter flag: SimHub also takes JavaScript by shape. Only consulted
+            // once the NCalc parse has failed, so a ';' inside a string literal can't
+            // misroute a valid NCalc formula.
+            if (declaredJavaScript == null && LooksLikeJavaScript(src))
+                return OffloadJavaScript(src, allowOffload);
 
             // The expression is valid SimHub but uses something the wheel has no
             // equivalent for — a stateful function, a SimHub-only helper. SimHub can
@@ -103,6 +105,18 @@ namespace MozaPlugin.UI.DjsonImport
             var offloaded = Offload(src, isJavaScript: false,
                 $"evaluated by SimHub on a borrowed channel ({result.Problems.FirstOrDefault()})");
             return offloaded.Ok ? offloaded : result;
+        }
+
+        private TranspileResult OffloadJavaScript(string src, bool allowOffload)
+        {
+            if (!allowOffload)
+            {
+                return TranspileResult.Fail(
+                    "SimHub-side JavaScript, and this target needs text — "
+                    + "a borrowed channel is numeric and cannot carry it");
+            }
+            return Offload(src, isJavaScript: true,
+                "SimHub-side JavaScript, evaluated by SimHub on a borrowed channel");
         }
 
         /// <summary>
@@ -137,8 +151,8 @@ namespace MozaPlugin.UI.DjsonImport
         }
 
         /// <summary>SimHub accepts JavaScript in a binding without the <c>js:</c> prefix
-        /// and detects it by shape. None of these tokens is valid NCalc, so their presence
-        /// is unambiguous.</summary>
+        /// and detects it by shape. None of these tokens is valid NCalc outside a string
+        /// literal.</summary>
         private static bool LooksLikeJavaScript(string src)
             => src.IndexOf("$prop(", StringComparison.OrdinalIgnoreCase) >= 0
             || src.IndexOf("return ", StringComparison.Ordinal) >= 0

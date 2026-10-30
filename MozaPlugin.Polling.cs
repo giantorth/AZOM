@@ -50,6 +50,10 @@ namespace MozaPlugin
             mgr.SetTimerResolution(wanted);
         }
 
+        /// <summary>Hold the 1 ms timer outside gameplay (e.g. dashboard-upload
+        /// frame pacing). Null when the manager isn't up; dispose to release.</summary>
+        internal IDisposable? AcquireTimerResolutionHold() => _responsiveness?.AcquireTimerResolution();
+
         // ES/ESX firmware RPM brightness register (0x14 0x00) is a small field, not a
         // 0..100 percentage: sweeping SimHub's 0..100 master made the bar ramp+wrap
         // ~3.3 times (issue #113 follow-up), so its period is ~30 counts. Scale the

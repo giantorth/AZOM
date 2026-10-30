@@ -42,9 +42,13 @@ key/value match).
 6. Validate `len(decompressed) == uncomp_sz`.
 
 Plugin: [`SessionDataReassembler.TryDecompress`](../../../Telemetry/Sessions/SessionDataReassembler.cs)
-applies this layout first; fallback `TryDecompressByMagic` scans for `78 9c`
-when the offset-based parser fails on a session that uses a different
-envelope (sessions 0x03/0x04). See
+locates the stream by its `78 9c` / `78 da` magic. When this envelope sits
+directly before it, `comp_sz` gates the decode (nothing is inflated until the
+whole stream is buffered) and both `uncomp_sz` and the Adler-32 trailer must
+match; otherwise (sessions 0x03/0x04, other prefixes) the stream is accepted
+only once its Adler-32 trailer is found in the buffer. It returns one complete
+message at a time, keeping any following bytes (the next message's packed
+head) buffered. See
 [`../plugin/reassembly-fallback.md`](../plugin/reassembly-fallback.md).
 
 #### Direction asymmetry

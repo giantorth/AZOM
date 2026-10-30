@@ -93,6 +93,7 @@ namespace MozaPlugin.Devices.Ui
             // unload. Clear the guard so the next load re-runs InitTelemetryUI and re-arms
             // them — otherwise after one tab-switch the byte preview + value column stay dead.
             _telemetryUIInitialized = false;
+            _lastPopulatedCm1Index = int.MinValue;
 
             if (_dashEventSubscribedPlugin != null)
             {
@@ -226,7 +227,11 @@ namespace MozaPlugin.Devices.Ui
                 // slot / ConfigJsonList to track.
                 if (IsCm1)
                 {
-                    PopulateDashboardCombo();
+                    // Repopulate only on a page change: every rebuild re-selects, and
+                    // the selection handler's ScrollIntoView snaps the list back.
+                    if ((_plugin?.GetActiveCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
+                        || TelemetryProfileList.Items.Count == 0)
+                        PopulateDashboardCombo();
                     long sigc = ComputeMappingDataSignature();
                     if (sigc != _lastMappingDataSignature) PopulateChannelMappingList();
                     return;
@@ -384,6 +389,8 @@ namespace MozaPlugin.Devices.Ui
         private void PopulateDashboardCombo()
         {
             if (_plugin == null) return;
+            // Any non-CM1 list invalidates the CM1 page snapshot.
+            _lastPopulatedCm1Index = int.MinValue;
 
             // CM1 base-bridged dash: built-in pages selected via the 0x32/0x81 switch
             // (1-based 1..N); no tier-def ConfigJsonList. Mirrors the FSR1 branch.
@@ -400,6 +407,7 @@ namespace MozaPlugin.Devices.Ui
                     int idx = active - min;
                     TelemetryProfileList.SelectedIndex = (idx >= 0 && idx < TelemetryProfileList.Items.Count) ? idx : 0;
                     _lastPopulatedWheelSlot = -1;
+                    _lastPopulatedCm1Index = active;
                 }
                 return;
             }
@@ -530,6 +538,10 @@ namespace MozaPlugin.Devices.Ui
         /// of any slot (including -1) is treated as a change.
         /// </summary>
         private int _lastPopulatedWheelSlot = int.MinValue;
+
+        /// <summary>CM1 page the dropdown was last populated against; int.MinValue when
+        /// the list doesn't hold the CM1 pages.</summary>
+        private int _lastPopulatedCm1Index = int.MinValue;
 
         /// <summary>Content signature of the ConfigJsonList the dropdown was
         /// last populated from. The list changes mid-session on upload/delete

@@ -762,38 +762,21 @@ namespace MozaPlugin
                 // doesn't keep showing a "port in use" banner after the user
                 // has intentionally turned the connection off.
                 _connection?.ResetFailureState();
-                _data.IsBaseConnected = false;
-                _data.IsHubConnected = false;
-                _data.ClearWheelIdentity();
-                DetectionState.ResetBase();
-                _data.ClearBaseIdentity();
-                _data.BaseSettingsRead = false;
-                DetectionState.DashDetected = false;
-                _baseModelChunk1 = null;
-                _baseModelChunk2 = null;
-                DetectionState.NewWheelDetected = false;
-                DetectionState.OldWheelDetected = false;
-                WheelModelInfo = null;
-                DetectionState.HandbrakeDetected = false;
-                DetectionState.PedalsDetected = false;
-                DetectionState.HubDetected = false;
-                DetectionState.Ab9Detected = false;
-                DetectionState.PedalsOwner = null;
-                DetectionState.HandbrakeOwner = null;
-                DetectionState.BaseOwner = null;
+                // A manual Disconnect() raises no Disconnected event, so run the
+                // handlers each pipe's loss would have. The ports are already
+                // closed, so none of them reaches the wire.
+                OnSerialDisconnected();
                 _ab9Manager?.Disconnect();
                 _hubManager?.Disconnect();
-                _baseManager?.Disconnect();
-                _connectionCoordinator?.ResetHubWheelMigrationState();
-                if (_telemetrySender != null)
-                {
-                    _telemetrySender.DetectedDeviceMask = 0;
-                }
-                _deviceManager.ResetWheelDetection();
-                Interlocked.Exchange(ref _telemetryStartRequested, 0);
-                DetectionState.ResetWheelPollMisses();
-                DetectionState.LastKnownWheelModel = "";
-                DetectionState.LastKnownWheelDeviceId = 0;
+                OnHubDisconnected();
+                OnBaseDisconnected();
+                // Disable-only. After the disconnects (they join the dispatch
+                // threads), so no in-flight ACK can re-claim an owner.
+                _deviceProber?.ReleasePeripheralOwnership();
+                DetectionState.ClearPeripheralsOwnedBy(null);
+                // A rim reset keeps a standalone-USB dash; disabling drops it too.
+                DetectionState.DashDetected = false;
+                DetectionState.Ab9Detected = false;
                 MozaLog.Info("[AZOM] Connection disabled");
             }
         }

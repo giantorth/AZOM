@@ -13,11 +13,9 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
     /// in captures. We decode best-effort and pass through.
     /// </para>
     /// <para>
-    /// The hardware command name is provisional — <c>MozaCommandDatabase</c>
-    /// does not yet have a center-wheel entry as of Phase 6a, so this is a
-    /// silent no-op on the wire. The handler still returns 2.03 Valid so the
-    /// SDK contract holds; once the DB grows a real command, no resource
-    /// code needs to change.
+    /// The hardware command name is provisional and not in
+    /// <c>MozaCommandDatabase</c>, so the write is a no-op until the command
+    /// exists. POST still returns 2.03 Valid.
     /// </para>
     /// </remarks>
     internal sealed class CenterWheelResource : CoapResourceHandler

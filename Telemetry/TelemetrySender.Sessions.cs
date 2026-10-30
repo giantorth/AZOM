@@ -136,6 +136,9 @@ namespace MozaPlugin.Telemetry
         internal global::MozaPlugin.Telemetry.Sessions.SessionRetransmitter Retransmitter => _retransmitter;
         internal void SendAndTrackChunkInternal(byte[] frame) => SendAndTrackChunk(frame);
         internal MultiStreamProfile? ProfileRef => _profile;
+        /// <summary>Guards publication of _profile/_tiers and any swap of the live
+        /// profile's tier channel lists together with the builder rebuild.</summary>
+        internal object ProfileSetLock => _profileSetLock;
 
         /// <summary>The session the tier-def is emitted on: whichever carries
         /// the wheel's real catalog+END. PitHouse "Form A" = mgmt (0x01),

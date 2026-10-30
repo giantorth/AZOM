@@ -895,4 +895,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Feedback tattile</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce pulsanti (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Anteprima non disponibile</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Premuto</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Rilasciato</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Selettore di tonalità personalizzato</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Rosso pastello</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Arancione pastello</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Giallo pastello</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Verde pastello</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Ciano pastello</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Blu pastello</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Viola pastello</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Magenta pastello</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tutti i file (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» applicato al profilo attivo</value></data>
 </root>

@@ -307,6 +307,7 @@ namespace MozaPlugin
         }
 
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
+        internal Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings() => _fsr1Cm1Mapping.GetActiveCm1Mappings();
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);
         internal void ClearCm1Mappings() => _fsr1Cm1Mapping.ClearCm1Mappings();
         internal int GetActiveCm1Index() => _fsr1Cm1Mapping.GetActiveCm1Index();

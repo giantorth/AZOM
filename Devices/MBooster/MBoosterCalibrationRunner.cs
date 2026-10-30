@@ -50,10 +50,9 @@ namespace MozaPlugin.Devices.MBooster
     /// target unit itself is resolved once at start and pinned (_dev).
     ///
     /// Driven by one <see cref="System.Timers.Timer"/> rather than a
-    /// DispatcherTimer in the settings panel: SettingsControl's
-    /// RunCalibrationCountdown silently drops its stop action if the panel
-    /// unloads mid-countdown, which here would leave the pedal mid-sweep with
-    /// no stop frame and no reboot.
+    /// DispatcherTimer in the settings panel: the run outlives any one panel
+    /// instance, and a step lost with the panel would leave the pedal
+    /// mid-sweep with no stop frame and no reboot.
     ///
     /// PendingResponseTracker is deliberately not used for the motor status
     /// poll: its 60s sunset blacklist expires almost exactly when a ~59.5s

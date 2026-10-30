@@ -575,6 +575,35 @@ namespace MozaPlugin.Hardware
             }
         }
 
+        /// <summary>Peek the base change gate without recording.</summary>
+        private static bool BaseCfgDiffers(string key, long value)
+        {
+            lock (s_baseCfgLock)
+                return !(s_baseCfgCache.TryGetValue(key, out var prev) && prev == value);
+        }
+
+        /// <summary>Record a value that went out to the base.</summary>
+        private static void BaseCfgNoteWrite(string key, long value)
+        {
+            lock (s_baseCfgLock) s_baseCfgCache[key] = value;
+        }
+
+        /// <summary>Drop the cached base-ambient values when the base itself is gone: the
+        /// ambient apply runs before the next base's UID is known, so a swapped-in base
+        /// would otherwise be skipped for values the old one held. Not called on reload.</summary>
+        internal static void ForgetBaseAmbientCfg()
+        {
+            lock (s_baseCfgLock)
+            {
+                System.Collections.Generic.List<string>? keys = null;
+                foreach (var k in s_baseCfgCache.Keys)
+                    if (k.StartsWith("base-ambient-", StringComparison.Ordinal))
+                        (keys ??= new System.Collections.Generic.List<string>()).Add(k);
+                if (keys != null)
+                    foreach (var k in keys) s_baseCfgCache.Remove(k);
+            }
+        }
+
         // ── Shifter settings: write-on-change against the shifter's own readback ──
         // Every group-0x52 write is an EEPROM commit on the shifter (Table 9 "Param N
         // Written"), so the profile is not pushed blind at detect. Detect ARMS a
@@ -813,7 +842,6 @@ namespace MozaPlugin.Hardware
             int[]? sleepColor  = sleepBundle?.Color;
             int rpmBri         = Eff(ov?.WheelRpmBrightness ?? -1, profile.WheelRpmBrightness);
             int btnBri         = Eff(ov?.WheelButtonsBrightness ?? -1, profile.WheelButtonsBrightness);
-            int flagsBri       = Eff(ov?.WheelFlagsBrightness ?? -1, profile.WheelFlagsBrightness);
             int rpmInd         = Eff(ov?.WheelRpmIndicatorMode ?? -1, profile.WheelRpmIndicatorMode);
             int rpmDisp        = Eff(ov?.WheelRpmDisplayMode ?? -1, profile.WheelRpmDisplayMode);
             int esRpmBri       = Eff(ov?.WheelESRpmBrightness ?? -1, profile.WheelESRpmBrightness);
@@ -868,7 +896,6 @@ namespace MozaPlugin.Hardware
             }
             if (rpmBri    >= 0) _data.WheelRpmBrightness     = rpmBri;
             if (btnBri    >= 0) _data.WheelButtonsBrightness = btnBri;
-            if (flagsBri  >= 0) _data.WheelFlagsBrightness   = flagsBri;
             if (esRpmBri  >= 0) _data.WheelESRpmBrightness   = esRpmBri;
             if (rpmInd    >= 0) _data.WheelRpmIndicatorMode  = rpmInd;
             if (rpmDisp   >= 0) _data.WheelRpmDisplayMode    = rpmDisp;
@@ -1099,8 +1126,8 @@ namespace MozaPlugin.Hardware
                 }
                 if (rpmBri   >= 0 && hasRpm && WheelCfgChangedForApply("wheel-rpm-brightness", rpmBri))     _deviceManager.WriteSetting("wheel-rpm-brightness", rpmBri);
                 if (btnBri   >= 0 && hasBtn && WheelCfgChangedForApply("wheel-buttons-brightness", btnBri)) _deviceManager.WriteSetting("wheel-buttons-brightness", btnBri);
-                if (flagsBri >= 0 && _detectionState.DashDetected && WheelCfgChangedForApply("dash-flags-brightness", flagsBri))
-                    _deviceManager.WriteSetting("dash-flags-brightness", flagsBri);
+                // Meter flag brightness (dash-flags-brightness) is applied from
+                // DashFlagsBrightness in ApplyDashToHardware.
 
                 if (WheelCfgChangedArr("wheel-rpm-color", rpmColors))
                     WriteColorArray(rpmColors, "wheel-rpm-color", rpmCount);
@@ -1246,7 +1273,12 @@ namespace MozaPlugin.Hardware
             bool isCm2 = _plugin.IsCm2Present && !_plugin.DashIsCm1;
 
             if (profile.DashRpmBrightness   >= 0) _deviceManager.WriteSetting("dash-rpm-brightness", profile.DashRpmBrightness);
-            if (profile.DashFlagsBrightness >= 0) _deviceManager.WriteSetting("dash-flags-brightness", profile.DashFlagsBrightness);
+            // Flash-backed: change-gated through the shared cfg cache, which the UI
+            // writer records into too. Not WheelCfgChangedForApply — its FSR1
+            // suppression guards the wheel's param store, not the dash's.
+            SyncWheelCfgCache();
+            if (profile.DashFlagsBrightness >= 0 && WheelCfgChanged("dash-flags-brightness", profile.DashFlagsBrightness))
+                _deviceManager.WriteSetting("dash-flags-brightness", profile.DashFlagsBrightness);
             // DECOUPLED: dash screen brightness + standby target the CM2's OWN sender
             // (the _cm2Sender drives the CM2 screen now — the main sender is wheel-only,
             // and idle entirely for a screenless/no-wheel rig, so routing these via the
@@ -1371,31 +1403,46 @@ namespace MozaPlugin.Hardware
             // Per-section gate only — see ApplyWheelToHardware comment for why
             // _data.IsConnected was dropped here.
             if (!_detectionState.BaseAmbientLedSupported) return;
+            // Change-gated against the per-base cache like the FFB settings, so an
+            // unchanged re-apply (game/profile switch) sends nothing. The UI writers
+            // record into the same cache.
+            SyncBaseCfgCache();
             // Brightness is percent: clamp so a profile written by an older build
             // (whose slider went to 255) cannot push an out-of-range value.
-            if (profile.BaseAmbientBrightness     >= 0) BaseManager.WriteSetting("base-ambient-brightness", System.Math.Min(100, profile.BaseAmbientBrightness));
-            if (profile.BaseAmbientStandbyMode    >= 0) BaseManager.WriteSetting("base-ambient-standby-mode", profile.BaseAmbientStandbyMode);
-            if (profile.BaseAmbientIndicatorState >= 0) BaseManager.WriteSetting("base-ambient-indicator-state", profile.BaseAmbientIndicatorState);
-            if (profile.BaseAmbientSleepMode      >= 0) BaseManager.WriteSetting("base-ambient-sleep-mode", profile.BaseAmbientSleepMode);
-            if (profile.BaseAmbientSleepTimeout   >= 0) BaseManager.WriteSetting("base-ambient-sleep-timeout", profile.BaseAmbientSleepTimeout);
-            if (profile.BaseAmbientStartupColor   >= 0) WritePackedColor("base-ambient-startup-color", profile.BaseAmbientStartupColor);
-            if (profile.BaseAmbientShutdownColor  >= 0) WritePackedColor("base-ambient-shutdown-color", profile.BaseAmbientShutdownColor);
+            if (profile.BaseAmbientBrightness     >= 0) WriteBaseAmbientIfChanged("base-ambient-brightness", System.Math.Min(100, profile.BaseAmbientBrightness));
+            WriteBaseAmbientIfChanged("base-ambient-standby-mode", profile.BaseAmbientStandbyMode);
+            WriteBaseAmbientIfChanged("base-ambient-indicator-state", profile.BaseAmbientIndicatorState);
+            WriteBaseAmbientIfChanged("base-ambient-sleep-mode", profile.BaseAmbientSleepMode);
+            WriteBaseAmbientIfChanged("base-ambient-sleep-timeout", profile.BaseAmbientSleepTimeout);
+            WriteBaseAmbientColorIfChanged("base-ambient-startup-color", profile.BaseAmbientStartupColor);
+            WriteBaseAmbientColorIfChanged("base-ambient-shutdown-color", profile.BaseAmbientShutdownColor);
 
             // Per-mode animation intervals (modes 2..5 only — off and constant
             // have no register) and the sleep breathing speed.
             if (profile.BaseAmbientStandbyIntervals != null)
             {
                 for (int mode = 2; mode <= 5 && mode < profile.BaseAmbientStandbyIntervals.Length; mode++)
-                {
-                    int ms = profile.BaseAmbientStandbyIntervals[mode];
-                    if (ms >= 0)
-                        BaseManager.WriteSetting($"base-ambient-standby-interval-mode{mode}", ms);
-                }
+                    WriteBaseAmbientIfChanged($"base-ambient-standby-interval-mode{mode}", profile.BaseAmbientStandbyIntervals[mode]);
             }
-            if (profile.BaseAmbientSleepBreathInterval >= 0)
-                BaseManager.WriteSetting("base-ambient-sleep-breath-interval", profile.BaseAmbientSleepBreathInterval);
+            WriteBaseAmbientIfChanged("base-ambient-sleep-breath-interval", profile.BaseAmbientSleepBreathInterval);
 
             ApplyBaseAmbientPalettes(profile);
+        }
+
+        // Base-ambient writes record into s_baseCfgCache only once dispatched, so a
+        // write dropped on a dead wire is retried by the next apply. Negative = unset.
+        private void WriteBaseAmbientIfChanged(string command, int value)
+        {
+            if (value < 0 || !BaseCfgDiffers(command, value)) return;
+            if (BaseManager.WriteSetting(command, value)) BaseCfgNoteWrite(command, value);
+        }
+
+        private void WriteBaseAmbientColorIfChanged(string command, int packed)
+        {
+            if (packed < 0) return;
+            long rgb = packed & 0xFFFFFF;
+            if (!BaseCfgDiffers(command, rgb)) return;
+            if (WritePackedColor(command, packed)) BaseCfgNoteWrite(command, rgb);
         }
 
         /// <summary>
@@ -1431,9 +1478,7 @@ namespace MozaPlugin.Hardware
         private void WritePaletteEntry(int[]? palette, int index, string command)
         {
             if (palette == null || index < 0 || index >= palette.Length) return;
-            int packed = palette[index];
-            if (packed < 0) return;
-            WritePackedColor(command, packed);
+            WriteBaseAmbientColorIfChanged(command, palette[index]);
         }
 
         /// <summary>Push handbrake settings. No-op unless detected.</summary>
@@ -2008,18 +2053,41 @@ namespace MozaPlugin.Hardware
         public void WriteIfDashDetected(string command, int value)
         {
             if (value < 0) return;
-            if (_detectionState.DashDetected) _deviceManager.WriteSetting(command, value);
+            if (!_detectionState.DashDetected) return;
+            if (IsFlashBackedWheelCfg(command))
+            {
+                QueueWheelCfgWrite(command, value, () => _deviceManager.WriteSetting(command, value));
+                return;
+            }
+            _deviceManager.WriteSetting(command, value);
         }
+
+        /// <summary>Drop the cached dash-flags-brightness. The cfg cache is keyed on the
+        /// wheel's UID, so a dash (re)attach doesn't invalidate it; called on the
+        /// dash-detection rising edge so the attached dash gets the value written once.</summary>
+        internal void ForgetDashFlagsBrightness()
+        {
+            const string key = "dash-flags-brightness";
+            lock (s_wheelCfgCacheLock)
+            {
+                s_wheelCfgCache.Remove(key);
+                s_wheelCfgLastWriteTicks.Remove(key);
+                s_wheelCfgDesired.Remove(key);
+                s_wheelCfgReassertCount.Remove(key);
+            }
+        }
+
         // The "base connected" gate uses the persisted DetectionState flag
         // (set on first base-mcu-temp echo and preserved across SimHub plugin
         // reloads via s_persistentDetectionState), not the volatile
         // _data.IsBaseConnected — see the ApplyBaseSettingIfSet comment for
         // the hot-reload rationale. _deviceManager.WriteSetting still bails
         // on a dead wire, so this is correct even mid-reconnect.
-        public void WriteIfBaseConnected(string command, int value)
+        /// <summary>True iff the write was dispatched (base detected, wire up, known command).</summary>
+        public bool WriteIfBaseConnected(string command, int value)
         {
-            if (value < 0) return;
-            if (_detectionState.BaseDetected) BaseManager.WriteSetting(command, value);
+            if (value < 0) return false;
+            return _detectionState.BaseDetected && BaseManager.WriteSetting(command, value);
         }
         public void WriteFloatIfBaseConnected(string command, int value)
         {
@@ -2110,10 +2178,13 @@ namespace MozaPlugin.Hardware
                 ShifterCfgNoteUserWrite(ShifterModelKind.Sgp, command, PackShifterColors(payload[0], payload[1]));
             SgpManager.WriteArray(command, payload);
         }
+        // Base-ambient UI writes always go out; recording them keeps the apply's
+        // change gate (ApplyBaseAmbientToHardware) in step with the hardware.
         public void WriteIfBaseAmbientSupported(string command, int value)
         {
-            if (value < 0) return;
-            if (_detectionState.BaseAmbientLedSupported) BaseManager.WriteSetting(command, value);
+            if (value < 0 || !_detectionState.BaseAmbientLedSupported) return;
+            SyncBaseCfgCache();
+            if (BaseManager.WriteSetting(command, value)) BaseCfgNoteWrite(command, value);
         }
         public void WriteColorIfWheelDetected(string command, byte r, byte g, byte b)
         {
@@ -2295,7 +2366,10 @@ namespace MozaPlugin.Hardware
         }
         public void WriteColorIfBaseAmbientSupported(string command, byte r, byte g, byte b)
         {
-            if (_detectionState.BaseAmbientLedSupported) BaseManager.WriteColor(command, r, g, b);
+            if (!_detectionState.BaseAmbientLedSupported) return;
+            SyncBaseCfgCache();
+            if (BaseManager.WriteColor(command, r, g, b))
+                BaseCfgNoteWrite(command, ((long)r << 16) | ((long)g << 8) | b);
         }
         public void WriteArrayIfWheelDetected(string command, byte[] payload)
         {
@@ -2551,7 +2625,7 @@ namespace MozaPlugin.Hardware
             dst[2] = (byte)(packed & 0xFF);
         }
 
-        public void WritePackedColor(string command, int packed)
+        public bool WritePackedColor(string command, int packed)
         {
             byte r = (byte)((packed >> 16) & 0xFF);
             byte g = (byte)((packed >> 8) & 0xFF);
@@ -2559,7 +2633,7 @@ namespace MozaPlugin.Hardware
             // Only base-ambient colours route here (startup/shutdown plus the
             // per-LED idle/sleep palettes) — target the base-owning pipe (see
             // BaseManager).
-            BaseManager.WriteColor(command, r, g, b);
+            return BaseManager.WriteColor(command, r, g, b);
         }
 
         /// <summary>Send all-off to wheel and dash LEDs via the device manager.</summary>

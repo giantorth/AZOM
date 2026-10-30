@@ -31,12 +31,14 @@ namespace MozaPlugin.Protocol
         Mode = 10,
         // AB9 host-rendered engine vibration (0x20/0x0A 05) at ~91 Hz.
         Ab9EngineVibration = 11,
-        // AB9 secondary FFB sub-streams (latest-wins per lane).
-        Ab9EnginePulse = 12,
-        Ab9TriggerA = 13,        // 0x0D start of both engine-pulse dampers (flat ~9 Hz)
-        Ab9TriggerRpm = 14,      // 0x0D start of the engine-vib sine (RPM-tracked)
-        Ab9TriggerExtra = 15,    // spare 0x0D lane
-        Ab9LowRate = 16,         // unused — 0x08 shift constant-force rides the one-shot FIFO
+        // AB9 secondary FFB sub-streams (latest-wins per lane). Each ON/OFF pair
+        // sits on adjacent slots, ON first: the write loop drains slots in index
+        // order, so a pair queued together goes out ON then OFF in one pass.
+        Ab9EnginePulse = 12,     // 0x0B engine-pulse ON half
+        Ab9EnginePulseOff = 13,  // 0x0B engine-pulse OFF half
+        Ab9TriggerA = 14,        // 0x0D start of the engine-pulse ON damper (flat ~9 Hz)
+        Ab9TriggerB = 15,        // 0x0D start of the engine-pulse OFF damper
+        Ab9TriggerRpm = 16,      // 0x0D start of the engine-vib sine (RPM-tracked)
         // mBooster motor-write lane for pedal axis 0. Each axis runs its own
         // worker and needs its OWN latest-wins lane — see MBoosterEffectAxis1/2
         // at 44+ for the chained axes.
@@ -81,11 +83,12 @@ namespace MozaPlugin.Protocol
         // oscillators (wire effect ids 1/2/0) and sums them; each needs its own
         // latest-wins lane so all three can stream at once without coalescing.
         // The plugin's own LFE mode drives ids 1/2 continuously (engine/ABS) and
-        // id 0 as a one-shot gearshift burst on the FIFO; the ShakeIt haptics
-        // device drives all three as continuous tones, so id 0 gets Osc0 here.
+        // id 0 as a one-shot gearshift burst on the FIFO, or continuously in Level
+        // mode; the ShakeIt haptics device drives all three as continuous tones.
+        // Every continuous id-0 stream uses Osc0 here.
         BaseLfeEngine = 41,   // wire id 1
         BaseLfeAbs = 42,      // wire id 2
-        BaseLfeOsc0 = 43,     // wire id 0 (continuous-tone lane; ShakeIt only)
+        BaseLfeOsc0 = 43,     // wire id 0 (continuous-tone lane: ShakeIt, Level-mode gearshift)
 
         // ── mBooster chained-axis motor lanes (absolute slots 44+) ───────────
         // One lane per pedal axis. Axis 0 keeps MBoosterEffect (17); a CHAINED
@@ -375,6 +378,14 @@ namespace MozaPlugin.Protocol
         // Stream lane: per-kind latest-wins slots, unpaced. SendStream overwrites pending values.
         private readonly byte[]?[] _streamSlots = new byte[StreamSlotCount][];
 
+        // Tier-overflow lane: latest-wins slots for tier-def tiers past TierDash7
+        // (radar/track-map dashboards split into more sub-tiers than the 8 fixed
+        // slots). One lazily-allocated array per pipeline lane base; drained with
+        // the stream slots and cleared wherever they are. Flag bytes bound a
+        // pipeline to 256 tiers, so 248 overflow slots per lane is the ceiling.
+        private const int TierOverflowSlotsPerLane = 256 - 8;
+        private readonly byte[]?[]?[] _tierOverflowLanes = new byte[]?[]?[StreamSlotCount];
+
         /// <summary>Live LED lane: latest-state zones pulled through the one-shot pacing
         /// gate, taking turns with the FIFO and any <see cref="IPacedFrameSource"/>.
         /// See <see cref="LedFrameScheduler"/>.</summary>
@@ -471,8 +482,22 @@ namespace MozaPlugin.Protocol
         public string? LastPortName
         {
             get => _lastPortName;
-            set => _lastPortName = value;
+            set
+            {
+                if (!string.Equals(_lastPortName, value, StringComparison.OrdinalIgnoreCase))
+                    _lastComName = null;
+                _lastPortName = value;
+            }
         }
+
+        private volatile string? _lastComName;
+
+        /// <summary>
+        /// Wine COM name of <see cref="LastPortName"/>, resolved when the port was
+        /// opened; null on Windows, when unresolved, or while closed. No I/O — safe
+        /// to read from the UI thread.
+        /// </summary>
+        public string? LastComName => _lastComName;
 
         private string? _lastDeviceId;
 
@@ -860,6 +885,7 @@ namespace MozaPlugin.Protocol
             try
             {
                 IMozaPort port;
+                string? com = null;
                 if (string.IsNullOrEmpty(devicePath))
                 {
                     port = new SerialPortMozaPort(portName, MozaProtocol.BaudRate);
@@ -872,16 +898,18 @@ namespace MozaPlugin.Protocol
                     // resolves — SerialPortMozaPort gets a 64 KB ReadBufferSize and
                     // does not gate reads on ClearCommError, which is the difference
                     // between resync=0 and resync 53-465 on the same hardware.
-                    // The native stty warm-up still runs first: it is what makes the
-                    // freshly-enumerated CDC-ACM endpoint safe to open at all.
-                    string? com = WineComNameResolver.ResolveComName(portName);
+                    com = WineComNameResolver.ResolveComName(portName);
+                    // The native stty warm-up runs once per attempt, before either
+                    // transport: it is what makes the freshly-enumerated CDC-ACM
+                    // endpoint safe to open at all. A timeout throws and ends this
+                    // attempt; the device-path fallback must not retry it.
+                    WineDevicePathMozaPort.WarmUpEndpoint(devicePath!);
                     port = null!;
                     if (!string.IsNullOrEmpty(com)
                         && MozaPlugin.Instance?.Settings?.PreferComPortOnWine != false)
                     {
                         try
                         {
-                            WineDevicePathMozaPort.WarmUpEndpoint(devicePath!);
                             port = new SerialPortMozaPort(com!, MozaProtocol.BaudRate);
                             MozaLog.Debug(
                                 $"[AZOM] Wine open: {portName} → {com} via SerialPort "
@@ -899,7 +927,9 @@ namespace MozaPlugin.Protocol
                     if (port == null)
                         port = new WineDevicePathMozaPort(devicePath!);
                 }
-                return FinishOpen(port, portName);
+                bool opened = FinishOpen(port, portName);
+                _lastComName = com;
+                return opened;
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -942,6 +972,7 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            ClearTierOverflow(0, _tierOverflowLanes.Length);
             Leds.Reset();
 
             _port = port;
@@ -1005,6 +1036,7 @@ namespace MozaPlugin.Protocol
         {
             Interlocked.Increment(ref _ioGeneration);
             _running = false;
+            _lastComName = null;
 
             // Close before joining so a syscall-wedged R/W returns to its loop.
             IMozaPort? p;
@@ -1146,6 +1178,44 @@ namespace MozaPlugin.Protocol
             Interlocked.Exchange(ref _streamSlots[idx], message);
         }
 
+        /// <summary>Latest-wins send for a tier-def tier past TierDash7.
+        /// <paramref name="laneBase"/> is the pipeline's stream-slot base,
+        /// <paramref name="overflowIndex"/> the tier index minus 8.</summary>
+        public void SendTierOverflow(int laneBase, int overflowIndex, byte[] message)
+        {
+            if (message == null) return;
+            if ((uint)laneBase >= (uint)_tierOverflowLanes.Length
+                || (uint)overflowIndex >= (uint)TierOverflowSlotsPerLane)
+            {
+                System.Diagnostics.Debug.Fail(
+                    $"SendTierOverflow lane {laneBase} index {overflowIndex} out of range");
+                MozaLog.Warn($"[AZOM] SendTierOverflow out-of-range lane {laneBase} index {overflowIndex} — frame dropped");
+                return;
+            }
+            var lane = Volatile.Read(ref _tierOverflowLanes[laneBase]);
+            if (lane == null)
+            {
+                Interlocked.CompareExchange(ref _tierOverflowLanes[laneBase],
+                    new byte[TierOverflowSlotsPerLane][], null);
+                lane = Volatile.Read(ref _tierOverflowLanes[laneBase])!;
+            }
+            Interlocked.Exchange(ref lane[overflowIndex], message);
+        }
+
+        /// <summary>Drop pending tier-overflow frames for lane bases in
+        /// [<paramref name="fromBase"/>, <paramref name="endBase"/>).</summary>
+        private void ClearTierOverflow(int fromBase, int endBase)
+        {
+            int end = Math.Min(endBase, _tierOverflowLanes.Length);
+            for (int b = Math.Max(0, fromBase); b < end; b++)
+            {
+                var lane = Volatile.Read(ref _tierOverflowLanes[b]);
+                if (lane == null) continue;
+                for (int k = 0; k < lane.Length; k++)
+                    Interlocked.Exchange(ref lane[k], null);
+            }
+        }
+
         // Set by FlushPendingWrites (any thread), serviced by the write thread.
         // DiscardOutBuffer must run on the write thread so it never races the
         // unlocked _port.Write there (SerialPort is not thread-safe).
@@ -1165,6 +1235,7 @@ namespace MozaPlugin.Protocol
             } while (Interlocked.CompareExchange(ref _oneShotFlushSeq, seq, prev) != prev);
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            ClearTierOverflow(0, _tierOverflowLanes.Length);
             // The OS-buffer discard may eat LED frames already counted as sent.
             Leds.Reset();
             // Defer the OS-buffer discard to the write thread (see _flushRequested).
@@ -1175,13 +1246,15 @@ namespace MozaPlugin.Protocol
         /// Clear only one pipeline's stream-slot lane (slots [from, from+count)),
         /// leaving the shared queues, OS buffer, and the OTHER pipeline's slots
         /// intact. Used when one of two senders sharing this connection stops/
-        /// restarts so it doesn't blank the co-resident pipeline's frames.
+        /// restarts so it doesn't blank the co-resident pipeline's frames. Also
+        /// clears the tier-overflow lane of any pipeline based in that range.
         /// </summary>
         public void ClearStreamSlots(int from, int count)
         {
             int end = Math.Min(from + count, _streamSlots.Length);
             for (int k = Math.Max(0, from); k < end; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            ClearTierOverflow(from, from + count);
         }
 
         // Record an I/O failure. Throttles log spam and force-closes the port
@@ -1225,6 +1298,7 @@ namespace MozaPlugin.Protocol
                 try { _port?.Close(); } catch { }
                 _port = null;
             }
+            _lastComName = null;
             // Release the port-held claim now (Disconnect does the same): until the
             // reconnect tick reopens, sibling lanes and the migration check would
             // otherwise still see this closed port as ours.
@@ -1235,6 +1309,7 @@ namespace MozaPlugin.Protocol
             while (_oneShotQueue.TryDequeue(out _)) { }
             for (int k = 0; k < _streamSlots.Length; k++)
                 Interlocked.Exchange(ref _streamSlots[k], null);
+            ClearTierOverflow(0, _tierOverflowLanes.Length);
             Leds.Reset();
             try { Disconnected?.Invoke(); } catch (Exception dex)
             {
@@ -1885,6 +1960,27 @@ namespace MozaPlugin.Protocol
                         lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
                         lastWasOneShot = false;
                         didWork = true;
+                    }
+                }
+
+                // 2b) Tier-overflow lane, same treatment as the stream slots.
+                for (int b = 0; b < _tierOverflowLanes.Length && gen == Volatile.Read(ref _ioGeneration); b++)
+                {
+                    var overflow = Volatile.Read(ref _tierOverflowLanes[b]);
+                    if (overflow == null) continue;
+                    for (int k = 0; k < overflow.Length && gen == Volatile.Read(ref _ioGeneration); k++)
+                    {
+                        if (Volatile.Read(ref overflow[k]) == null) continue;
+                        var slot = Interlocked.Exchange(ref overflow[k], null);
+                        if (slot == null) continue;
+                        int written = WriteFrame(slot, ref stuffBuf, MozaProtocol.StuffedFrameSize(slot));
+                        if (written > 0)
+                        {
+                            writeCount++;
+                            lastWriteTs = System.Diagnostics.Stopwatch.GetTimestamp();
+                            lastWasOneShot = false;
+                            didWork = true;
+                        }
                     }
                 }
 

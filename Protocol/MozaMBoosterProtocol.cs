@@ -50,6 +50,10 @@ namespace MozaPlugin.Protocol
         /// <summary>Motor-write payload length (excludes group + device per dirt-client framing rule).</summary>
         public const byte MotorPayloadLen = 0x09;
 
+        /// <summary>Every effect wire id, ascending — the set a full disable burst covers.</summary>
+        internal static readonly MBoosterEffectId[] AllEffectIds =
+            (MBoosterEffectId[])Enum.GetValues(typeof(MBoosterEffectId));
+
         // Firmware error reports -------------------------------------------
         // A unit reports an error on group 0x0E as `03 <code:2 BE> 00 01`; Pit
         // House acks with `04 <code:2 BE> 01` to that unit's id and the unit

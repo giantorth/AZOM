@@ -4,6 +4,7 @@ using System.Threading;
 using System.Timers;
 using GameReaderCommon;
 using MozaPlugin.Protocol;
+using MozaPlugin.Settings;
 using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Display
@@ -144,9 +145,14 @@ namespace MozaPlugin.Telemetry.Display
 
             var resolve = _resolve;
             long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
+            // Resolved once per tick, not per field; the mapping dict is a copy-on-write snapshot.
+            var cm1Maps = plugin?.GetActiveCm1Mappings();
             float ValueFor(Cm1FieldDef f)
             {
-                var m = plugin?.GetCm1FieldMapping(f.FieldId);
+                Fsr1FieldMapping? m = null;
+                if (cm1Maps != null && !string.IsNullOrEmpty(f.FieldId)
+                    && cm1Maps.TryGetValue(f.FieldId, out var fm))
+                    m = fm;
                 string prop = m?.Property ?? f.DefaultProperty;
                 // Test pattern: sweep each field over an inferred natural range
                 // (the CM1 catalog carries no per-field range). Constants stay put.

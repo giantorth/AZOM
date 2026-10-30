@@ -87,7 +87,7 @@ namespace MozaPlugin.UI
                 for (int i = 0; i < 5; i++)
                 {
                     string name = $"mbooster-{prefix}-y{i + 1}";
-                    if (c.OutputRegisterValue(dev, name) != (int)Math.Round(curve[i]))
+                    if (!c.UnitHoldsFloat(dev, name, curve[i]))
                         c.SendFloatWrite(name, curve[i], dev);
                 }
             });

@@ -199,9 +199,12 @@ namespace MozaPlugin.Protocol
 
         private void Run()
         {
+            // Moza HID paths the reader skips by design (PID not read, or no
+            // tracked usage). Never re-walked while they stay plugged in.
+            var ignoredPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             while (!_stop)
             {
-                var devices = FindMozaDevices();
+                var devices = FindMozaDevices(ignoredPaths);
                 _data.IsStalksConnected = devices.Any(d => d.Item3 == MozaHidClass.Stalks);
                 _data.IsAb9HidConnected = false;
                 if (devices.Count == 0)
@@ -212,25 +215,31 @@ namespace MozaPlugin.Protocol
                 }
 
                 var threads = new List<Thread>();
-                // Every Moza HID path seen by the last full enumeration, opened
-                // or not — a path outside this set is a hot-plugged device.
-                var knownPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var openPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // Devices that refused to open, retried directly by the hot-plug scan.
+                var failedOpens = new Dictionary<string, (HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)>(StringComparer.OrdinalIgnoreCase);
                 int openCount = 0;
 
                 // Open one device on its own reader thread; false when it refused
-                // to open (left for the next hot-plug scan to retry).
+                // to open (left in failedOpens for the hot-plug scan to retry).
                 bool TryStart((HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity) d)
                 {
                     var (device, usages, deviceClass, identity) = d;
-                    knownPaths.Add(DevicePathOf(device));
-                    if (!device.TryOpen(out HidStream stream)) return false;
+                    string path = DevicePathOf(device);
+                    if (!device.TryOpen(out HidStream stream))
+                    {
+                        failedOpens[path] = d;
+                        MozaLog.DebugIfChanged($"hid-open-{path}",
+                            $"[AZOM] HID PID {device.ProductID:X4} refused to open; retrying");
+                        return false;
+                    }
+                    failedOpens.Remove(path);
                     try
                     {
                         openCount++;
                         // Register so Dispose() can force-close on shutdown.
                         TrackStream(stream, (ushort)device.ProductID);
-                        openPaths.Add(DevicePathOf(device));
+                        openPaths.Add(path);
                         if (deviceClass == MozaHidClass.Stalks) _data.IsStalksConnected = true;
                         if (deviceClass == MozaHidClass.Ab9) _data.IsAb9HidConnected = true;
 
@@ -280,9 +289,8 @@ namespace MozaPlugin.Protocol
                     // re-enumerate in between finds only the base, and nothing
                     // ends the new wait — so it stayed unopened until a SimHub
                     // restart (bug 01MCT5T0: pedal positions dead, the brake row
-                    // gone). Scan for unknown Moza HID paths and open them
-                    // alongside the live devices; the cheap path check keeps the
-                    // descriptor walk (and its log lines) for real arrivals.
+                    // gone). Retry refused opens, then descriptor-walk only Moza
+                    // HID paths that are neither open, ignored nor pending retry.
                     int sinceScanMs = 0;
                     while (!_stop && threads.Count > 0 && threads.All(t => t.IsAlive))
                     {
@@ -290,21 +298,36 @@ namespace MozaPlugin.Protocol
                         sinceScanMs += 250;
                         if (sinceScanMs < HotplugScanIntervalMs) continue;
                         sinceScanMs = 0;
-                        if (!HasUnknownMozaHid(knownPaths)) continue;
+                        var present = MozaHidPaths();
+                        if (present == null) continue;
                         bool added = false;
-                        foreach (var d in FindMozaDevices())
+                        foreach (var path in failedOpens.Keys.ToList())
                         {
-                            if (openPaths.Contains(DevicePathOf(d.device))) { knownPaths.Add(DevicePathOf(d.device)); continue; }
-                            if (TryStart(d)) added = true;
+                            if (!present.Contains(path)) { failedOpens.Remove(path); continue; }
+                            if (TryStart(failedOpens[path])) added = true;
+                        }
+                        bool unknown = present.Any(p => !openPaths.Contains(p)
+                            && !ignoredPaths.Contains(p) && !failedOpens.ContainsKey(p));
+                        if (unknown)
+                        {
+                            foreach (var d in FindMozaDevices(ignoredPaths,
+                                         p => openPaths.Contains(p) || failedOpens.ContainsKey(p)))
+                                if (TryStart(d)) added = true;
                         }
                         if (added) _data.IsHidConnected = true;
                     }
-
-                    // A device dropped (or we're shutting down): force every
-                    // still-open stream closed so the surviving ReadDevice threads
-                    // unblock from their read wait and exit (same mechanism as
-                    // Dispose), then join them all so each disposes its own stream
-                    // before we re-enumerate from the top.
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Debug($"[AZOM] HID error: {ex.Message}");
+                }
+                finally
+                {
+                    // A device dropped (or we're shutting down, or the body threw):
+                    // force every still-open stream closed so the surviving
+                    // ReadDevice threads unblock from their read wait and exit
+                    // (same mechanism as Dispose), then join them all so each
+                    // disposes its own stream before we re-enumerate from the top.
                     HidStream[] snapshot;
                     lock (_streamsLock) snapshot = _liveStreams.ToArray();
                     foreach (var s in snapshot)
@@ -313,10 +336,6 @@ namespace MozaPlugin.Protocol
                     }
                     foreach (var t in threads)
                         try { t.Join(1000); } catch { }
-                }
-                catch (Exception ex)
-                {
-                    MozaLog.Debug($"[AZOM] HID error: {ex.Message}");
                 }
 
                 _data.IsHidConnected = false;
@@ -332,21 +351,19 @@ namespace MozaPlugin.Protocol
             try { return dev.DevicePath ?? ""; } catch { return ""; }
         }
 
-        /// <summary>Whether a Moza-VID HID device exists whose path the last
-        /// enumeration never saw — the hot-plug trigger. Path check only: no
-        /// descriptor walk, no log lines, cheap enough to poll.</summary>
-        private static bool HasUnknownMozaHid(HashSet<string> knownPaths)
+        /// <summary>Paths of every Moza-VID HID device currently present, or null
+        /// when enumeration failed. Path check only: no descriptor walk, no log
+        /// lines, cheap enough to poll.</summary>
+        private static HashSet<string>? MozaHidPaths()
         {
             try
             {
+                var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var dev in DeviceList.Local.GetHidDevices())
-                {
-                    if (dev.VendorID != MozaPortDiscovery.MozaVid) continue;
-                    if (!knownPaths.Contains(DevicePathOf(dev))) return true;
-                }
+                    if (dev.VendorID == MozaPortDiscovery.MozaVid) paths.Add(DevicePathOf(dev));
+                return paths;
             }
-            catch { }
-            return false;
+            catch { return null; }
         }
 
         /// <summary>
@@ -387,24 +404,33 @@ namespace MozaPlugin.Protocol
             }
         }
 
-        private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)> FindMozaDevices()
+        /// <param name="ignoredPaths">Paths skipped by design: not walked, and
+        /// updated in place (new skips added, unplugged paths dropped).</param>
+        /// <param name="skip">Further paths not to walk (already open / pending retry).</param>
+        private static List<(HidDevice device, Dictionary<uint, (int min, int max)> usages, MozaHidClass kind, string identity)> FindMozaDevices(
+            HashSet<string> ignoredPaths, Func<string, bool>? skip = null)
         {
             var result = new List<(HidDevice, Dictionary<uint, (int, int)>, MozaHidClass, string)>();
-            IEnumerable<HidDevice> allDevices;
+            List<HidDevice> allDevices;
             try
             {
-                allDevices = DeviceList.Local.GetHidDevices();
+                allDevices = DeviceList.Local.GetHidDevices().ToList();
             }
             catch { return result; }
 
+            var present = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var dev in allDevices)
             {
                 try
                 {
                     if (dev.VendorID != MozaPortDiscovery.MozaVid) continue;
+                    string devPath = DevicePathOf(dev);
+                    present.Add(devPath);
+                    if (ignoredPaths.Contains(devPath)) continue;
+                    if (skip != null && skip(devPath)) continue;
 
                     ushort pid = (ushort)dev.ProductID;
-                    if (!ReadsPid(pid)) continue;
+                    if (!ReadsPid(pid)) { ignoredPaths.Add(devPath); continue; }
                     var category = MozaUsbIds.Categorize(pid);
                     bool isMBooster = category == MozaDeviceCategory.MBooster;
                     bool isAb9 = category == MozaDeviceCategory.Ab9;
@@ -468,6 +494,10 @@ namespace MozaPlugin.Protocol
                         }
                         result.Add((dev, usages, kind, identity));
                     }
+                    else
+                    {
+                        ignoredPaths.Add(devPath);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -478,6 +508,7 @@ namespace MozaPlugin.Protocol
                 }
             }
 
+            ignoredPaths.RemoveWhere(p => !present.Contains(p));
             return result;
         }
 
@@ -607,7 +638,7 @@ namespace MozaPlugin.Protocol
                                     $"raw={logical} tracked={usages.ContainsKey(usage)}");
                         }
 
-                        if (usage == 0 || !usages.ContainsKey(usage)) return;
+                        if (usage == 0 || !usages.TryGetValue(usage, out var range)) return;
 
                         if (usage == UsageX)
                         {
@@ -670,7 +701,6 @@ namespace MozaPlugin.Protocol
                         }
                         else
                         {
-                            var range = usages[usage];
                             if (range.max > range.min)
                             {
                                 if (kind == MozaHidClass.MBooster)
@@ -729,6 +759,8 @@ namespace MozaPlugin.Protocol
                     var seenValues = new bool[fields.Length];
                     var pressedBuf = new ushort[Math.Max(1, layout.MaxPressed(0x0009))];
                     var buffer = new byte[layout.InputReportLength];
+                    // Built once: a lambda in the read loop allocates per report.
+                    Action<ushort, bool> onButton = (usage, pressed) => Dispatch(0x00090000u | usage, pressed ? 1 : 0);
 
                     stream.ReadTimeout = Timeout.Infinite;
                     MozaLog.Debug(
@@ -778,7 +810,7 @@ namespace MozaPlugin.Protocol
                                 if (group.Field.ReportId != reportId) continue;
                                 int count = layout.GetPressed(group.Field, buffer, pressedBuf);
                                 if (count < 0) continue;
-                                group.Apply(pressedBuf, count, (usage, pressed) => Dispatch(0x00090000u | usage, pressed ? 1 : 0));
+                                group.Apply(pressedBuf, count, onButton);
                             }
                         }
                         catch (Exception ex)

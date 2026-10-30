@@ -41,7 +41,8 @@ namespace MozaPlugin.UI
             {
                 if (UpdateCheckEnabledToggle == null) return; // legacy XAML — nothing to do
 
-                LoadChangelog();
+                // Built the first time it's shown, not per construction.
+                if (ChangelogBox != null) ChangelogBox.IsVisibleChanged += OnChangelogBoxVisibleChanged;
 
                 var s = _plugin?.Settings;
                 if (s == null) return;
@@ -162,6 +163,13 @@ namespace MozaPlugin.UI
                 _renderedReleaseNotes = notes;
             }
             UpdateReleaseNotesPanel.Visibility = Visibility.Visible;
+        }
+
+        private void OnChangelogBoxVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!(bool)e.NewValue) return;
+            ChangelogBox.IsVisibleChanged -= OnChangelogBoxVisibleChanged;
+            LoadChangelog();
         }
 
         // Renders the CHANGELOG.md embedded at build time into the right half
@@ -674,15 +682,36 @@ namespace MozaPlugin.UI
             // finds an available update.
             UpdateInstallCoordinator.Instance.DismissedThisSession = false;
 
-            // Cancel any in-flight manual check before kicking off a new one.
+            // Cancel any in-flight manual check before kicking off a new one;
+            // the superseded run leaves the button and status to this one.
             try { _updateCheckCts?.Cancel(); } catch { }
-            _updateCheckCts = new CancellationTokenSource();
-            var ct = _updateCheckCts.Token;
+            var cts = new CancellationTokenSource();
+            _updateCheckCts = cts;
+            var ct = cts.Token;
 
             UpdateCheckNowButton.IsEnabled = false;
             if (UpdateLastCheckedText != null)
                 UpdateLastCheckedText.Text = Strings.Status_UpdateChecking;
 
+            try
+            {
+                await RunManualCheckCoreAsync(s, cts, ct);
+            }
+            finally
+            {
+                // Each run disposes its own source once its fetch is done; only
+                // the current run restores the button (Unload cancels it too).
+                if (ReferenceEquals(_updateCheckCts, cts))
+                {
+                    _updateCheckCts = null;
+                    if (UpdateCheckNowButton != null) UpdateCheckNowButton.IsEnabled = true;
+                }
+                cts.Dispose();
+            }
+        }
+
+        private async Task RunManualCheckCoreAsync(Settings.MozaPluginSettings s, CancellationTokenSource cts, CancellationToken ct)
+        {
             SnapshotFetchResult fetch;
             try
             {
@@ -692,16 +721,20 @@ namespace MozaPlugin.UI
             }
             catch (OperationCanceledException)
             {
-                return; // unloaded mid-check; nothing to update
+                // Unloaded mid-check: put back the last-checked line.
+                if (ReferenceEquals(_updateCheckCts, cts)) RefreshLastCheckedText();
+                return;
             }
             catch (Exception ex)
             {
                 MozaLog.Debug($"[UpdateBanner] manual check threw: {ex.Message}");
-                if (UpdateLastCheckedText != null)
+                if (ReferenceEquals(_updateCheckCts, cts) && UpdateLastCheckedText != null)
                     UpdateLastCheckedText.Text = Strings.Status_UpdateFailedNetwork;
-                if (UpdateCheckNowButton != null) UpdateCheckNowButton.IsEnabled = true;
                 return;
             }
+
+            // A newer check owns the UI and fetches the same snapshot.
+            if (!ReferenceEquals(_updateCheckCts, cts)) return;
 
             // Persist the timestamp regardless of outcome so the throttle
             // logic doesn't refire on every plugin Init right after a failed
@@ -781,8 +814,6 @@ namespace MozaPlugin.UI
                     }
                 }
             }
-
-            if (UpdateCheckNowButton != null) UpdateCheckNowButton.IsEnabled = true;
         }
 
         // ----- Install flow -----

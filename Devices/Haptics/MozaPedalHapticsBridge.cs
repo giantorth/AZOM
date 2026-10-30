@@ -52,6 +52,13 @@ namespace MozaPlugin.Devices.Haptics
         private static readonly ConcurrentDictionary<Type, FieldInfo?> FieldCache =
             new ConcurrentDictionary<Type, FieldInfo?>();
 
+        // Enum.GetValues allocates and boxes per call; the sweep walks placements per
+        // leaf. Nested so FFBPlacement only loads with the guarded sweep methods.
+        private static class Placements
+        {
+            public static readonly FFBPlacement[] All = (FFBPlacement[])Enum.GetValues(typeof(FFBPlacement));
+        }
+
         /// <summary>Build the replacement manager lazily, inside a caller's guard.</summary>
         public static object CreateConnectionManager(byte pedal) => new MozaPedalHapticsConnectionManager(pedal);
 
@@ -210,7 +217,7 @@ namespace MozaPlugin.Devices.Haptics
         private static bool WantsAny(DeviceChannelActivationSettings activation,
             Func<PlacementChannelsActivation?, bool> wants)
         {
-            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            foreach (var placement in Placements.All)
             {
                 activation.Channels.TryGetValue(placement, out var pca);
                 if (wants(pca)) return true;
@@ -268,7 +275,7 @@ namespace MozaPlugin.Devices.Haptics
             Func<PlacementChannelsActivation?, bool> wants)
         {
             int found = -1;
-            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            foreach (var placement in Placements.All)
             {
                 activation.Channels.TryGetValue(placement, out var pca);
                 bool want = wants(pca);
@@ -299,7 +306,7 @@ namespace MozaPlugin.Devices.Haptics
         private static void SetSingleChannel(DeviceChannelActivationSettings activation, int blockBase, int channel,
             Func<PlacementChannelsActivation?, bool> wants)
         {
-            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            foreach (var placement in Placements.All)
             {
                 if (!activation.Channels.TryGetValue(placement, out var pca) || pca == null)
                 {

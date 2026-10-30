@@ -85,7 +85,7 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             if (data == null) throw new ArgumentNullException(nameof(data));
             if (hardware == null) throw new ArgumentNullException(nameof(hardware));
 
-            RegisterHandler(new SteerLockWriteHandler(data, hardware));
+            RegisterHandler(new SteerLockWriteHandler(hardware));
             RegisterHandler(new SteerLockReadHandler(data));
         }
 
@@ -138,6 +138,7 @@ namespace MozaPlugin.Sdk.PitHouseUdp
                 {
                     var endpoint = new IPEndPoint(IPAddress.Loopback, desiredPort);
                     var udp = new UdpClient(endpoint);
+                    LoopbackUdpSocket.DisableConnectionReset(udp, "[PitHouseUdp]");
 
                     // No ReceiveTimeout: ReceiveLoop uses Socket.Poll for
                     // its 200 ms wake-up budget. The prior approach set

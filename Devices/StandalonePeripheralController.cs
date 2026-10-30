@@ -360,29 +360,7 @@ namespace MozaPlugin.Devices
             _prober.DetectDevices(r.Name, r.IntValue, r.DeviceId);
         }
 
-        private void ClearOwnershipIfHeld()
-        {
-            if (ReferenceEquals(_detectionState.PedalsOwner, _deviceManager))
-            {
-                _detectionState.PedalsDetected = false;
-                _detectionState.PedalsOwner = null;
-            }
-            if (ReferenceEquals(_detectionState.HandbrakeOwner, _deviceManager))
-            {
-                _detectionState.HandbrakeDetected = false;
-                _detectionState.HandbrakeOwner = null;
-            }
-            if (ReferenceEquals(_detectionState.HgpOwner, _deviceManager))
-            {
-                _detectionState.HgpDetected = false;
-                _detectionState.HgpOwner = null;
-            }
-            if (ReferenceEquals(_detectionState.SgpOwner, _deviceManager))
-            {
-                _detectionState.SgpDetected = false;
-                _detectionState.SgpOwner = null;
-            }
-        }
+        private void ClearOwnershipIfHeld() => _detectionState.ClearPeripheralsOwnedBy(_deviceManager);
 
         private static string ShortId(string identity)
         {

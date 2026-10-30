@@ -15,12 +15,8 @@ namespace MozaPlugin.Sdk.Resources.Lifecycle
     /// best-effort logged.
     /// </para>
     /// <para>
-    /// The hardware-side command name is provisional. As of Phase 6a the
-    /// <c>MozaCommandDatabase</c> does not yet contain a <c>wheel-soft-reboot</c>
-    /// entry, so <see cref="HardwareApplier.WriteIfBaseConnected"/> returns
-    /// false silently and the wheel does not actually reboot. We still reply
-    /// 2.03 Valid because the client's contract is "the request was accepted"
-    /// — once the command is added to the DB, no handler change is required.
+    /// Forwarded as <c>main-soft-reboot</c> when a base is detected; 2.03 Valid
+    /// means "the request was accepted", including when no base is connected.
     /// </para>
     /// </remarks>
     internal sealed class SoftRebootResource : CoapResourceHandler

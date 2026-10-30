@@ -144,7 +144,7 @@ namespace MozaPlugin.UI
             if (db > 1000) db = 1000;
             db = ((db + 25) / 50) * 50;
             debSlider.Value = db;
-            debBox.Text = $"{db} ms";
+            SetValueText(debBox, $"{db} ms");
         }
 
         // The frequency slider's range follows the slot's mode (Custom = full wire
@@ -172,7 +172,7 @@ namespace MozaPlugin.UI
             slider.Value = sliderVal;                     // kept as the revert-to value; WPF clamps to Min/Max
             slider.Visibility = hasFormula ? Visibility.Collapsed : Visibility.Visible;
             box.Visibility = hasFormula ? Visibility.Collapsed : Visibility.Visible;
-            box.Text = ((int)slider.Value).ToString();
+            SetValueText(box, ((int)slider.Value).ToString());
             formulaText.Visibility = hasFormula ? Visibility.Visible : Visibility.Collapsed;
             formulaText.Text = hasFormula ? formula : "";
             formulaText.ToolTip = hasFormula ? formula : null;

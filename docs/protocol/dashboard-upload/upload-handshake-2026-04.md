@@ -228,6 +228,12 @@ native Windows, KS Pro, no LED traffic at all — timed out at 95.7 %
 Useful throughput at 6 ms was ~2 kB/s of acked payload against 10.7 kB/s
 pushed: a 5:1 waste ratio that is retransmit churn. Pacing slower moves more.
 
+The delay is a `Thread.Sleep`, which Windows rounds up to the system timer
+period (15.6 ms by default outside gameplay). `WheelUploadCoordinator.SendDashboardUpload`
+therefore takes a 1 ms timer-resolution hold (`ProcessResponsivenessManager.AcquireTimerResolution`)
+for the whole attempt and releases it when the attempt ends, so the 8 ms figure
+above is what actually goes on the wire whether or not a game is running.
+
 ### A backwards seq on the upload session is a re-burst, not a new burst
 
 On a forward gap the wheel **re-bursts its whole unacked window**, not just the

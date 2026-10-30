@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.UI.DjsonImport
@@ -34,7 +33,7 @@ namespace MozaPlugin.UI.DjsonImport
         private readonly FontMap _fonts;
         private readonly ConversionReport _report;
         private readonly ImageSet _images;
-        private readonly string _sourceDir;
+        private readonly WidgetSource _widgets;
 
         /// <summary>Guards against a widget cycle (A includes B includes A), which would
         /// otherwise recurse until the stack gives out.</summary>
@@ -53,19 +52,18 @@ namespace MozaPlugin.UI.DjsonImport
         public Dictionary<string, PageExpansionCandidate> PagedWidgets { get; } =
             new Dictionary<string, PageExpansionCandidate>(StringComparer.OrdinalIgnoreCase);
 
-        // Parsed widget files, for pricing nested widgets without re-reading a file that
-        // a dashboard may place 25 times.
+        // Widget roots already priced by this pass, by file name.
         private readonly Dictionary<string, JObject?> _widgetRoots =
             new Dictionary<string, JObject?>(StringComparer.OrdinalIgnoreCase);
 
         public DjsonToIr(BindingTranslator bindings, FontMap fonts, ConversionReport report,
-                         ImageSet images, string sourceDir)
+                         ImageSet images, WidgetSource widgets)
         {
             _bindings = bindings;
             _fonts = fonts;
             _report = report;
             _images = images;
-            _sourceDir = sourceDir;
+            _widgets = widgets;
         }
 
         /// <summary>Item types this converter does not emit, and why.
@@ -304,7 +302,7 @@ namespace MozaPlugin.UI.DjsonImport
 
             try
             {
-                var (root, error) = DjsonReader.Load(path);
+                var (root, error) = _widgets.Load(path);
                 if (root == null)
                 {
                     _report.Record("WidgetItem", name, ItemOutcome.Dropped,
@@ -485,32 +483,17 @@ namespace MozaPlugin.UI.DjsonImport
         {
             if (_widgetRoots.TryGetValue(fileName, out var cached)) return cached;
             string? path = ResolveWidgetPath(fileName);
-            var (root, _) = path == null ? (null, "") : DjsonReader.Load(path);
+            var (root, _) = path == null ? (null, "") : _widgets.Load(path);
             _widgetRoots[fileName] = root;
             return root;
         }
 
         private string? ResolveWidgetPath(string fileName)
         {
-            // Same folder first, then SimHub's shared _Library tree one level up.
-            string direct = Path.Combine(_sourceDir, fileName);
-            if (File.Exists(direct)) return direct;
-
-            try
-            {
-                var parent = Directory.GetParent(_sourceDir);
-                if (parent == null) return null;
-                string library = Path.Combine(parent.FullName, "_Library");
-                if (!Directory.Exists(library)) return null;
-
-                foreach (var hit in Directory.GetFiles(library, fileName, SearchOption.AllDirectories))
-                    return hit;
-            }
-            catch (Exception ex)
-            {
-                _report.Notes.Add($"widget lookup for '{fileName}' failed: {ex.Message}");
-            }
-            return null;
+            string? path = _widgets.Resolve(fileName, out var lookupError);
+            if (lookupError != null)
+                _report.Notes.Add($"widget lookup for '{fileName}' failed: {lookupError}");
+            return path;
         }
 
         // ── Leaf items ────────────────────────────────────────────────────────

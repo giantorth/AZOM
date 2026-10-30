@@ -882,4 +882,18 @@
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Boop Woof</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Yip!</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Whimper…</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Paw down!</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Paw up!</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Sniff out a hue!</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Yap!</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Soft barff!</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Soft yowl!</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Soft arf!</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Soft rrrf!</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Soft wroof!</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Soft bork!</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Soft boof!</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Soft yap!</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse woof-preset (*.mzpreset;*.json)|*.mzpreset;*.json|Every last file (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>Buried “{0}” in the active kennel!</value></data>
 </root>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Threading;
 
 namespace MozaPlugin.Telemetry.Frames
 {
@@ -16,6 +17,10 @@ namespace MozaPlugin.Telemetry.Frames
         // this set indefinitely (each entry is a string heap allocation).
         private const int MaxWarned = 256;
         private static readonly ConcurrentDictionary<string, byte> _warnedPaths = new();
+        // Entry count of _warnedPaths; ConcurrentDictionary.Count takes every bucket lock.
+        private static int _warnedCount;
+
+        private enum WarnKind { Null, UnsupportedType, NonNumericString }
 
         /// <summary>
         /// Coerce a SimHub property value to double. Handles the common numeric
@@ -26,7 +31,7 @@ namespace MozaPlugin.Telemetry.Frames
             switch (value)
             {
                 case null:
-                    WarnOnce(propertyPath, "returned null");
+                    WarnOnce(propertyPath, WarnKind.Null, null);
                     return 0.0;
                 case double d:   return d;
                 case float f:    return f;
@@ -42,7 +47,7 @@ namespace MozaPlugin.Telemetry.Frames
                 case TimeSpan ts: return ts.TotalSeconds;
                 case string str: return ParseString(str, propertyPath);
                 default:
-                    WarnOnce(propertyPath, $"unsupported type {value.GetType().Name}");
+                    WarnOnce(propertyPath, WarnKind.UnsupportedType, value);
                     return 0.0;
             }
         }
@@ -68,29 +73,42 @@ namespace MozaPlugin.Telemetry.Frames
             if (s == "N") return 0.0;
             if (double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var n))
                 return n;
-            WarnOnce(propertyPath, $"non-numeric string '{s}'");
+            WarnOnce(propertyPath, WarnKind.NonNumericString, s);
             return 0.0;
         }
 
-        private static void WarnOnce(string path, string detail)
+        // Runs per resolve for a bad mapping, so the already-warned path stays
+        // lock- and allocation-free: the message is built only for a new path.
+        private static void WarnOnce(string path, WarnKind kind, object? value)
         {
+            if (_warnedPaths.ContainsKey(path)) return;
             // Cap before TryAdd: the size guard is best-effort under contention
             // (multiple threads can race past this point), but a few extra
             // entries above the cap is acceptable. Once full, silently drop —
             // re-checking later won't help, and logging the suppression once
             // per excess path would defeat the rate-limit it exists for.
-            if (_warnedPaths.Count >= MaxWarned) return;
-            if (_warnedPaths.TryAdd(path, 0))
+            if (Volatile.Read(ref _warnedCount) >= MaxWarned) return;
+            if (!_warnedPaths.TryAdd(path, 0)) return;
+            Interlocked.Increment(ref _warnedCount);
+
+            string detail = kind switch
             {
-                try
-                {
-                    MozaLog.Warn($"[AZOM] Property '{path}' {detail}; channel will send 0 until mapping is fixed.");
-                }
-                catch { /* logging may not be initialised in tests */ }
+                WarnKind.UnsupportedType => $"unsupported type {value!.GetType().Name}",
+                WarnKind.NonNumericString => $"non-numeric string '{value}'",
+                _ => "returned null",
+            };
+            try
+            {
+                MozaLog.Warn($"[AZOM] Property '{path}' {detail}; channel will send 0 until mapping is fixed.");
             }
+            catch { /* logging may not be initialised in tests */ }
         }
 
         /// <summary>Reset the once-per-path warning tracker. Intended for tests.</summary>
-        public static void ResetWarnings() => _warnedPaths.Clear();
+        public static void ResetWarnings()
+        {
+            _warnedPaths.Clear();
+            Interlocked.Exchange(ref _warnedCount, 0);
+        }
     }
 }

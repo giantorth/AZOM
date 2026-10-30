@@ -891,4 +891,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Απτική ανάδραση</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce κουμπιών (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Η προεπισκόπηση δεν είναι διαθέσιμη</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Πατημένο</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Ελεύθερο</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Προσαρμοσμένη επιλογή απόχρωσης</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Ματζέντα</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Παστέλ κόκκινο</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Παστέλ πορτοκαλί</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Παστέλ κίτρινο</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Παστέλ πράσινο</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Παστέλ κυανό</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Παστέλ μπλε</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Παστέλ μωβ</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Παστέλ ματζέντα</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Όλα τα αρχεία (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>το «{0}» εφαρμόστηκε στο ενεργό προφίλ</value></data>
 </root>

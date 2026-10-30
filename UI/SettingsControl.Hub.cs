@@ -33,7 +33,7 @@ namespace MozaPlugin.UI
         {
             bool detected = _plugin.IsHubDetected;
             HubTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
-            if (!detected) return;
+            if (!detected || !HubTab.IsSelected) return;
 
             // Pedals port: high byte >= 1 means connected (foxblat convention)
             UpdateHubPortIndicator(HubPedals1Dot, HubPedals1Label, _data.HubPedals1Power, isPedals: true);
@@ -55,7 +55,7 @@ namespace MozaPlugin.UI
 
             bool connected = isPedals ? (value >> 8) >= 1 : value <= 1;
             dot.Fill = connected ? Brushes.LimeGreen : Brushes.Gray;
-            label.Text = connected ? "Connected" : "Disconnected";
+            label.Text = connected ? Strings.Status_Connected : Strings.Status_Disconnected;
         }
 
         private void ApplyPedalCurvePreset(string pedal, int[] curve, int[] dataArray,

@@ -222,7 +222,7 @@ namespace MozaPlugin.Telemetry
             if (catalog != null && catalog.Count > 0)
             {
                 _tierDefEmitter.SortTierChannelsByCatalogIdx(value, catalog);
-                _tierDefEmitter.RebuildFrameBuildersFromProfile();
+                RebuildFrameBuilders();
             }
         }
         private MultiStreamProfile? _profile;

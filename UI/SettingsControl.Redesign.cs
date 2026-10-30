@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -317,23 +318,14 @@ namespace MozaPlugin.UI
         }
 
         // Called from existing RefreshBaseTab — pushes new live-display values.
-        private void UpdateRedesignLiveDisplays()
+        // The connection pill sits in the top bar; the rest only while the
+        // Base tab is shown.
+        private void UpdateRedesignLiveDisplays(bool baseShown)
         {
             try
             {
-                UpdateTemperatureDisplays();
-                UpdateTorqueDisplays();
-
-                if (SteeringArcViz != null)
-                {
-                    // The arc's Angle is fed GetCurrentAngleDegrees(MaxAngle * 2),
-                    // which halves the range internally and so returns
-                    // ±_data.MaxAngle at full lock. The arc's MaxAngle must equal
-                    // that same value for the dot to reach the arc endpoint at the
-                    // configured rotation limit — doubling it filled only halfway.
-                    double maxA = _data.MaxAngle > 0 ? _data.MaxAngle : 270;
-                    SteeringArcViz.MaxAngle = maxA;
-                }
+                if (baseShown)
+                    UpdateBaseLiveDisplays();
                 UpdateConnectionPill();
             }
             catch (Exception ex)
@@ -347,8 +339,26 @@ namespace MozaPlugin.UI
             }
         }
 
+        private void UpdateBaseLiveDisplays()
+        {
+            UpdateTemperatureDisplays();
+            UpdateTorqueDisplays();
+
+            if (SteeringArcViz != null)
+            {
+                // The arc's Angle is fed GetCurrentAngleDegrees(MaxAngle * 2),
+                // which halves the range internally and so returns
+                // ±_data.MaxAngle at full lock. The arc's MaxAngle must equal
+                // that same value for the dot to reach the arc endpoint at the
+                // configured rotation limit — doubling it filled only halfway.
+                double maxA = _data.MaxAngle > 0 ? _data.MaxAngle : 270;
+                SteeringArcViz.MaxAngle = maxA;
+            }
+        }
+
         // Push the current legend readings + the background history window into
-        // the temp graph. Called every refresh tick and once at init (so the
+        // the temp graph. Called every refresh tick while the Base tab is shown
+        // and once at init (so the
         // full window shows the instant the panel opens). The graph is fed fresh
         // display-unit arrays each call so a °C/°F toggle reflows the whole
         // window, not just samples taken after the toggle. Disconnected samples
@@ -446,19 +456,59 @@ namespace MozaPlugin.UI
 
         // Under Wine the port key is the tty name; append the COM name Wine gave
         // it so the pill still matches what other tools show. Windows returns the
-        // port name unchanged.
-        private static string DescribePort(string? portName)
+        // port name unchanged. Never resolves on this thread: the resolver walks
+        // sysfs and spawns a host shell.
+        private string DescribePort(global::MozaPlugin.Protocol.MozaSerialConnection? conn)
         {
+            string? portName = conn?.LastPortName;
             if (string.IsNullOrEmpty(portName)) return "—";
-            string? com = global::MozaPlugin.Protocol.WineComNameResolver.ResolveComName(portName!);
+            string? com = conn!.LastComName ?? CachedComLabel(portName!);
             return com == null ? portName! : $"{portName} ({com})";
+        }
+
+        // COM label for a port the connection has not opened, resolved on the
+        // thread pool once per port name; a failed resolve is retried after
+        // ComLabelRetryInterval.
+        private static readonly TimeSpan ComLabelRetryInterval = TimeSpan.FromSeconds(10);
+        private string? _comLabelPort;
+        private string? _comLabel;
+        private bool _comLabelResolving;
+        private DateTime _comLabelRetryUtc;
+
+        private string? CachedComLabel(string portName)
+        {
+            bool samePort = string.Equals(_comLabelPort, portName, StringComparison.OrdinalIgnoreCase);
+            if (samePort && (_comLabel != null || _comLabelResolving || DateTime.UtcNow < _comLabelRetryUtc))
+                return _comLabel;
+            _comLabelPort = portName;
+            _comLabel = null;
+            _comLabelResolving = true;
+            Task.Run(() => global::MozaPlugin.Protocol.WineComNameResolver.ResolveComName(portName))
+                .ContinueWith(t => Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!string.Equals(_comLabelPort, portName, StringComparison.OrdinalIgnoreCase)) return;
+                    _comLabelResolving = false;
+                    _comLabel = t.Status == TaskStatus.RanToCompletion ? t.Result : null;
+                    if (_comLabel == null)
+                    {
+                        _comLabelRetryUtc = DateTime.UtcNow + ComLabelRetryInterval;
+                        return;
+                    }
+                    try { UpdateConnectionPill(); }
+                    catch (Exception ex)
+                    {
+                        MozaLog.DebugIfChanged("redesign-live-update",
+                            $"[Redesign] live update failed: {ex.Message}");
+                    }
+                })), TaskScheduler.Default);
+            return null;
         }
 
         private void UpdateConnectionPill()
         {
             if (ConnectionPill == null) return;
             ConnectionPill.IsConnected = _data.IsConnected;
-            ConnectionPill.PortName = DescribePort(_plugin.Connection?.LastPortName);
+            ConnectionPill.PortName = DescribePort(_plugin.Connection);
             if (!_data.IsConnected)
             {
                 ConnectionPill.StatusText = global::MozaPlugin.Resources.Strings.Status_Disconnected;

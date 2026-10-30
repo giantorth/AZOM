@@ -23,6 +23,11 @@ namespace MozaPlugin.Telemetry.Frames
         private const int ChecksumLen = 1;
 
         private readonly DashboardProfile _profile;
+        // Channel set captured at construction. The emitter swaps tier.Channels on
+        // the live profile, so per-frame loops must never re-read _profile.Channels:
+        // every per-channel array here is sized and indexed against this snapshot.
+        private readonly ChannelDefinition[] _channels;
+        private readonly int[] _bitWidth;
         private readonly Func<GameDataSnapshot, double>[] _resolvers;
 
         // Per-channel encode path resolved once at construction (a channel's
@@ -44,6 +49,8 @@ namespace MozaPlugin.Telemetry.Frames
         /// per-opponent allocation entirely when no channel consumes them
         /// (the shipped default, with radar/track-map channels disabled).</summary>
         public bool NeedsCarPositions { get; private set; }
+        // Any RadarPair channel — the only consumer of the heading state below.
+        private readonly bool _hasRadar;
         // Track-map location_t packing. The 64-bit slot is, little-endian,
         //   [u16 Y(elev) | u24 Z | u24 X]
         // where each field = clamp(center + round(scale * worldMetres)).
@@ -140,13 +147,17 @@ namespace MozaPlugin.Telemetry.Frames
             // we're just rewiring the host-side value source. Per-frame cost
             // is two property reads + one branch on top of the existing
             // resolver dispatch — sub-µs even on long tier lists.
-            _resolvers = new Func<GameDataSnapshot, double>[profile.Channels.Count];
-            _encKind = new EncKind[profile.Channels.Count];
-            _encFn = new Func<double, ulong>?[profile.Channels.Count];
-            _locIndex = new int[profile.Channels.Count];
-            for (int i = 0; i < profile.Channels.Count; i++)
+            _channels = profile.Channels.ToArray();
+            int count = _channels.Length;
+            _bitWidth = new int[count];
+            _resolvers = new Func<GameDataSnapshot, double>[count];
+            _encKind = new EncKind[count];
+            _encFn = new Func<double, ulong>?[count];
+            _locIndex = new int[count];
+            for (int i = 0; i < count; i++)
             {
-                var ch = profile.Channels[i];
+                var ch = _channels[i];
+                _bitWidth[i] = ch.BitWidth;
                 if (propertyResolver != null)
                 {
                     var resolver = propertyResolver;
@@ -204,6 +215,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _encKind[i] = EncKind.RadarPair;
                     _locIndex[i] = riIdx;
                     NeedsCarPositions = true;
+                    _hasRadar = true;
                 }
                 else
                 {
@@ -614,12 +626,13 @@ namespace MozaPlugin.Telemetry.Frames
 
                 // Refresh per-car headings from motion before writing radar slots
                 // (feeds the ri high-12-bit relative-orientation field).
-                UpdateRadarHeadings(in snapshot);
+                if (_hasRadar)
+                    UpdateRadarHeadings(in snapshot);
 
                 if (NeedsCarPositions)
                     UpdateMapTransform(in snapshot);
 
-                for (int i = 0; i < _profile.Channels.Count; i++)
+                for (int i = 0; i < _channels.Length; i++)
                 {
                     if (_encKind[i] == EncKind.LocationPair)
                     {
@@ -633,7 +646,7 @@ namespace MozaPlugin.Telemetry.Frames
                     }
                     double value = _resolvers[i](snapshot);
                     if (double.IsNaN(value) || double.IsInfinity(value)) value = 0.0;
-                    WriteChannel(i, value, _profile.Channels[i].BitWidth);
+                    WriteChannel(i, value, _bitWidth[i]);
                 }
             }
 
@@ -669,11 +682,10 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 _bitWriter.Reset();
 
-                for (int i = 0; i < _profile.Channels.Count; i++)
+                for (int i = 0; i < _channels.Length; i++)
                 {
-                    var ch = _profile.Channels[i];
-                    double value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
-                    WriteChannel(i, value, ch.BitWidth);
+                    double value = TestSignalGenerator.Compute(_channels[i].TestSignal, nowMs);
+                    WriteChannel(i, value, _bitWidth[i]);
                 }
             }
 

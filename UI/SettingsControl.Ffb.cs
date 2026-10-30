@@ -298,7 +298,7 @@ namespace MozaPlugin.UI
                 ((DispatcherTimer)s!).Stop();
                 if (ReferenceEquals(_baseCalStatusTimer, s)) _baseCalStatusTimer = null;
             };
-            _baseCalStatusTimer = timer;   // stopped by OnUnloadedStopTimers
+            _baseCalStatusTimer = timer;
             timer.Start();
         }
 

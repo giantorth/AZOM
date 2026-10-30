@@ -177,6 +177,7 @@ namespace MozaPlugin
             DetectionState.ResetBase();
             _data.ClearBaseIdentity();
             _data.BaseSettingsRead = false;
+            HardwareApplier.ForgetBaseAmbientCfg();
             // Half-received main-model-name chunks must not recombine with the next
             // base's reply.
             _baseModelChunk1 = null;

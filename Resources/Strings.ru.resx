@@ -892,4 +892,18 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Тактильная отдача</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Антидребезг кнопок (мс)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Предпросмотр недоступен</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Нажато</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Отпущено</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Выбор своего оттенка</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Пурпурный</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Пастельный красный</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Пастельный оранжевый</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Пастельный жёлтый</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Пастельный зелёный</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Пастельный голубой</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Пастельный синий</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Пастельный фиолетовый</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Пастельный пурпурный</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Пресет PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Все файлы (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
 </root>

@@ -469,6 +469,7 @@ namespace MozaPlugin.Telemetry
             // for true cold starts immediately after this call.
             _coldStartWheelGatePending = false;
             _coldStartGateLogged = false;
+            _reprovokePending = false;
             // Fresh cycle: init handshake not yet sent (so the FF-session re-send
             // guard in ApplySubscription re-evaluates against this connection).
             _initHandshakeSession = 0;
@@ -603,6 +604,7 @@ namespace MozaPlugin.Telemetry
             // all reach it, and the bare "Stop()" reason didn't say which. The
             // top frames name the culprit in the diagnostics bundle.
             TransitionTo(TelemetryState.Idle, "Stop() ← " + DescribeStopCaller());
+            _reprovokePending = false;
             _connection.MessageReceived -= _inboundDispatcher.OnMessageDuringPreamble;
             // Stop() is reachable concurrently (read thread, recovery workers,
             // poll timer, UI) — Exchange picks a single winner for the teardown.
@@ -698,6 +700,9 @@ namespace MozaPlugin.Telemetry
             // wheel-state doesn't change without user action.
             try { _configJson.ClearBuffer(); } catch { }
             try { _tileServerParser.Clear(); } catch { }
+            // A high-water mark left from this session would silently drop every
+            // next-session tile-server chunk at or below it as a retransmit.
+            lock (_tileServerHighestSeq) _tileServerHighestSeq.Clear();
             try { _session0aInbox.Clear(); } catch { }
             // Reset so StartTelemetryIfReady() won't skip us on re-enable
             _framesSent = 0;

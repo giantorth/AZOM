@@ -71,7 +71,7 @@ namespace MozaPlugin.UI
             bool passive = _passivePedals[0] != null || _passivePedals[1] != null || _passivePedals[2] != null;
             bool detected = plainPedals || passive;
             PedalsTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
-            if (!detected) return;
+            if (!detected || !PedalsTab.IsSelected) return;
 
             ApplyPedalGroupAvailability(passive);
             if (passive)

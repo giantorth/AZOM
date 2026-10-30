@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Text;
+using MozaPlugin.Telemetry.Sessions;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Telemetry.TileServer
@@ -22,57 +21,81 @@ namespace MozaPlugin.Telemetry.TileServer
     {
         // Hard cap on accumulated buffer. Real envelopes are <100 KB; anything
         // beyond this is malformed input that would otherwise grow unbounded
-        // (sentinel mismatch in TryDecode returns null without trimming the buffer).
+        // (an envelope whose size field claims more than arrives). Also the
+        // bound on an envelope's claimed size.
         private const int MaxBufferBytes = 1 * 1024 * 1024;
 
+        // Guards _buf: OnChunk runs on the serial read thread, Clear() on Stop().
+        private readonly object _lock = new object();
         private readonly List<byte> _buf = new List<byte>();
-        private TileServerState? _lastState;
+        private volatile TileServerState? _lastState;
 
         public TileServerState? LastState => _lastState;
 
+        private enum DecodeStatus { Incomplete, Decoded, Invalid }
+
         /// <summary>Append a session 0x03 chunk payload (CRC already stripped)
-        /// and attempt to decode any complete envelope it completes.</summary>
+        /// and decode every complete envelope it completes; returns the last.</summary>
         public TileServerState? OnChunk(byte[] chunkPayload)
         {
             if (chunkPayload == null || chunkPayload.Length == 0) return null;
-            _buf.AddRange(chunkPayload);
-            TileServerState? decoded = TryDecode(out int consumed);
-            if (decoded != null && consumed > 0)
+            lock (_lock)
             {
-                _buf.RemoveRange(0, consumed);
-                _lastState = decoded;
-                return decoded;
-            }
+                _buf.AddRange(chunkPayload);
+                TileServerState? latest = null;
+                while (true)
+                {
+                    // Leading bytes that aren't an envelope start are stray
+                    // (envelope from a prior, partially-lost message or
+                    // genuinely corrupt input): skip to the next plausible
+                    // FF 01 00 so the buffer doesn't accumulate up to
+                    // MaxBufferBytes before clearing.
+                    if (_buf.Count >= 3 && !LooksLikeEnvelopeStart(_buf, 0))
+                    {
+                        DropToNextEnvelopeStart();
+                        continue;
+                    }
 
-            // No decode this pass. If the buffer is large enough to evaluate
-            // the sentinel and it doesn't match at offset 0, the leading
-            // bytes are stray (envelope from a prior, partially-lost message
-            // or genuinely corrupt input). Scan for the next plausible
-            // envelope start (FF 01 00) and trim everything before it so the
-            // buffer doesn't accumulate up to MaxBufferBytes before clearing.
-            // Mirrors SessionDataReassembler.TryDecompressByMagic's recovery
-            // pattern. Without this, captures of malformed input grew the
-            // buffer to the 1 MiB cap over time before the wholesale clear.
-            if (_buf.Count >= 3 && !LooksLikeEnvelopeStart(_buf, 0))
-            {
-                int next = FindNextEnvelopeStart(_buf, 1);
-                if (next > 0)
-                    _buf.RemoveRange(0, next);
-                else
-                    // No sentinel anywhere in the buffer — keep the last 2
-                    // bytes in case the envelope start straddles the next
-                    // chunk boundary, drop the rest.
-                    _buf.RemoveRange(0, Math.Max(0, _buf.Count - 2));
-            }
-            else if (_buf.Count > MaxBufferBytes)
-            {
-                // Defensive: buffer still grew past the cap (e.g. a long
-                // run of plausible-sentinel starts that never resolve into
-                // a real envelope). Drop everything.
-                _buf.Clear();
-            }
+                    var status = TryDecode(out TileServerState? decoded, out int consumed);
+                    if (status == DecodeStatus.Decoded)
+                    {
+                        _buf.RemoveRange(0, consumed);
+                        _lastState = decoded;
+                        latest = decoded;
+                        continue;
+                    }
+                    if (status == DecodeStatus.Invalid)
+                    {
+                        // Complete-but-undecodable (or impossible) envelope at
+                        // offset 0: its bytes will never change, so retrying
+                        // would block every later envelope. Resync past it.
+                        DropToNextEnvelopeStart();
+                        continue;
+                    }
+                    break;
+                }
 
-            return null;
+                if (_buf.Count > MaxBufferBytes)
+                {
+                    // Defensive: buffer still grew past the cap (e.g. a long
+                    // run of plausible-sentinel starts that never resolve into
+                    // a real envelope). Drop everything.
+                    _buf.Clear();
+                }
+                return latest;
+            }
+        }
+
+        /// <summary>Drop the buffer head up to the next FF 01 00 after offset 0.
+        /// With none, keep the last 2 bytes in case an envelope start straddles
+        /// the next chunk boundary.</summary>
+        private void DropToNextEnvelopeStart()
+        {
+            int next = FindNextEnvelopeStart(_buf, 1);
+            if (next > 0)
+                _buf.RemoveRange(0, next);
+            else
+                _buf.RemoveRange(0, Math.Max(0, _buf.Count - 2));
         }
 
         private static bool LooksLikeEnvelopeStart(List<byte> buf, int offset)
@@ -93,58 +116,50 @@ namespace MozaPlugin.Telemetry.TileServer
             return -1;
         }
 
-        public void Clear() => _buf.Clear();
-
-        private TileServerState? TryDecode(out int consumed)
+        public void Clear()
         {
+            lock (_lock) _buf.Clear();
+        }
+
+        /// <summary>Decode the envelope at offset 0. <see cref="DecodeStatus.Invalid"/>
+        /// when it can never decode: bad sentinel, impossible size, or a fully
+        /// buffered stream that fails inflate / Adler-32 / size / JSON checks.</summary>
+        private DecodeStatus TryDecode(out TileServerState? state, out int consumed)
+        {
+            state = null;
             consumed = 0;
             // Need at least envelope (12) + zlib header (2)
-            if (_buf.Count < 14) return null;
+            if (_buf.Count < 14) return DecodeStatus.Incomplete;
             // Sentinels must match
             if (_buf[0] != 0xFF || _buf[1] != 0x01 || _buf[2] != 0x00 ||
                 _buf[7] != 0xFF || _buf[8] != 0x00)
             {
-                return null;
+                return DecodeStatus.Invalid;
             }
             // compressed_size + 4 (LE u32 at offset 3..6)
             uint compPlus4 = (uint)_buf[3] | ((uint)_buf[4] << 8) |
                              ((uint)_buf[5] << 16) | ((uint)_buf[6] << 24);
-            if (compPlus4 < 4) return null;
+            if (compPlus4 < 4 || compPlus4 - 4 > MaxBufferBytes - 12) return DecodeStatus.Invalid;
             int compSize = (int)(compPlus4 - 4);
             // uncompressed_size (BE u24 at offset 9..11)
             int uncompSize = (_buf[9] << 16) | (_buf[10] << 8) | _buf[11];
             int total = 12 + compSize;
-            if (_buf.Count < total) return null;
+            if (_buf.Count < total) return DecodeStatus.Incomplete;
             try
             {
                 byte[] zlib = _buf.GetRange(12, compSize).ToArray();
-                byte[] raw = DecompressZlib(zlib);
-                if (raw.Length != uncompSize)
-                {
-                    // Size mismatch — likely wrong envelope interpretation.
-                    // Skip this attempt but don't corrupt buffer.
-                    return null;
-                }
+                // Bounded inflate; null on Adler-32 or size mismatch.
+                byte[]? raw = SessionDataReassembler.InflateZlibExact(zlib, 0, compSize, uncompSize);
+                if (raw == null) return DecodeStatus.Invalid;
                 string json = Encoding.UTF8.GetString(raw);
-                var state = ParseJson(json);
+                state = ParseJson(json);
                 consumed = total;
-                return state;
+                return DecodeStatus.Decoded;
             }
             catch
             {
-                return null;
+                return DecodeStatus.Invalid;
             }
-        }
-
-        private static byte[] DecompressZlib(byte[] zlib)
-        {
-            if (zlib.Length < 6) return Array.Empty<byte>();
-            // Skip 2-byte zlib header, strip 4-byte Adler-32 trailer
-            using var input = new MemoryStream(zlib, 2, zlib.Length - 6);
-            using var deflate = new DeflateStream(input, CompressionMode.Decompress);
-            using var output = new MemoryStream();
-            deflate.CopyTo(output);
-            return output.ToArray();
         }
 
         private static TileServerState ParseJson(string json)

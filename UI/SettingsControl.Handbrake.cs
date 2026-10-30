@@ -38,7 +38,7 @@ namespace MozaPlugin.UI
             bool detected = _plugin.IsHandbrakeDetected;
             HandbrakeTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
 
-            if (!detected) return;
+            if (!detected || !HandbrakeTab.IsSelected) return;
 
             SetComboSafe(HandbrakeModeCombo, _data.HandbrakeMode);
 
@@ -134,18 +134,20 @@ namespace MozaPlugin.UI
 
         // Shared single-button calibration flow: send start, show a live
         // countdown instruction, then auto-send stop after CalibrationSeconds.
+        // Each target (keyed by its start button) owns its own timer, and an
+        // Unload does not stop it: every cal-start must be paired with its
+        // cal-stop, and the timer self-terminates within CalibrationSeconds.
         private void RunCalibrationCountdown(Button startButton, TextBlock status,
             string instructionFormat, Action sendStart, Action sendStop)
         {
+            if (_calCountdowns.ContainsKey(startButton)) return;
+
             sendStart();
             startButton.IsEnabled = false;
             int remaining = CalibrationSeconds;
             status.Text = string.Format(instructionFormat, remaining);
             status.Visibility = Visibility.Visible;
 
-            // Held in a field so OnUnloadedStopTimers can stop it: a running
-            // DispatcherTimer roots this control (and _plugin) until it fires.
-            _calCountdownTimer?.Stop();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (s, _) =>
             {
@@ -156,16 +158,16 @@ namespace MozaPlugin.UI
                     return;
                 }
                 ((DispatcherTimer)s!).Stop();
-                if (ReferenceEquals(_calCountdownTimer, s)) _calCountdownTimer = null;
+                _calCountdowns.Remove(startButton);
                 sendStop();
                 status.Text = Strings.Status_Done;
                 startButton.IsEnabled = true;
             };
-            _calCountdownTimer = timer;
+            _calCountdowns[startButton] = timer;
             timer.Start();
         }
 
-        private DispatcherTimer? _calCountdownTimer;
+        private readonly Dictionary<Button, DispatcherTimer> _calCountdowns = new Dictionary<Button, DispatcherTimer>();
 
         private void HbCalStartButton_Click(object sender, RoutedEventArgs e) =>
             RunCalibrationCountdown(HbCalStartButton, HbCalStatus, Strings.Hint_CalibrateHandbrake,

@@ -82,8 +82,36 @@ namespace MozaPlugin.Telemetry
         /// tier-def DISPLAY wheel co-residing on that bus is flipped to strict/shares so
         /// the two don't collide. On a CM2's own USB cable it uses base 0. Tears the CM2
         /// sender down (debounced) when no CM2 is present.
+        ///
+        /// Called from the PollStatus timer, the serial-read thread and UI paths.
+        /// Reconciles are serialised without blocking: a caller that finds one in
+        /// progress leaves a request and returns, and the running reconcile goes
+        /// round again — so the read thread never waits behind a Stop()'s close
+        /// sleep, and two callers can't both construct a CM2 sender.
         /// </summary>
         internal void EnsureCm2Pipeline()
+        {
+            System.Threading.Interlocked.Exchange(ref _cm2ReconcileRequested, 1);
+            while (System.Threading.Volatile.Read(ref _cm2ReconcileRequested) == 1)
+            {
+                if (!System.Threading.Monitor.TryEnter(_cm2ReconcileLock)) return;
+                try
+                {
+                    while (System.Threading.Interlocked.Exchange(ref _cm2ReconcileRequested, 0) == 1)
+                        EnsureCm2PipelineCore();
+                }
+                finally
+                {
+                    System.Threading.Monitor.Exit(_cm2ReconcileLock);
+                }
+            }
+        }
+
+        private readonly object _cm2ReconcileLock = new object();
+        private int _cm2ReconcileRequested;
+        private static readonly string[] Cm2MappingDashKeys = { MozaPlugin.Cm2DashKey };
+
+        private void EnsureCm2PipelineCore()
         {
             bool busCm2 = _detectionState.DashDetected && !_plugin.DashboardUsbConnected
                           && _plugin.Connection?.IsConnected == true;
@@ -171,7 +199,10 @@ namespace MozaPlugin.Telemetry
                 _plugin._cm2Sender.Rebind(conn); // no-op when already on this connection
 
             var cm2 = _plugin._cm2Sender;
-            cm2.Policy = Era.EraPolicy.For(Era.MozaWheelEra.Auto);
+            // Idle only — a running sender keeps its resolved policy (see
+            // DashboardBindingCoordinator.ApplyTelemetrySettings).
+            if (cm2.StateIsIdle)
+                cm2.Policy = Era.EraPolicy.For(Era.MozaWheelEra.Auto);
             cm2.PropertyResolver = _plugin.PropertyResolver.ResolveAsDouble;
             cm2.PropertyStringResolver = _plugin.PropertyResolver.ResolveAsString;
             cm2.UploadDashboard = false;
@@ -199,7 +230,7 @@ namespace MozaPlugin.Telemetry
             // CM2 channel mappings live under the dash device GUID + a fixed key,
             // independent of the wheel, so the CM2's catalog-synth applies its own.
             cm2.MappingPageGuid = MozaPlugin.Cm2PageGuid;
-            cm2.MappingDashKeys = new[] { MozaPlugin.Cm2DashKey };
+            cm2.MappingDashKeys = Cm2MappingDashKeys;
             // A bus-bridged dash of unknown type might be a CM1 (group-0x35) that never
             // advertises a tier-def catalog. Suppress the no-catalog engagement watchdog
             // so it doesn't loop restarts while TickCm1Discriminator decides. A USB dash

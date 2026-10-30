@@ -950,5 +950,19 @@ namespace MozaPlugin.Resources
         public static string Motion_Effect_TactileFeedback => Get("Motion_Effect_TactileFeedback");
         public static string SliderLabel_StalkDebounce => Get("SliderLabel_StalkDebounce");
         public static string Status_PreviewUnavailable => Get("Status_PreviewUnavailable");
+        public static string Status_Pressed => Get("Status_Pressed");
+        public static string Status_Released => Get("Status_Released");
+        public static string Tooltip_CustomHuePicker => Get("Tooltip_CustomHuePicker");
+        public static string Swatch_Magenta => Get("Swatch_Magenta");
+        public static string Swatch_PastelRed => Get("Swatch_PastelRed");
+        public static string Swatch_PastelOrange => Get("Swatch_PastelOrange");
+        public static string Swatch_PastelYellow => Get("Swatch_PastelYellow");
+        public static string Swatch_PastelGreen => Get("Swatch_PastelGreen");
+        public static string Swatch_PastelCyan => Get("Swatch_PastelCyan");
+        public static string Swatch_PastelBlue => Get("Swatch_PastelBlue");
+        public static string Swatch_PastelPurple => Get("Swatch_PastelPurple");
+        public static string Swatch_PastelMagenta => Get("Swatch_PastelMagenta");
+        public static string FileFilter_PitHousePreset => Get("FileFilter_PitHousePreset");
+        public static string Import_Footer_Applied => Get("Import_Footer_Applied");
     }
 }

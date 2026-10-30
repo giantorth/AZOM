@@ -49,8 +49,8 @@ namespace MozaPlugin.Devices.StalksTruckSim
         private readonly long[] _lockoutEnd = new long[MozaData.MaxStalksButtons];   // Stopwatch ticks, 0 = none
         private volatile int _debounceMs;
         private readonly Timer _lockoutTimer;
-        // Serialises edge delivery between the HID thread and the lockout timer.
-        // Taken before _lock, never inside it.
+        // Serialises edge delivery between the HID thread and the lockout timer,
+        // and against the game-exit release. Taken before _lock, never inside it.
         private readonly object _edgeLock = new object();
 
         public StalksTruckSimController()
@@ -84,14 +84,20 @@ namespace MozaPlugin.Devices.StalksTruckSim
         public void SetGameContext(string gameName, bool gameRunning)
         {
             bool truck = gameRunning && IsTruckSimGame(gameName);
-            bool wasTruck = _truckGameRunning;
-            _truckGameRunning = truck;
-            if (!truck)
+            // Edges only: this runs at DataUpdate rate. Sole writer, so the unlocked read is safe.
+            if (truck == _truckGameRunning) return;
+            if (truck) { _truckGameRunning = true; return; }
+
+            // Under the edge lock so a press already past the Active gate finishes
+            // its key-down before the release below, instead of landing after it.
+            lock (_edgeLock)
             {
+                _truckGameRunning = false;
                 // The blinker tracker models the game's own state, which is gone with
                 // the game — unlike the wiper/light stages below, it is reset here.
-                // Only on the edge: this runs at DataUpdate rate.
-                if (wasTruck) ResetIndicator();
+                ResetIndicator();
+                // Flush first: ReleaseAll enqueues the key-ups, and a Flush after it would
+                // drain them before the worker wakes.
                 _kb.Flush();
                 _kb.ReleaseAll();
             }
@@ -429,8 +435,9 @@ namespace MozaPlugin.Devices.StalksTruckSim
 
         public void Dispose()
         {
-            try { _lockoutTimer.Dispose(); } catch { }
-            try { _cancelTimer.Dispose(); } catch { }
+            // Wait out in-flight callbacks so none reaches the sender mid-dispose.
+            KeyboardSender.DisposeTimerAndWait(_lockoutTimer);
+            KeyboardSender.DisposeTimerAndWait(_cancelTimer);
             try { _kb.Dispose(); } catch { }
         }
     }

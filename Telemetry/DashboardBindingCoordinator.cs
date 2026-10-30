@@ -244,8 +244,11 @@ namespace MozaPlugin.Telemetry
             string telemName = _plugin.ActiveTelemetryProfileName;
 
             // Era is always Auto — TelemetrySender.ResolveAutoPolicy pins the
-            // real era from the wheel's catalog/model at session start.
-            sender.Policy = EraPolicy.For(MozaWheelEra.Auto);
+            // real era from the wheel's catalog/model at session start. Idle only:
+            // a running sender's resolved policy carries the upload wire-format
+            // fallback, and the next Start re-resolves anyway.
+            if (sender.StateIsIdle)
+                sender.Policy = EraPolicy.For(MozaWheelEra.Auto);
             // Upload/download UI is hidden while feature is in development;
             // force both off regardless of saved settings.
             sender.UploadDashboard = false;

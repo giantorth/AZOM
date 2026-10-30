@@ -157,6 +157,10 @@ namespace MozaPlugin.Telemetry
         private int _forceColdReprovoke;
         private int _coldStartReprovokeAttempts;
         private const int MaxColdStartReprovokes = 3;
+        // Set when the wedge branch queues its re-provoke: holds the preamble (no
+        // Active transition, no tier-def) until that restart's Stop/Start lands.
+        // Cleared by Stop() and InitTickStateAndTransitionToStarting.
+        private volatile bool _reprovokePending;
 
 
         // Upload handshake state.
@@ -352,6 +356,30 @@ namespace MozaPlugin.Telemetry
             return h;
         }
 
+        // The parser publishes catalogs copy-on-write and never mutates a
+        // published list, so the same reference means the same hash. One
+        // immutable pair so the tick and StartInner threads never tear it.
+        private sealed class CatalogHashMemo
+        {
+            public readonly System.Collections.Generic.IReadOnlyList<string> Catalog;
+            public readonly ulong Hash;
+            public CatalogHashMemo(System.Collections.Generic.IReadOnlyList<string> catalog, ulong hash)
+            {
+                Catalog = catalog;
+                Hash = hash;
+            }
+        }
+        private volatile CatalogHashMemo? _catalogHashMemo;
+
+        private ulong CatalogHashFor(System.Collections.Generic.IReadOnlyList<string> catalog)
+        {
+            var memo = _catalogHashMemo;
+            if (memo != null && ReferenceEquals(memo.Catalog, catalog)) return memo.Hash;
+            ulong h = ComputeCatalogHash(catalog);
+            _catalogHashMemo = new CatalogHashMemo(catalog, h);
+            return h;
+        }
+
         // CRC32 reject counters for catalog (sess=0x01/FlagByte) and tile-server
         // (sess=0x03/0x0b) chunks. Surfaced via diagnostics for link-quality.
         private int _catalogCrcRejects;
@@ -443,7 +471,7 @@ namespace MozaPlugin.Telemetry
                 _frames.InvalidateDisplayConfig();
                 // Rebuild per-tier frame builders with the new dev_id so value
                 // frames address the right device on the next tick.
-                RebuildFrameBuildersForTargetDevice();
+                RebuildFrameBuilders();
                 MozaLog.Debug($"[AZOM] Telemetry target device set to {TargetDescription}");
             }
         }
@@ -482,20 +510,28 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        private void RebuildFrameBuildersForTargetDevice()
+        /// <summary>Rebuild every tier's frame builder from the live profile's
+        /// current channel lists. Call after any change to tier.Channels, the
+        /// target device id, or the property resolver. Under
+        /// <see cref="_profileSetLock"/> so the (_profile, _tiers) pair and the
+        /// tier lists it reads are the ones the setter published together.</summary>
+        internal void RebuildFrameBuilders()
         {
-            var profile = _profile;
-            var tiers = _tiers;
-            if (profile == null || tiers == null) return;
-            for (int i = 0; i < tiers.Length && i < profile.Tiers.Count; i++)
+            lock (_profileSetLock)
             {
-                if (tiers[i] == null) continue;
-                tiers[i].Builder = new TelemetryFrameBuilder(
-                    profile.Tiers[i], PropertyResolver,
-                    type02NConvention: false,
-                    deviceId: _targetDeviceId);
+                var profile = _profile;
+                var tiers = _tiers;
+                if (profile == null || tiers == null) return;
+                for (int i = 0; i < tiers.Length && i < profile.Tiers.Count; i++)
+                {
+                    if (tiers[i] == null) continue;
+                    tiers[i].Builder = new TelemetryFrameBuilder(
+                        profile.Tiers[i], PropertyResolver,
+                        type02NConvention: false,
+                        deviceId: _targetDeviceId);
+                }
+                _builtWithResolverTarget = PropertyResolver?.Target;
             }
-            _builtWithResolverTarget = PropertyResolver?.Target;
         }
 
         // Delegate Target (= the SimHubPropertyResolver instance) that the current
@@ -519,7 +555,7 @@ namespace MozaPlugin.Telemetry
         internal void RebindFrameBuildersToResolver()
         {
             if (ReferenceEquals(PropertyResolver?.Target, _builtWithResolverTarget)) return;
-            RebuildFrameBuildersForTargetDevice();
+            RebuildFrameBuilders();
         }
 
         // Session 0x09 configJson RPC. Device pushes dashboard state; we reply
@@ -1005,7 +1041,8 @@ namespace MozaPlugin.Telemetry
                 {
                     Retransmitter.ReleaseHold(s);
                     Retransmitter.DropSession(s);
-                });
+                },
+                acquireTimerResolution: () => MozaPlugin.Instance?.AcquireTimerResolutionHold());
 
             // Single-line outcome log per upload attempt. Without this, a
             // silent failure (e.g. NoFtSession) only shows up as a Warn deep

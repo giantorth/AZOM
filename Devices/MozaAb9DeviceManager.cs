@@ -786,12 +786,9 @@ namespace MozaPlugin.Devices
 
             var on  = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOn), (ushort)coefficient, amp);
             var off = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOff), (ushort)coefficient, 0x0000);
+            // Adjacent slots: ON then OFF back-to-back in one drain pass, as PitHouse pairs them.
             _connection.SendStream(StreamKind.Ab9EnginePulse, on);
-            // OFF immediately follows on the wire because the lane is latest-wins:
-            // queue the ON first so it goes out, then enqueue OFF to overwrite the
-            // slot for the next drain pass. Result: ON, OFF land back-to-back in
-            // the right order matching PitHouse's pair cadence.
-            _connection.Send(off);
+            _connection.SendStream(StreamKind.Ab9EnginePulseOff, off);
             return true;
         }
 
@@ -926,8 +923,10 @@ namespace MozaPlugin.Devices
             switch (effect)
             {
                 case Ab9Effect.EnginePulseOn:
-                case Ab9Effect.EnginePulseOff:
                     _connection.SendStream(StreamKind.Ab9TriggerA, frame);
+                    break;
+                case Ab9Effect.EnginePulseOff:
+                    _connection.SendStream(StreamKind.Ab9TriggerB, frame);
                     break;
                 case Ab9Effect.EngineVib:
                     _connection.SendStream(StreamKind.Ab9TriggerRpm, frame);
@@ -962,25 +961,14 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Restart both engine-pulse dampers. PitHouse fires them within sub-ms of
-        /// each other; we queue both into the same lane so the second naturally
-        /// follows the first onto the wire.
+        /// each other; the two starts ride adjacent stream slots, so the OFF start
+        /// follows the ON start in the same drain pass.
         /// </summary>
         public bool SendKeepalivePair()
         {
             if (!_connection.IsConnected) return false;
             SendTrigger(Ab9Effect.EnginePulseOn);
-            // Second start uses the one-shot FIFO so it can't be overwritten by
-            // another EnginePulseOn before it reaches the wire.
-            var b = new byte[8];
-            b[0] = MozaProtocol.MessageStart;
-            b[1] = 0x03;
-            b[2] = 0x20;
-            b[3] = MozaProtocol.DeviceAb9;
-            b[4] = 0x0D;
-            b[5] = EffectIndex(Ab9Effect.EnginePulseOff);
-            b[6] = 0x01;
-            b[7] = MozaProtocol.CalculateWireChecksum(b, 7);
-            _connection.Send(b);
+            SendTrigger(Ab9Effect.EnginePulseOff);
             return true;
         }
 

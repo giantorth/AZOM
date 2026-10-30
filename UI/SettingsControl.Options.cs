@@ -91,6 +91,7 @@ namespace MozaPlugin.UI
         // Called from RefreshDisplay inside the event suppressor.
         private void RefreshOptionsTab()
         {
+            if (!OptionsTab.IsSelected) return;
             if (ForzaCompatCheck != null)
                 ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
         }

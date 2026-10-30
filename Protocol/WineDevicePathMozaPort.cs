@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -35,17 +36,21 @@ namespace MozaPlugin.Protocol
         private const uint PURGE_TXCLEAR = 0x0004;
         private static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
 
+        // Unix nodes whose warm-up stty is still running (an abandoned timeout).
+        private static readonly ConcurrentDictionary<string, byte> s_warmUpInFlight =
+            new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+
         private readonly object _gate = new object();
         private IntPtr _handle = INVALID_HANDLE;
         private volatile bool _closed;
         private readonly string _path;
 
         /// <summary>Open and configure the device. Throws on failure (the caller
-        /// classifies it exactly like a SerialPort open failure).</summary>
+        /// classifies it exactly like a SerialPort open failure). The caller must
+        /// have run <see cref="WarmUpEndpoint"/> for this attempt.</summary>
         public WineDevicePathMozaPort(string devicePath)
         {
             _path = devicePath;
-            WarmUpEndpoint(devicePath);
             MozaLog.Debug("[AZOM] WineDevicePathPort: CreateFile");
             IntPtr h = CreateFileW(devicePath, GENERIC_READ | GENERIC_WRITE, 0, IntPtr.Zero,
                 OPEN_EXISTING, 0, IntPtr.Zero);
@@ -85,7 +90,9 @@ namespace MozaPlugin.Protocol
         /// <para>A non-zero exit is fine (the open will fail on its own and the
         /// reconnect timer retries). A TIMEOUT is not: the native side wedging is
         /// the one state in which entering Wine's comm-config is unsafe, so we
-        /// refuse the open and let the 5 s reconnect try again.</para>
+        /// refuse the open and let the 5 s reconnect try again. Until that timed-out
+        /// stty returns, later attempts on the node are refused without spawning
+        /// another one.</para>
         /// </summary>
         internal static void WarmUpEndpoint(string devicePath)
         {
@@ -97,9 +104,15 @@ namespace MozaPlugin.Protocol
                 return;
             }
 
+            if (!s_warmUpInFlight.TryAdd(node!, 0))
+                throw new IOException($"native warm-up of {node} from an earlier attempt has not returned — refusing the Wine open");
             var r = WineNativeExec.Run(
                 new[] { "stty", "-F", node!, "115200", "raw", "-echo", "clocal", "-hupcl" },
-                timeoutMs: 3000);
+                timeoutMs: 3000,
+                onExit: () => s_warmUpInFlight.TryRemove(node!, out _));
+            // onExit already ran for Completed; Unavailable never spawned.
+            if (r.Outcome == NativeSpawnOutcome.Unavailable)
+                s_warmUpInFlight.TryRemove(node!, out _);
             if (r.Outcome == NativeSpawnOutcome.TimedOut)
                 throw new IOException($"native warm-up of {node} did not return — refusing the Wine open");
             if (r.Outcome == NativeSpawnOutcome.Completed)

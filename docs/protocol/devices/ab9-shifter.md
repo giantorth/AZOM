@@ -439,6 +439,8 @@ Offsets are 0-indexed payload positions (the wire frame's `frame[4]` is `payload
 
 Implementation rule (**corrected 2026-05-31**): emit pulse pairs at a **constant ~48 Hz** (not RPM- or intensity-driven — the rate is flat across rpm-fraction 0.2..1.0 and across intensity 100/60/40 %); amp16 = `0x2328` constant for ON, `0x0000` for OFF; coefficient = `9800 × (1 − rpm/maxRpm)` (**corrected 2026-10-29**), never a wrapping counter. **Intensity is NOT encoded here** — it is the linear `0x0A 0x05` amplitude field (offset 6-7); see "Slider effects on the stream" above.
 
+Plugin transport: the ON and OFF halves ride adjacent latest-wins stream slots (`StreamKind.Ab9EnginePulse` / `Ab9EnginePulseOff`, ON first). The write loop drains slots in index order, so a pair queued together goes out ON then OFF back-to-back in one pass. The damper-start pair (`0x0D` for the ON and OFF dampers, `MozaAb9DeviceManager.SendKeepalivePair`) is carried the same way on `Ab9TriggerA` / `Ab9TriggerB`.
+
 #### `0x08 <idx>` shift constant-force pair — 11 byte payload
 
 ```

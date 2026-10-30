@@ -14,8 +14,8 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
-                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
+                <ctrl:SharedResourceDictionary SharedSource="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
+                <ctrl:SharedResourceDictionary SharedSource="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Custom Effects' inline formula editor (mirrors DashboardManagementControl.xaml's
@@ -350,7 +350,7 @@
         <TabControl x:Name="MainTabs" Style="{StaticResource MozaTabControl}">
 
             <!-- ==================== BASE TAB ==================== -->
-            <TabItem Header="{x:Static res:Strings.TabHeader_Base}">
+            <TabItem x:Name="BaseTab" Header="{x:Static res:Strings.TabHeader_Base}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
                     <StackPanel>
                         <!-- Live telemetry header -->
@@ -1397,7 +1397,8 @@
                                                      HorizontalAlignment="Stretch"/>
                                     </StackPanel>
                                     <TextBlock x:Name="HandbrakeButtonStatus" FontFamily="Consolas" FontSize="14"
-                                               FontWeight="Normal" Margin="0,4" Visibility="Collapsed">Released</TextBlock>
+                                               FontWeight="Normal" Margin="0,4" Visibility="Collapsed"
+                                               Text="{x:Static res:Strings.Status_Released}"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
 

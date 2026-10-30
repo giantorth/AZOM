@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using MozaPlugin.Resources;
 
 namespace MozaControls
 {
@@ -26,50 +27,76 @@ namespace MozaControls
         public sealed class Swatch
         {
             public string Id { get; }
-            public string Label { get; }
+            /// <summary>Localized name, looked up from <see cref="Id"/> on each
+            /// read so it follows the UI language.</summary>
+            public string Label => LabelFor(Id);
             /// <summary>Written to the LED and matched for the selection ring.</summary>
             public Color Value { get; }
             /// <summary>Painted on the chip; differs from Value only for Off,
             /// which has to stay visible on the dark theme.</summary>
             public Color Display { get; }
             public bool IsOff { get; }
-            public Swatch(string id, string label, Color value, bool isOff = false, Color? display = null)
+            public Swatch(string id, Color value, bool isOff = false, Color? display = null)
             {
-                Id = id; Label = label; Value = value; IsOff = isOff; Display = display ?? value;
+                Id = id; Value = value; IsOff = isOff; Display = display ?? value;
             }
         }
+
+        private static string LabelFor(string id) => id switch
+        {
+            "red"            => Strings.ShifterColor_Red,
+            "orange"         => Strings.ShifterColor_Orange,
+            "yellow"         => Strings.ShifterColor_Yellow,
+            "green"          => Strings.ShifterColor_Green,
+            "cyan"           => Strings.ShifterColor_Cyan,
+            "blue"           => Strings.ShifterColor_Blue,
+            "purple"         => Strings.ShifterColor_Purple,
+            "magenta"        => Strings.Swatch_Magenta,
+            "pastel-red"     => Strings.Swatch_PastelRed,
+            "pastel-orange"  => Strings.Swatch_PastelOrange,
+            "pastel-yellow"  => Strings.Swatch_PastelYellow,
+            "pastel-green"   => Strings.Swatch_PastelGreen,
+            "pastel-cyan"    => Strings.Swatch_PastelCyan,
+            "pastel-blue"    => Strings.Swatch_PastelBlue,
+            "pastel-purple"  => Strings.Swatch_PastelPurple,
+            "pastel-magenta" => Strings.Swatch_PastelMagenta,
+            "off"            => Strings.Option_Off,
+            "white"          => Strings.ShifterColor_White,
+            "saved"          => Strings.Tooltip_SavedColor,
+            _                => id,
+        };
 
         // Strip row 1, in spectral order.
         public static readonly IReadOnlyList<Swatch> PureSwatches = new[]
         {
-            new Swatch("red",     "Red",     Color.FromRgb(0xFF, 0x00, 0x00)),
-            new Swatch("orange",  "Orange",  Color.FromRgb(0xFF, 0x80, 0x00)),
-            new Swatch("yellow",  "Yellow",  Color.FromRgb(0xFF, 0xFF, 0x00)),
-            new Swatch("green",   "Green",   Color.FromRgb(0x00, 0xFF, 0x00)),
-            new Swatch("cyan",    "Cyan",    Color.FromRgb(0x00, 0xFF, 0xFF)),
-            new Swatch("blue",    "Blue",    Color.FromRgb(0x00, 0x00, 0xFF)),
-            new Swatch("purple",  "Purple",  Color.FromRgb(0x80, 0x00, 0xFF)),
-            new Swatch("magenta", "Magenta", Color.FromRgb(0xFF, 0x00, 0xFF)),
+            new Swatch("red",     Color.FromRgb(0xFF, 0x00, 0x00)),
+            new Swatch("orange",  Color.FromRgb(0xFF, 0x80, 0x00)),
+            new Swatch("yellow",  Color.FromRgb(0xFF, 0xFF, 0x00)),
+            new Swatch("green",   Color.FromRgb(0x00, 0xFF, 0x00)),
+            new Swatch("cyan",    Color.FromRgb(0x00, 0xFF, 0xFF)),
+            new Swatch("blue",    Color.FromRgb(0x00, 0x00, 0xFF)),
+            new Swatch("purple",  Color.FromRgb(0x80, 0x00, 0xFF)),
+            new Swatch("magenta", Color.FromRgb(0xFF, 0x00, 0xFF)),
         };
 
         // Strip row 2: 50 % white tints of the row above, column-aligned with it.
         public static readonly IReadOnlyList<Swatch> PastelSwatches = new[]
         {
-            new Swatch("pastel-red",     "Pastel red",     Color.FromRgb(0xFF, 0x80, 0x80)),
-            new Swatch("pastel-orange",  "Pastel orange",  Color.FromRgb(0xFF, 0xC0, 0x80)),
-            new Swatch("pastel-yellow",  "Pastel yellow",  Color.FromRgb(0xFF, 0xFF, 0x80)),
-            new Swatch("pastel-green",   "Pastel green",   Color.FromRgb(0x80, 0xFF, 0x80)),
-            new Swatch("pastel-cyan",    "Pastel cyan",    Color.FromRgb(0x80, 0xFF, 0xFF)),
-            new Swatch("pastel-blue",    "Pastel blue",    Color.FromRgb(0x80, 0x80, 0xFF)),
-            new Swatch("pastel-purple",  "Pastel purple",  Color.FromRgb(0xC0, 0x80, 0xFF)),
-            new Swatch("pastel-magenta", "Pastel magenta", Color.FromRgb(0xFF, 0x80, 0xFF)),
+            new Swatch("pastel-red",     Color.FromRgb(0xFF, 0x80, 0x80)),
+            new Swatch("pastel-orange",  Color.FromRgb(0xFF, 0xC0, 0x80)),
+            new Swatch("pastel-yellow",  Color.FromRgb(0xFF, 0xFF, 0x80)),
+            new Swatch("pastel-green",   Color.FromRgb(0x80, 0xFF, 0x80)),
+            new Swatch("pastel-cyan",    Color.FromRgb(0x80, 0xFF, 0xFF)),
+            new Swatch("pastel-blue",    Color.FromRgb(0x80, 0x80, 0xFF)),
+            new Swatch("pastel-purple",  Color.FromRgb(0xC0, 0x80, 0xFF)),
+            new Swatch("pastel-magenta", Color.FromRgb(0xFF, 0x80, 0xFF)),
         };
 
         // Utility column at the end of row 1 (row 2 holds CUSTOM + SAVED beneath).
         public static readonly Swatch Off =
-            new Swatch("off", "Off", Colors.Black, isOff: true, display: Color.FromRgb(0x1A, 0x1F, 0x23));
+            new Swatch("off", Colors.Black, isOff: true, display: Color.FromRgb(0x1A, 0x1F, 0x23));
         public static readonly Swatch White =
-            new Swatch("white", "White", Color.FromRgb(0xFF, 0xFF, 0xFF));
+            new Swatch("white", Color.FromRgb(0xFF, 0xFF, 0xFF));
 
         /// <summary>Last colour confirmed in the CUSTOM dialog; null until one is picked.</summary>
         public static Color? SavedColor { get; private set; }

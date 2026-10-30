@@ -470,23 +470,28 @@ namespace MozaPlugin.Protocol
         private static byte[]? BuildChunk(Zone z, LedZoneLayout layout)
         {
             int n = Math.Min(EntriesPerChunk, z.TurnSlots.Count - z.TurnPos);
-            var payload = new byte[n * 4];
-            for (int k = 0; k < n; k++)
+            var cmd = layout.ColorCommand;
+            // Sent-state bookkeeping runs even when the command is unwritable (null frame).
+            var frame = cmd.NewWriteFrame(layout.DeviceId, n * 4);
+            int o = cmd.PayloadOffset;
+            for (int k = 0; k < n; k++, o += 4)
             {
                 int slot = z.TurnSlots[z.TurnPos + k];
                 int c = z.Want[slot];
-                int o = k * 4;
-                payload[o] = layout.LedIndex[slot];
-                payload[o + 1] = (byte)(c >> 16);
-                payload[o + 2] = (byte)(c >> 8);
-                payload[o + 3] = (byte)c;
+                if (frame != null)
+                {
+                    frame[o] = layout.LedIndex[slot];
+                    frame[o + 1] = (byte)(c >> 16);
+                    frame[o + 2] = (byte)(c >> 8);
+                    frame[o + 3] = (byte)c;
+                }
                 z.Sent[slot] = c;
                 z.SentValid[slot] = true;
             }
             z.TurnPos += n;
             z.Frames++;
             z.ColorEntries += n;
-            return layout.ColorCommand.BuildWriteMessage(layout.DeviceId, payload);
+            return frame == null ? null : MozaCommand.SealFrame(frame);
         }
 
         private static byte[]? BuildMask(LedZoneLayout layout, int idx, int active, int window)
@@ -495,19 +500,31 @@ namespace MozaPlugin.Protocol
             switch (layout.MaskEncodings[idx])
             {
                 case LedMaskEncoding.ActiveWindowLe8:
-                    return cmd.BuildWriteMessage(layout.DeviceId, new[]
-                    {
-                        (byte)active, (byte)(active >> 8), (byte)(active >> 16), (byte)(active >> 24),
-                        (byte)window, (byte)(window >> 8), (byte)(window >> 16), (byte)(window >> 24),
-                    });
+                {
+                    var frame = cmd.NewWriteFrame(layout.DeviceId, 8);
+                    if (frame == null) return null;
+                    PutLe32(frame, cmd.PayloadOffset, active);
+                    PutLe32(frame, cmd.PayloadOffset + 4, window);
+                    return MozaCommand.SealFrame(frame);
+                }
                 case LedMaskEncoding.ActiveLe4:
-                    return cmd.BuildWriteMessage(layout.DeviceId, new[]
-                    {
-                        (byte)active, (byte)(active >> 8), (byte)(active >> 16), (byte)(active >> 24),
-                    });
+                {
+                    var frame = cmd.NewWriteFrame(layout.DeviceId, 4);
+                    if (frame == null) return null;
+                    PutLe32(frame, cmd.PayloadOffset, active);
+                    return MozaCommand.SealFrame(frame);
+                }
                 default:
                     return cmd.BuildWriteInt(layout.DeviceId, active);
             }
+        }
+
+        private static void PutLe32(byte[] dst, int offset, int value)
+        {
+            dst[offset] = (byte)value;
+            dst[offset + 1] = (byte)(value >> 8);
+            dst[offset + 2] = (byte)(value >> 16);
+            dst[offset + 3] = (byte)(value >> 24);
         }
 
         /// <summary>Per-zone counters for the Diagnostics tab.</summary>

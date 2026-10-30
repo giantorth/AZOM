@@ -1455,10 +1455,32 @@ namespace MozaPlugin.Devices.MBooster
                 || (field.Length == 2 && field[0] == 'y' && field[1] >= '1' && field[1] <= '5');
         }
 
-        private void StoreOutputRegister(byte device, string name, int value)
+        // Float output registers (y1..y5, sensor ratio) as reported, unrounded —
+        // what a float write is compared against. Guarded by _statusLock.
+        private readonly Dictionary<string, float> _outputFloatRegs = new Dictionary<string, float>();
+        // Well below the profile's resolution, above float round-trip noise.
+        private const float FloatRegisterTolerance = 0.01f;
+
+        private void StoreOutputRegister(byte device, in ParsedResponse r)
         {
-            if (!IsOutputRegister(name)) return;
-            lock (_statusLock) _outputRegs[$"{device:x2}:{name}"] = value;
+            if (!IsOutputRegister(r.Name)) return;
+            string key = $"{device:x2}:{r.Name}";
+            lock (_statusLock)
+            {
+                _outputRegs[key] = RegisterValue(r);
+                if (r.FloatValue is float f) _outputFloatRegs[key] = f;
+            }
+        }
+
+        /// <summary>
+        /// A read-back as the int cache holds it: float registers rounded (the
+        /// parser's IntValue truncates them).
+        /// </summary>
+        private static int RegisterValue(in ParsedResponse r)
+        {
+            if (r.FloatValue is float f && !float.IsNaN(f) && !float.IsInfinity(f))
+                return (int)Math.Round(f);
+            return r.IntValue;
         }
 
         /// <summary>Device-reported value of a per-role output register on
@@ -1467,6 +1489,16 @@ namespace MozaPlugin.Devices.MBooster
         {
             lock (_statusLock)
                 return _outputRegs.TryGetValue($"{device:x2}:{name}", out var v) ? v : -1;
+        }
+
+        /// <summary>Whether <paramref name="device"/> already reports float
+        /// output register <paramref name="name"/> at <paramref name="value"/>
+        /// (read-back or write echo). False until it has reported.</summary>
+        public bool UnitHoldsFloat(byte device, string name, float value)
+        {
+            lock (_statusLock)
+                return _outputFloatRegs.TryGetValue($"{device:x2}:{name}", out var v)
+                    && Math.Abs(v - value) < FloatRegisterTolerance;
         }
 
         // Every one of these registers is a flash parameter on the unit
@@ -1492,7 +1524,7 @@ namespace MozaPlugin.Devices.MBooster
                 _lastSegDamp[device] = frame;
                 _plainDampingLatest.Remove(device);
             }
-            SendOneShot(frame);
+            SendSettingsFrame(frame);
         }
 
         /// <summary>Write plain Virtual Damping (0xAD press/release raw). Both
@@ -1785,7 +1817,7 @@ namespace MozaPlugin.Devices.MBooster
             lock (_statusLock) _statusRegs.Clear();
             // Register values describe a live unit; a stale one would let the
             // next apply skip a write the reconnected unit needs.
-            lock (_statusLock) _outputRegs.Clear();
+            lock (_statusLock) { _outputRegs.Clear(); _outputFloatRegs.Clear(); }
             // The next connect-time apply resends every feel-curve X.
             lock (_lastFeelX) _lastFeelX.Clear();
             lock (_lastSegDamp) { _lastSegDamp.Clear(); _plainDampingLatest.Clear(); }
@@ -1840,7 +1872,7 @@ namespace MozaPlugin.Devices.MBooster
                     // motor-locate status back through this branch, not the
                     // host arm below.
                     StoreStatusRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
-                    StoreOutputRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
+                    StoreOutputRegister((byte)unswapped, probe.Value);
                     StoreUnitIdentity((byte)unswapped, probe.Value.Name, probe.Value.ArrayValue);
                 }
                 // Log each distinct READ response once; write-echoes change with
@@ -1925,7 +1957,7 @@ namespace MozaPlugin.Devices.MBooster
                         DeviceReportedMaxThresholdKg =
                             (float)MozaMBoosterProtocol.DecodeThresholdKg(r.IntValue);
                     StoreStatusRegister(HostDeviceId, r.Name, r.IntValue);
-                    StoreOutputRegister(HostDeviceId, r.Name, r.IntValue);
+                    StoreOutputRegister(HostDeviceId, r);
                     StoreCalib(HostDeviceId, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
                     if (r.Name == "mbooster-status-21" || r.Name == "mbooster-status-22" || r.Name == "mbooster-status-23")
@@ -2528,6 +2560,19 @@ namespace MozaPlugin.Devices.MBooster
             _connection.Send(frame);
         }
 
+        /// <summary>
+        /// Settings reads/writes go on the device-command lane: a routed lane
+        /// shares the base/hub pipe, and a telemetry Stop's FlushPendingWrites
+        /// keeps those frames. Motor, keepalive and disable frames stay on
+        /// <see cref="SendOneShot"/>/<see cref="SendMotorStream"/> so a Stop can
+        /// still silence them.
+        /// </summary>
+        private void SendSettingsFrame(byte[] frame)
+        {
+            if (frame == null || !_connection.IsConnected) return;
+            _connection.SendDeviceCommand(frame);
+        }
+
         /// <summary>Publish latest telemetry to the worker.</summary>
         public void PostTelemetry(in MBoosterTelemetrySnapshot snap)
         {
@@ -2553,7 +2598,7 @@ namespace MozaPlugin.Devices.MBooster
             if (cmd == null) return false;
             var msg = cmd.BuildWriteInt(dev, value);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -2565,12 +2610,12 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (!_connection.IsConnected) return false;
             byte dev = device ?? HostDeviceId;
-            if (UnitHolds(dev, commandName, (int)Math.Round(value))) return true;
+            if (UnitHoldsFloat(dev, commandName, value)) return true;
             var cmd = MozaCommandDatabase.Get(commandName);
             if (cmd == null) return false;
             var msg = cmd.BuildWriteFloat(dev, value);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -2738,7 +2783,7 @@ namespace MozaPlugin.Devices.MBooster
             if (cmd == null) return false;
             var msg = cmd.BuildReadMessage(device);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -3067,10 +3112,9 @@ namespace MozaPlugin.Devices.MBooster
             "mbooster-status-24",
         };
 
-        /// <summary>Fire all five disable frames; called on disconnect / shutdown.
-        /// Traction Control and Custom Effects share Engine's wire ID (no
-        /// verified ID of their own), so the Engine disable frame below
-        /// already covers them too.</summary>
+        /// <summary>Fire a disable frame for every effect wire id; called on
+        /// shutdown. Traction Control, Wheel Spin, Gear Shift, Bite Point and
+        /// Custom Effects share Engine's wire ID, so its disable covers them.</summary>
         public void SendAllDisableFrames()
         {
             if (!_connection.IsConnected) return;
@@ -3080,13 +3124,8 @@ namespace MozaPlugin.Devices.MBooster
             // motor can't latch its last waveform after the port closes;
             // routed: the tunneled pedal sub-device only).
             foreach (var dev in MotorIds)
-            {
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Abs, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Lockup, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Threshold, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Engine, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.RoadTexture, dev));
-            }
+                foreach (var id in MozaMBoosterProtocol.AllEffectIds)
+                    SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, dev));
         }
 
         /// <summary>
@@ -3288,6 +3327,12 @@ namespace MozaPlugin.Devices.MBooster
             // connection is still open at this point.
             try { StopCalibFlushTimer(flush: true); } catch { }
             _disposed = true;
+            // Workers first, so no tick can stream a motor frame after the
+            // disables below; Stop() restores Brake Fade while still connected.
+            // Signal all three first so their joins overlap (≤1 s total, not ≤3 s
+            // serially on the reconnect timer / End()).
+            foreach (var w in _workers) { try { w.RequestStop(); } catch { } }
+            foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try
             {
                 // Best-effort emit disable frames before tearing down so the
@@ -3300,10 +3345,6 @@ namespace MozaPlugin.Devices.MBooster
                     SendAllDisableFrames();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Disable on dispose: {ex.Message}"); }
-            // Signal all three first so their joins overlap (≤1 s total, not ≤3 s
-            // serially on the reconnect timer / End()).
-            foreach (var w in _workers) { try { w.RequestStop(); } catch { } }
-            foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
             try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }
             // A routed lane shares its owner's pipe — never dispose it.

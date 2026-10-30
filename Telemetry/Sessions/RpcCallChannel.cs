@@ -166,6 +166,12 @@ namespace MozaPlugin.Telemetry.Sessions
             return acked ? reply : null;
         }
 
+        /// <summary>True while any <see cref="Call"/> is waiting for a reply.</summary>
+        public bool HasWaiters
+        {
+            get { lock (_lock) return _waiters.Count > 0; }
+        }
+
         /// <summary>
         /// Decode a session-0x0a reply blob and route to the waiter by <c>id</c>.
         /// Method name is NOT inspected — replies route solely on integer id, which

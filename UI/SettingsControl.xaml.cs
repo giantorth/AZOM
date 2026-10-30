@@ -26,9 +26,9 @@ namespace MozaPlugin.UI
 {
     public partial class SettingsControl : UserControl
     {
-        // Static reference so per-device controls (e.g. MozaWheelSettingsControl's
-        // Inputs sub-tab) can forward user input back to the existing plugin-pane
-        // handlers + settings persistence path. Cleared in OnUnloadedStopTimers.
+        // The loaded (on-screen) instance, for background callbacks that repaint
+        // the pane. Set on Loaded, cleared on Unloaded, so a control SimHub
+        // builds but never shows isn't pinned.
         internal static SettingsControl? Instance { get; private set; }
 
         private readonly MozaPlugin _plugin;
@@ -99,8 +99,6 @@ namespace MozaPlugin.UI
             importControl.ApplyRequested += ApplyImportPlan;
             ImportTab.Content = importControl;
 
-            Instance = this;
-
             // Host the shared banner control (instantiated here — a generated
             // typed field of MozaPlugin.UI.* collides with the MozaPlugin class
             // name). Wire its in-app navigation; device-page hosts leave these
@@ -113,6 +111,7 @@ namespace MozaPlugin.UI
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _refreshTimer.Tick += RefreshDisplay;
+            MainTabs.SelectionChanged += MainTabs_SelectionChanged;
 
             _steeringAngleTimer = new DispatcherTimer(DispatcherPriority.Render)
             {
@@ -133,8 +132,6 @@ namespace MozaPlugin.UI
             PreviewMouseDown  += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
             PreviewKeyDown    += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
             PreviewMouseWheel += (s, ev) => _plugin?.Standby?.NotifyUserActivity();
-
-            RequestAllSettings();
         }
 
         private void OnSteeringAngleTick(object? sender, EventArgs e)
@@ -148,6 +145,7 @@ namespace MozaPlugin.UI
             // WPF can fire Loaded more than once if the control is reparented
             // (SimHub's tab containers do this during settings-panel layout).
             // Calling Start() twice would double the tick rate.
+            Instance = this;
             bool wasRunning = _refreshTimer.IsEnabled;
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
             if (!_steeringAngleTimer.IsEnabled) _steeringAngleTimer.Start();
@@ -167,6 +165,7 @@ namespace MozaPlugin.UI
             // reseed instead of waiting for that first tick.
             if (!wasRunning)
             {
+                RequestAllSettingsThrottled();
                 _mboosterUiSeeded = false;
                 RefreshMBoosterTab();
             }
@@ -185,8 +184,9 @@ namespace MozaPlugin.UI
             _steeringAngleTimer.Stop();
             _rotationReadbackTimer.Stop();
             _bandwidthTimer?.Stop();
-            _calCountdownTimer?.Stop();
-            _baseCalStatusTimer?.Stop();
+            // Calibration countdowns and the base-cal status timer are left to
+            // finish (a few seconds at most) so their stop write / status
+            // restore still happens.
             // Detach from the mBooster calibration runner (which lives on the
             // registry and outlives this panel): its ProgressChanged handler
             // captures `this`, so staying subscribed would root the whole
