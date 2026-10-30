@@ -72,6 +72,7 @@ namespace MozaPlugin.UI
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = plugin.Settings.Ab9DetectionEnabled;
+                PedalHapticsCombinedCheck.IsChecked = plugin.Settings.PedalHapticsCombinedDevice;
                 SyncWheelbaseLfeSourceCombo();
                 SyncAutoStandbyCombo();
                 int kaSec = plugin.Settings.WheelKeepaliveTimeoutSec;

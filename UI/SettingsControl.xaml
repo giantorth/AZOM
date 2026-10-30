@@ -3674,6 +3674,16 @@
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
+                                    <!-- S12 pedal haptics as one SimHub device (a channel per
+                                         pedal) instead of one device per pedal. -->
+                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_PedalHapticsCombined}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="PedalHapticsCombinedCheck" VerticalAlignment="Center"
+                                                  Checked="PedalHapticsCombinedCheck_Changed" Unchecked="PedalHapticsCombinedCheck_Changed"/>
+                                        <TextBlock x:Name="PedalHapticsCombinedStatusText" Text=""
+                                                   Style="{StaticResource MutedHintText}"
+                                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
                                     <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
                                          Persistent base-side state, read back from the device
                                          rather than stored in settings — so the toggle shows what

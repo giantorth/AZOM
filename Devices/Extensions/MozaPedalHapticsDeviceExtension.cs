@@ -33,6 +33,10 @@ namespace MozaPlugin.Devices.Extensions
     ///
     /// Unlike the wheelbase, the Connection tab is left in place — there is no
     /// LEDs tab here for its state and identity to live on instead.
+    ///
+    /// Also serves the combined all-pedals device, which swaps in
+    /// <see cref="MozaPedalHapticsCombinedChannelsProvider"/> and the per-pedal
+    /// oscillator sweep instead.
     /// </summary>
     internal class MozaPedalHapticsDeviceExtension : DeviceExtension
     {
@@ -60,18 +64,23 @@ namespace MozaPlugin.Devices.Extensions
         // DeviceTypeID; the three pedal devices differ only by this.
         private byte _pedal = (byte)PedalHapticsPedal.Throttle;
 
-        public override string ExtentionTabTitle =>
-            "MOZA " + MozaPedalHapticsProtocol.PedalLabel(_pedal) + " Haptics";
+        // The combined device: every pedal, one channel each. _pedal is unused.
+        private bool _combined;
+
+        public override string ExtentionTabTitle => _combined
+            ? "MOZA Pedal Haptics"
+            : "MOZA " + MozaPedalHapticsProtocol.PedalLabel(_pedal) + " Haptics";
 
         public override void Init(PluginManager pluginManager)
         {
-            byte pedal = MozaDeviceConstants.PedalHapticsPedalFor(
-                LinkedDevice.DeviceDescriptor?.DeviceTypeID ?? "");
+            string typeId = LinkedDevice.DeviceDescriptor?.DeviceTypeID ?? "";
+            _combined = MozaDeviceConstants.IsPedalHapticsCombinedDevice(typeId);
+            byte pedal = MozaDeviceConstants.PedalHapticsPedalFor(typeId);
             if (pedal != 0) _pedal = pedal;
 
             if (!_registeredActive)
             {
-                MozaPlugin.PedalHapticsDeviceExtensionStarted();
+                MozaPlugin.PedalHapticsDeviceExtensionStarted(_combined);
                 _registeredActive = true;
             }
 
@@ -125,7 +134,9 @@ namespace MozaPlugin.Devices.Extensions
 
             try
             {
-                var manager = (MozaPedalHapticsConnectionManager)MozaPedalHapticsBridge.CreateConnectionManager(_pedal);
+                var manager = (MozaPedalHapticsConnectionManager)(_combined
+                    ? MozaPedalHapticsBridge.CreateCombinedConnectionManager()
+                    : MozaPedalHapticsBridge.CreateConnectionManager(_pedal));
                 var previous = LedDriverInjection.SwapConnectionManager(instance, manager);
                 if (previous == null) return;
 
@@ -148,7 +159,10 @@ namespace MozaPlugin.Devices.Extensions
                     _motorsDevice = FindMotorsDevice();
                 if (_motorsDevice == null) return;
 
-                MozaPedalHapticsBridge.TryInstallChannelsProvider(_motorsDevice, _pedal);
+                if (_combined)
+                    MozaPedalHapticsBridge.TryInstallCombinedChannelsProvider(_motorsDevice);
+                else
+                    MozaPedalHapticsBridge.TryInstallChannelsProvider(_motorsDevice, _pedal);
             }
             catch (Exception ex)
             {
@@ -198,10 +212,13 @@ namespace MozaPlugin.Devices.Extensions
         private void SyncOscillators()
         {
             if (_motorsDevice == null) return;
-            var (assigned, released) = MozaPedalHapticsBridge.SyncOscillatorAssignments(_motorsDevice);
+            var (assigned, released) = _combined
+                ? MozaPedalHapticsBridge.SyncCombinedOscillatorAssignments(_motorsDevice)
+                : MozaPedalHapticsBridge.SyncOscillatorAssignments(_motorsDevice);
             if (assigned > 0 || released > 0)
-                MozaLog.Debug($"[AZOM] Pedal-haptics {MozaPedalHapticsProtocol.PedalLabel(_pedal).ToLowerInvariant()} "
-                            + $"oscillators: {assigned} effect(s) assigned, {released} released");
+                MozaLog.Debug($"[AZOM] Pedal-haptics "
+                            + (_combined ? "combined" : MozaPedalHapticsProtocol.PedalLabel(_pedal).ToLowerInvariant())
+                            + $" oscillators: {assigned} effect(s) assigned, {released} released");
         }
 
         public override void End(PluginManager pluginManager)
@@ -217,7 +234,7 @@ namespace MozaPlugin.Devices.Extensions
 
             if (_registeredActive)
             {
-                MozaPlugin.PedalHapticsDeviceExtensionEnded();
+                MozaPlugin.PedalHapticsDeviceExtensionEnded(_combined);
                 _registeredActive = false;
             }
         }

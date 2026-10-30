@@ -246,9 +246,11 @@ namespace MozaPlugin.UI
                     StatusHintKind.ProfileNotAddedPedalHaptics,
                     Strings.Banner_ProfileNotAddedPedalHaptics_Title,
                     string.Format(Strings.Banner_ProfileNotAddedPedalHaptics_Body,
-                        "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
-                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
-                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
+                        plugin.PedalHapticsCombined
+                            ? Devices.Extensions.DeviceDefinitionDeployer.PedalHapticsCombinedDeviceName
+                            : "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
+                              + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
+                              + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
             }
 
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —

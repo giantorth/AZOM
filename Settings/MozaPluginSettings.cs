@@ -57,6 +57,7 @@ namespace MozaPlugin.Settings
             TelemetryEnabledDefaultForNewWheels = true,
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
             KnobColorAllBlackRepaired = true,
+            PedalHapticsCombinedDevice = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -361,6 +362,13 @@ namespace MozaPlugin.Settings
         // upgraders who were using the pre-1.6 haptics device get it via the
         // LegacyLfeDeviceMigrated one-shot below.
         public WheelbaseLfeSource WheelbaseLfeSource { get; set; } = WheelbaseLfeSource.PluginTab;
+
+        // S12 pedal haptics as one SimHub device with a channel per pedal, instead
+        // of one device per pedal. Both definitions are kept so effects can be
+        // carried across; only the chosen one is driven. Initializer stays false
+        // so upgraders keep their per-pedal devices; new installs get true via
+        // CreateForNewInstall.
+        public bool PedalHapticsCombinedDevice { get; set; }
 
         // One-shot marker for the migration off the pre-1.6 "Wheelbase LFE haptics"
         // device (DeviceTypeID F208F60B-…), which was code-registered and vanished

@@ -838,6 +838,7 @@ namespace MozaPlugin.Resources
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
         public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
         public static string SliderLabel_Ab9Detection => Get("SliderLabel_Ab9Detection");
+        public static string SliderLabel_PedalHapticsCombined => Get("SliderLabel_PedalHapticsCombined");
         public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
         public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
         public static string Option_GraphTorque => Get("Option_GraphTorque");

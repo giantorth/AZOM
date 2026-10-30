@@ -768,6 +768,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Gerätedefinition aktualisiert. SimHub zum Anwenden neu starten.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-Kompatibilität</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Aktivschalthebel-Erkennung (AB9 / AB6)</value></data>
+  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Kombiniertes Pedal-Haptikgerät</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Diagramm</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandbreite</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Drehmoment</value></data>
