@@ -22,6 +22,10 @@ namespace MozaPlugin.Protocol
         // post-open IO-failure branch can flip to this kind once a richer
         // surface is wired; today the broad disconnect path is sufficient.
         IoFailureAfterOpen,
+        // Open or Close of the port did not return in time — the device stopped
+        // answering at the USB level (needs a power cycle). The stuck call runs
+        // on and the port isn't reopened until it returns.
+        DeviceUnresponsive,
     }
 
     /// <summary>

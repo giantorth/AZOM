@@ -55,6 +55,7 @@ All notable changes to the AZOM plugin are documented here.
 - **RSF steering-lock writes work right after a plugin reload.**
 - **PitHouse import applies values whose rounded display matches,** e.g. FFB 75.5% vs 75%.
 - **Base ambient LED settings are only re-sent when changed.**
+- **A device that stops responding on USB no longer stalls reconnects for minutes,** or SimHub shutdown; Diagnostics shows `DeviceUnresponsive`.
 
 ## [1.7.1]
 

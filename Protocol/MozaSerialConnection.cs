@@ -314,6 +314,57 @@ namespace MozaPlugin.Protocol
         private const int ProbeBackoffBaseMs = 10_000;
         private const int ProbeBackoffMaxMs = 300_000;
 
+        // Ports whose handle this process is still opening or closing on a worker
+        // thread because the device stopped answering at the USB level (bundle
+        // 5RWB04RE: Close blocked ~62 s, the next Open ~3.5 min). TryOpen and the
+        // probe sweep leave such a port alone until the call returns — a second
+        // open would fail against our own handle and read as "port in use by
+        // another app". Static: a reloaded plugin instance can meet the previous
+        // instance's handle.
+        private static readonly ConcurrentDictionary<string, PortHandleBusy> s_portBusy =
+            new ConcurrentDictionary<string, PortHandleBusy>(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class PortHandleBusy
+        {
+            public readonly string What;
+            public readonly DateTime SinceUtc;
+
+            public PortHandleBusy(string what)
+            {
+                What = what;
+                SinceUtc = DateTime.UtcNow;
+            }
+        }
+
+        // Healthy closes take milliseconds; past this the caller moves on and the
+        // close worker finishes on its own.
+        private const int PortCloseWaitMs = 2_000;
+        // Healthy opens take milliseconds on Windows; under Wine the native warm-up
+        // alone may take 3 s (WineDevicePathMozaPort.WarmUpEndpoint) before the open.
+        private const int PortOpenTimeoutMs = 8_000;
+
+        // One open running on a worker thread. Fields after Busy are guarded by
+        // lock(this) — a leaf lock, never taken with _lock or _failureLock held.
+        private sealed class OpenAttempt
+        {
+            public readonly string PortName;
+            public readonly PortHandleBusy Busy = new PortHandleBusy("open");
+            public readonly Stopwatch Elapsed = Stopwatch.StartNew();
+            public bool Done;
+            // The opener gave up waiting; a late port is adopted by the next Connect.
+            public bool Abandoned;
+            // Nobody will adopt it (Disconnect); the worker closes a late port itself.
+            public bool Discard;
+            public IMozaPort? Port;
+            public string? Com;
+            public Exception? Error;
+
+            public OpenAttempt(string portName) { PortName = portName; }
+        }
+
+        // Open abandoned at PortOpenTimeoutMs and not yet resolved.
+        private OpenAttempt? _pendingOpen;
+
         /// <summary>
         /// How long <see cref="ProbeWithTimeout"/> waits for the probe thread
         /// before abandoning it.
@@ -727,11 +778,11 @@ namespace MozaPlugin.Protocol
         // — that counter is open-retry-specific and drives the port-in-use banner.
         // This is what makes Diagnostics show a real failure instead of
         // "LastFailure: kind=None" while a connected-but-dead link is being reset.
-        private void RecordRuntimeFailure(ConnectionFailureKind kind, string message)
+        private void RecordRuntimeFailure(ConnectionFailureKind kind, string message, string? portName = null)
         {
             lock (_failureLock)
             {
-                _lastFailure = new ConnectionFailureInfo(kind, _lastPortName, message, DateTime.UtcNow);
+                _lastFailure = new ConnectionFailureInfo(kind, portName ?? _lastPortName, message, DateTime.UtcNow);
             }
         }
 
@@ -806,6 +857,10 @@ namespace MozaPlugin.Protocol
             if (_running || _port != null)
                 Disconnect();
 
+            var pending = ResolvePendingOpen();
+            if (pending.HasValue)
+                return pending.Value;
+
             // Cached-identity fast path. The durable id is tried FIRST because it
             // survives the device landing on a different tty/COM after a replug —
             // the port name only survives until then. Both are gated on
@@ -818,6 +873,8 @@ namespace MozaPlugin.Protocol
                 && !_activePorts.ContainsKey(known.PortName))
             {
                 DiscoveredPid = FormatPid(known.Pid);
+                if (SkipBusyPort(known.PortName))
+                    return false;
                 if (TryOpen(known.PortName, known.DevicePath))
                     return true;
                 // Enumeration already proved this is the right device for this
@@ -834,6 +891,9 @@ namespace MozaPlugin.Protocol
                     && (_pidFilter == null || _pidFilter(FormatPid(info.Pid))))
                 {
                     DiscoveredPid = FormatPid(info.Pid);
+                    // Our own stuck handle is not a stale cache entry — keep it.
+                    if (SkipBusyPort(_lastPortName))
+                        return false;
                     if (TryOpen(_lastPortName, info.DevicePath))
                         return true;
                     MozaLog.Debug(
@@ -885,63 +945,264 @@ namespace MozaPlugin.Protocol
         // devicePath is set only by the sysfs source (Wine/Proton): there the COM
         // name is unknowable, so we open the unix device node directly. Empty on
         // Windows, where portName IS the thing to open.
+        //
+        // The open itself runs on a worker so a device that stopped answering at the
+        // USB level (open blocked minutes in bundle 5RWB04RE) can't hold the reconnect
+        // tick — and every lane it services — hostage. Past PortOpenTimeoutMs the
+        // worker is abandoned, never closed cross-thread (the Wine mid-Open crash, see
+        // _probeInFlight); a port it opens late is adopted by the next Connect.
         private bool TryOpen(string portName, string? devicePath = null)
         {
+            if (SkipBusyPort(portName))
+                return false;
+
+            var attempt = new OpenAttempt(portName);
+            s_portBusy[portName] = attempt.Busy;
+            var worker = new Thread(() => RunOpenAttempt(attempt, devicePath))
+                { IsBackground = true, Name = $"MozaPortOpen-{portName}" };
+            bool started;
+            try { worker.Start(); started = true; }
+            catch { started = false; }
+
+            if (!started)
+            {
+                RunOpenAttempt(attempt, devicePath);
+            }
+            else if (!worker.Join(PortOpenTimeoutMs))
+            {
+                bool abandoned;
+                lock (attempt)
+                {
+                    abandoned = !attempt.Done;
+                    if (abandoned) attempt.Abandoned = true;
+                }
+                if (abandoned)
+                {
+                    Volatile.Write(ref _pendingOpen, attempt);
+                    var msg = $"open did not return within {PortOpenTimeoutMs} ms (device not responding)";
+                    RecordOpenFailure(portName, ConnectionFailureKind.DeviceUnresponsive, new TimeoutException(msg));
+                    MozaLog.Warn($"[AZOM] {portName}: {msg} — abandoning the open thread; " +
+                                 "a late handle is adopted or closed when it returns");
+                    return false;
+                }
+            }
+            return CompleteOpen(attempt);
+        }
+
+        private static void RunOpenAttempt(OpenAttempt a, string? devicePath)
+        {
+            IMozaPort? port = null;
+            string? com = null;
+            Exception? error = null;
+            try { port = OpenPortChain(a.PortName, devicePath, out com); }
+            catch (Exception ex) { error = ex; }
+
+            bool abandoned, discard;
+            lock (a)
+            {
+                discard = a.Discard && port != null;
+                a.Port = discard ? null : port;
+                a.Com = com;
+                a.Error = error;
+                a.Done = true;
+                abandoned = a.Abandoned;
+            }
+            if (abandoned)
+            {
+                MozaLog.Info($"[AZOM] {a.PortName}: abandoned open returned after {a.Elapsed.ElapsedMilliseconds} ms — " +
+                    (error != null ? $"failed ({error.Message})"
+                     : discard ? "opened, no longer wanted — closing"
+                     : "opened — adopting on the next reconnect tick"));
+            }
+            // Same thread that opened it: never a cross-thread close of a Wine open.
+            if (discard)
+            {
+                try { port!.Close(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Port close: {ex.Message}"); }
+            }
+            // A held port stays busy until CompleteOpen adopts it.
+            if (port == null || discard)
+                ReleaseBusy(a.PortName, a.Busy);
+        }
+
+        // Wire a finished attempt's port into the connection, or report its failure.
+        private bool CompleteOpen(OpenAttempt a)
+        {
+            IMozaPort? port;
+            string? com;
+            Exception? error;
+            lock (a)
+            {
+                port = a.Port;
+                com = a.Com;
+                error = a.Error;
+                a.Port = null;
+            }
+            if (port == null)
+            {
+                var ex = error ?? new IOException("open returned no port");
+                RecordOpenFailure(a.PortName, ClassifyOpenFailure(ex), ex);
+                MozaLog.Error($"[AZOM] Failed to connect to {a.PortName}: {ex.Message}");
+                return false;
+            }
             try
             {
-                IMozaPort port;
-                string? com = null;
-                if (string.IsNullOrEmpty(devicePath))
-                {
-                    port = new SerialPortMozaPort(portName, MozaProtocol.BaudRate);
-                }
-                else
-                {
-                    // Wine/Proton. sysfs already told us WHICH tty is the MOZA, so
-                    // there is no blind probing either way; the only question is how
-                    // to open it. Prefer the COM name when Wine's dosdevices mapping
-                    // resolves — SerialPortMozaPort gets a 64 KB ReadBufferSize and
-                    // does not gate reads on ClearCommError, which is the difference
-                    // between resync=0 and resync 53-465 on the same hardware.
-                    com = WineComNameResolver.ResolveComName(portName);
-                    // The native stty warm-up runs once per attempt, before either
-                    // transport: it is what makes the freshly-enumerated CDC-ACM
-                    // endpoint safe to open at all. A timeout throws and ends this
-                    // attempt; the device-path fallback must not retry it.
-                    WineDevicePathMozaPort.WarmUpEndpoint(devicePath!);
-                    port = null!;
-                    if (!string.IsNullOrEmpty(com)
-                        && MozaPlugin.Instance?.Settings?.PreferComPortOnWine != false)
-                    {
-                        try
-                        {
-                            port = new SerialPortMozaPort(com!, MozaProtocol.BaudRate);
-                            MozaLog.Debug(
-                                $"[AZOM] Wine open: {portName} → {com} via SerialPort "
-                                + "(buffered read path)");
-                        }
-                        catch (Exception ex)
-                        {
-                            MozaLog.Debug(
-                                $"[AZOM] Wine open: {com} via SerialPort failed "
-                                + $"({ex.GetType().Name}: {ex.Message}) — falling back to "
-                                + "the device path");
-                            port = null!;
-                        }
-                    }
-                    if (port == null)
-                        port = new WineDevicePathMozaPort(devicePath!);
-                }
-                bool opened = FinishOpen(port, portName);
+                bool opened = FinishOpen(port, a.PortName);
                 _lastComName = com;
                 return opened;
             }
             catch (Exception ex)
             {
-                RecordOpenFailure(portName, ClassifyOpenFailure(ex), ex);
-                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
+                RecordOpenFailure(a.PortName, ClassifyOpenFailure(ex), ex);
+                MozaLog.Error($"[AZOM] Failed to connect to {a.PortName}: {ex.Message}");
                 return false;
             }
+            finally
+            {
+                ReleaseBusy(a.PortName, a.Busy);
+            }
+        }
+
+        // Settle an open abandoned on an earlier tick. Null: nothing pending (or it
+        // failed late) — carry on with a fresh attempt. False: still blocked. True:
+        // the late handle was adopted.
+        private bool? ResolvePendingOpen()
+        {
+            var a = Volatile.Read(ref _pendingOpen);
+            if (a == null) return null;
+            bool done;
+            lock (a) done = a.Done;
+            if (!done)
+            {
+                NoteHandleBusy(a.PortName, a.Busy);
+                return false;
+            }
+            Interlocked.CompareExchange(ref _pendingOpen, null, a);
+            bool hasPort;
+            lock (a) hasPort = a.Port != null;
+            if (!hasPort) return null;
+            MozaLog.Info($"[AZOM] {a.PortName}: adopting the late-opened handle");
+            return CompleteOpen(a);
+        }
+
+        // Disconnect: nobody will adopt a pending open any more.
+        private void DiscardPendingOpen()
+        {
+            var a = Interlocked.Exchange(ref _pendingOpen, null);
+            if (a == null) return;
+            IMozaPort? late = null;
+            lock (a)
+            {
+                if (a.Done)
+                {
+                    late = a.Port;
+                    a.Port = null;
+                }
+                else
+                {
+                    a.Discard = true;
+                }
+            }
+            if (late != null)
+            {
+                ClosePortBounded(late, a.PortName);
+                ReleaseBusy(a.PortName, a.Busy);
+            }
+        }
+
+        private bool SkipBusyPort(string portName)
+        {
+            if (!s_portBusy.TryGetValue(portName, out var busy))
+                return false;
+            NoteHandleBusy(portName, busy);
+            return true;
+        }
+
+        private void NoteHandleBusy(string portName, PortHandleBusy busy)
+        {
+            long secs = (long)(DateTime.UtcNow - busy.SinceUtc).TotalSeconds;
+            string msg = $"previous {busy.What} of {portName} still blocked after {secs} s " +
+                         "(device not responding) — not reopening until it returns";
+            RecordRuntimeFailure(ConnectionFailureKind.DeviceUnresponsive, msg, portName);
+            MozaLog.DebugIfChanged($"port-busy:{CaptureLabel}:{portName}",
+                busy.What + busy.SinceUtc.Ticks, "[AZOM] " + msg);
+        }
+
+        private static void ReleaseBusy(string portName, PortHandleBusy busy) =>
+            ((ICollection<KeyValuePair<string, PortHandleBusy>>)s_portBusy)
+                .Remove(new KeyValuePair<string, PortHandleBusy>(portName, busy));
+
+        // Close on a worker, waiting at most PortCloseWaitMs. Close on a device that
+        // stopped answering blocked ~62 s in bundle 5RWB04RE; until it returns the
+        // port stays busy, so the reconnect skips it instead of failing against it.
+        private static void ClosePortBounded(IMozaPort port, string? portName)
+        {
+            string key = portName ?? "";
+            var busy = new PortHandleBusy("close");
+            if (key.Length != 0) s_portBusy[key] = busy;
+            var sw = Stopwatch.StartNew();
+            void Run()
+            {
+                try { port.Close(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Port close: {ex.Message}"); }
+                finally
+                {
+                    if (key.Length != 0) ReleaseBusy(key, busy);
+                    if (sw.ElapsedMilliseconds >= PortCloseWaitMs)
+                        MozaLog.Info($"[AZOM] {key}: close returned after {sw.ElapsedMilliseconds} ms");
+                }
+            }
+            var t = new Thread(Run) { IsBackground = true, Name = $"MozaPortClose-{key}" };
+            try { t.Start(); }
+            catch
+            {
+                Run();
+                return;
+            }
+            if (!t.Join(PortCloseWaitMs))
+                MozaLog.Warn($"[AZOM] {key}: close blocked > {PortCloseWaitMs} ms (device not responding) — " +
+                             "continuing; the port is reopened once the close returns");
+        }
+
+        // The open chain itself; runs on the TryOpen worker.
+        private static IMozaPort OpenPortChain(string portName, string? devicePath, out string? com)
+        {
+            com = null;
+            if (string.IsNullOrEmpty(devicePath))
+                return new SerialPortMozaPort(portName, MozaProtocol.BaudRate);
+
+            // Wine/Proton. sysfs already told us WHICH tty is the MOZA, so
+            // there is no blind probing either way; the only question is how
+            // to open it. Prefer the COM name when Wine's dosdevices mapping
+            // resolves — SerialPortMozaPort gets a 64 KB ReadBufferSize and
+            // does not gate reads on ClearCommError, which is the difference
+            // between resync=0 and resync 53-465 on the same hardware.
+            com = WineComNameResolver.ResolveComName(portName);
+            // The native stty warm-up runs once per attempt, before either
+            // transport: it is what makes the freshly-enumerated CDC-ACM
+            // endpoint safe to open at all. A timeout throws and ends this
+            // attempt; the device-path fallback must not retry it.
+            WineDevicePathMozaPort.WarmUpEndpoint(devicePath!);
+            if (!string.IsNullOrEmpty(com)
+                && MozaPlugin.Instance?.Settings?.PreferComPortOnWine != false)
+            {
+                try
+                {
+                    var port = new SerialPortMozaPort(com!, MozaProtocol.BaudRate);
+                    MozaLog.Debug(
+                        $"[AZOM] Wine open: {portName} → {com} via SerialPort "
+                        + "(buffered read path)");
+                    return port;
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Debug(
+                        $"[AZOM] Wine open: {com} via SerialPort failed "
+                        + $"({ex.GetType().Name}: {ex.Message}) — falling back to "
+                        + "the device path");
+                }
+            }
+            return new WineDevicePathMozaPort(devicePath!);
         }
 
         // Order matters: FileNotFoundException is an IOException, and an
@@ -1035,10 +1296,8 @@ namespace MozaPlugin.Protocol
                 _port = null;
             }
             if (p != null)
-            {
-                try { p.Close(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM] Port close: {ex.Message}"); }
-            }
+                ClosePortBounded(p, _lastPortName);
+            DiscardPendingOpen();
 
             var lastPort = _lastPortName;
             if (lastPort != null)
@@ -1282,11 +1541,16 @@ namespace MozaPlugin.Protocol
         // _portFailureLogged CAS first so this can't race a double-close/notify.
         private void ClosePortAndNotify()
         {
+            // Close outside the lock: Disconnect (the reconnect tick's first step)
+            // takes it, and a close on an unresponsive device can block for a minute.
+            IMozaPort? p;
             lock (_lock)
             {
-                try { _port?.Close(); } catch { }
+                p = _port;
                 _port = null;
             }
+            if (p != null)
+                ClosePortBounded(p, _lastPortName);
             _lastComName = null;
             // Release the port-held claim now (Disconnect does the same): until the
             // reconnect tick reopens, sibling lanes and the migration check would
@@ -2494,6 +2758,10 @@ namespace MozaPlugin.Protocol
             _probeBackoff.TryGetValue(portName, out var backoff);
             if (backoff != null && DateTime.UtcNow < backoff.NextEligibleUtc)
                 return new ProbeResult(ProbeOutcome.Skipped, detail: $"backoff after {backoff.Consecutive} blocked open(s)");
+
+            // Our own connection's handle on it is still stuck opening/closing.
+            if (s_portBusy.TryGetValue(portName, out var busy))
+                return new ProbeResult(ProbeOutcome.Skipped, detail: $"own {busy.What} still blocked");
 
             // A prior probe on this port hung in Open() and was abandoned (see
             // _probeInFlight docs). Its SerialPort still owns the OS handle, so
