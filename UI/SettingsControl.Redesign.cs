@@ -611,8 +611,8 @@ namespace MozaPlugin.UI
             // Ceiling is the base's RATED torque, so the trace shows real
             // headroom instead of being restretched every time a new peak
             // arrives. Auto-scale (floored) only when the rating isn't
-            // established — see BaseModelInfo.RatedNm.
-            double rated = Devices.BaseModelInfo.RatedNm(_data.BaseModelName);
+            // established — see MozaData.BaseRatedNm.
+            double rated = _data.BaseRatedNm;
             double scale = rated > 0
                 ? rated
                 : Math.Max(TorqueScaleFloorNm, Math.Ceiling(hist.PeakNm));

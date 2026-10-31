@@ -581,6 +581,34 @@ namespace MozaPlugin
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
 
+        // Minimum base firmware carrying the torque-boost flag (register 0x39).
+        public const int BaseFwTorqueBoostMin = (1 << 24) | (2 << 16) | (12 << 8) | 4; // 1.2.12.4
+
+        /// <summary>True when this base has the torque-boost flag: an R16/R21/R25
+        /// Ultra on firmware >= 1.2.12.4. Gates the 0x39 poll.</summary>
+        public bool BaseSupportsTorqueBoost =>
+            BaseFwVersion >= BaseFwTorqueBoostMin
+            && Devices.BaseModelInfo.HasTorqueBoost(BaseModelName,
+                Devices.BaseModelInfo.ExtractHardwareCode(BaseSwVersion, BaseHwVersion));
+
+        // Torque-boost flag read back from the base: -1 = not read yet,
+        // 0 = stock, 1 = unlocked.
+        public const int TorqueBoostUnread = -1;
+        public volatile int BaseTorqueBoost = TorqueBoostUnread;
+
+        public bool BaseTorqueBoosted => BaseTorqueBoost == 1 && BaseSupportsTorqueBoost;
+
+        /// <summary>The base's peak torque in Nm, including the torque boost once
+        /// the base reports it unlocked; 0 when the model isn't established.</summary>
+        public double BaseRatedNm
+        {
+            get
+            {
+                double rated = Devices.BaseModelInfo.RatedNm(BaseModelName);
+                return rated > 0 && BaseTorqueBoosted ? rated + Devices.BaseModelInfo.TorqueBoostNm : rated;
+            }
+        }
+
         /// <summary>Packed <see cref="BaseFwVersion"/> as PitHouse displays it
         /// (major.minor.patch.build), or "unknown" when no probe has answered.</summary>
         public string BaseFwVersionText
@@ -899,6 +927,7 @@ namespace MozaPlugin
                 // State
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
+                case "base-torque-boost":   BaseTorqueBoost = value; break;
 
                 // Core settings
                 case "base-limit":          Limit = value; BaseSettingsRead = true; break;
@@ -1485,6 +1514,7 @@ namespace MozaPlugin
             BaseHwSubVersion = "";
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
+            BaseTorqueBoost = TorqueBoostUnread;
             // BaseFwVersion is intentionally NOT cleared — see its field comment.
             // It is static-backed and survives resets so the LFE card doesn't blink
             // out; the prober overwrites it on the next base detect.

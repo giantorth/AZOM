@@ -287,6 +287,33 @@ namespace MozaPlugin
                     "10-band EQ stay disabled (needs >= 1.2.10.10)");
         }
 
+        private int _lastLoggedTorqueBoost = MozaData.TorqueBoostUnread;
+
+        /// <summary>
+        /// Re-read the torque-boost flag every tick on a base that carries it, so an
+        /// unlock done in PitHouse mid-session reaches the rated torque without a
+        /// restart. PitHouse polls the same register every 4–30 s.
+        /// </summary>
+        private void TickTorqueBoostPoll()
+        {
+            if (!DetectionState.BaseDetected) return;
+            var data = _data;
+            if (data == null || !data.BaseSupportsTorqueBoost) return;
+            var owner = DetectionState.BaseOwner ?? _deviceManager;
+            if (owner == null || !owner.IsConnected) return;
+
+            int boost = data.BaseTorqueBoost;
+            if (boost != _lastLoggedTorqueBoost && boost != MozaData.TorqueBoostUnread)
+            {
+                _lastLoggedTorqueBoost = boost;
+                MozaLog.Info($"[AZOM] Base torque boost: {(boost == 1 ? "unlocked" : "stock")} " +
+                    $"(rated {data.BaseRatedNm:0.#} Nm)");
+            }
+
+            // Untracked: the next tick re-asks.
+            owner.ReadSettingUntracked("base-torque-boost");
+        }
+
         // Same budget as the base: ~25 s past wheel detect, one frame per round.
         private const int WheelFwVersionProbeRetryLimit = 5;
 
@@ -375,6 +402,7 @@ namespace MozaPlugin
 
             TickBaseFwVersionRetry();
             TickWheelFwVersionRetry();
+            TickTorqueBoostPoll();
 
             // CM2 / dashboard-pipeline reconcile runs REGARDLESS of the wheelbase
             // connection. DECOUPLED: a standalone-USB CM2 is driven by the dedicated

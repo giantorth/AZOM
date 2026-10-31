@@ -10,6 +10,7 @@ All notable changes to the AZOM plugin are documented here.
 - **`AZOM.ProfileName` and `AZOM.DashboardName` properties** show the active profile and the dashboard on screen.
 - **Dashboard page shows a preview of the selected dashboard,** requires Dashboard Studio.
 - **S12 pedal haptics can run as one SimHub device** with a channel per pedal; toggle in Options, existing per-pedal devices are kept.
+- **Torque graph and `AZOM.TorqueLimit` include the +2 Nm Ultra torque boost** once it's unlocked in Pit House (R16/R21/R25 Ultra, fw 1.2.12.4+).
 
 ## Fixed
 

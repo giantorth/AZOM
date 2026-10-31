@@ -21,6 +21,22 @@ namespace MozaPlugin.UI
         public static string Redact(string s) => MozaLog.RedactId(s);
         public static string RedactBytes(byte[] b) => MozaLog.RedactBytesHex(b);
         public static string Hex(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b);
+
+        private static string TorqueBoostText(MozaData d)
+        {
+            if (!Devices.BaseModelInfo.HasTorqueBoost(d.BaseModelName,
+                    Devices.BaseModelInfo.ExtractHardwareCode(d.BaseSwVersion, d.BaseHwVersion)))
+                return "n/a (model)";
+            if (!d.BaseSupportsTorqueBoost)
+                return "n/a (needs >= 1.2.12.4)";
+            switch (d.BaseTorqueBoost)
+            {
+                case MozaData.TorqueBoostUnread: return "unread";
+                case 1: return "unlocked";
+                case 0: return "stock";
+                default: return $"raw {d.BaseTorqueBoost}";
+            }
+        }
         public static string JoinList(IReadOnlyList<string> l)
             => l == null || l.Count == 0 ? "(empty)" : string.Join(", ", l);
         public static string TruncateId(string id)
@@ -732,6 +748,7 @@ namespace MozaPlugin.UI
 
             sb.AppendLine($"LFE support:    {(d.BaseSupportsLfe ? "yes" : "no")}  (needs >= 1.2.10.10)");
             sb.AppendLine($"EQ bands:       {(d.BaseSupportsEq10 ? 10 : 6)}  (same firmware gate as LFE)");
+            sb.AppendLine($"Torque boost:   {TorqueBoostText(d)}  rated {d.BaseRatedNm:0.#} Nm");
 
             if (plugin != null)
             {

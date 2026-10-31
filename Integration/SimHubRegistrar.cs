@@ -47,12 +47,12 @@ namespace MozaPlugin.Integration
             // Peak |torque| this game session — cleared on each game start by
             // MozaPlugin.DataUpdate, and by the plugin reload a game switch causes.
             _plugin.AttachDelegate("AZOM.MaxTorque", () => _plugin.Data?.LiveTorquePeakNm ?? 0.0);
-            // The base model's rated peak, the figure the Base-tab graph scales to.
-            // -1 = not established (an unrecognised model). Distinct from
-            // AZOM.Torque, which is the user's own output limit as a percentage.
+            // The base's rated peak (torque boost included), the figure the Base-tab
+            // graph scales to. -1 = not established (an unrecognised model). Distinct
+            // from AZOM.Torque, which is the user's own output limit as a percentage.
             _plugin.AttachDelegate("AZOM.TorqueLimit", () =>
             {
-                double rated = BaseModelInfo.RatedNm(_plugin.Data?.BaseModelName);
+                double rated = _plugin.Data?.BaseRatedNm ?? 0;
                 return rated > 0 ? rated : -1.0;
             });
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);

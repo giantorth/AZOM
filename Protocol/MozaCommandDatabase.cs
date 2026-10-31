@@ -66,6 +66,9 @@ namespace MozaPlugin.Protocol
             // Wheel uses persisted base-gearshift-vibration intensity; no echo on 0xAD.
             AddCommand("base-gearshift-event",    "base", 0xFF, 45, new byte[] { 0x76 }, 2, "int");
             AddCommand("base-ffb-disable",        "base", 40, 41, new byte[] { 254 },    2, "int");
+            // cmd 0x39 Ultra-base +2 Nm torque boost (fw >= 1.2.12.4): 0 = stock,
+            // 1 = unlocked. Read-only here.
+            AddCommand("base-torque-boost",       "base", 40, 0xFF, new byte[] { 0x39 }, 2, "int");
 
             // FFB curve (read group 40, write group 41)
             AddCommand("base-ffb-curve-x1", "base", 40, 41, new byte[] { 34, 1 }, 1, "int");
