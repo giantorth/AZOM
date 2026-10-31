@@ -323,6 +323,10 @@ namespace MozaPlugin.Devices
         // only enumerates peripherals and must not touch the primary sender's
         // heartbeat mask.
         private readonly bool _drivesTelemetry;
+        // Set once this instance has issued the wheel's detect-time read cascade.
+        // Per instance like MozaData, so a persistent-wire reload starts it false
+        // while LastKnownWheelModel rides the bag — see RereadWheelAfterReload.
+        private bool _wheelReadsIssued;
 
         public DeviceProber(
             MozaPlugin plugin,
@@ -662,6 +666,48 @@ namespace MozaPlugin.Devices
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Wheel counterpart of the base reload repair in DetectDevices. A reload
+        /// restores LastKnownWheelModel, so the first-sight cascade never runs on the
+        /// fresh MozaData and wheel identity, input modes and LED/knob state stay
+        /// blank — e.g. per-knob selectors fall back to legacy All Rotaries (142QVFB4).
+        /// Deferred during a param storm; the model-name recheck that triggers it is
+        /// suspended then too.
+        /// </summary>
+        private void RereadWheelAfterReload(byte deviceId, bool oldProtocol)
+        {
+            if (!_drivesTelemetry || _wheelReadsIssued) return;
+            if (_plugin.FirmwareDebugLogForDiagnostics.ParamStormActive) return;
+            _wheelReadsIssued = true;
+
+            _deviceManager.ReadSetting("wheel-sw-version");
+            _deviceManager.ReadSetting("wheel-hw-version");
+            if (oldProtocol)
+            {
+                _deviceManager.ReadSetting("wheel-serial-a");
+                _deviceManager.ReadSetting("wheel-serial-b");
+                _deviceManager.ReadSetting("es-wheel-hw-version");
+                _deviceManager.ReadSetting("es-wheel-sw-version");
+                _deviceManager.ReadSetting("es-wheel-mcu-uid");
+                _deviceManager.SendPithouseIdentityProbe(deviceId);
+                _deviceManager.ReadSettingsPaced(OldWheelSettingsReadCommands);
+            }
+            else
+            {
+                bool fsr1 = _plugin.IsFsr1DisplayWheel;
+                if (!fsr1)
+                {
+                    _deviceManager.ReadSetting("wheel-serial-a");
+                    _deviceManager.ReadSetting("wheel-serial-b");
+                    _deviceManager.SendPithouseIdentityProbe(deviceId);
+                }
+                _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
+                _deviceManager.ReadSettingsPaced(
+                    BuildNewWheelLedReadCommands(_plugin.WheelModelInfo, fsr1));
+            }
+            MozaLog.Debug("[AZOM] Wheel rode a persistent-wire reload — re-reading identity, settings and LED state");
         }
 
         /// <summary>
@@ -1050,6 +1096,7 @@ namespace MozaPlugin.Devices
                         // First-sight: resolve LED layout and deploy device defs.
                         if (string.IsNullOrEmpty(_detectionState.LastKnownWheelModel))
                         {
+                            _wheelReadsIssued = true;
                             _detectionState.LastKnownWheelModel = currentModel;
                             _plugin.WheelModelInfo = WheelModelInfo.FromModelName(currentModel);
                             var info = _plugin.WheelModelInfo;
@@ -1134,6 +1181,10 @@ namespace MozaPlugin.Devices
                             // ShouldDriveDashboard now has real input — make the keep/skip decision.
                             _plugin.StartTelemetryIfReady();
                         }
+                        else
+                        {
+                            RereadWheelAfterReload(deviceId, oldProtocol: false);
+                        }
                     }
                     else
                     {
@@ -1173,6 +1224,7 @@ namespace MozaPlugin.Devices
                             break;
                         if (string.IsNullOrEmpty(_detectionState.LastKnownWheelModel))
                         {
+                            _wheelReadsIssued = true;
                             _detectionState.LastKnownWheelModel = esModel;
                             _plugin.WheelModelInfo = WheelModelInfo.FromModelName(esModel);
                             var info = _plugin.WheelModelInfo;
@@ -1187,6 +1239,10 @@ namespace MozaPlugin.Devices
                             var prof = _plugin.Settings?.ProfileStore?.CurrentProfile;
                             if (prof != null)
                                 _plugin.ApplyProfileOnConnect(prof);
+                        }
+                        else
+                        {
+                            RereadWheelAfterReload(_deviceManager.WheelDeviceId, oldProtocol: true);
                         }
                     }
                     break;
