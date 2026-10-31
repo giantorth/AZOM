@@ -144,7 +144,9 @@ namespace MozaPlugin.Telemetry
                 // value and the wheel binds then. Gating logic for first
                 // emission (END handshake + fallback) and pacing for
                 // subsequent emissions both live in the helper.
-                if (!_hotSwitch.ShouldEmitThisTick(act, _catalogParser.LastWheelEndMarkerTickMs))
+                bool endUnsettled = _hotSwitch.LastEmissionTickMs == 0
+                    && _catalogParser.HasUnsettledEndSince(_hotSwitch.ArmTickMs);
+                if (!_hotSwitch.ShouldEmitThisTick(act, _catalogParser.LastWheelEndMarkerTickMs, endUnsettled))
                     return;
 
                 int now = Environment.TickCount;
@@ -157,7 +159,8 @@ namespace MozaPlugin.Telemetry
                     $"#{emissionIdx}, cap {Lifecycle.HotSwitchCoordinator.MinEmissions}-" +
                     $"{Lifecycle.HotSwitchCoordinator.MaxEmissions}): " +
                     $"catalog {prev}→{cur}, wheel END={_catalogParser.LastWheelEndMarker}, " +
-                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _hotSwitch.LastEmissionTickMs)}ms");
+                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _hotSwitch.LastEmissionTickMs)}ms" +
+                    (endUnsettled ? " (END still unsettled — cap reached)" : ""));
                 try
                 {
                     ApplySubscription(force: true);

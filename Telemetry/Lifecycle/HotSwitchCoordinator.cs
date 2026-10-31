@@ -60,6 +60,12 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// signal).</summary>
         public const int FirstEmissionQuietMs = 200;
 
+        /// <summary>Cap on the first-emission wait while the wheel's post-arm
+        /// END is still unsettled (not yet re-asserted by its ~1 Hz END tick).
+        /// Settling lands ~2.5 s after arm on a CM2 switch (bundle DJQ23F6D), so
+        /// this sits above that; it bounds a firmware that never re-asserts.</summary>
+        public const int FirstEmissionUnsettledCapMs = 4000;
+
         // ── State ─────────────────────────────────────────────────────────
         // Pending count is the residual emission budget. Arm sets it to
         // MaxEmissions; the adaptive logic in MarkEmission clamps to MinEmissions
@@ -145,13 +151,16 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// <paramref name="catalogLastActivityTickMs"/> from
         /// <c>LastActivityMs</c> (0 = never), and
         /// <paramref name="catalogWheelEndMarkerTickMs"/> from
-        /// <c>LastWheelEndMarkerTickMs</c> (0 = never).
+        /// <c>LastWheelEndMarkerTickMs</c> (0 = never), and
+        /// <paramref name="catalogEndUnsettledSinceArm"/> from
+        /// <c>HasUnsettledEndSince(ArmTickMs)</c>.
         ///
         /// Returns true ONLY when the caller should call
         /// <see cref="MarkEmission"/> after a successful emit. False
         /// covers all "wait more" cases.</summary>
         public bool ShouldEmitThisTick(int catalogLastActivityTickMs,
-                                       int catalogWheelEndMarkerTickMs)
+                                       int catalogWheelEndMarkerTickMs,
+                                       bool catalogEndUnsettledSinceArm)
         {
             if (Volatile.Read(ref _pendingReemit) == 0) return false;
 
@@ -160,12 +169,21 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
             if (isFirstEmission)
             {
-                // Hard cap fallback: regardless of state, we never wait
-                // longer than this. Covers wheels that skip the post-switch
+                int sinceArm = now - _armTickMs;
+
+                // The wheel's END is a ~1 Hz tick carrying its running record
+                // count, so an END that advanced since arm may have landed
+                // mid-announcement. Echoing it shapes the tier-def for a
+                // partial generation (bundle DJQ23F6D: emission #1 echoed
+                // END=179 after 2 of 54 records; only those 2 channels ever
+                // displayed). Hold until the wheel re-asserts its END.
+                if (catalogEndUnsettledSinceArm)
+                    return sinceArm >= FirstEmissionUnsettledCapMs;
+
+                // Hard cap fallback: covers wheels that skip the post-switch
                 // catalog push entirely (e.g., switching to a slot the
                 // wheel was already on) or stay quiet because their
                 // catalog is already consistent with what the host had.
-                int sinceArm = now - _armTickMs;
                 if (sinceArm >= FirstEmissionFallbackMs) return true;
 
                 // END-advance gate: the wheel's END marker u32 must have

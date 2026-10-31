@@ -52,6 +52,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Dash flag-brightness slider no longer writes flash on every tick.**
 - **CM1 dashboard list scrolls again** instead of jumping back every half second.
 - **AB9 and display-brightness button actions stop resending at their limits.**
+- **CM2 dashboard switches no longer leave most values blank,** and the new dashboard's channels arrive ~5 s sooner.
 - **RSF steering-lock writes work right after a plugin reload.**
 - **PitHouse import applies values whose rounded display matches,** e.g. FFB 75.5% vs 75%.
 - **Base ambient LED settings are only re-sent when changed.**

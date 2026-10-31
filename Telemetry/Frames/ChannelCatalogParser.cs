@@ -163,6 +163,16 @@ namespace MozaPlugin.Telemetry.Frames
         // only populated when that session's buffer contains a valid
         // tag-0x06 size-4 END record. Guarded by _bufferLock.
         private readonly Dictionary<byte, uint> _endMarkerBySession = new();
+        // END settle tracking, per session. The END marker is a ~1 Hz tick that
+        // carries the wheel's cumulative catalog record count, so a tick can land
+        // mid-announcement (bundle DJQ23F6D: b19 b22 END=179, then 25 back-refs +
+        // 27 URLs, END=231). The announcement is finished once a tick re-asserts the
+        // same value with no records since. Guarded by _bufferLock.
+        private readonly Dictionary<byte, int> _endChangedTickBySession = new();
+        private readonly Dictionary<byte, uint> _settledEndBySession = new();
+        // END value each session buffer was last trimmed through: the walk's
+        // "previous END" for the bytes that remain.
+        private readonly Dictionary<byte, uint> _trimmedEndBySession = new();
         // Sessions that have ever produced ≥1 valid URL/back-ref catalog record
         // in TryParse. Used by HasRealCatalogOnSession to distinguish a session
         // carrying the wheel's real channel catalog from a degenerate one (the
@@ -263,6 +273,25 @@ namespace MozaPlugin.Telemetry.Frames
         {
             lock (_bufferLock)
                 return _endMarkerBySession.TryGetValue(session, out var v) ? v : 0u;
+        }
+
+        /// <summary>True while some session's END marker has changed since
+        /// <paramref name="sinceTickMs"/> and the wheel has not yet re-asserted it —
+        /// the latest END is a running count inside an announcement that is still
+        /// arriving, not a finished generation.</summary>
+        public bool HasUnsettledEndSince(int sinceTickMs)
+        {
+            lock (_bufferLock)
+            {
+                foreach (var kv in _endChangedTickBySession)
+                {
+                    if (kv.Value - sinceTickMs <= 0) continue;
+                    if (!_endMarkerBySession.TryGetValue(kv.Key, out var cur)) continue;
+                    if (!_settledEndBySession.TryGetValue(kv.Key, out var settled) || settled != cur)
+                        return true;
+                }
+                return false;
+            }
         }
 
         /// <summary>True once <paramref name="session"/> has carried BOTH ≥1
@@ -538,7 +567,12 @@ namespace MozaPlugin.Telemetry.Frames
                     sessionEnd = scanFinalEnd;
                 }
                 if (foundEndThisSession)
+                {
+                    if (!_endMarkerBySession.TryGetValue(session, out var priorSessionEnd)
+                        || priorSessionEnd != sessionEnd)
+                        _endChangedTickBySession[session] = Environment.TickCount;
                     _endMarkerBySession[session] = sessionEnd;
+                }
                 if (scanFinalEnd != _lastWheelEndMarker)
                 {
                     _lastWheelEndMarker = scanFinalEnd;
@@ -628,6 +662,7 @@ namespace MozaPlugin.Telemetry.Frames
             _headBlockedSinceTickMs.Remove(session);
             _lastAppendTickMs.Remove(session);
             _lastProgressTickMs.Remove(session);
+            _trimmedEndBySession.Remove(session);
             _lastParseLen = 0;
         }
 
@@ -693,6 +728,9 @@ namespace MozaPlugin.Telemetry.Frames
                     _lastAppendTickMs.Clear();
                     _lastProgressTickMs.Clear();
                     _endMarkerBySession.Clear();
+                    _endChangedTickBySession.Clear();
+                    _settledEndBySession.Clear();
+                    _trimmedEndBySession.Clear();
                     _sessionsWithValidUrls.Clear();
                 }
                 _lastParseLen = 0;
@@ -738,6 +776,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
                     _lastProgressTickMs.Remove(sess);
+                    _trimmedEndBySession.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[AZOM] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -788,6 +827,7 @@ namespace MozaPlugin.Telemetry.Frames
                     // and overwriting `trimTo` means the last match wins,
                     // matching the "latest committed END" requirement.
                     int trimTo = 0;
+                    uint trimEnd = 0;
                     int n = buf.Count;
                     for (int i = 0; i + 8 < n; i++)
                     {
@@ -801,10 +841,16 @@ namespace MozaPlugin.Telemetry.Frames
                             | (buf[i + 7] << 16)
                             | (buf[i + 8] << 24));
                         if (_committedMarkers.Contains(val))
+                        {
                             trimTo = i + 9; // byte immediately past this END
+                            trimEnd = val;
+                        }
                     }
                     if (trimTo > 0)
+                    {
                         buf.RemoveRange(0, trimTo);
+                        _trimmedEndBySession[sess] = trimEnd;
+                    }
                     newTotal += buf.Count;
                 }
                 // Re-stamp _lastParseLen so the "buffer grew since last
@@ -880,7 +926,7 @@ namespace MozaPlugin.Telemetry.Frames
             // Snapshot all session buffers under lock, in arrival order, then
             // release the lock before parsing (parsing is purely CPU work on
             // the snapshots and shouldn't block appends).
-            List<(byte session, byte[] bytes)> snapshots;
+            List<(byte session, byte[] bytes, uint prevEnd)> snapshots;
             int totalBytes;
             lock (_bufferLock)
             {
@@ -888,12 +934,13 @@ namespace MozaPlugin.Telemetry.Frames
                 // Give up on any hole that never filled before snapshotting, so a
                 // single lost chunk cannot wedge a session's reassembly forever.
                 EscapePendingStallLocked();
-                snapshots = new List<(byte, byte[])>(_sessionOrder.Count);
+                snapshots = new List<(byte, byte[], uint)>(_sessionOrder.Count);
                 totalBytes = 0;
                 foreach (var s in _sessionOrder)
                 {
                     if (!_buffersBySession.TryGetValue(s, out var buf) || buf.Count == 0) continue;
-                    snapshots.Add((s, buf.ToArray()));
+                    snapshots.Add((s, buf.ToArray(),
+                        _trimmedEndBySession.TryGetValue(s, out var te) ? te : 0u));
                     totalBytes += buf.Count;
                 }
             }
@@ -926,7 +973,7 @@ namespace MozaPlugin.Telemetry.Frames
             int totalSizeReject = 0, totalPlausReject = 0;
             var existingCatalog = _catalog;
 
-            foreach (var (session, buffer) in snapshots)
+            foreach (var (session, buffer, trimmedEnd) in snapshots)
             {
                 // Pre-scan: any tag=0x04 URL records OR tag=0x06 END markers
                 // present? Skip the (expensive) parse + diag logging when the
@@ -1209,6 +1256,11 @@ namespace MozaPlugin.Telemetry.Frames
                     _pendingIdxs.Clear();
                 }
 
+                // Settle detection: an END that repeats the previous END's value
+                // with no records in between means the announcement is finished.
+                uint prevEnd = trimmedEnd;
+                int recordsSinceEnd = 0;
+                uint settledEnd = 0;
                 int i = 0;
                 while (i + 6 < buffer.Length)
                 {
@@ -1228,6 +1280,10 @@ namespace MozaPlugin.Telemetry.Frames
                                 | (buffer[i + 6] << 8)
                                 | (buffer[i + 7] << 16)
                                 | (buffer[i + 8] << 24));
+                            if (recordsSinceEnd == 0 && markerValue == prevEnd && markerValue != 0)
+                                settledEnd = markerValue;
+                            prevEnd = markerValue;
+                            recordsSinceEnd = 0;
                             CommitLiveSet(markerValue);
                             i += 9;
                             continue;
@@ -1241,6 +1297,7 @@ namespace MozaPlugin.Telemetry.Frames
                         sSizeReject++;
                         i++; continue;
                     }
+                    recordsSinceEnd++;
                     int idx = buffer[i + 5];  // wheel-firmware-canonical idx (1-based)
                     int urlLen = (int)param - 1;
                     int urlStart = i + 6;
@@ -1458,6 +1515,17 @@ namespace MozaPlugin.Telemetry.Frames
                     i += 5 + (int)param;
                 }
 
+                if (settledEnd != 0)
+                {
+                    lock (_bufferLock)
+                    {
+                        if (!_settledEndBySession.TryGetValue(session, out var priorSettled)
+                            || priorSettled != settledEnd)
+                            MozaLog.Debug($"[AZOM] Catalog END settled sess=0x{session:X2} end={settledEnd}");
+                        _settledEndBySession[session] = settledEnd;
+                    }
+                }
+
                 int distinctIdxAfter = parsed.Count;
                 perSessionStats.Add((session, sFull, sPrefix, sAbbr, sBackref,
                     sBackrefFail, sSizeReject, sPlausReject,
@@ -1556,6 +1624,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
                     _lastProgressTickMs.Remove(sess);
+                    _trimmedEndBySession.Remove(sess);
                     MozaLog.Debug(
                         $"[AZOM] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
                         $"({wiped}B, no valid records for {ageMs / 1000}s, last append " +

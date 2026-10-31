@@ -400,9 +400,12 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // Channel catalog buffering. V0 URL-subscription firmware (CSP post-
             // 2026-04) sends URL entries on 0x01; V2-compact uses 0x02. Listen
             // on both during preamble. CRC validation prevents corrupted chunks
-            // from mangling diagnostic catalog URLs.
+            // from mangling diagnostic catalog URLs. Empty keepalive chunks
+            // (CRC only) must reach the parser: they consume a seq, and skipping
+            // them parks the next catalog burst behind a hole until the 5 s
+            // stall escape (bundle DJQ23F6D).
             bool isCatalogSession = session == _sender.FlagByte || session == 0x01;
-            if (isCatalogSession && data.Length > 12 && chunkPayload.Length >= 4)
+            if (isCatalogSession && chunkPayload.Length >= 4)
             {
                 int netLen = chunkPayload.Length - 4;
                 if (ChunkCrcOk())
