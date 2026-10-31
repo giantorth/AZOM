@@ -468,6 +468,24 @@ namespace MozaPlugin.Protocol
         private static readonly object s_walkLock = new object();
         private static long s_walkTimestamp;                       // 0 = uninitialised
         private static List<PortInfo> s_walkCache = new List<PortInfo>();
+        private static IReadOnlyList<string> s_walkLiveCom = Array.Empty<string>();
+        private static IReadOnlyList<string> s_walkSkippedMoza = Array.Empty<string>();
+
+        /// <summary>OS COM port list (<see cref="SerialPort.GetPortNames"/>) from the last registry walk.</summary>
+        public static IReadOnlyList<string> LastLiveComPorts
+        {
+            get { lock (s_walkLock) return s_walkLiveCom; }
+        }
+
+        /// <summary>
+        /// MOZA-VID registry entries the last walk did not list as a port, each
+        /// with the reason: a serial interface on another driver, a usbser entry
+        /// without a PortName, or a PortName the OS isn't currently mounting.
+        /// </summary>
+        public static IReadOnlyList<string> LastSkippedMozaEntries
+        {
+            get { lock (s_walkLock) return s_walkSkippedMoza; }
+        }
 
         private static List<PortInfo> WalkUsbSerialPortsCached()
         {
@@ -477,12 +495,19 @@ namespace MozaPlugin.Protocol
                 if (s_walkTimestamp != 0 && (now - s_walkTimestamp) < CacheTtlTicks)
                     return s_walkCache;
             }
-            var fresh = WalkUsbSerialPorts();
+            var fresh = WalkUsbSerialPorts(out var liveCom, out var skipped);
             lock (s_walkLock)
             {
                 s_walkCache = fresh;
+                s_walkLiveCom = liveCom;
+                s_walkSkippedMoza = skipped;
                 s_walkTimestamp = Stopwatch.GetTimestamp();
             }
+            MozaLog.DebugIfChanged("registry-walk",
+                $"[AZOM] Registry walk: OS COM ports [{string.Join(", ", liveCom)}]; " +
+                (skipped.Count == 0
+                    ? "no skipped MOZA entries"
+                    : $"skipped MOZA entries: {string.Join("; ", skipped)}"));
             return fresh;
         }
 
@@ -493,21 +518,28 @@ namespace MozaPlugin.Protocol
         /// <see cref="ForeignPortVids"/> takes everything else. Go through
         /// <see cref="WalkUsbSerialPortsCached"/> rather than calling this directly.
         /// </summary>
-        private static List<PortInfo> WalkUsbSerialPorts()
+        private static List<PortInfo> WalkUsbSerialPorts(out IReadOnlyList<string> liveComList,
+                                                         out IReadOnlyList<string> skippedMoza)
         {
             // Live COM port set — drops ghost registry entries left by previous
             // USB-port attachments. SerialPort.GetPortNames reads the same
             // SERIALCOMM table the kernel populates with currently-mounted ports.
             HashSet<string> liveCom;
+            string[] osPorts;
             try
             {
-                liveCom = new HashSet<string>(SerialPort.GetPortNames(), StringComparer.OrdinalIgnoreCase);
+                osPorts = SerialPort.GetPortNames();
             }
             catch (Exception ex)
             {
                 MozaLog.Debug($"[AZOM] SerialPort.GetPortNames failed: {ex.GetType().Name}: {ex.Message}");
-                liveCom = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                osPorts = Array.Empty<string>();
             }
+            liveCom = new HashSet<string>(osPorts, StringComparer.OrdinalIgnoreCase);
+            Array.Sort(osPorts, StringComparer.OrdinalIgnoreCase);
+            liveComList = osPorts;
+            var skipped = new List<string>();
+            skippedMoza = skipped;
 
             var results = new List<PortInfo>();
             try
@@ -536,19 +568,37 @@ namespace MozaPlugin.Protocol
                         // against future MOZA devices that bind a different
                         // service (WinUSB, custom driver) and shouldn't be
                         // treated as a serial pipe.
+                        bool isMoza = vid == MozaVid;
                         var service = instanceKey.GetValue("Service") as string;
-                        if (!string.Equals(service, "usbser", StringComparison.OrdinalIgnoreCase))
-                            continue;
+                        bool usbser = string.Equals(service, "usbser", StringComparison.OrdinalIgnoreCase);
+                        if (!usbser && !isMoza) continue;
 
                         using var paramsKey = instanceKey.OpenSubKey("Device Parameters", writable: false);
-                        if (paramsKey == null) continue;
+                        var portName = paramsKey?.GetValue("PortName") as string;
+                        string entry = $@"{deviceKeyName}\{instanceName}";
 
-                        var portName = paramsKey.GetValue("PortName") as string;
-                        if (string.IsNullOrEmpty(portName)) continue;
+                        if (!usbser)
+                        {
+                            // HID and composite-parent interfaces land here too;
+                            // only one carrying a COM name is a serial interface
+                            // that moved to another driver.
+                            if (!string.IsNullOrEmpty(portName))
+                                skipped.Add($"{entry}: {portName} on driver '{service ?? "(none)"}', not usbser");
+                            continue;
+                        }
+                        if (string.IsNullOrEmpty(portName))
+                        {
+                            if (isMoza) skipped.Add($"{entry}: usbser without a PortName");
+                            continue;
+                        }
 
                         // Filter ghosts: PortName is in the registry but the
                         // COM is not currently mounted.
-                        if (!liveCom.Contains(portName!)) continue;
+                        if (!liveCom.Contains(portName!))
+                        {
+                            if (isMoza) skipped.Add($"{entry}: {portName} not in the OS COM port list");
+                            continue;
+                        }
 
                         var friendly = (instanceKey.GetValue("FriendlyName") as string) ?? string.Empty;
                         // ContainerID groups all interfaces of one physical device;

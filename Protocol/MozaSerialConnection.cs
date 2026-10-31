@@ -713,12 +713,12 @@ namespace MozaPlugin.Protocol
             }
         }
 
-        private void RecordOpenFailure(string portName, ConnectionFailureKind kind, Exception ex)
+        private void RecordOpenFailure(string portName, ConnectionFailureKind kind, Exception ex, bool fromProbe = false)
         {
             Interlocked.Increment(ref _consecutiveOpenFailures);
             lock (_failureLock)
             {
-                _lastFailure = new ConnectionFailureInfo(kind, portName, ex.Message, DateTime.UtcNow);
+                _lastFailure = new ConnectionFailureInfo(kind, portName, ex.Message, DateTime.UtcNow, fromProbe);
             }
         }
 
@@ -856,9 +856,22 @@ namespace MozaPlugin.Protocol
                 // it — FindMozaPort's probe revalidates it first.
             }
 
+            var sweep = new ProbeSweep();
             var (portName, pid, viaHubProbe, devicePath) = FindMozaPort(
                 _pidFilter, _probeTarget, preferredPort, _disableProbeFallback,
-                CaptureLabel, () => _shutdownRequested);
+                CaptureLabel, sweep, () => _shutdownRequested);
+
+            // The saved port is the one MOZA port enumeration couldn't see, so a
+            // probe that can't open it is the open failure Diagnostics and the
+            // port-in-use banner need. Any other result this sweep (opened, or
+            // not probed because it left the port list) retires the old one; a
+            // backoff skip says nothing new.
+            var saved = sweep.SavedPortProbe;
+            if (saved?.Outcome == ProbeOutcome.OpenFailed && preferredPort != null)
+                RecordOpenFailure(preferredPort, ClassifyOpenFailure(saved.Value.Error!), saved.Value.Error!, fromProbe: true);
+            else if (saved?.Outcome != ProbeOutcome.Skipped && LastFailure.FromProbe)
+                ResetFailureState();
+
             if (portName == null)
                 return false;
 
@@ -923,36 +936,23 @@ namespace MozaPlugin.Protocol
                 _lastComName = com;
                 return opened;
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
-                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
-                return false;
-            }
-            catch (IOException ex) when (LooksLikeAccessDenied(ex))
-            {
-                RecordOpenFailure(portName, ConnectionFailureKind.AccessDenied, ex);
-                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
-                return false;
-            }
-            catch (FileNotFoundException ex)
-            {
-                RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
-                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
-                return false;
-            }
-            catch (IOException ex) when (LooksLikePortVanished(ex))
-            {
-                RecordOpenFailure(portName, ConnectionFailureKind.PortVanished, ex);
-                MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
-                return false;
-            }
             catch (Exception ex)
             {
-                RecordOpenFailure(portName, ConnectionFailureKind.OpenFailedOther, ex);
+                RecordOpenFailure(portName, ClassifyOpenFailure(ex), ex);
                 MozaLog.Error($"[AZOM] Failed to connect to {portName}: {ex.Message}");
                 return false;
             }
+        }
+
+        // Order matters: FileNotFoundException is an IOException, and an
+        // access-denied message wins over it.
+        private static ConnectionFailureKind ClassifyOpenFailure(Exception ex)
+        {
+            if (ex is UnauthorizedAccessException) return ConnectionFailureKind.AccessDenied;
+            if (ex is IOException && LooksLikeAccessDenied(ex)) return ConnectionFailureKind.AccessDenied;
+            if (ex is FileNotFoundException) return ConnectionFailureKind.PortVanished;
+            if (ex is IOException && LooksLikePortVanished(ex)) return ConnectionFailureKind.PortVanished;
+            return ConnectionFailureKind.OpenFailedOther;
         }
 
         // Shared commit path: wire an already-open port into the read/write loops.
@@ -2120,6 +2120,8 @@ namespace MozaPlugin.Protocol
         /// unclassified ports only, and only when enumeration can be incomplete
         /// (never under sysfs). Classified mismatches are skipped.
         /// <paramref name="preferredPort"/> tilts toward the saved port on multi-rig setups.
+        /// <paramref name="sweep"/> receives the first probe of <paramref name="preferredPort"/>
+        /// this sweep (left null when the probe never reached it).
         /// </summary>
         private static (string? PortName, string? Pid, bool ViaHubProbe, string? DevicePath) FindMozaPort(
             Func<string?, bool>? pidFilter,
@@ -2130,6 +2132,7 @@ namespace MozaPlugin.Protocol
             // lines below (every lane re-runs this on the 5 s reconnect tick) —
             // without a per-lane key one pipe's steady state would mask another's.
             string laneLabel,
+            ProbeSweep sweep,
             Func<bool>? cancel = null)
         {
             // Stage 1: registry walk. Take the full MOZA enumeration first
@@ -2315,6 +2318,18 @@ namespace MozaPlugin.Protocol
             // thread the probe so one bad port can't block all detection.
             var unreachable = new HashSet<string>();
 
+            // Every probe's outcome, for the not-found line at the end of each branch.
+            var probes = new List<string>();
+            ProbeResult Probe(string port, ProbeKind kind)
+            {
+                var r = ProbeWithTimeout(port, ProbeJoinTimeoutMs, kind);
+                probes.Add(DescribeProbe(port, kind, r));
+                if (sweep.SavedPortProbe == null
+                    && string.Equals(port, preferredPort, StringComparison.OrdinalIgnoreCase))
+                    sweep.SavedPortProbe = r;
+                return r;
+            }
+
             // Skip ports held by a sibling connection (Wine pty has no O_EXCL).
             bool IsHeldByPeer(string port) => _activePorts.ContainsKey(port);
 
@@ -2367,23 +2382,23 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    var (baseResp, baseReach) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Base);
-                    if (!baseReach) { unreachable.Add(port); continue; }
-                    if (baseResp)
+                    var baseProbe = Probe(port, ProbeKind.Base);
+                    if (!baseProbe.Reachable) { unreachable.Add(port); continue; }
+                    if (baseProbe.Responded)
                     {
                         MozaLog.Debug($"[AZOM] Probe {port} Ab9: base probe matched — wheelbase territory, skipping");
                         continue;
                     }
 
-                    var (ab9Resp, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Ab9);
-                    if (ab9Resp)
+                    if (Probe(port, ProbeKind.Ab9).Responded)
                     {
                         MozaLog.Info($"[AZOM] Found Moza AB9 shifter on {port} (probe)");
                         return (port, null, false, null);
                     }
                 }
 
-                MozaLog.DebugIfChanged($"ab9-probe:{laneLabel}", "[AZOM] No AB9 device found on any COM port");
+                MozaLog.DebugIfChanged($"ab9-probe:{laneLabel}",
+                    "[AZOM] No AB9 device found on any COM port" + ProbeSummary(probes));
                 return (null, null, false, null);
             }
 
@@ -2403,15 +2418,14 @@ namespace MozaPlugin.Protocol
                         continue;
                     }
 
-                    var (responded, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Hub);
-                    if (responded)
+                    if (Probe(port, ProbeKind.Hub).Responded)
                     {
                         MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe, dedicated hub connection)");
                         return (port, null, true, null);
                     }
                 }
 
-                MozaLog.Debug("[AZOM] No Moza hub found on any COM port (dedicated hub connection)");
+                MozaLog.Debug("[AZOM] No Moza hub found on any COM port (dedicated hub connection)" + ProbeSummary(probes));
                 return (null, null, false, null);
             }
 
@@ -2429,13 +2443,13 @@ namespace MozaPlugin.Protocol
                     continue;
                 }
 
-                var (responded, reachable) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Base);
-                if (responded)
+                var baseProbe = Probe(port, ProbeKind.Base);
+                if (baseProbe.Responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza base on {port} (probe)");
                     return (port, null, false, null);
                 }
-                if (!reachable) unreachable.Add(port);
+                if (!baseProbe.Reachable) unreachable.Add(port);
             }
 
             foreach (var port in ports)
@@ -2448,8 +2462,7 @@ namespace MozaPlugin.Protocol
                 // here is guaranteed mismatching — skip without re-logging.
                 if (registryByPort.ContainsKey(port)) continue;
 
-                var (responded, _) = ProbeWithTimeout(port, ProbeJoinTimeoutMs, ProbeKind.Hub);
-                if (responded)
+                if (Probe(port, ProbeKind.Hub).Responded)
                 {
                     MozaLog.Info($"[AZOM] Found Moza hub on {port} (probe)");
                     return (port, null, true, null);
@@ -2458,14 +2471,14 @@ namespace MozaPlugin.Protocol
 
             // Drop to Debug — reconnect timer fires every 5s, so Info-level
             // would flood the log when no device is plugged in.
-            MozaLog.Debug("[AZOM] No MOZA device found on any COM port");
+            MozaLog.Debug("[AZOM] No MOZA device found on any COM port" + ProbeSummary(probes));
             return (null, null, false, null);
         }
 
         // ProbeKind, the probe frames, and the open+probe core live in the
         // shared SerialProbeCore (Protocol/SerialProbeCore.cs).
 
-        private static (bool responded, bool reachable) ProbeWithTimeout(string portName, int timeoutMs, ProbeKind kind)
+        private static ProbeResult ProbeWithTimeout(string portName, int timeoutMs, ProbeKind kind)
         {
             // The open+probe runs on a throwaway background thread so a hung
             // SerialPort.Open() on a not-ready CDC-ACM port (Wine's freshly-
@@ -2480,7 +2493,7 @@ namespace MozaPlugin.Protocol
             // MozaLog.Debug lines below to one-per-step instead of twice-per-sweep.
             _probeBackoff.TryGetValue(portName, out var backoff);
             if (backoff != null && DateTime.UtcNow < backoff.NextEligibleUtc)
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.Skipped, detail: $"backoff after {backoff.Consecutive} blocked open(s)");
 
             // A prior probe on this port hung in Open() and was abandoned (see
             // _probeInFlight docs). Its SerialPort still owns the OS handle, so
@@ -2494,11 +2507,10 @@ namespace MozaPlugin.Protocol
                 // interval instead of relogging this on every sweep.
                 NoteProbeBlocked(portName, backoff,
                     "skipped — a prior probe is still blocked in Open() (port not ready)");
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.Skipped, detail: "prior probe still blocked in Open()");
             }
 
-            bool responded = false;
-            bool reachable = false;
+            var result = new ProbeResult(ProbeOutcome.Skipped, detail: "probe thread did not finish");
             _probeAbort.TryRemove(portName, out _);
             _probeInFlight[portName] = 1;
 
@@ -2511,11 +2523,11 @@ namespace MozaPlugin.Protocol
                     // Wine mid-Open). On the abandoned-timeout path the thread is
                     // simply left running; it self-cleans here when Open finally
                     // returns.
-                    (responded, reachable) = SerialProbeCore.ProbeOnePort(
+                    result = SerialProbeCore.ProbeOnePort(
                         portName, kind, m => MozaLog.Debug($"[AZOM] {m}"),
                         shouldAbort: () => _probeAbort.ContainsKey(portName));
                 }
-                catch { responded = false; reachable = false; }
+                catch (Exception ex) { result = new ProbeResult(ProbeOutcome.IoFailed, ex); }
                 finally
                 {
                     _probeAbort.TryRemove(portName, out _);
@@ -2535,7 +2547,7 @@ namespace MozaPlugin.Protocol
                 // forever (the marker would be a permanent in-flight tombstone).
                 _probeAbort.TryRemove(portName, out _);
                 _probeInFlight.TryRemove(portName, out _);
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.Skipped, detail: "probe thread failed to start");
             }
 
             if (!t.Join(timeoutMs))
@@ -2558,7 +2570,7 @@ namespace MozaPlugin.Protocol
                 NoteProbeBlocked(portName, backoff,
                     $"timed out after {timeoutMs}ms — abandoning blocked probe thread " +
                     "(not force-closing cross-thread; port marked in-flight)");
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.Blocked, detail: $"Open() blocked > {timeoutMs}ms");
             }
 
             // Open() returned inside the deadline, so the port is responsive
@@ -2566,8 +2578,35 @@ namespace MozaPlugin.Protocol
             // slow-but-real port (the Wine freshly-powered-base case the abandon
             // path exists for) recovers its full probe cadence here.
             _probeBackoff.TryRemove(portName, out _);
-            return (responded, reachable);
+            return result;
         }
+
+        private sealed class ProbeSweep
+        {
+            public ProbeResult? SavedPortProbe;
+        }
+
+        /// <summary>One-line "COM5 Base: open failed (AccessDenied: …)" for the sweep summary.</summary>
+        private static string DescribeProbe(string port, ProbeKind kind, in ProbeResult r)
+        {
+            string what;
+            switch (r.Outcome)
+            {
+                case ProbeOutcome.NoReply:    what = "no reply"; break;
+                case ProbeOutcome.OtherReply: what = $"non-MOZA reply ({r.Detail})"; break;
+                case ProbeOutcome.OpenFailed: what = $"open failed ({ClassifyOpenFailure(r.Error!)}: {r.Error!.Message})"; break;
+                case ProbeOutcome.IoFailed:
+                    what = $"{r.Detail ?? "I/O"} failed ({r.Error?.GetType().Name}: {r.Error?.Message})"; break;
+                case ProbeOutcome.Abandoned:  what = "abandoned"; break;
+                case ProbeOutcome.Blocked:    what = r.Detail ?? "Open() blocked"; break;
+                case ProbeOutcome.Skipped:    what = "skipped (" + r.Detail + ")"; break;
+                default:                      what = r.Outcome.ToString(); break;
+            }
+            return $"{port} {kind}: {what}";
+        }
+
+        private static string ProbeSummary(List<string> probes) =>
+            probes.Count == 0 ? " (no COM port was probed)" : ": " + string.Join(", ", probes);
 
         /// <summary>
         /// Record a blocked/timed-out probe cycle for <paramref name="portName"/>

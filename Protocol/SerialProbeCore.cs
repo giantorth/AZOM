@@ -8,6 +8,46 @@ namespace MozaPlugin.Protocol
     /// <summary>Which MOZA device a serial probe targets.</summary>
     public enum ProbeKind { Base, Hub, Ab9 }
 
+    /// <summary>How a single port probe ended.</summary>
+    public enum ProbeOutcome
+    {
+        Responded,
+        // Opened, nothing came back.
+        NoReply,
+        // Opened, bytes came back but not the expected response group.
+        OtherReply,
+        // Open() threw; ProbeResult.Error carries the exception.
+        OpenFailed,
+        // Opened, then a write/read threw.
+        IoFailed,
+        // Opened, then the caller abandoned the probe mid-poll.
+        Abandoned,
+        // Open() did not return before the caller's deadline.
+        Blocked,
+        // Not attempted (backoff window, prior probe still blocked, thread start failed).
+        Skipped,
+    }
+
+    public readonly struct ProbeResult
+    {
+        public readonly ProbeOutcome Outcome;
+        public readonly Exception? Error;
+        public readonly string? Detail;
+
+        public ProbeResult(ProbeOutcome outcome, Exception? error = null, string? detail = null)
+        {
+            Outcome = outcome;
+            Error = error;
+            Detail = detail;
+        }
+
+        public bool Responded => Outcome == ProbeOutcome.Responded;
+
+        /// <summary>The port opened and was usable; false means it could not be probed at all.</summary>
+        public bool Reachable => Outcome == ProbeOutcome.Responded || Outcome == ProbeOutcome.NoReply
+                              || Outcome == ProbeOutcome.OtherReply || Outcome == ProbeOutcome.Abandoned;
+    }
+
     /// <summary>
     /// Serial open+probe core used by <see cref="MozaSerialConnection"/>.
     ///
@@ -46,8 +86,8 @@ namespace MozaPlugin.Protocol
         /// <summary>
         /// Open <paramref name="portName"/>, send the probe for
         /// <paramref name="kind"/>, and poll for the expected response group.
-        /// Returns (responded, reachable); reachable=false means the open itself
-        /// failed. <b>This is the call that can crash Wine on a not-ready port</b>
+        /// Returns how the probe ended; an Open() failure carries its exception
+        /// so the caller can classify it. <b>This is the call that can crash Wine on a not-ready port</b>
         /// — never call it on a thread/process whose death would matter.
         /// <paramref name="log"/> is an optional diagnostic sink.
         ///
@@ -59,7 +99,7 @@ namespace MozaPlugin.Protocol
         /// Open is the Wine segfault, which is why the caller cannot just do it
         /// itself.</para>
         /// </summary>
-        public static (bool responded, bool reachable) ProbeOnePort(
+        public static ProbeResult ProbeOnePort(
             string portName, ProbeKind kind, Action<string>? log = null,
             Func<bool>? shouldAbort = null)
         {
@@ -70,7 +110,7 @@ namespace MozaPlugin.Protocol
                 case ProbeKind.Base: msg = BaseProbeFrame; expectedRespGroup = MozaProtocol.BaseRespGroup; break;
                 case ProbeKind.Hub:  msg = HubProbeFrame;  expectedRespGroup = MozaProtocol.HubRespGroup;  break;
                 case ProbeKind.Ab9:  msg = Ab9ProbeFrame;  expectedRespGroup = MozaProtocol.Ab9RespGroup;  break;
-                default: return (false, false);
+                default: return new ProbeResult(ProbeOutcome.Skipped, detail: $"unknown probe kind {kind}");
             }
 
             SerialPort? probe = null;
@@ -79,10 +119,10 @@ namespace MozaPlugin.Protocol
                 probe = new SerialPort(portName, MozaProtocol.BaudRate) { ReadTimeout = 300, WriteTimeout = 300 };
                 probe.Open();
             }
-            catch
+            catch (Exception ex)
             {
                 try { probe?.Dispose(); } catch { }
-                return (false, false); // open failed → not reachable
+                return new ProbeResult(ProbeOutcome.OpenFailed, ex);
             }
 
             try
@@ -104,7 +144,8 @@ namespace MozaPlugin.Protocol
                 {
                     if (waited >= nextProbeAt)
                     {
-                        try { probe.Write(msg, 0, msg.Length); } catch { return (false, false); }
+                        try { probe.Write(msg, 0, msg.Length); }
+                        catch (Exception ex) { return new ProbeResult(ProbeOutcome.IoFailed, ex, "write"); }
                         nextProbeAt = waited + ProbeRepeatMs;
                     }
 
@@ -116,7 +157,7 @@ namespace MozaPlugin.Protocol
                     if (shouldAbort?.Invoke() == true)
                     {
                         log?.Invoke($"Probe {portName}: abandoned by caller after {waited}ms — releasing port");
-                        return (false, true);
+                        return new ProbeResult(ProbeOutcome.Abandoned);
                     }
 
                     int avail = probe.BytesToRead;
@@ -140,18 +181,17 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                if (!responded && firstSeenGroup != 0xFF)
-                {
-                    log?.Invoke(
-                        $"Probe {portName} {kind}: {accum.Count}B in {waited}ms, " +
-                        $"no 0x{expectedRespGroup:X2} (first seen 0x{firstSeenGroup:X2})");
-                }
-                return (responded, true);
+                if (responded) return new ProbeResult(ProbeOutcome.Responded);
+                if (firstSeenGroup == 0xFF) return new ProbeResult(ProbeOutcome.NoReply);
+                log?.Invoke(
+                    $"Probe {portName} {kind}: {accum.Count}B in {waited}ms, " +
+                    $"no 0x{expectedRespGroup:X2} (first seen 0x{firstSeenGroup:X2})");
+                return new ProbeResult(ProbeOutcome.OtherReply, detail: $"group 0x{firstSeenGroup:X2}");
             }
             catch (Exception ex)
             {
                 log?.Invoke($"Probe {portName}: {ex.GetType().Name}");
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.IoFailed, ex);
             }
             finally
             {

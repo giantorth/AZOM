@@ -134,9 +134,24 @@ namespace MozaPlugin.UI
                 }
             }
 
+            var osPorts = MozaPortDiscovery.LastLiveComPorts;
+            sb.AppendLine($"OS COM ports:   {(osPorts.Count == 0 ? "(none)" : string.Join(", ", osPorts))}");
+            var skipped = MozaPortDiscovery.LastSkippedMozaEntries;
+            if (skipped.Count > 0)
+            {
+                sb.AppendLine($"Registry skips: {skipped.Count} MOZA entr{(skipped.Count == 1 ? "y" : "ies")} not listed as a port");
+                for (int i = 0; i < skipped.Count; i++)
+                    sb.AppendLine($"  {skipped[i]}");
+            }
+
+            // LastPortName is seeded from settings at startup and survives
+            // Disconnect, so it is only the live port while connected.
             string wheelbasePort = plugin.Connection?.LastPortName ?? "";
             sb.Append("Assignments:    Wheelbase ");
-            sb.Append(string.IsNullOrEmpty(wheelbasePort) ? "(disconnected)" : "→ " + wheelbasePort);
+            if (plugin.Connection?.IsConnected == true && wheelbasePort.Length > 0)
+                sb.Append("→ " + wheelbasePort);
+            else
+                sb.Append(wheelbasePort.Length > 0 ? $"(disconnected; saved {wheelbasePort})" : "(disconnected)");
             // AB9/AB6 share one lane. LastPortName survives Disconnect, so gate on
             // IsConnected like the Hub / Base(aux) lines below — otherwise this
             // prints a port for a shifter that was unplugged.
@@ -190,7 +205,9 @@ namespace MozaPlugin.UI
                 var f = conn.LastFailure;
                 sb.AppendLine(
                     $"LastFailure:    kind={f.Kind} port={f.PortName ?? "-"} " +
-                    $"consecutive={conn.ConsecutiveOpenFailures}");
+                    $"consecutive={conn.ConsecutiveOpenFailures}" +
+                    (f.FromProbe ? " (probe of saved port)" : "") +
+                    (f.Kind != ConnectionFailureKind.None && !string.IsNullOrEmpty(f.Message) ? $"  \"{f.Message}\"" : ""));
             }
             return sb.ToString();
         }

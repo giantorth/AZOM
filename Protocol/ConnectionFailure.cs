@@ -35,13 +35,18 @@ namespace MozaPlugin.Protocol
         public readonly string? PortName;
         public readonly string? Message;
         public readonly DateTime UtcTimestamp;
+        // Recorded by the serial-probe fallback opening the saved port, not by
+        // an open of a port enumeration had already classified.
+        public readonly bool FromProbe;
 
-        public ConnectionFailureInfo(ConnectionFailureKind kind, string? portName, string? message, DateTime utcTimestamp)
+        public ConnectionFailureInfo(ConnectionFailureKind kind, string? portName, string? message, DateTime utcTimestamp,
+                                     bool fromProbe = false)
         {
             Kind = kind;
             PortName = portName;
             Message = message;
             UtcTimestamp = utcTimestamp;
+            FromProbe = fromProbe;
         }
 
         public static ConnectionFailureInfo None => default;

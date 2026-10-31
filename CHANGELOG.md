@@ -28,6 +28,8 @@ All notable changes to the AZOM plugin are documented here.
 - **Turning Connection off and on no longer force-reconnects the wheel;** stale display and watchdog state is cleared on disable.
 - **Shifter and pedal tabs follow the hub** when it is unplugged or the primary connection moves.
 - **Unanswered polled reads stop retrying after 60 s** instead of retransmitting forever.
+- **Port-in-use banner also shows when another app holds the saved wheelbase port** and USB detection can't see the device.
+- **Diagnostics shows why no MOZA device was found:** OS COM ports, skipped registry entries and each probed port's result; a disconnected wheelbase no longer shows as assigned.
 - **Wheel settings are re-read after a game-switch reload,** so per-knob Button/Knob selectors no longer fall back to the All Rotaries one.
 - **Gear-shift bumps no longer fire on re-enable or at session start.**
 - **Pedal-haptics restart banner no longer shows on every detection,** and moving a rim to another base refreshes its device definition.
