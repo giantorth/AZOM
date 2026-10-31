@@ -156,6 +156,9 @@ namespace MozaPlugin.Devices.MBooster
             public string? Identity { get; }
             public int AxisIndex { get; }
 
+            /// <summary>True while a routine owns any lane. The UI disables both
+            /// buttons on every pedal while this holds — the routines reboot the
+            /// unit, so a second one cannot be allowed to interleave.</summary>
             public bool IsRunning => Kind != MBoosterCalKind.None
                 && Step != MBoosterCalStep.Idle
                 && Step != MBoosterCalStep.Done
@@ -167,11 +170,6 @@ namespace MozaPlugin.Devices.MBooster
             lock (_lock)
                 return new Status(_kind, _step, _message, _secondsRemaining, _identity, _axisIndex);
         }
-
-        /// <summary>True while a routine owns any lane. The UI disables both
-        /// buttons on every pedal while this holds — the routines reboot the
-        /// unit, so a second one cannot be allowed to interleave.</summary>
-        public bool IsRunning => Snapshot().IsRunning;
 
         // ---- Entry points ---------------------------------------------------
 
@@ -377,10 +375,10 @@ namespace MozaPlugin.Devices.MBooster
 
                 case MBoosterCalStep.Rebooting:
                     // Observing the port gone counts as the drop, not just the
-                    // registry's DeviceRemoved: Refresh() only disposes a
+                    // registry's OnDeviceRemoved call: Refresh() only disposes a
                     // controller whose PORT disappeared, and reconnects one
-                    // whose port merely wedged — that second path never fires
-                    // DeviceRemoved, so waiting on it alone stalled the verify
+                    // whose port merely wedged — that second path never calls
+                    // OnDeviceRemoved, so waiting on it alone stalled the verify
                     // for the full reconnect timeout.
                     if (!connected)
                     {

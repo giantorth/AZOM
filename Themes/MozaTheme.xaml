@@ -38,18 +38,12 @@
 
     <!-- Accents -->
     <Color x:Key="CyanColor">#FF00E5FF</Color>
-    <Color x:Key="CyanGlowColor">#6600E5FF</Color>
     <Color x:Key="CyanSoftColor">#2200E5FF</Color>
     <Color x:Key="GreenColor">#FF39FF88</Color>
-    <Color x:Key="GreenGlowColor">#6639FF88</Color>
-    <Color x:Key="GreenSoftColor">#2239FF88</Color>
     <Color x:Key="AmberColor">#FFFFB84D</Color>
-    <Color x:Key="AmberGlowColor">#66FFB84D</Color>
     <Color x:Key="AmberSoftColor">#22FFB84D</Color>
     <Color x:Key="RedColor">#FFFF5566</Color>
-    <Color x:Key="RedGlowColor">#66FF5566</Color>
     <Color x:Key="BlueColor">#FF4D8CFF</Color>
-    <Color x:Key="BlueGlowColor">#664D8CFF</Color>
 
     <!-- ============================================================ -->
     <!-- Brushes                                                       -->
@@ -73,11 +67,8 @@
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
 
     <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanColor}"/>
-    <SolidColorBrush x:Key="CyanGlowBrush" Color="{StaticResource CyanGlowColor}"/>
     <SolidColorBrush x:Key="CyanSoftBrush" Color="{StaticResource CyanSoftColor}"/>
     <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource GreenColor}"/>
-    <SolidColorBrush x:Key="GreenGlowBrush" Color="{StaticResource GreenGlowColor}"/>
-    <SolidColorBrush x:Key="GreenSoftBrush" Color="{StaticResource GreenSoftColor}"/>
     <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}"/>
     <SolidColorBrush x:Key="AmberSoftBrush" Color="{StaticResource AmberSoftColor}"/>
     <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}"/>
@@ -180,8 +171,6 @@
                       ShadowDepth="0" BlurRadius="6" Opacity="0.35"/>
     <DropShadowEffect x:Key="GreenGlowEffect" Color="{StaticResource GreenColor}"
                       ShadowDepth="0" BlurRadius="8" Opacity="0.6"/>
-    <DropShadowEffect x:Key="AmberGlowEffect" Color="{StaticResource AmberColor}"
-                      ShadowDepth="0" BlurRadius="6" Opacity="0.4"/>
 
     <!-- ============================================================ -->
     <!-- Shared TextBlock typography                                   -->
@@ -241,14 +230,6 @@
         <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="Foreground" Value="{StaticResource TextDimBrush}"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-        <Setter Property="Margin" Value="0,0,18,0"/>
-    </Style>
-
-    <Style x:Key="StatusBarText" TargetType="TextBlock">
-        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
-        <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Margin" Value="0,0,18,0"/>
     </Style>
@@ -782,16 +763,6 @@
     <!-- Style is keyed by the type itself (default style) via the     -->
     <!-- SectionCard class's static constructor.                       -->
     <!-- ============================================================ -->
-
-    <!-- TeleCard background style for compact telemetry tiles -->
-    <Style x:Key="TeleCardBorder" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource BgCardBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="6"/>
-        <Setter Property="Padding" Value="14,12"/>
-        <Setter Property="Margin" Value="0,0,10,10"/>
-    </Style>
 
     <!-- Generic "card" wrapper (no header — for paddle/button live tiles) -->
     <Style x:Key="InnerCardBorder" TargetType="Border">

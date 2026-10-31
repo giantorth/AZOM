@@ -28,14 +28,6 @@
                  calibration status line, which stays collapsed while empty. -->
             <ctrl:EmptyStringToVisibilityConverter x:Key="EmptyStringToVisibility"/>
 
-            <!-- Legacy keys preserved so the hidden Wheel/AB9/mBooster/Hub tabs (kept in
-                 the visual tree but Visibility=Collapsed in Phase 1) still resolve.
-                 They route to the new design's brushes + typography so any pixels they
-                 do emit blend in. Phase 2 deletes these along with the stub tabs. -->
-            <Style x:Key="SectionHeader" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleText}">
-                <Setter Property="Margin" Value="0,20,0,8"/>
-                <Setter Property="FontSize" Value="14"/>
-            </Style>
             <!-- Slider/toggle row labels. MinWidth keeps short labels aligned across
                  rows (English: ~180px is the widest); MaxWidth caps growth so a
                  verbose translation can't squeeze the slider below usable size.
@@ -74,15 +66,7 @@
                 <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
             </Style>
-            <Style x:Key="SliderValue" TargetType="TextBlock">
-                <Setter Property="VerticalAlignment" Value="Center"/>
-                <Setter Property="Width" Value="60"/>
-                <Setter Property="TextAlignment" Value="Right"/>
-                <Setter Property="Margin" Value="8,0,0,0"/>
-                <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
-                <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
-            </Style>
-            <!-- Editable slider value: looks like the read-only SliderValue text
+            <!-- Editable slider value: looks like plain value text
                  while idle, reveals editable chrome on hover/focus. KeyDown +
                  LostFocus handlers in code-behind parse the typed value and
                  push it back to the paired Slider via Tag (which is bound to
@@ -172,36 +156,6 @@
                 <Setter Property="CaretBrush" Value="{StaticResource RedBrush}"/>
                 <Setter Property="SelectionBrush" Value="{StaticResource RedBrush}"/>
             </Style>
-            <Style x:Key="TempValue" TargetType="TextBlock">
-                <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
-                <Setter Property="FontSize" Value="18"/>
-                <Setter Property="VerticalAlignment" Value="Center"/>
-                <Setter Property="Margin" Value="10,0,20,0"/>
-                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            </Style>
-            <Style x:Key="ConnectionDot" TargetType="Ellipse">
-                <Setter Property="Width" Value="12"/>
-                <Setter Property="Height" Value="12"/>
-                <Setter Property="VerticalAlignment" Value="Center"/>
-                <Setter Property="Margin" Value="0,0,8,0"/>
-            </Style>
-            <Style x:Key="ColorRect" TargetType="Border">
-                <Setter Property="Width" Value="28"/>
-                <Setter Property="Height" Value="28"/>
-                <Setter Property="BorderBrush" Value="#555"/>
-                <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="CornerRadius" Value="3"/>
-                <Setter Property="Margin" Value="2,0"/>
-                <Setter Property="Cursor" Value="Hand"/>
-            </Style>
-            <Style x:Key="LedIndex" TargetType="TextBlock">
-                <Setter Property="Width" Value="28"/>
-                <Setter Property="TextAlignment" Value="Center"/>
-                <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
-                <Setter Property="FontSize" Value="10"/>
-                <Setter Property="Margin" Value="2,0"/>
-            </Style>
-
             <!-- Default styles for native WPF controls used throughout (Buttons,
                  CheckBoxes, ComboBoxes get the new dark aesthetic automatically). -->
             <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
@@ -232,11 +186,6 @@
                 <Setter Property="VerticalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
                 <Setter Property="RowBackground" Value="{StaticResource BgCardBrush}"/>
                 <Setter Property="AlternatingRowBackground" Value="{StaticResource BgCard2Brush}"/>
-            </Style>
-
-            <!-- Row-grid template used by every restyled slider row -->
-            <Style x:Key="RowGrid" TargetType="Grid">
-                <Setter Property="Margin" Value="0,4"/>
             </Style>
 
             <!-- One selectable row per connected mBooster in the Pedals card's
@@ -312,14 +261,6 @@
                 <ctrl:ConnectionPill Grid.Column="1" x:Name="ConnectionPill"
                                      Margin="0,0,12,0"
                                      VerticalAlignment="Center"/>
-
-                <!-- Legacy hidden controls kept for code-behind binding contracts.
-                     ConnectionIndicator + ConnectionLabel are written by .cs; we
-                     route those updates into ConnectionPill from code-behind. -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Visibility="Collapsed">
-                    <Ellipse x:Name="ConnectionIndicator" Style="{StaticResource ConnectionDot}" Fill="Gray"/>
-                    <TextBlock x:Name="ConnectionLabel" Text="{x:Static res:Strings.Status_Disconnected}"/>
-                </StackPanel>
 
                 <ctrl:OffOnToggle Grid.Column="2" x:Name="ConnectionToggle"
                                   Margin="0,0,12,0" IsChecked="True"
@@ -473,15 +414,6 @@
                                                         <TextBlock x:Name="TempLegendMax3" Style="{StaticResource KvKeyText}" Margin="8,0,0,0" Opacity="0.7"/>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <!-- Legacy named legend labels — kept hidden so any code that
-                                                     references McuTempLegend / MosfetTempLegend / MotorTempLegend
-                                                     by name still compiles. The ranked legend above is the
-                                                     visible source of truth. -->
-                                                <StackPanel Visibility="Collapsed">
-                                                    <TextBlock x:Name="McuTempLegend"/>
-                                                    <TextBlock x:Name="MosfetTempLegend"/>
-                                                    <TextBlock x:Name="MotorTempLegend"/>
-                                                </StackPanel>
                                             </StackPanel>
                                         </Border>
                                         <Border Grid.Column="1" x:Name="BandwidthCard" Style="{StaticResource InnerCardBorder}"
@@ -525,12 +457,6 @@
                                                                    Foreground="{StaticResource TextFaintBrush}"/>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <!-- Session totals not surfaced visibly; hidden stubs keep
-                                                     OnBandwidthTick writes alive without null guards. -->
-                                                <StackPanel Visibility="Collapsed">
-                                                    <TextBlock x:Name="BandwidthInSessionText"/>
-                                                    <TextBlock x:Name="BandwidthOutSessionText"/>
-                                                </StackPanel>
                                             </StackPanel>
                                         </Border>
                                         <!-- Live wheelbase torque (base status reg 0x07), 2-minute
@@ -572,17 +498,6 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
-
-                        <!-- Legacy text-based readouts: hidden but kept so code-behind
-                             that writes to SteeringAngleLabel.Text etc. still works.
-                             .cs additionally pushes Angle into SteeringArcViz and
-                             numeric values into the *TempCell controls. -->
-                        <StackPanel Visibility="Collapsed">
-                            <TextBlock x:Name="SteeringAngleLabel" Text="--"/>
-                            <TextBlock x:Name="McuTempLabel" Text="--"/>
-                            <TextBlock x:Name="MosfetTempLabel" Text="--"/>
-                            <TextBlock x:Name="MotorTempLabel" Text="--"/>
-                        </StackPanel>
 
                         <!-- Core Settings + Gearshift Vibration side-by-side: both are
                              "configure-then-forget" sliders that benefit from being
@@ -975,43 +890,24 @@
                              still resolve through the existing two-way bindings). -->
                         <StackPanel Visibility="Collapsed">
                             <Slider x:Name="Eq1Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq1Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq1Value" Text="100%"/>
                             <Slider x:Name="Eq2Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq2Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq2Value" Text="100%"/>
                             <Slider x:Name="Eq3Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq3Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq3Value" Text="100%"/>
                             <Slider x:Name="Eq4Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq4Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq4Value" Text="100%"/>
                             <Slider x:Name="Eq5Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq5Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq5Value" Text="100%"/>
                             <Slider x:Name="Eq6Slider" Minimum="0" Maximum="400" TickFrequency="1" ValueChanged="Eq6Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq6Value" Text="100%"/>
                             <Slider x:Name="Eq7Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq7Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq7Value" Text="100%"/>
                             <Slider x:Name="Eq8Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq8Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq8Value" Text="100%"/>
                             <Slider x:Name="Eq9Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq9Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq9Value" Text="100%"/>
                             <Slider x:Name="Eq10Slider" Minimum="0" Maximum="500" TickFrequency="1" ValueChanged="Eq10Slider_ValueChanged"/>
-                            <TextBox x:Name="Eq10Value" Text="100%"/>
                             <Slider x:Name="FfbCurveX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX1Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveX1Value" Text="20"/>
                             <Slider x:Name="FfbCurveX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX2Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveX2Value" Text="40"/>
                             <Slider x:Name="FfbCurveX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX3Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveX3Value" Text="60"/>
                             <Slider x:Name="FfbCurveX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveX4Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveX4Value" Text="80"/>
                             <Slider x:Name="FfbCurveY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY1Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveY1Value" Text="20"/>
                             <Slider x:Name="FfbCurveY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY2Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveY2Value" Text="40"/>
                             <Slider x:Name="FfbCurveY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY3Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveY3Value" Text="60"/>
                             <Slider x:Name="FfbCurveY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY4Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveY4Value" Text="80"/>
                             <Slider x:Name="FfbCurveY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY5Slider_ValueChanged"/>
-                            <TextBox x:Name="FfbCurveY5Value" Text="100"/>
                         </StackPanel>
 
                         <!-- Miscellaneous + High Speed Damping sit side-by-side: small
@@ -1097,12 +993,6 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ==================== WHEEL TAB (Phase 6: hidden) ====================
-                 Wheel-input settings + live paddle/button display now live in the
-                 per-device MozaWheelSettingsControl "Inputs" sub-tab. The controls
-                 here stay in the visual tree (Visibility=Collapsed) so the device
-                 pane can forward user input to them, triggering this code-behind's
-                 existing handler + persistence logic. -->
             <!-- Wheelbase LFE effects — own tab (immediately right of Base), shown
                  only on LFE-capable firmware (MozaData.BaseSupportsLfe). A presets box
                  on top, then one box per effect. Content between the GEN markers is
@@ -1506,15 +1396,10 @@
                         <!-- Data-store sliders, driven by HandbrakeCurveEditor -->
                         <StackPanel Visibility="Collapsed">
                             <Slider x:Name="HbY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="HbY1Slider_ValueChanged"/>
-                            <TextBox x:Name="HbY1Value" Text="20"/>
                             <Slider x:Name="HbY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="HbY2Slider_ValueChanged"/>
-                            <TextBox x:Name="HbY2Value" Text="40"/>
                             <Slider x:Name="HbY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="HbY3Slider_ValueChanged"/>
-                            <TextBox x:Name="HbY3Value" Text="60"/>
                             <Slider x:Name="HbY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="HbY4Slider_ValueChanged"/>
-                            <TextBox x:Name="HbY4Value" Text="80"/>
                             <Slider x:Name="HbY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="HbY5Slider_ValueChanged"/>
-                            <TextBox x:Name="HbY5Value" Text="100"/>
                         </StackPanel>
 
                     </StackPanel>
@@ -1642,15 +1527,10 @@
                         <!-- Data-store sliders, driven by ThrottleCurveEditor -->
                         <StackPanel Visibility="Collapsed">
                             <Slider x:Name="ThrottleY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY1Slider_ValueChanged"/>
-                            <TextBox x:Name="ThrottleY1Value" Text="20"/>
                             <Slider x:Name="ThrottleY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY2Slider_ValueChanged"/>
-                            <TextBox x:Name="ThrottleY2Value" Text="40"/>
                             <Slider x:Name="ThrottleY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY3Slider_ValueChanged"/>
-                            <TextBox x:Name="ThrottleY3Value" Text="60"/>
                             <Slider x:Name="ThrottleY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY4Slider_ValueChanged"/>
-                            <TextBox x:Name="ThrottleY4Value" Text="80"/>
                             <Slider x:Name="ThrottleY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY5Slider_ValueChanged"/>
-                            <TextBox x:Name="ThrottleY5Value" Text="100"/>
                         </StackPanel>
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_ThrottleCalibration}"
                                           Icon="{StaticResource IconCal}"
@@ -1746,15 +1626,10 @@
                         <!-- Data-store sliders, driven by BrakeCurveEditor -->
                         <StackPanel Visibility="Collapsed">
                             <Slider x:Name="BrakeY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY1Slider_ValueChanged"/>
-                            <TextBox x:Name="BrakeY1Value" Text="20"/>
                             <Slider x:Name="BrakeY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY2Slider_ValueChanged"/>
-                            <TextBox x:Name="BrakeY2Value" Text="40"/>
                             <Slider x:Name="BrakeY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY3Slider_ValueChanged"/>
-                            <TextBox x:Name="BrakeY3Value" Text="60"/>
                             <Slider x:Name="BrakeY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY4Slider_ValueChanged"/>
-                            <TextBox x:Name="BrakeY4Value" Text="80"/>
                             <Slider x:Name="BrakeY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY5Slider_ValueChanged"/>
-                            <TextBox x:Name="BrakeY5Value" Text="100"/>
                         </StackPanel>
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_BrakeCalibration}"
                                           Icon="{StaticResource IconCal}"
@@ -1833,15 +1708,10 @@
                         <!-- Data-store sliders, driven by ClutchCurveEditor -->
                         <StackPanel Visibility="Collapsed">
                             <Slider x:Name="ClutchY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY1Slider_ValueChanged"/>
-                            <TextBox x:Name="ClutchY1Value" Text="20"/>
                             <Slider x:Name="ClutchY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY2Slider_ValueChanged"/>
-                            <TextBox x:Name="ClutchY2Value" Text="40"/>
                             <Slider x:Name="ClutchY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY3Slider_ValueChanged"/>
-                            <TextBox x:Name="ClutchY3Value" Text="60"/>
                             <Slider x:Name="ClutchY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY4Slider_ValueChanged"/>
-                            <TextBox x:Name="ClutchY4Value" Text="80"/>
                             <Slider x:Name="ClutchY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY5Slider_ValueChanged"/>
-                            <TextBox x:Name="ClutchY5Value" Text="100"/>
                         </StackPanel>
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_ClutchCalibration}"
                                           Icon="{StaticResource IconCal}"
@@ -1890,7 +1760,7 @@
                                  not one row for the whole connection. The label is a plain
                                  clickable Button (see MBoosterDeviceRowButtonStyle); clicking a
                                  row selects BOTH the physical device AND that specific pedal for
-                                 the Pedal Feel/Sim Input/Effects/Calibration cards below,
+                                 the Pedal Feel/Sim Input/Effects cards below,
                                  replacing the old trio of Device combo + per-axis Pedal Roles
                                  panel + Configure-pedal combo. Each row's own Role combo edits
                                  THAT pedal's Role regardless of which row is selected; two
@@ -1992,7 +1862,7 @@
                                             <!-- Live "position % · kg force" readout, updated at 30 Hz in
                                                  UpdateMBoosterCurveMarkers alongside this tab's other live
                                                  displays. kg is a computed estimate (raw position % scaled by
-                                                 this pedal's own Max Threshold, i.e. what force reads 100%
+                                                 this pedal's own Max Force, i.e. what force reads 100%
                                                  travel), not a directly-read sensor value. -->
                                             <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_InputForce}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                                             <TextBlock Grid.Row="0" Grid.Column="2" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"
@@ -2105,29 +1975,17 @@
                                         <!-- Data-store sliders, driven by MBoosterInputCurveEditor -->
                                         <StackPanel Visibility="Collapsed">
                                             <Slider x:Name="MBoosterInputY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY1Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY1Value" Text="14"/>
                                             <Slider x:Name="MBoosterInputY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY2Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY2Value" Text="29"/>
                                             <Slider x:Name="MBoosterInputY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY3Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY3Value" Text="43"/>
                                             <Slider x:Name="MBoosterInputY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY4Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY4Value" Text="57"/>
                                             <Slider x:Name="MBoosterInputY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY5Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY5Value" Text="71"/>
                                             <Slider x:Name="MBoosterInputY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputY6Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputY6Value" Text="86"/>
                                             <Slider x:Name="MBoosterInputX1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX1Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX1Value" Text="14"/>
                                             <Slider x:Name="MBoosterInputX2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX2Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX2Value" Text="29"/>
                                             <Slider x:Name="MBoosterInputX3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX3Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX3Value" Text="43"/>
                                             <Slider x:Name="MBoosterInputX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX4Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX4Value" Text="57"/>
                                             <Slider x:Name="MBoosterInputX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX5Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX5Value" Text="71"/>
                                             <Slider x:Name="MBoosterInputX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX6Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterInputX6Value" Text="86"/>
                                         </StackPanel>
                                     </StackPanel>
 
@@ -2204,15 +2062,10 @@
                                         <StackPanel Visibility="Collapsed">
                                             <Slider x:Name="MBoosterY1Slider" Minimum="0" Maximum="100" TickFrequency="1"/>
                                             <Slider x:Name="MBoosterY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY2Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY2Value" Text="40"/>
                                             <Slider x:Name="MBoosterY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY3Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY3Value" Text="60"/>
                                             <Slider x:Name="MBoosterY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY4Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY4Value" Text="80"/>
                                             <Slider x:Name="MBoosterY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY5Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY5Value" Text="100"/>
                                             <Slider x:Name="MBoosterY6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterY6Slider_ValueChanged"/>
-                                            <TextBox x:Name="MBoosterY6Value" Text="100"/>
                                             <Slider x:Name="MBoosterRangeStartSlider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterRangeStartSlider_ValueChanged"/>
                                             <Slider x:Name="MBoosterRangeEndSlider" Minimum="0" Maximum="100" TickFrequency="1" Value="100" ValueChanged="MBoosterRangeEndSlider_ValueChanged"/>
                                         </StackPanel>
@@ -2935,51 +2788,6 @@
                                     </ItemsControl>
                                     <Button x:Name="MBoosterAddCustomEffectButton" Content="{x:Static res:Strings.Button_AddCustomEffect}"
                                             Margin="0,4,0,0" HorizontalAlignment="Left" Click="MBoosterAddCustomEffectButton_Click"/>
-                                </StackPanel>
-                            </ctrl:SectionCard>
-
-                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_Calibration}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_CalibrationExperimental}"
-                                              Icon="{StaticResource IconCal}"
-                                              AccentBrush="{StaticResource AmberBrush}"
-                                              IsCollapsible="True"
-                                              Visibility="Collapsed">
-                                <StackPanel>
-                                    <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_MBoosterCalibrationWarning}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,4">
-                                        <ctrl:OffOnToggle x:Name="MBoosterDirCheck" Content="{x:Static res:Strings.Label_ReversedDirection}" Checked="MBoosterDirCheck_Changed" Unchecked="MBoosterDirCheck_Changed"/>
-                                    </StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MinRaw}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterMinSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="65535" TickFrequency="1024" ValueChanged="MBoosterMinSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterMinValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterMinSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_MaxRaw}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="MBoosterMaxSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="65535" TickFrequency="1024" ValueChanged="MBoosterMaxSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="MBoosterMaxValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=MBoosterMaxSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0"/>
-                                    </Grid>
-
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <Button x:Name="MBoosterReadCalButton" Content="{x:Static res:Strings.Button_ReadFromDevice}" Margin="0,0,6,0" Click="MBoosterReadCalButton_Click"/>
-                                        <Button x:Name="MBoosterApplyCalButton" Content="{x:Static res:Strings.Button_Apply}" Click="MBoosterApplyCalButton_Click"/>
-                                    </StackPanel>
                                 </StackPanel>
                             </ctrl:SectionCard>
 

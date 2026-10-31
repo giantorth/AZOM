@@ -155,9 +155,6 @@ namespace MozaPlugin.UI.DjsonImport
         public IReadOnlyCollection<ChannelAllocation> Allocations
             => _allocationOrder.ConvertAll(k => _allocated[k]);
 
-        /// <summary>How many spare channels remain.</summary>
-        public int FreeChannels => Math.Max(0, _pool.Count - _poolNext);
-
         /// <summary>Return every borrowed channel to the pool. Call between dashboards —
         /// allocations are per-dashboard settings, so they must not carry over.</summary>
         public void ResetAllocations()

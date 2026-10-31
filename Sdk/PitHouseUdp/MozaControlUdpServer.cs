@@ -104,16 +104,9 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             _handlers[handler.PacketId] = handler;
         }
 
-        public bool IsRunning => _running;
-
         public string Status
         {
             get { lock (_stateGate) return _status; }
-        }
-
-        public int BoundPort
-        {
-            get { lock (_stateGate) return _boundPort; }
         }
 
         /// <summary>
@@ -377,8 +370,6 @@ namespace MozaPlugin.Sdk.PitHouseUdp
                 _ => throw new InvalidOperationException($"'Head.PacketId' has unsupported type {pidObj?.GetType().Name ?? "null"}"),
             };
 
-            string version = headMap.TryGetValue("Version", out var verObj) && verObj is string s ? s : string.Empty;
-
             int? replyPort = null;
             if (headMap.TryGetValue("ReplyPort", out var portObj))
             {
@@ -392,7 +383,7 @@ namespace MozaPlugin.Sdk.PitHouseUdp
             }
 
             rootMap.TryGetValue("Payload", out var payload);
-            return new PitHousePacket(packetId, version, replyPort, payload);
+            return new PitHousePacket(packetId, replyPort, payload);
         }
 
         private void LogUnknownPacketId(int packetId, IPEndPoint remote)

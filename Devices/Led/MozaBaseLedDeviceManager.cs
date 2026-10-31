@@ -46,9 +46,6 @@ namespace MozaPlugin.Devices.Led
             => MozaPlugin.Instance?.Data?.ResolvedAmbientLedsPerStrip
                ?? BaseModelInfo.DefaultLedsPerStrip;
 
-        /// <summary>Total LEDs SimHub is asked to render for this base.</summary>
-        internal static int CurrentTotalLeds => CurrentLedsPerStrip * 2;
-
         private LedDeviceState _lastState = SimHubLedCompat.CreateState(
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),
             Array.Empty<Color>(), Array.Empty<Color>(), Array.Empty<Color>(),

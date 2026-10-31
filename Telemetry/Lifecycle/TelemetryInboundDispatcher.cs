@@ -131,9 +131,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private void HandleDeviceInit(byte[] data, byte session)
         {
             int openSeq = data.Length >= 8 ? data[6] | (data[7] << 8) : 0;
-            var info = _sender.Sessions.GetOrCreate(session);
-            info.DeviceInitiated = true;
-            info.Port = (byte)(openSeq & 0xFF);
             _sender.SendSessionAckInternal(session, (ushort)openSeq);
             // Route device-init through dispatcher first so we check ownership
             // before redirecting the uploader's ActiveSession (don't let
@@ -211,13 +208,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // silently drop retransmits of older seqs).
             if (isFlag)
             {
-                if (seq > _sender._sessionAckSeq)
-                    _sender._sessionAckSeq = seq;
                 _sender.SendSessionAckInternal(
                     _sender.FlagByte, _sender.GapAwareCatalogAckSeq(_sender.FlagByte, seq));
 
-                // First inbound on sess=FlagByte = engagement gate.
-                _sender.Watchdog.NoteSession02FirstInbound();
+                _sender.Watchdog.NoteSession02Inbound();
                 AbsorbCatalogLaneChunk(session, seq, chunkPayload, ChunkCrcOk());
             }
 
@@ -226,8 +220,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // wheel can keep 0x01 live without fc:00-acking our open.
             if (isMgmt)
             {
-                if (seq > _sender._mgmtAckSeq)
-                    _sender._mgmtAckSeq = seq;
                 _sender.SendSessionAckInternal(
                     mgmt, _sender.GapAwareCatalogAckSeq(mgmt, seq));
                 _sender.MgmtResponseEvent.Set();

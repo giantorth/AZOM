@@ -19,7 +19,7 @@ namespace MozaPlugin.UI
     /// <c>MBoosterDeviceRowButtonStyle</c> in SettingsControl.xaml, "selected"
     /// highlight via a DataTrigger on <see cref="IsSelected"/>); clicking it
     /// selects BOTH the physical device AND this specific pedal for the Pedal
-    /// Feel/Sim Input/Effects/Calibration cards below — handled by a plain
+    /// Feel/Sim Input/Effects cards below — handled by a plain
     /// Click event (<c>MBoosterDeviceRow_Click</c>) reading this row off the
     /// sender's DataContext, deliberately not a WPF selection/grouping
     /// primitive (RadioButton GroupName + TwoWay binding proved unreliable

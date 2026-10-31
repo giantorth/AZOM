@@ -48,11 +48,6 @@ namespace MozaPlugin.Integration.Motion
         private const int FrameIntervalMs = 30;
         private const int FeedMaxAgeMs = 500;
 
-        private static int s_activeInstances;
-
-        /// <summary>True while an HMA150 output is started in SimHub Motion.</summary>
-        internal static bool AnyStarted => Volatile.Read(ref s_activeInstances) > 0;
-
         private int _counted;
 
         [JsonIgnore]
@@ -123,10 +118,7 @@ namespace MozaPlugin.Integration.Motion
                 return;
             }
             if (Interlocked.Exchange(ref _counted, 1) == 0)
-            {
-                Interlocked.Increment(ref s_activeInstances);
                 lane.Acquire();
-            }
             lane.SetIdle(false);
             lane.Engage(new MotionEngageConfig { FrameIntervalMs = FrameIntervalMs });
             ConnectionState = OutputConnectionState.Connected;
@@ -137,10 +129,7 @@ namespace MozaPlugin.Integration.Motion
             var lane = Lane;
             lane?.Disengage();
             if (Interlocked.Exchange(ref _counted, 0) == 1)
-            {
-                Interlocked.Decrement(ref s_activeInstances);
                 lane?.Release();
-            }
         }
 
         public override bool IsReadyForLiveMotionData()
@@ -203,10 +192,7 @@ namespace MozaPlugin.Integration.Motion
         public override void Dispose()
         {
             if (Interlocked.Exchange(ref _counted, 0) == 1)
-            {
-                Interlocked.Decrement(ref s_activeInstances);
                 Lane?.Release();
-            }
             base.Dispose();
         }
     }

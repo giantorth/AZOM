@@ -345,9 +345,6 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
         }
 
-        /// <summary>Overload without missing-fields output, kept for existing callers.</summary>
-        public static WheelDashboardState? Parse(byte[] jsonBytes) => Parse(jsonBytes, out _);
-
         /// <summary>
         /// One-pass byte scan that returns true only when <paramref name="jsonBytes"/>
         /// holds a balanced root JSON object: starts with '{', ends with the

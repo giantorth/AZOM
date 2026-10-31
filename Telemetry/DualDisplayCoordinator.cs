@@ -470,8 +470,6 @@ namespace MozaPlugin.Telemetry
         }
 
         // ===== Discriminator state, for the diagnostics bundle =====
-        internal bool DashParamReadAnswered => _dashParamReadAnswered;
-        internal int Cm1ProbeCount => _cm1ProbeCount;
         /// <summary>How long the bridged dash has been decidable-but-unclassified, or
         /// null before the anchor is stamped (no dash, or sender still cold-starting).</summary>
         internal TimeSpan? DiscriminatingFor =>

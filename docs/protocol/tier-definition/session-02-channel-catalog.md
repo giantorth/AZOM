@@ -310,9 +310,10 @@ before the first live commit (cold start), when no masked view exists yet.
 
 [`TelemetrySender.WheelChannelCatalog`](../../../Telemetry/TelemetrySender.cs)
 parses this stream during preamble and exposes the resulting URL list to
-the UI. The list is also used by `FilterProfileToCatalog` to drop tier
-entries whose URL doesn't appear in the wheel's advertised set, with
-last-path-segment fallback (case-insensitive). See
+the UI. Under the `V2Type02` encoding the list is also used by
+`TierDefinitionEmitter.RefilterLiveTiers` to drop tier entries whose URL
+has no idx in the wheel's live catalog (case-insensitive full-URL match)
+and sort the rest by catalog idx. See
 [`../plugin/tier-impl.md`](../plugin/tier-impl.md).
 
 Catalog-only profile synthesis (`TelemetrySender.MaybeSwapProfileForCatalog`,

@@ -237,7 +237,6 @@ namespace MozaPlugin
 
         // Protection
         public volatile int Protection = -1;
-        public volatile int ProtectionMode;
         public volatile int NaturalInertia = -1;
 
         // High speed damping
@@ -251,7 +250,6 @@ namespace MozaPlugin
 
         // FFB misc
         public volatile int FfbReverse = -1;
-        public volatile int FfbDisable;
         public volatile int TempStrategy = -1;   // cmd 0x1E base — also exposed in
                                                   // PitHouse as "Performance output"
                                                   // (0 = Reserved, 1 = Full).
@@ -917,7 +915,6 @@ namespace MozaPlugin
 
                 // Protection
                 case "base-protection":         Protection = value; break;
-                case "base-protection-mode":    ProtectionMode = value; break;
                 case "base-natural-inertia":    NaturalInertia = value; break;
 
                 // High speed damping
@@ -931,7 +928,6 @@ namespace MozaPlugin
 
                 // FFB misc
                 case "base-ffb-reverse":    FfbReverse = value; break;
-                case "base-ffb-disable":    FfbDisable = value; break;
                 case "base-temp-strategy":  TempStrategy = value; break;
                 case "base-gearshift-vibration": GearshiftVibration = value; break;
 
@@ -1130,13 +1126,6 @@ namespace MozaPlugin
                 int idx = ParseTrailingIndex(commandName, "wheel-button-color");
                 if (idx >= 0 && idx < WheelButtonMax && data.Length >= 3)
                     SetColor(WheelButtonColors[idx], data);
-            }
-            // Wheel flag colors
-            else if (commandName.StartsWith("wheel-flag-color", StringComparison.Ordinal))
-            {
-                int idx = ParseTrailingIndex(commandName, "wheel-flag-color");
-                if (idx >= 0 && idx < 6 && data.Length >= 3)
-                    SetColor(WheelFlagColors[idx], data);
             }
             // Old wheel RPM colors
             else if (commandName.StartsWith("wheel-old-rpm-color", StringComparison.Ordinal))
@@ -1553,7 +1542,6 @@ namespace MozaPlugin
             if (commandName.StartsWith("wheel-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
                 return true;
             if (commandName.StartsWith("wheel-button-color", StringComparison.Ordinal)) return true;
-            if (commandName.StartsWith("wheel-flag-color", StringComparison.Ordinal)) return true;
             if (commandName.StartsWith("wheel-knob-bg-color", StringComparison.Ordinal)) return true;
             // wheel-knob{N}-active-color
             if (commandName.StartsWith("wheel-knob", StringComparison.Ordinal) && commandName.EndsWith("-active-color", StringComparison.Ordinal))

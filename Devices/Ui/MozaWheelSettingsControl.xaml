@@ -585,41 +585,6 @@
                         </StackPanel>
                     </ctrl:SectionCard>
 
-                    <!-- Hidden stubs: keep the x:Names + handler contract for code-behind. -->
-                    <StackPanel x:Name="WheelKnobRingSection" Visibility="Collapsed">
-                        <!-- Per-knob signal mode stubs (now driven by inline chips above each
-                             KnobRingViz). Plain ComboBox + StackPanel keeps the x:Names + handler
-                             contract intact for the existing code-behind without dragging extra
-                             SegmentedControl templates into the layout pass. -->
-                        <StackPanel x:Name="WiKnobSignalModePanel">
-                            <StackPanel x:Name="WiKnobSignalMode0Row">
-                                <ComboBox x:Name="WiKnobSignalMode0Combo" SelectionChanged="WiKnobSignalMode0Combo_Changed">
-                                    <ComboBoxItem Content="Buttons"/><ComboBoxItem Content="Knob"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel x:Name="WiKnobSignalMode1Row">
-                                <ComboBox x:Name="WiKnobSignalMode1Combo" SelectionChanged="WiKnobSignalMode1Combo_Changed">
-                                    <ComboBoxItem Content="Buttons"/><ComboBoxItem Content="Knob"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel x:Name="WiKnobSignalMode2Row">
-                                <ComboBox x:Name="WiKnobSignalMode2Combo" SelectionChanged="WiKnobSignalMode2Combo_Changed">
-                                    <ComboBoxItem Content="Buttons"/><ComboBoxItem Content="Knob"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel x:Name="WiKnobSignalMode3Row">
-                                <ComboBox x:Name="WiKnobSignalMode3Combo" SelectionChanged="WiKnobSignalMode3Combo_Changed">
-                                    <ComboBoxItem Content="Buttons"/><ComboBoxItem Content="Knob"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <StackPanel x:Name="WiKnobSignalMode4Row">
-                                <ComboBox x:Name="WiKnobSignalMode4Combo" SelectionChanged="WiKnobSignalMode4Combo_Changed">
-                                    <ComboBoxItem Content="Buttons"/><ComboBoxItem Content="Knob"/>
-                                </ComboBox>
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-
                     </StackPanel>
                 <!-- /ScrollViewer -->
             </TabItem>

@@ -38,7 +38,6 @@ namespace MozaPlugin.Telemetry.Frames
         private int _lastTierDefUnboundCount = -1;
         private int _lastTierDefTotalCount = -1;
 
-        public int LastTierDefUnboundCount => _lastTierDefUnboundCount;
         public int LastTierDefTotalCount => _lastTierDefTotalCount;
         public bool IsTierDefFullyBound =>
             _lastTierDefUnboundCount == 0 && _lastTierDefTotalCount > 0;
@@ -122,55 +121,6 @@ namespace MozaPlugin.Telemetry.Frames
                     return;
                 Thread.Sleep(20);
             }
-        }
-
-        /// <summary>Filter a profile to channels in the catalog (last-segment match accepted).</summary>
-        public static MultiStreamProfile FilterProfileToCatalog(
-            MultiStreamProfile profile,
-            IReadOnlyList<string> catalog)
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in catalog)
-            {
-                if (string.IsNullOrEmpty(entry)) continue;
-                set.Add(entry);
-                int slash = entry.LastIndexOf('/');
-                if (slash >= 0 && slash < entry.Length - 1)
-                    set.Add(entry.Substring(slash + 1));
-            }
-
-            bool ChannelMatches(ChannelDefinition ch)
-            {
-                if (set.Contains(ch.Url)) return true;
-                int slash = ch.Url.LastIndexOf('/');
-                if (slash >= 0 && slash < ch.Url.Length - 1
-                    && set.Contains(ch.Url.Substring(slash + 1))) return true;
-                return false;
-            }
-
-            var result = new MultiStreamProfile
-            {
-                Name = profile.Name,
-                PageCount = profile.PageCount,
-            };
-            foreach (var tier in profile.Tiers)
-            {
-                var kept = new List<ChannelDefinition>();
-                foreach (var ch in tier.Channels)
-                    if (ChannelMatches(ch)) kept.Add(ch);
-                if (kept.Count == 0) continue;
-                result.Tiers.Add(new DashboardProfile
-                {
-                    Name = tier.Name,
-                    Channels = kept,
-                    PackageLevel = tier.PackageLevel,
-                    TotalBits = tier.TotalBits,
-                    TotalBytes = tier.TotalBytes,
-                    FlagByte = tier.FlagByte,
-                });
-            }
-            // Empty filter → fall back to original (wheel rejects empty tier-defs).
-            return result.Tiers.Count == 0 ? profile : result;
         }
 
         /// <summary>Build a V0 subscription profile from the wheel's full catalog (host metadata reused per URL).</summary>
@@ -352,7 +302,9 @@ namespace MozaPlugin.Telemetry.Frames
             if (!_sender.ConnectionIsConnected)
                 return;
 
-            // V0: synthesize from catalog. V2/Type02: send all channels. V2 legacy: filter to catalog.
+            // V0: synthesize from catalog. V2Type02: refiltered to the live catalog
+            // below (RefilterLiveTiers); with no catalog yet (compact fallback) all
+            // channels are sent.
             // NEVER assign Profile property here — its setter re-expands tiers exponentially.
             //
             // LiveCatalog, not Catalog: Catalog is the never-pruned merge of every
@@ -511,13 +463,11 @@ namespace MozaPlugin.Telemetry.Frames
                         _sender.CatalogParser.GetEndMarkerForSession(tierDefSession);
                     byte[] message = TierDefinitionBuilder.BuildTierDefinitionMessage(
                         profile, flagBase,
-                        includeEnableEntries: true,
                         useWheelCatalogIndices: cspIdx,
                         wheelCatalog: catalog,
                         endMarkerCounter: endForThisEmission,
                         prevFlagBase: doReuse ? (byte?)null : prevSub?.FlagBase,
-                        prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0),
-                        prevSubPerBroadcast: doReuse ? 0 : (prevSub?.SubTiersPerBroadcast ?? 0));
+                        prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0));
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     // Stamp BEFORE the chunks hit the wire — the wheel's reject
@@ -540,8 +490,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _sender.ActiveSubscription = new TelemetrySender.SubscriptionState(
                         flagBase: flagBase,
                         tierCount: profile.Tiers.Count,
-                        subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile),
-                        profileName: profile.Name);
+                        subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile));
                     _sender.IncrementSubscriptionGen();
                     if (!doReuse)
                     {

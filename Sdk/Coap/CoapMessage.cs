@@ -69,7 +69,7 @@ namespace MozaPlugin.Sdk.Coap
 
         /// <summary>
         /// Returns the first option matching <paramref name="number"/>, or null
-        /// if absent. Use <see cref="GetOptions"/> for repeated options.
+        /// if absent.
         /// </summary>
         public CoapOption? GetOption(int number)
         {
@@ -78,14 +78,6 @@ namespace MozaPlugin.Sdk.Coap
                 if (Options[i].Number == number) return Options[i];
             }
             return null;
-        }
-
-        public IEnumerable<CoapOption> GetOptions(int number)
-        {
-            for (int i = 0; i < Options.Count; i++)
-            {
-                if (Options[i].Number == number) yield return Options[i];
-            }
         }
 
         /// <summary>

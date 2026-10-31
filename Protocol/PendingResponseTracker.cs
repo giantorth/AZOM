@@ -54,49 +54,18 @@ namespace MozaPlugin.Protocol
         // skips these; a response for one lifts it; Clear() empties the set.
         private readonly HashSet<string> _sunset = new();
         private readonly object _lock = new object();
-        // Lock-free count mirror; NoteResponse early-outs when idle (~50-200 Hz path).
+        // Lock-free count mirrors; NoteResponse early-outs when idle (~50-200 Hz path).
         private volatile int _pendingCount;
         private volatile int _sunsetCount;
 
         public int PendingCount => _pendingCount;
 
-        /// <summary>Number of command names that have been sunset on the
-        /// current connection (no response within <see cref="SunsetAfterMs"/>).
-        /// Reset on <see cref="Clear"/>. A growing value across reconnects
-        /// indicates the user's hardware variant doesn't implement those
-        /// commands; not necessarily an error.</summary>
-        public int SunsetCount => _sunsetCount;
-
-        /// <summary>Wall-clock milliseconds the oldest still-pending entry has
-        /// been waiting for its response. Zero when nothing is pending.
-        /// Useful as a diagnostic: a value that grows without bound indicates
-        /// the wheel never produced the expected named response.</summary>
-        public long LongestPendingMs
-        {
-            get
-            {
-                if (_pendingCount == 0) return 0;
-                long oldest = long.MaxValue;
-                lock (_lock)
-                {
-                    foreach (var kv in _pending)
-                    {
-                        if (kv.Value.EnqueuedAtTicks < oldest)
-                            oldest = kv.Value.EnqueuedAtTicks;
-                    }
-                }
-                if (oldest == long.MaxValue) return 0;
-                return (DateTime.UtcNow.Ticks - oldest) / TimeSpan.TicksPerMillisecond;
-            }
-        }
-
         /// <summary>Track an outbound frame awaiting a named response (caller
-        /// has already Send'd). The <paramref name="maxAttempts"/> parameter
-        /// is accepted for API stability but no longer enforced — retries are
-        /// bounded by <see cref="SunsetAfterMs"/>, not attempt count.
+        /// has already Send'd). Retries are bounded by
+        /// <see cref="SunsetAfterMs"/>, not attempt count.
         /// Silently no-ops if <paramref name="expectedName"/> has been sunset
         /// on this connection.</summary>
-        public void Track(string expectedName, byte[] frame, int[] backoffMs, int maxAttempts)
+        public void Track(string expectedName, byte[] frame, int[] backoffMs)
         {
             if (string.IsNullOrEmpty(expectedName) || frame == null || backoffMs == null) return;
             if (backoffMs.Length == 0) return;

@@ -229,7 +229,6 @@ namespace MozaPlugin.Telemetry
 
         // ── Inbound-dispatcher accessors ─────────────────────────────────
         internal SessionDispatcher Dispatcher => _dispatcher;
-        internal SessionRegistry Sessions => _sessions;
         internal WheelUploadCoordinator Uploader => _uploader;
         internal ConfigJsonClient ConfigJson => _configJson;
         internal RpcCallChannel Rpc => _rpc;
@@ -313,6 +312,15 @@ namespace MozaPlugin.Telemetry
             }
         }
 
+        // FF session the init handshake (kind=2/7) was last sent on. The
+        // handshake fires early in StartInner BEFORE the wheel's catalog has
+        // arrived, so on a Form-B wheel it goes on the pre-catalog FF default
+        // (0x02) while the catalog later flips the FF session to 0x01. The wheel
+        // acked the init on the old session and won't accept kind=4 / commit the
+        // tier-def on the new session, so ApplySubscription re-sends the init on
+        // the corrected FF session. 0 = not sent this cycle.
+        private byte _initHandshakeSession;
+
         /// <summary>
         /// Cold-start session 0x02 init handshake. PitHouse bridge captures
         /// (verified across 2026-04-28..05-03 via
@@ -338,15 +346,6 @@ namespace MozaPlugin.Telemetry
         /// wheel (required power-cycle); the records carry session-bound
         /// state and have to be regenerated per cold-start, not replayed.
         /// </summary>
-        // FF session the init handshake (kind=2/7) was last sent on. The
-        // handshake fires early in StartInner BEFORE the wheel's catalog has
-        // arrived, so on a Form-B wheel it goes on the pre-catalog FF default
-        // (0x02) while the catalog later flips the FF session to 0x01. The wheel
-        // acked the init on the old session and won't accept kind=4 / commit the
-        // tier-def on the new session, so ApplySubscription re-sends the init on
-        // the corrected FF session. 0 = not sent this cycle.
-        private byte _initHandshakeSession;
-
         internal void SendSessionInitHandshake()
         {
             if (_state == TelemetryState.Idle || !_connection.IsConnected) return;
@@ -423,9 +422,9 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>
         /// Stop+Start cycle for dashboard switches. Used when the kind=4 has
-        /// already been sent by the caller (UI knob in MozaWheelSettingsControl,
-        /// or auto-test via SwitchToProfile) — we just need to rebind our
-        /// session state to match the new dashboard. The wheel's ~10–14s
+        /// already been sent by the caller (UI knob in MozaWheelSettingsControl)
+        /// — we just need to rebind our session state to match the new
+        /// dashboard. The wheel's ~10–14s
         /// internal sess=0x09 timeout is the gate on re-engagement; the
         /// silence enforcement inside <see cref="StartInner"/> (via
         /// SilenceGate, which Stop arms unconditionally) handles that
@@ -486,12 +485,5 @@ namespace MozaPlugin.Telemetry
                 global::MozaPlugin.Telemetry.Sessions.SessionPropertyPushBuilder.KindDashDisplayRotation,
                 (byte)mode);
         }
-
-        /// <summary>
-        /// Drop queued and in-flight writes on the serial connection. Exposed so
-        /// the UI Test Stop button can halt wire traffic immediately even when
-        /// the sender itself is left running (telemetry remains enabled).
-        /// </summary>
-        public void FlushPendingOutput() => _connection.FlushPendingWrites();
     }
 }

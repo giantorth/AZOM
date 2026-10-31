@@ -855,8 +855,6 @@ namespace MozaPlugin.Devices.Led
 
                 if (rawColors.Length > 0 || overrideColors.Length > 0)
                 {
-                    // LogRawDiagnostic(rawColors, ledColors.Length, buttonColors.Length);
-
                     int telemetryPhys = modelInfo != null
                         ? modelInfo.RpmLedCount + (modelInfo.HasFlagLeds ? MozaDeviceConstants.FlagLedCount : 0)
                         : ledColors.Length;
@@ -1200,13 +1198,6 @@ namespace MozaPlugin.Devices.Led
                             knobBitmask |= (1 << i);
                     }
 
-
-                    // We're in this block because SimHub is feeding the knob channel, so
-                    // drive the owned knobs every frame. The explicit release paths
-                    // (Default-during-telemetry toggle / static-hold timeout / no owned
-                    // knob left) are what hand the ring back to its stored colours.
-                    bool knobsActive = true;
-
                     // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
                     // colours stay unchanged for longer than the timeout, release telemetry
                     // ownership so the wheel shows its native per-position colours — lets a
@@ -1266,7 +1257,7 @@ namespace MozaPlugin.Devices.Led
                         // just don't drive. Crucially, taking THIS branch (not the drive
                         // else-if) for every off frame — even after _lastKnobBitmask was
                         // reset to -1 by the release — is what stops the release ↔ re-drive
-                        // flicker that knobsActive=true would otherwise cause.
+                        // flicker that driving every frame would otherwise cause.
                         if (_lastKnobBitmask > 0 && !ledThrottled)
                         {
                             var layout = KnobLayout(plugin, count);
@@ -1278,8 +1269,11 @@ namespace MozaPlugin.Devices.Led
                         }
                         if (knobStaticTimedOut) _knobStaticHoldReleased = true;
                     }
-                    else if (knobsActive && !_knobStaticHoldReleased)
+                    else if (!_knobStaticHoldReleased)
                     {
+                        // SimHub is feeding the knob channel, so drive the owned knobs every
+                        // frame; the release branch above hands the ring back to its stored
+                        // colours.
                         bool knobResend = Volatile.Read(ref _knobResend) != 0;
                         bool knobsChanged = knobResend || !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = !ledThrottled
@@ -2010,29 +2004,6 @@ namespace MozaPlugin.Devices.Led
                 rgb[i] = (colors[i].R << 16) | (colors[i].G << 8) | colors[i].B;
             return rgb;
         }
-
-        // Diagnostic: log rawColors length and per-slot state once per distinct pattern.
-        // Helps verify SimHub's Individual-LEDs output shape (physical-indexed vs other).
-#if MOZA_RAW_LED_DIAG
-        private string? _lastRawDiagKey;
-        private void LogRawDiagnostic(Color[] rawColors, int ledsLen, int buttonsLen)
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"rawLen={rawColors.Length} leds={ledsLen} buttons={buttonsLen} nonEmpty=[");
-            for (int i = 0; i < rawColors.Length; i++)
-            {
-                var c = rawColors[i];
-                if (c.A != 0 || c.R != 0 || c.G != 0 || c.B != 0)
-                    sb.Append($"{i}:A{c.A}R{c.R}G{c.G}B{c.B} ");
-            }
-            sb.Append(']');
-            string key = sb.ToString();
-            if (key == _lastRawDiagKey) return;
-            _lastRawDiagKey = key;
-            // Very chatty when animation is running
-            MozaLog.Debug($"[AZOM] IndividualLEDs diag {key}");
-        }
-#endif
 
         // Bit i set when colors[offset + i] is lit (any of R/G/B non-zero).
         private static int LitMask(Color[] colors, int offset, int count)

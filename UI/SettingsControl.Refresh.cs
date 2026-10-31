@@ -110,11 +110,7 @@ namespace MozaPlugin.UI
             RefreshDisplay(this, EventArgs.Empty);
         }
 
-        // Every tab the pane can hide: the detection-gated device tabs, plus the
-        // ones hidden unconditionally in XAML — the wheel tab (migrated to the
-        // per-wheel device page) and the dashboard upload / wheel files tabs
-        // (feature still in development). Nothing else drives the latter three's
-        // Visibility, so ShowAllTabs is the only thing that surfaces them.
+        // The detection-gated device tabs ShowAllTabs can force visible.
         private TabItem[] HideableTabs => new[]
         {
             BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
@@ -151,16 +147,9 @@ namespace MozaPlugin.UI
             if (BaseTab.IsSelected)
             {
                 if (connected && _data.MaxAngle > 0)
-                {
-                    double deg = hidReader!.GetCurrentAngleDegrees(_data.MaxAngle * 2);
-                    SteeringAngleLabel.Text = $"{deg:0;-0;0}°";
-                    UpdateRedesignSteeringAngle(deg, valid: true);
-                }
+                    UpdateRedesignSteeringAngle(hidReader!.GetCurrentAngleDegrees(_data.MaxAngle * 2), valid: true);
                 else
-                {
-                    SteeringAngleLabel.Text = "--";
                     UpdateRedesignSteeringAngle(0, valid: false);
-                }
             }
 
             if (HandbrakeTab.IsSelected)
@@ -269,8 +258,6 @@ namespace MozaPlugin.UI
 
         private void RefreshBaseTab()
         {
-            ConnectionIndicator.Fill = _data.IsConnected ? Brushes.LimeGreen : Brushes.Gray;
-            ConnectionLabel.Text = _data.IsConnected ? "Connected" : "Disconnected";
             bool baseShown = BaseTab.IsSelected;
             UpdateRedesignLiveDisplays(baseShown);
 
@@ -303,11 +290,6 @@ namespace MozaPlugin.UI
             // the tab's own contents, only while it is shown
             // (MainTabs_SelectionChanged repaints it on selection).
             if (!baseShown) return;
-
-            string tempUnit = _data.UseFahrenheit ? "°F" : "°C";
-            McuTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.McuTemp):F0} {tempUnit}" : "--";
-            MosfetTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.MosfetTemp):F0} {tempUnit}" : "--";
-            MotorTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.MotorTemp):F0} {tempUnit}" : "--";
 
             // Reverse expression: *2 (raw → display degrees)
             // Floor 60° = measured firmware clamp (PitHouse stops at 90°);
@@ -413,34 +395,34 @@ namespace MozaPlugin.UI
 
             // FFB Equalizer (100% = flat). Ranges depend on the band mode:
             // legacy 0-400 on all six; 10-band fw is 0-500 except the 100 Hz
-            // band (Eq6), which keeps its 0-100 cap. SetSliderRaw clamps, so
+            // band (Eq6), which keeps its 0-100 cap. SetDataSlider clamps, so
             // the ranges are load-bearing.
             int eqHi = eq10 ? 500 : 400;
-            SetSliderRaw(Eq1Slider, Eq1Value, _data.Equalizer1, 0, eqHi, "%");
-            SetSliderRaw(Eq2Slider, Eq2Value, _data.Equalizer2, 0, eqHi, "%");
-            SetSliderRaw(Eq3Slider, Eq3Value, _data.Equalizer3, 0, eqHi, "%");
-            SetSliderRaw(Eq4Slider, Eq4Value, _data.Equalizer4, 0, eqHi, "%");
-            SetSliderRaw(Eq5Slider, Eq5Value, _data.Equalizer5, 0, eqHi, "%");
-            SetSliderRaw(Eq6Slider, Eq6Value, _data.Equalizer6, 0, eq10 ? 100 : 400, "%");
+            SetDataSlider(Eq1Slider, _data.Equalizer1, 0, eqHi);
+            SetDataSlider(Eq2Slider, _data.Equalizer2, 0, eqHi);
+            SetDataSlider(Eq3Slider, _data.Equalizer3, 0, eqHi);
+            SetDataSlider(Eq4Slider, _data.Equalizer4, 0, eqHi);
+            SetDataSlider(Eq5Slider, _data.Equalizer5, 0, eqHi);
+            SetDataSlider(Eq6Slider, _data.Equalizer6, 0, eq10 ? 100 : 400);
             if (eq10)
             {
-                SetSliderRaw(Eq7Slider, Eq7Value, _data.Equalizer7, 0, 500, "%");
-                SetSliderRaw(Eq8Slider, Eq8Value, _data.Equalizer8, 0, 500, "%");
-                SetSliderRaw(Eq9Slider, Eq9Value, _data.Equalizer9, 0, 500, "%");
-                SetSliderRaw(Eq10Slider, Eq10Value, _data.Equalizer10, 0, 500, "%");
+                SetDataSlider(Eq7Slider, _data.Equalizer7, 0, 500);
+                SetDataSlider(Eq8Slider, _data.Equalizer8, 0, 500);
+                SetDataSlider(Eq9Slider, _data.Equalizer9, 0, 500);
+                SetDataSlider(Eq10Slider, _data.Equalizer10, 0, 500);
             }
 
             // FFB Curve — X1..X4 are the draggable input positions of points 1-4
             // (point 5 fixed at input=100%); Y1..Y5 the output values.
-            SetSliderRaw(FfbCurveX1Slider, FfbCurveX1Value, _data.FfbCurveX1, 0, 100, "");
-            SetSliderRaw(FfbCurveX2Slider, FfbCurveX2Value, _data.FfbCurveX2, 0, 100, "");
-            SetSliderRaw(FfbCurveX3Slider, FfbCurveX3Value, _data.FfbCurveX3, 0, 100, "");
-            SetSliderRaw(FfbCurveX4Slider, FfbCurveX4Value, _data.FfbCurveX4, 0, 100, "");
-            SetSliderRaw(FfbCurveY1Slider, FfbCurveY1Value, _data.FfbCurveY1, 0, 100, "");
-            SetSliderRaw(FfbCurveY2Slider, FfbCurveY2Value, _data.FfbCurveY2, 0, 100, "");
-            SetSliderRaw(FfbCurveY3Slider, FfbCurveY3Value, _data.FfbCurveY3, 0, 100, "");
-            SetSliderRaw(FfbCurveY4Slider, FfbCurveY4Value, _data.FfbCurveY4, 0, 100, "");
-            SetSliderRaw(FfbCurveY5Slider, FfbCurveY5Value, _data.FfbCurveY5, 0, 100, "");
+            SetDataSlider(FfbCurveX1Slider, _data.FfbCurveX1, 0, 100);
+            SetDataSlider(FfbCurveX2Slider, _data.FfbCurveX2, 0, 100);
+            SetDataSlider(FfbCurveX3Slider, _data.FfbCurveX3, 0, 100);
+            SetDataSlider(FfbCurveX4Slider, _data.FfbCurveX4, 0, 100);
+            SetDataSlider(FfbCurveY1Slider, _data.FfbCurveY1, 0, 100);
+            SetDataSlider(FfbCurveY2Slider, _data.FfbCurveY2, 0, 100);
+            SetDataSlider(FfbCurveY3Slider, _data.FfbCurveY3, 0, 100);
+            SetDataSlider(FfbCurveY4Slider, _data.FfbCurveY4, 0, 100);
+            SetDataSlider(FfbCurveY5Slider, _data.FfbCurveY5, 0, 100);
 
             // Deadzone compensation has no register; read it back off the curve.
             int dz = DeadzoneCompFromCurve();

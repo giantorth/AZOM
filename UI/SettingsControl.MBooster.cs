@@ -443,13 +443,6 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Write <paramref name="role"/> to wherever <see cref="MozaMBoosterRegistry.ResolveAxisRole"/>
-        /// actually reads it for (<paramref name="axisCount"/>, <paramref name="axisIndex"/>)
-        /// — <c>Role</c> for a standalone pedal, <c>AxisRoles[axisIndex]</c> for
-        /// one pedal of a chain (seeding the array from the currently-resolved
-        /// roles first, so unedited axes keep their effective role).
-        /// </summary>
-        /// <summary>
         /// Persist one pedal's role. <paramref name="rawAxisCount"/> sizes the
         /// <see cref="MBoosterDeviceSettings.AxisRoles"/> array (it's indexed by
         /// HID axis index, so it must cover every axis, wired or not), while
@@ -800,19 +793,11 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterGForceResponseSpeedValue, (fx?.GForce?.ResponseSpeedPct ?? 50).ToString());
         }
 
-        /// <summary>Seed the Calibration, Sim Input Mapping and Pedal Feel controls
+        /// <summary>Seed the output curve, Sim Input Mapping and Pedal Feel controls
         /// from one pedal's config (master flat fields or a chained pedal's entry;
         /// null = defaults). Assumes the event suppressor is active.</summary>
         private void SeedMBoosterConfigControls(IMBoosterPedalConfig? fx)
         {
-            // Calibration
-            MBoosterDirCheck.IsChecked = (fx?.Direction == 1);
-            int min = fx?.Min ?? -1;
-            MBoosterMinSlider.Value = min >= 0 ? min : 0;
-            SetValueText(MBoosterMinValue, MBoosterMinSlider.Value.ToString("F0"));
-            int max = fx?.Max ?? -1;
-            MBoosterMaxSlider.Value = max >= 0 ? max : 0;
-            SetValueText(MBoosterMaxValue, MBoosterMaxSlider.Value.ToString("F0"));
             SeedMBoosterOutputCurve(fx);
             // Sim Input Mapping
             float ratio = fx?.SensorOutputRatioPct ?? -1;
@@ -824,20 +809,20 @@ namespace MozaPlugin.UI
             // Pedal Feel
             var inputCurve = (fx?.InputCurveY != null && fx.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
                 ? fx.InputCurveY : MBoosterInputCurveDefault;
-            MBoosterInputY1Slider.Value = inputCurve[0]; SetValueText(MBoosterInputY1Value, inputCurve[0].ToString("F0"));
-            MBoosterInputY2Slider.Value = inputCurve[1]; SetValueText(MBoosterInputY2Value, inputCurve[1].ToString("F0"));
-            MBoosterInputY3Slider.Value = inputCurve[2]; SetValueText(MBoosterInputY3Value, inputCurve[2].ToString("F0"));
-            MBoosterInputY4Slider.Value = inputCurve[3]; SetValueText(MBoosterInputY4Value, inputCurve[3].ToString("F0"));
-            MBoosterInputY5Slider.Value = inputCurve[4]; SetValueText(MBoosterInputY5Value, inputCurve[4].ToString("F0"));
-            MBoosterInputY6Slider.Value = inputCurve[5]; SetValueText(MBoosterInputY6Value, inputCurve[5].ToString("F0"));
+            MBoosterInputY1Slider.Value = inputCurve[0];
+            MBoosterInputY2Slider.Value = inputCurve[1];
+            MBoosterInputY3Slider.Value = inputCurve[2];
+            MBoosterInputY4Slider.Value = inputCurve[3];
+            MBoosterInputY5Slider.Value = inputCurve[4];
+            MBoosterInputY6Slider.Value = inputCurve[5];
             var inputCurveX = (fx?.InputCurveX != null && fx.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
                 ? fx.InputCurveX : MBoosterInputCurveDefault;
-            MBoosterInputX1Slider.Value = inputCurveX[0]; SetValueText(MBoosterInputX1Value, inputCurveX[0].ToString("F0"));
-            MBoosterInputX2Slider.Value = inputCurveX[1]; SetValueText(MBoosterInputX2Value, inputCurveX[1].ToString("F0"));
-            MBoosterInputX3Slider.Value = inputCurveX[2]; SetValueText(MBoosterInputX3Value, inputCurveX[2].ToString("F0"));
-            MBoosterInputX4Slider.Value = inputCurveX[3]; SetValueText(MBoosterInputX4Value, inputCurveX[3].ToString("F0"));
-            MBoosterInputX5Slider.Value = inputCurveX[4]; SetValueText(MBoosterInputX5Value, inputCurveX[4].ToString("F0"));
-            MBoosterInputX6Slider.Value = inputCurveX[5]; SetValueText(MBoosterInputX6Value, inputCurveX[5].ToString("F0"));
+            MBoosterInputX1Slider.Value = inputCurveX[0];
+            MBoosterInputX2Slider.Value = inputCurveX[1];
+            MBoosterInputX3Slider.Value = inputCurveX[2];
+            MBoosterInputX4Slider.Value = inputCurveX[3];
+            MBoosterInputX5Slider.Value = inputCurveX[4];
+            MBoosterInputX6Slider.Value = inputCurveX[5];
             float mf = fx?.MaxForceKg ?? -1;
             MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));

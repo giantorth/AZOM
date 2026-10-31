@@ -659,13 +659,6 @@ skipReadByMode:
                             && _plugin!.IsNewWheelDetected
                             && _plugin!.IsWheelPageReady;
 
-            if (wheelConnected)
-            {
-                string modelName = _data!.WheelModelName;
-                string swVersion = _data.WheelSwVersion;
-                string hwVersion = _data.WheelHwVersion;
-            }
-
             using (_suppressor.Begin())
             {
                 bool anyWheel = newWheel || oldWheel;

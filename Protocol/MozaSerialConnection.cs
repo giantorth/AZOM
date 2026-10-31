@@ -544,7 +544,6 @@ namespace MozaPlugin.Protocol
         private readonly object _failureLock = new object();
         private ConnectionFailureInfo _lastFailure;
         private int _consecutiveOpenFailures;
-        private DateTime _lastSuccessfulOpenUtc;
 
         public event Action<byte[]>? MessageReceived;
         // Raised on the I/O thread after HandleIoFailure force-closes the port.
@@ -571,7 +570,7 @@ namespace MozaPlugin.Protocol
 
         /// <summary>Sliding-window snapshot of write-budget utilization. Read by
         /// the diagnostics tab so the user can see when the link approaches
-        /// saturation. Each call resets the rolling peak.</summary>
+        /// saturation.</summary>
         public WriteBudget.Snapshot CurrentBudget => _budget.GetSnapshot();
 
         /// <summary>Wire-error counters surfaced together — drops on write,
@@ -686,13 +685,6 @@ namespace MozaPlugin.Protocol
         /// </summary>
         public int ConsecutiveOpenFailures =>
             Interlocked.CompareExchange(ref _consecutiveOpenFailures, 0, 0);
-
-        /// <summary>UTC of the most recent successful <see cref="TryOpen"/>;
-        /// <see cref="DateTime.MinValue"/> if never connected this session.</summary>
-        public DateTime LastSuccessfulOpenUtc
-        {
-            get { lock (_failureLock) return _lastSuccessfulOpenUtc; }
-        }
 
         /// <summary>Time since the last inbound byte on this connection; null
         /// before the first one (or after the read-idle detector has fired).
@@ -1023,10 +1015,7 @@ namespace MozaPlugin.Protocol
             // value from a prior connection can't immediately force-close.
             Interlocked.Exchange(ref _lastRxUtcTicks, 0);
             lock (_failureLock)
-            {
                 _lastFailure = ConnectionFailureInfo.None;
-                _lastSuccessfulOpenUtc = DateTime.UtcNow;
-            }
             Interlocked.Exchange(ref _consecutiveOpenFailures, 0);
             MozaLog.Info($"[AZOM] Connected to {portName}");
             return true;
@@ -1988,8 +1977,7 @@ namespace MozaPlugin.Protocol
                 long warnNow = System.Diagnostics.Stopwatch.GetTimestamp();
                 if (warnNow - lastBudgetWarnTs >= oneSecTicks)
                 {
-                    // PeekSnapshot preserves the rolling peak for the diagnostics tab.
-                    var snap = _budget.PeekSnapshot();
+                    var snap = _budget.GetSnapshot();
                     if (snap.PercentBudget >= 90)
                     {
                         MozaLog.Warn(

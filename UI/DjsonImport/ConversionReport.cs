@@ -20,7 +20,6 @@ namespace MozaPlugin.UI.DjsonImport
     public sealed class ItemRecord
     {
         public string SourceType { get; set; } = "";
-        public string Name { get; set; } = "";
         public ItemOutcome Outcome { get; set; }
         public string Detail { get; set; } = "";
     }
@@ -77,11 +76,10 @@ namespace MozaPlugin.UI.DjsonImport
         /// rather than shipping a misleadingly clean result.</summary>
         public double DropRatio => TotalCount == 0 ? 0 : (double)DroppedCount / TotalCount;
 
-        public void Record(string sourceType, string name, ItemOutcome outcome, string detail = "")
+        public void Record(string sourceType, ItemOutcome outcome, string detail = "")
             => Items.Add(new ItemRecord
             {
                 SourceType = sourceType,
-                Name = name,
                 Outcome = outcome,
                 Detail = detail,
             });

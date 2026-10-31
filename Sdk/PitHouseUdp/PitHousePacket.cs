@@ -23,7 +23,6 @@ namespace MozaPlugin.Sdk.PitHouseUdp
     internal sealed class PitHousePacket
     {
         public int PacketId { get; }
-        public string Version { get; }
         public int? ReplyPort { get; }
         /// <summary>
         /// Decoded payload. Typically a <see cref="Dictionary{TKey,TValue}"/>
@@ -34,10 +33,9 @@ namespace MozaPlugin.Sdk.PitHouseUdp
         /// </summary>
         public object? Payload { get; }
 
-        public PitHousePacket(int packetId, string version, int? replyPort, object? payload)
+        public PitHousePacket(int packetId, int? replyPort, object? payload)
         {
             PacketId = packetId;
-            Version = version ?? string.Empty;
             ReplyPort = replyPort;
             Payload = payload;
         }

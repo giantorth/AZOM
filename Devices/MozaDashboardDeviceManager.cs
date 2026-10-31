@@ -58,9 +58,6 @@ namespace MozaPlugin.Devices
             return ok;
         }
 
-        /// <summary>Send setting reads on the dashboard connection.</summary>
-        public void ReadSettings(params string[] commandNames) => _deviceManager.ReadSettings(commandNames);
-
         /// <summary>
         /// Write an int setting to an explicit device id on the dashboard
         /// connection. Used to push the live RPM/flag LED bitmask

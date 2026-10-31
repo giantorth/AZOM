@@ -954,35 +954,6 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
-        private void TelemetryClearMzdash_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-            _plugin.ActiveTelemetryProfileName = "";
-            _plugin.ActiveTelemetryMzdashPath = "";
-            _plugin.SaveSettings();
-            _plugin.OnDashboardSwitched();
-
-            using (_suppressor.Begin())
-            {
-                // Drop any stale [Custom: ...] entry so the dropdown doesn't keep
-                // showing a previously-loaded mzdash filename.
-                for (int i = TelemetryProfileList.Items.Count - 1; i >= 0; i--)
-                    if (TelemetryProfileList.Items[i]?.ToString()?.StartsWith("[Custom:") == true)
-                        TelemetryProfileList.Items.RemoveAt(i);
-                // Select "(none)".
-                for (int i = 0; i < TelemetryProfileList.Items.Count; i++)
-                {
-                    if (TelemetryProfileList.Items[i]?.ToString() == "(none)")
-                    {
-                        TelemetryProfileList.SelectedIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            PopulateChannelMappingList();
-        }
-
         // Single toggle: Send Test Pattern ⇄ Stop Test. Button content + enabled
         // state are kept in sync each tick by RefreshTelemetryStatus.
         private void TelemetryTestToggle_Click(object sender, RoutedEventArgs e)

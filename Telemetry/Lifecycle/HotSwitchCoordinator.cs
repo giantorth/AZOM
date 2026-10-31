@@ -91,7 +91,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
         public bool Enabled { get; set; } = true;
 
         public bool IsBurstPending => Volatile.Read(ref _pendingReemit) != 0;
-        public int RemainingEmissions => Math.Max(0, Volatile.Read(ref _pendingReemit));
         public int EmissionsSent => Volatile.Read(ref _emissionsSent);
         public int ArmTickMs => _armTickMs;
         public int LastEmissionTickMs => _lastEmissionTickMs;
@@ -227,12 +226,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
             int newSent = Interlocked.Increment(ref _emissionsSent);
             int newRemaining = Interlocked.Decrement(ref _pendingReemit);
 
-            int cap = boundComplete switch
-            {
-                null  => EmissionCount,                              // legacy
-                true  => Math.Max(MinEmissions, EmissionCount),      // bound: stop at min
-                false => MaxEmissions,                               // not bound: extend
-            };
             // Bound-with-min-reached: clamp the residual to zero.
             if (boundComplete == true && newSent >= MinEmissions)
             {
@@ -241,7 +234,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             }
 
             // Hit the legacy cap (no bind info) — stop.
-            if (boundComplete == null && newSent >= cap)
+            if (boundComplete == null && newSent >= EmissionCount)
             {
                 Interlocked.Exchange(ref _pendingReemit, 0);
                 return 0;

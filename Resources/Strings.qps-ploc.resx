@@ -144,7 +144,6 @@
   <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>Howl!</value></data>
   <data name="Section_MBoosterPedals" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value></value></data>
-  <data name="SliderLabel_Device" xml:space="preserve"><value>Awoo!</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Yap!</value></data>
@@ -162,7 +161,6 @@
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Barff!</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>AWOO!!</value></data>
-  <data name="Subtitle_SimInputMapping" xml:space="preserve"><value></value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value></value></data>
@@ -173,7 +171,6 @@
   <data name="Section_RoadTexture" xml:space="preserve"><value>Barff!</value></data>
   <data name="Section_BrakeFade" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Boof!</value></data>
-  <data name="Button_Test1s" xml:space="preserve"><value>Yip!</value></data>
   <data name="Label_Test" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Ruff!</value></data>
@@ -201,12 +198,7 @@
   <data name="Button_AddCustomEffect" xml:space="preserve"><value>Yip!</value></data>
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Yap!</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Woof!</value></data>
-  <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>Ruff Arf Bork!</value></data>
-  <data name="Label_ReversedDirection" xml:space="preserve"><value>Awoo!</value></data>
-  <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Rrrf!</value></data>
-  <data name="SliderLabel_MaxRaw" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>WOOF!!</value></data>
-  <data name="Button_Apply" xml:space="preserve"><value>RUFF!!</value></data>
   <data name="Section_UniversalHubPedals" xml:space="preserve"><value>YOWL!!</value></data>
   <data name="Subtitle_PedalsPort" xml:space="preserve"><value>Bork Arf!</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Wan!</value></data>
@@ -313,22 +305,11 @@
   <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>Woof Grr!</value></data>
   <data name="Section_Updates" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Subtitle_Updates" xml:space="preserve"><value>Grr!</value></data>
-  <data name="Section_Bandwidth" xml:space="preserve"><value>BORK!!</value></data>
-  <data name="Subtitle_Bandwidth" xml:space="preserve"><value>Wuff Arf!</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Label_Outbound" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Label_Capacity" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Label_Peak" xml:space="preserve"><value>WROOF!!</value></data>
-  <data name="Label_Session" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Section_SerialTrafficCapture" xml:space="preserve"><value>BARK!!</value></data>
-  <data name="Subtitle_SerialTrafficCapture" xml:space="preserve"><value>Grrowl Woof!</value></data>
-  <data name="Hint_CaptureDataInMemory" xml:space="preserve"><value>Grrowl Boof Yowff Grrowl Bark Bork!</value></data>
-  <data name="Button_StartCapture" xml:space="preserve"><value>AWOO!!</value></data>
-  <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Yowff Grr Yap!</value></data>
-  <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Howl Grrowl Howl Woof!</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Button_CopyReference" xml:space="preserve"><value>Yip Yip!</value></data>
-  <data name="Button_CopyCapture" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>Woof!</value></data>
   <data name="Button_Expand" xml:space="preserve"><value>GRRR!!</value></data>
@@ -338,20 +319,16 @@
   <data name="Hint_FullDiagRendered" xml:space="preserve"><value>Ruff Awoo {0} Yap Woof!</value></data>
   <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Hint_MBoosterIntro" xml:space="preserve"><value></value></data>
-  <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>YOWL!!</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>WROOF!!</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>BORK WROOF!!</value></data>
-  <data name="Label_BaseModel" xml:space="preserve"><value>Arf!</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Yowl Ruff Barff Yowff Rrrf Yowl!</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>RUFF!!</value></data>
   <data name="SliderLabel_IndicatorState" xml:space="preserve"><value>Barff!</value></data>
   <data name="Option_Off" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Option_On" xml:space="preserve"><value>Snarf!</value></data>
-  <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Bark!</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Barff!</value></data>
   <data name="Option_Breath" xml:space="preserve"><value>Howl!</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Yap!</value></data>
@@ -361,11 +338,7 @@
   <data name="SliderLabel_Brightness" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Section_Sleep" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Snarf!</value></data>
-  <data name="Option_Enabled" xml:space="preserve"><value>Yowl!</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Bork!</value></data>
-  <data name="Section_PowerOnOffColor" xml:space="preserve"><value>ARF YAP!!</value></data>
-  <data name="SliderLabel_StartupColor" xml:space="preserve"><value>Awoo!</value></data>
-  <data name="SliderLabel_ShutdownColor" xml:space="preserve"><value>Wan!</value></data>
   <data name="Section_MozaDashboard" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Snarf…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>BORK!!</value></data>
@@ -400,13 +373,10 @@
   <data name="Label_PaddleCombined" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>YAP!!</value></data>
   <data name="Section_Joystick" xml:space="preserve"><value>WROOF!!</value></data>
-  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Yip Boof Wan Grrowl Grrowl Yap!</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Awoo!</value></data>
-  <data name="Button_LoadMzdash" xml:space="preserve"><value>BORK…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>BORK…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Yowl Awoo Awoo!</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Yip Wuff Wan!</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Boof Grr Yap!</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>BARK!!</value></data>
@@ -428,20 +398,9 @@
   <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Un-bork it, Rrrf!</value></data>
   <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>No Bark (check the log)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>RUFF!!</value></data>
-  <data name="Button_SplitField" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Button_BitSplit" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Button_MergePrev" xml:space="preserve"><value>GRRR!!</value></data>
-  <data name="Button_MergeNext" xml:space="preserve"><value>GRRR!!</value></data>
-  <data name="Button_RemoveSplit" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Viz_Title" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="Edit_StartByte" xml:space="preserve"><value>Bork!</value></data>
-  <data name="Edit_StartBit" xml:space="preserve"><value>Boof!</value></data>
-  <data name="Edit_BitWidth" xml:space="preserve"><value>Yowff!</value></data>
-  <data name="Edit_EndByte" xml:space="preserve"><value>Grr!</value></data>
-  <data name="Edit_Endian_LE" xml:space="preserve"><value>Barff!</value></data>
   <data name="Edit_Scale" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Yowff!</value></data>
-  <data name="Section_Display" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Sniff sniff…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Awoo!</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Yip!</value></data>
@@ -478,9 +437,7 @@
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>Boof Yowl!</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Subtitle_EsLegacy" xml:space="preserve"><value>Yowl!</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Yip!</value></data>
-  <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Howl!</value></data>
   <data name="Section_ButtonLedMode" xml:space="preserve"><value>BORK!!</value></data>
   <data name="SliderLabel_ButtonLedMode" xml:space="preserve"><value>Bork!</value></data>
   <data name="SliderLabel_ButtonIdleEffect" xml:space="preserve"><value>Bork!</value></data>
@@ -513,18 +470,15 @@
   <data name="Section_Language" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="SliderLabel_Language" xml:space="preserve"><value>Arf!</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Grr Awoo Bork!</value></data>
-  <data name="Button_ImportProfile" xml:space="preserve"><value>BARK…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Boof!</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Awoo…</value></data>
   <data name="Import_Category_Motor" xml:space="preserve"><value>Bork!</value></data>
   <data name="Import_Category_Pedals" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Import_NoFolderFound" xml:space="preserve"><value>Grrowl Yap Arf Yip!</value></data>
   <data name="Import_SetCustomFolder" xml:space="preserve"><value>Bork…</value></data>
-  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Grrowl Awoo Wroof {0} Yap Howl Yowl {1} Snarf Wroof Wan!</value></data>
   <data name="Import_NoChangesHeader" xml:space="preserve"><value>Awoo Howl Yowl!</value></data>
   <data name="Import_NotImportedHeader" xml:space="preserve"><value>Wan Awoo!</value></data>
   <data name="Import_ApplyButton" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="Import_CancelButton" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Woof Yip Wan Arf Boof!</value></data>
@@ -614,7 +568,6 @@
   <data name="SliderLabel_PaddleCalibration" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Button_RestartWheelbase" xml:space="preserve"><value>Yap!</value></data>
   <data name="Button_CalibrateStart" xml:space="preserve"><value>Bork!</value></data>
-  <data name="Button_CalibrateSave" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Dialog_RestartWheelbase_Caption" xml:space="preserve"><value>Bark!</value></data>
   <data name="Dialog_RestartWheelbase_Body" xml:space="preserve"><value>Wroof Grr Grrowl Awoo!</value></data>
   <data name="Hint_PaddleCalibrate" xml:space="preserve"><value>Snarf Barff Boof {0} Rrrf Woof Woof…</value></data>
@@ -641,15 +594,11 @@
   <data name="SliderLabel_WiperStageCount" xml:space="preserve"><value>Bark!</value></data>
   <data name="Label_WiperForwardWraps" xml:space="preserve"><value>Wroof!</value></data>
   <data name="SliderLabel_LightStageCount" xml:space="preserve"><value>Woof!</value></data>
-  <data name="Button_ResyncWipers" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Hint_ResyncWipers" xml:space="preserve"><value>Yip Yip Woof Wuff Snarf!</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Wan {0}!</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Yowff!</value></data>
   <data name="Button_ResyncStages" xml:space="preserve"><value>Yowff!</value></data>
-  <data name="Section_PedalRoles" xml:space="preserve"><value>Yowl!</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Rrrf {0}!</value></data>
-  <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Snarf Howl Wroof Ruff Bork Yip!</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Awoo!</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Snarf Bork Yowl Yowl!</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>ARF!!</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>BARK!!</value></data>
@@ -669,9 +618,7 @@
   <data name="ShifterColor_Blue" xml:space="preserve"><value>Bork!</value></data>
   <data name="ShifterColor_Purple" xml:space="preserve"><value>Boof!</value></data>
   <data name="ShifterColor_White" xml:space="preserve"><value>Arf!</value></data>
-  <data name="Section_WheelbaseLfe" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="SliderLabel_Trigger" xml:space="preserve"><value>Woof!</value></data>
-  <data name="Label_EnginePresets" xml:space="preserve"><value>Yip!</value></data>
   <data name="Preset_AdditiveEngine" xml:space="preserve"><value>Ruff!</value></data>
   <data name="Preset_BigRig" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Preset_DetunedV8" xml:space="preserve"><value>Yip!</value></data>
@@ -690,14 +637,12 @@
   <data name="Mode_Abs" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="Mode_Gearshift" xml:space="preserve"><value>Bork!</value></data>
   <data name="Mode_Custom" xml:space="preserve"><value>Howl!</value></data>
-  <data name="Label_Load" xml:space="preserve"><value>Bork!</value></data>
   <data name="Label_Save" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Label_Delete" xml:space="preserve"><value>Howl!</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Wan!</value></data>
   <data name="Label_Export" xml:space="preserve"><value>Howl!</value></data>
   <data name="Preset_RoadRumble" xml:space="preserve"><value>Snarf!</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>WAN!</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Howl Snarf!</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Rrrf!</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Snarf Bork Grrowl Wan Awoo!</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Yowl Yowl!</value></data>
@@ -710,12 +655,6 @@
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Ruff Arf Yap!</value></data>
   <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Arf Rrrf Bark Yap Woof!</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Yap Bork!</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Yip!</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Rrrf Barff Yowff Grr Ruff Wan!</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Rrrf!</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Yowl Woof Woof Howl {0} Ruff Yap Yip Woof {1} Yap Awoo Woof Barff {2} Arf Bark Yap Arf {3} Bark Yip Boof Boof {4} Bark Bark Rrrf Wuff!</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>Yowl!</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>Bork!</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Awoo Yip Rrrf!</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Woof Yip Rrrf Grrowl!</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Awoo!</value></data>
@@ -743,7 +682,6 @@
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Wroof!</value></data>
-  <data name="Section_PerLedColors" xml:space="preserve"><value>WOOF PER PUP!</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Nap · Barff!</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Nap · Howl!</value></data>
   <data name="Label_SleepBreathing" xml:space="preserve"><value>Snooze · Howl!</value></data>
@@ -795,7 +733,6 @@
   <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Yip Woof Bark Yap — Grr Awoo Wuff Barff, Yowl Arf Wan. {0} Woof Grrowl…</value></data>
   <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Yowff Grr Awoo — Yowl Arf Wuff Barff. Woof Yip Bark Grrowl. {0} Wan…</value></data>
   <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Awoo Wuff Barff Yip — Woof Grr Yowl Bark Wan.</value></data>
-  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>Grrowl Yap Woof Barff Yip Bark.</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Grr Barff Yowl: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Woof (Yap)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Woof (Grr)</value></data>

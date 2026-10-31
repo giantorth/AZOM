@@ -67,7 +67,7 @@ namespace MozaPlugin.Diagnostics
 
         private volatile bool _enabled;
         // Capture clock, in UTC ticks. Set once via CompareExchange on the first
-        // recorded frame; 0 means "not started". Never reset by EnsureRunning.
+        // recorded frame; 0 means "not started". Never reset.
         private long _startTicks;
 
         // Always-on JSONL sink (bridge-format). Independent of in-memory ring.
@@ -75,11 +75,8 @@ namespace MozaPlugin.Diagnostics
         // without it (null = closed, the common case).
         private readonly object _fileLock = new object();
         private volatile FileSink? _fileSink;
-        private long _fileSinkDropped;
         private const int FileSinkQueueCap = 20000;
         private const int FileSinkFlushIntervalMs = 100;
-        /// <summary>Lines dropped because the writer fell behind the queue cap.</summary>
-        public long FileSinkDroppedLines => Volatile.Read(ref _fileSinkDropped);
 
         // One open sink. RecordTx/RecordRx run on the serial write and read
         // threads, so lines go into a bounded queue drained by a background
@@ -88,7 +85,6 @@ namespace MozaPlugin.Diagnostics
         // keeps its own stop flag and queue and can't steal the next sink's lines.
         private sealed class FileSink
         {
-            private readonly SerialTrafficCapture _owner;
             private readonly StreamWriter _writer;
             private readonly ConcurrentQueue<string> _queue = new ConcurrentQueue<string>();
             private readonly AutoResetEvent _signal = new AutoResetEvent(false);
@@ -96,12 +92,8 @@ namespace MozaPlugin.Diagnostics
             private volatile bool _stop;
             private int _queued;
 
-            internal string Path { get; }
-
-            internal FileSink(SerialTrafficCapture owner, string path, StreamWriter writer)
+            internal FileSink(StreamWriter writer)
             {
-                _owner = owner;
-                Path = path;
                 _writer = writer;
                 _thread = new Thread(Loop)
                 {
@@ -114,12 +106,8 @@ namespace MozaPlugin.Diagnostics
 
             internal void Enqueue(string line)
             {
-                if (Volatile.Read(ref _queued) >= FileSinkQueueCap)
-                {
-                    // Writer has fallen behind (disk stall): drop rather than grow.
-                    Interlocked.Increment(ref _owner._fileSinkDropped);
-                    return;
-                }
+                // Writer has fallen behind (disk stall): drop rather than grow.
+                if (Volatile.Read(ref _queued) >= FileSinkQueueCap) return;
                 int queued = Interlocked.Increment(ref _queued);
                 _queue.Enqueue(line);
                 // Wake the writer on the empty→non-empty edge; it drains everything
@@ -187,23 +175,6 @@ namespace MozaPlugin.Diagnostics
                 return t == 0 ? default : new DateTime(t, DateTimeKind.Utc);
             }
         }
-        public string? FileSinkPath => _fileSink?.Path;
-
-        // Per-segment stats for the Diagnostics-tab status line.
-        public int StartupFrameCount => Volatile.Read(ref _startupCount);
-        public long StartupByteSize => Volatile.Read(ref _startupBytes);
-        public int RollingFrameCount => Volatile.Read(ref _rollingCount);
-        public long RollingByteSize => Volatile.Read(ref _rollingBytes);
-        public bool StartupFrozen
-        {
-            get
-            {
-                long start = Interlocked.Read(ref _startTicks);
-                if (start == 0) return false;
-                long elapsedMs = (DateTime.UtcNow.Ticks - start) / TimeSpan.TicksPerMillisecond;
-                return elapsedMs >= StartupWindowMs || Volatile.Read(ref _startupBytes) >= StartupByteCap;
-            }
-        }
 
         // Always-on cumulative byte counters — incremented on every RecordTx /
         // RecordRx regardless of whether the in-memory ring is enabled. Powers
@@ -224,13 +195,6 @@ namespace MozaPlugin.Diagnostics
         /// </summary>
         public void EnsureRunning()
         {
-            _enabled = true;
-        }
-
-        /// <summary>Clear both segments and restart the capture clock.</summary>
-        public void Start()
-        {
-            Clear();
             _enabled = true;
         }
 
@@ -257,7 +221,7 @@ namespace MozaPlugin.Diagnostics
                 {
                     AutoFlush = false,
                 };
-                var sink = new FileSink(this, path, writer);
+                var sink = new FileSink(writer);
                 sink.Start();
                 _fileSink = sink;
             }
@@ -275,27 +239,6 @@ namespace MozaPlugin.Diagnostics
             // A Record that read the old instance just before the swap enqueues
             // into it, never into the next sink.
             sink?.Close(2000);
-        }
-
-        /// <summary>Disable capture and return an ordered snapshot of all entries.</summary>
-        public IReadOnlyList<Entry> Stop()
-        {
-            _enabled = false;
-            var list = new List<Entry>(Count);
-            foreach (var e in _startupEntries) list.Add(e);
-            foreach (var e in _rollingEntries) list.Add(e);
-            return list;
-        }
-
-        public void Clear()
-        {
-            while (_startupEntries.TryDequeue(out _)) { }
-            while (_rollingEntries.TryDequeue(out _)) { }
-            Volatile.Write(ref _startupBytes, 0);
-            Volatile.Write(ref _rollingBytes, 0);
-            Volatile.Write(ref _startupCount, 0);
-            Volatile.Write(ref _rollingCount, 0);
-            Interlocked.Exchange(ref _startTicks, 0);
         }
 
         /// <summary>Ordered snapshot of the frozen first-minute startup segment.</summary>
@@ -472,25 +415,8 @@ namespace MozaPlugin.Diagnostics
         private static readonly DateTime _epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         /// <summary>
-        /// Render entries as one-line-per-frame text. Timestamps are local time
-        /// to ms; bytes are space-separated uppercase hex with no prefix.
-        /// </summary>
-        public static string Format(IReadOnlyList<Entry> entries)
-        {
-            var sb = new StringBuilder(entries.Count * 64);
-            sb.Append("# timestamp (local)        dir source     bytes\n");
-            foreach (var e in entries)
-            {
-                AppendEntryPrefix(sb, e);
-                AppendHex(sb, e.Bytes);
-                sb.Append('\n');
-            }
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// Shared per-entry line prefix (timestamp, direction, source) used by
-        /// both <see cref="Format"/> and the redacting formatter.
+        /// Per-entry line prefix (timestamp, direction, source) for the
+        /// redacting formatter.
         /// </summary>
         internal static void AppendEntryPrefix(StringBuilder sb, Entry e)
         {
@@ -503,16 +429,6 @@ namespace MozaPlugin.Diagnostics
             sb.Append("  ");
             sb.Append(e.Source.PadRight(10));
             sb.Append(' ');
-        }
-
-        private static void AppendHex(StringBuilder sb, byte[] data)
-        {
-            for (int i = 0; i < data.Length; i++)
-            {
-                if (i > 0) sb.Append(' ');
-                sb.Append(HexChar(data[i] >> 4));
-                sb.Append(HexChar(data[i] & 0xF));
-            }
         }
 
         internal static char HexChar(int n) => (char)(n < 10 ? '0' + n : 'a' + (n - 10));

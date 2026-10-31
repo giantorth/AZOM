@@ -29,10 +29,6 @@ namespace MozaPlugin.Telemetry.Display
         public double Scale = 1.0;
         public double Bias = 0.0;
 
-        /// <summary>When set and the field is unmapped, stream this constant verbatim.
-        /// null = stream 0 when unmapped.</summary>
-        public double? Constant = null;
-
         /// <summary>True when the field's channel is known.</summary>
         public bool Decoded = false;
 
@@ -40,8 +36,6 @@ namespace MozaPlugin.Telemetry.Display
         /// data — lap counters, positions, fuel, track/air temp), matching PitHouse's split.
         /// False = fast lane (group 0x35, full rate).</summary>
         public bool Slow = false;
-
-        public bool IsUserMappable => true;
     }
 
     /// <summary>
@@ -59,7 +53,7 @@ namespace MozaPlugin.Telemetry.Display
     {
         private static Cm1FieldDef F(byte hi, byte lo, string label, bool decoded = false,
                                      string prop = "", double scale = 1.0, double bias = 0.0,
-                                     double? constant = null, bool slow = false) => new()
+                                     bool slow = false) => new()
         {
             Key = new[] { hi, lo },
             FieldId = $"{hi:x2}{lo:x2}",
@@ -67,7 +61,6 @@ namespace MozaPlugin.Telemetry.Display
             DefaultProperty = prop,
             Scale = scale,
             Bias = bias,
-            Constant = constant,
             Decoded = decoded,
             Slow = slow,
         };

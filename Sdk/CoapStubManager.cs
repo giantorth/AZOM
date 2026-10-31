@@ -76,7 +76,6 @@ namespace MozaPlugin.Sdk
         // abandons a Stop() that wedges under Wine while it still holds _gate, and
         // a getter that waited on the gate pinned the WPF thread behind it.
         private volatile string _status = "Stopped";
-        private volatile string? _lastError;
         private volatile bool _runningCached;
         private volatile int _pidCached;
         private bool _disposed;
@@ -90,9 +89,6 @@ namespace MozaPlugin.Sdk
 
         /// <summary>Human-readable status string for surfacing in the UI tab.</summary>
         public string Status => _status;
-
-        /// <summary>Most recent error message, if any. Cleared on successful <see cref="Start"/>.</summary>
-        public string? LastError => _lastError;
 
         /// <summary>
         /// Path on disk the stub is extracted to. Exposed for diagnostics/UI.
@@ -163,7 +159,6 @@ namespace MozaPlugin.Sdk
                         // will never call. Surface a clear "Disabled" status
                         // so the UI doesn't show a misleading "Stopped".
                         _status = "Disabled (non-Windows host)";
-                        _lastError = null;
                         MozaLog.Info("[AZOM] CoapStubManager.Start skipped: host is not Windows.");
                         return;
                     }
@@ -301,7 +296,6 @@ namespace MozaPlugin.Sdk
                         _pidCached = p.Id;
                         _runningCached = true;
                         _status = $"Running (PID {p.Id})";
-                        _lastError = null;
                         MozaLog.Info($"[AZOM] CoAP stub started (PID {p.Id}, exe '{exePath}').");
 
                         // Redirect HKCU\Software\MOZA\PitHouse\path to our
@@ -335,7 +329,6 @@ namespace MozaPlugin.Sdk
                 }
                 catch (Exception ex)
                 {
-                    _lastError = ex.Message;
                     _status = "Failed to start";
                     MozaLog.Error($"[AZOM] CoAP stub start failed: {ex}");
                     CleanupProcessLocked();

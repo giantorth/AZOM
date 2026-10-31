@@ -21,10 +21,11 @@ namespace MozaPlugin.Diagnostics
         private const int TailBytesVisible = 2;
 
         /// <summary>
-        /// Format <paramref name="entries"/> like
-        /// <see cref="SerialTrafficCapture.Format"/>, but with any occurrence of
-        /// a known identity sequence rendered as <c>..</c>. Masked runs keep
-        /// their last <see cref="TailBytesVisible"/> bytes visible.
+        /// Format <paramref name="entries"/> one line per frame: the
+        /// <see cref="SerialTrafficCapture.AppendEntryPrefix"/> prefix, then
+        /// space-separated hex with any occurrence of a known identity sequence
+        /// rendered as <c>..</c>. Masked runs keep their last
+        /// <see cref="TailBytesVisible"/> bytes visible.
         /// </summary>
         public static string FormatRedacted(
             IReadOnlyList<SerialTrafficCapture.Entry> entries, MozaData? data)

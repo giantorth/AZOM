@@ -25,8 +25,6 @@ namespace MozaPlugin.Integration.Motion
     {
         private static volatile bool s_broken;
 
-        public static bool IsAvailable => !s_broken;
-
         /// <summary>Whether the active SimHub Motion setup contains an enabled HMA150 output.</summary>
         public static MotionSetupStatus GetSetupStatus(PluginManager? pluginManager)
         {
@@ -46,17 +44,6 @@ namespace MozaPlugin.Integration.Motion
                 ? MotionSetupStatus.OutputAdded
                 : MotionSetupStatus.OutputNotAdded;
         }
-
-        /// <summary>True while SimHub Motion has an HMA150 output started.</summary>
-        public static bool AnyOutputStarted()
-        {
-            if (s_broken) return false;
-            try { return AnyOutputStartedCore(); }
-            catch (Exception ex) { Disable(ex); return false; }
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private static bool AnyOutputStartedCore() => MozaHma150Output.AnyStarted;
 
         private static void Disable(Exception ex)
         {

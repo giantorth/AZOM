@@ -17,7 +17,6 @@ using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 using MozaPlugin.Telemetry;
-using MozaPlugin.Telemetry.Display;
 using MozaPlugin.Telemetry.Dashboard;
 using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.TileServer;
@@ -166,17 +165,6 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Auto-detect connected devices based on response commands.
-        ///   - dash-rpm-indicator-mode responds -> dashboard present
-        ///   - wheel-telemetry-mode responds -> new protocol wheel (GS/FSR/CS/RS/TSW)
-        ///   - wheel-rpm-value1 responds (but not telemetry-mode) -> old protocol wheel (ES)
-        /// </summary>
-        
-        // Hardware-apply entry points moved to HardwareApplier. Profile + WheelOverride
-        // are the single source of truth; every write is detection-gated AND
-        // sentinel-guarded (no brightness write storm on cold start).
-
-        /// <summary>
         /// Resolve the wheel-page GUID for the currently-connected wheel, or null
         /// if no wheel model is known yet (hardware not identified).
         /// </summary>
@@ -243,11 +231,7 @@ namespace MozaPlugin
         internal WheelSleepSettings? GetOrCreateActiveWheelSleep() => _profileCoordinator.GetOrCreateActiveWheelSleep();
         internal WheelIdleSettings? ActiveWheelIdle => _profileCoordinator.ActiveWheelIdle;
         internal WheelIdleSettings? GetOrCreateActiveWheelIdle() => _profileCoordinator.GetOrCreateActiveWheelIdle();
-        /// <summary>
-        /// Channel-mapping dict for the active profile × current wheel page. Null
-        /// when no profile/wheel is resolvable. Caller must not mutate returned
-        /// dict directly — use the channel-mapping write helpers in MozaPlugin.cs.
-        /// </summary>
+
         // CM2 dash settings are keyed under a fixed page GUID with a single
         // dashboard key, so the CM2's dashboard/channel config is fully independent
         // of the wheel's. pageGuid==null means "the current wheel page".
@@ -265,6 +249,12 @@ namespace MozaPlugin
         // persist independently.
         internal static readonly Guid Cm1PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashCm1Guid);
 
+        /// <summary>
+        /// Channel-mapping dict for the active profile × wheel page (current wheel
+        /// page when <paramref name="pageGuid"/> is null). Null when no profile/wheel
+        /// is resolvable. Don't mutate the returned dict; write through
+        /// <see cref="ChannelMappingCoordinator"/>.
+        /// </summary>
         internal Dictionary<string, Dictionary<string, string>>? GetActiveChannelMappings(Guid? pageGuid = null)
         {
             var profile = _settings?.ProfileStore?.CurrentProfile;
@@ -297,14 +287,6 @@ namespace MozaPlugin
         internal int TakePendingFsr1Brightness() => _fsr1Cm1Mapping.TakePendingFsr1Brightness();
 
         internal void ClearFsr1FieldOverrides(string recordKey) => _fsr1Cm1Mapping.ClearFsr1FieldOverrides(recordKey);
-        internal Fsr1FieldDef? FindFsr1Field(string recordKey, string fieldId)
-        {
-            var dash = Fsr1DashboardCatalog.ByKey(recordKey);
-            if (dash == null || string.IsNullOrEmpty(fieldId)) return null;
-            foreach (var f in dash.Fields)
-                if (f.FieldId == fieldId) return f;
-            return null;
-        }
 
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId) => _fsr1Cm1Mapping.GetCm1FieldMapping(fieldId);
         internal Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings() => _fsr1Cm1Mapping.GetActiveCm1Mappings();

@@ -273,7 +273,7 @@ namespace MozaPlugin
 
                 // Diagnostic capture is always on (no user toggle): enable before
                 // any device traffic so the startup segment covers the full
-                // connect/handshake. EnsureRunning() — not Start() — so the
+                // connect/handshake. EnsureRunning() is idempotent, so the
                 // dual-segment ring (and its frozen first-minute) survives the
                 // plugin reload on game switches.
                 {
@@ -863,7 +863,7 @@ namespace MozaPlugin
                 DashCache = new DashboardCache(cacheDir, DashProfileStore);
                 DashCache.LoadFromDisk();
                 // Per-wheel folder is loaded on wheel-model-name detection via
-                // overlay.TelemetryMzdashFolder. Init only loads the disk cache.
+                // ActiveTelemetryMzdashFolder. Init only loads the disk cache.
                 if (_telemetrySender != null)
                 {
                     _telemetrySender.DashCache = DashCache;

@@ -46,9 +46,6 @@ namespace MozaPlugin.Diagnostics
         /// exclusive; the driver gates its probe override on this.</summary>
         internal bool Active => _step >= 0 || _fieldProbe != null;
 
-        /// <summary>Current 0-based probe step across the active page's data bytes.</summary>
-        internal int StepIndex => _step;
-
         /// <summary>The record(s) the probe walks — the active page's type(s), or the full
         /// live set as a fallback when the active index is unmapped (mirrors the driver's
         /// own active/fallback selection so the probe targets what is actually streaming).</summary>

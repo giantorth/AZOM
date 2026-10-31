@@ -30,11 +30,6 @@ namespace MozaPlugin
     public partial class MozaPlugin
     {
 
-        /// <summary>
-        /// Look up (or lazily create) the per-device mBooster settings entry
-        /// in the current profile. Called by the registry and the effect
-        /// worker on every tick — must be allocation-free for known devices.
-        /// </summary>
         // Transport-identity → "mbooster:<serial>" once a lane's serial is
         // interrogated. Populated on OnMBoosterSerialResolved; read lock-free in
         // GetOrCreateMBoosterSettings. Deliberately NOT resolved via the
@@ -45,6 +40,11 @@ namespace MozaPlugin
             new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly object _mboosterSettingsLock = new object();
 
+        /// <summary>
+        /// Look up (or lazily create) the per-device mBooster settings entry
+        /// in the current profile. Called by the registry and the effect
+        /// worker on every tick — must be allocation-free for known devices.
+        /// </summary>
         internal MBoosterDeviceSettings GetOrCreateMBoosterSettings(string identity)
         {
             // Resolve a transport identity to the device's stable serial key so
@@ -958,12 +958,6 @@ namespace MozaPlugin
             }
         }
 
-        /// <summary>
-        /// One-shot migration (see
-        /// <see cref="MozaPluginSettings.MBoosterOutputCurveMovedToDevice"/>):
-        /// every profile's and every pedal's host-side output curve becomes the
-        /// device curve — see MozaMBoosterRegistry.MigrateLegacyOutputCurve.
-        /// </summary>
         /// <summary>This device's settings in every profile, under its serial
         /// key; empty until the serial has resolved.</summary>
         internal List<MBoosterDeviceSettings> MBoosterSettingsInAllProfiles(string identity)
@@ -983,6 +977,12 @@ namespace MozaPlugin
             return list;
         }
 
+        /// <summary>
+        /// One-shot migration (see
+        /// <see cref="MozaPluginSettings.MBoosterOutputCurveMovedToDevice"/>):
+        /// every profile's and every pedal's host-side output curve becomes the
+        /// device curve — see MozaMBoosterRegistry.MigrateLegacyOutputCurve.
+        /// </summary>
         private void MigrateMBoosterOutputCurveToDevice()
         {
             var profiles = _settings?.ProfileStore?.Profiles;
@@ -1057,26 +1057,6 @@ namespace MozaPlugin
                 }
                 catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] serial timeout for {MBoosterDeviceController.ShortIdentity(controller.Identity)}: {ex.Message}"); }
             }, TaskScheduler.Default);
-        }
-
-
-        // Resolve a dashboard name to its parsed MultiStreamProfile without firing
-        // Resolves a profile by name (cache → builtin) without touching the
-        // current telemetry profile — used by SwitchToProfile to avoid racing
-        // ApplyTelemetrySettings's full-stack reload.
-        internal MultiStreamProfile? ResolveDashboardProfileByName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return null;
-            if (DashCache != null)
-            {
-                var p = DashCache.TryGetByName(name);
-                if (p != null) return p;
-            }
-            var builtins = DashProfileStore.BuiltinProfiles;
-            foreach (var p in builtins)
-                if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))
-                    return p;
-            return null;
         }
     }
 }

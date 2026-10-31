@@ -581,8 +581,7 @@ so nothing would ever elicit a parseable response for
 `MBoosterDeviceController.MarkDetected` to latch onto. `TryConnect`
 fires `RequestCalibrationReads()` immediately after the port opens for
 exactly this reason — without it the UI sits at "Probing…"
-indefinitely until something (previously, only the user manually
-clicking "Read from device") prompts a response.
+indefinitely.
 
 ### Disable
 
@@ -1708,9 +1707,9 @@ The protocol note marks the pedal-config command surface (group 35
 read, group 36 write) as "likely but unverified" on mBooster firmware.
 The plugin ships the full surface in
 [`MozaCommandDatabase.cs`](../../../Protocol/MozaCommandDatabase.cs)
-under the `mbooster-*` prefix anyway — the user opted in. The UI's
-Calibration card (Direction / Min Raw / Max Raw / Read from device /
-Apply) surfaces this as experimental with a yellow warning.
+under the `mbooster-*` prefix anyway — the user opted in. A passive
+pedal's Direction and output range are written from the Pedals tab
+(`SettingsControl.Pedals.cs` `WritePassivePedal`).
 
 Every one of these registers is **flash-backed**, and each write
 additionally drags the 6-frame [curve7 resync](#pedal-feel)
@@ -2228,7 +2227,7 @@ effects use)/35 (read, unused by any capture — this command isn't part
 of `RequestCalibrationReads`' fixed read-burst list) — with a **fixed
 21-byte payload**: the cmd byte followed by 10 big-endian `u16` fields,
 each `raw = round(pct * 65535 / 100)` (`MozaMBoosterProtocol
-.EncodeSegmentedDampingPct`/`DecodeSegmentedDampingPct`). Cross-checking
+.EncodeSegmentedDampingPct`). Cross-checking
 the "When Pressed" captures against the "When Released" ones (which
 exist on disk as `pedal-feel-damping-released-*.pcapng`) revealed the
 full field order — critically, **every write resends all 10 fields**,
@@ -2483,11 +2482,11 @@ any active Custom Effects for that one wire slot; it's placed last in
 the `Tick()` priority ladder (same tier as ABS/Lockup/Threshold) so it
 always wins over ambient vibration when active.
 
-The sustained Test toggle substitutes live throttle position for
-`tcActive` (gated at 80% throttle, mirroring ABS's 60%-brake gate) —
-this needed a new `MBoosterTelemetrySnapshot.Throttle` field and a
-`MBoosterEffectWorker.EffectiveThrottle` helper (mirroring
-`EffectiveBrake`), since the snapshot previously only carried Brake.
+The sustained Test toggle substitutes the pedal's own press for
+`tcActive`, gated at 60% (same as ABS's brake gate).
+`MBoosterEffectWorker.EffectiveOwnPress` supplies it: the game's value
+for whichever role the pedal holds, raised by its own HID position, so
+the test works on any motorized pedal, not only the throttle.
 
 ### Wheel Spin — Traction Control's physics-heuristic sibling
 
@@ -2525,9 +2524,9 @@ it, Wheel Spin and Lockup stay off: an earlier fallback fired from pedal
 position alone (throttle > 0.9 / brake > 0.9) and buzzed on every
 launch and hard stop (ticket BRE60X3R). `FeedbackData.WheelSlip` is not
 used; its scale differs per reader (AC slip magnitude, rF2
-`1 - gripFract`, F1 signed slip ratio). The sustained Test toggle substitutes live throttle
-position (via the same `EffectiveThrottle` helper Traction Control
-uses), gated at 80% throttle.
+`1 - gripFract`, F1 signed slip ratio). The sustained Test toggle substitutes the
+pedal's own press (via the same `EffectiveOwnPress` helper Traction
+Control uses), gated at 60%.
 
 This makes ABS/Traction Control (simple game-flag effects) and
 Lockup/Wheel Spin (raw physics-heuristic effects) a deliberate
@@ -2888,10 +2887,9 @@ sample presets is in 0–100 (`clutch_min: 0` / `clutch_max: 100` is the
 full-range default; `brake_min: 16`, `brake_max: 99`, `throttle_min: 3`), and
 they sit alongside `nonlinear1..5`, which are unambiguously percentages.
 
-`MBoosterDeviceSettings.Min`/`Max` are the device's own **raw counts** — the
-Calibration card's sliders are labelled "Min (raw)"/"Max (raw)", run 0–65535
-(the 2-byte field's range), and are seeded from the device read-back, unlike
-every other min/max slider in the app, which clamps 0–100.
+`MBoosterDeviceSettings.Min`/`Max` are the device's own **raw counts** —
+0–65535 (the 2-byte field's range), seeded from the device read-back, unlike
+every min/max slider in the app, which clamps 0–100.
 
 The importer therefore does **not** map them. Writing PitHouse's `max: 99`
 straight into the raw field caps the pedal's output at ~0.15 % of full scale.

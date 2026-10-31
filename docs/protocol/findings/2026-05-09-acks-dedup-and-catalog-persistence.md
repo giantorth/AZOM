@@ -66,7 +66,7 @@ The token-bucket `WriteBudget` was sized at 8000 B/s sustained / 12000 B/s burst
 
 **Fix:** target raised to 11000 B/s, soft threshold to 9500 B/s, burst ceiling to 14000 B/s. `MayDrainStreams()` removed entirely — latest-wins coalescing in the stream slots already provides natural backpressure (fresh `SendStream` overwrites pending slots before the writer can drain them), and `SerialPort.Write` blocks when the OS write buffer (16 KB on Wine SerialPort) fills, providing a hard physical-layer gate.
 
-The peak counter (`_peakBytesInWindow`) is now monotonic per session — it was reset-on-read previously, so the diagnostics UI peak field jumped between every poll. Manual `ResetPeak()` available for explicit baseline reset.
+The peak counter (`_peakBytesInWindow`) is now monotonic per session — it was reset-on-read previously, so the diagnostics UI peak field jumped between every poll.
 
 ## 8. State-machine guards added
 

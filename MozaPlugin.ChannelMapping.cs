@@ -28,9 +28,6 @@ namespace MozaPlugin
 {
     public partial class MozaPlugin
     {
-
-        /// <summary>Apply telemetry settings from the active wheel overlay to the TelemetrySender.</summary>
-        
         public IReadOnlyList<string> GetAllSimHubPropertyNames() => _propertyResolver.GetAllSimHubPropertyNames();
         public object? GetPropertyValueForDisplay(string? path) => _propertyResolver.GetValueForDisplay(path);
         internal string CurrentWheelKey() => _propertyResolver.CurrentWheelKey();

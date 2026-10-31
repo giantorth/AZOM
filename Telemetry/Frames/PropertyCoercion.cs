@@ -52,19 +52,6 @@ namespace MozaPlugin.Telemetry.Frames
             }
         }
 
-        /// <summary>
-        /// Parse a gear string: "R" = -1, "N"/empty = 0, numeric = parsed.
-        /// Shared between GameDataSnapshot and the property resolver path so
-        /// gear strings coerce the same way regardless of which source feeds them.
-        /// </summary>
-        public static double ParseGear(string? gear)
-        {
-            if (string.IsNullOrEmpty(gear)) return 0.0;
-            if (gear == "R") return -1.0;
-            if (gear == "N") return 0.0;
-            return double.TryParse(gear, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : 0.0;
-        }
-
         private static double ParseString(string s, string propertyPath)
         {
             if (s.Length == 0) return 0.0;
@@ -102,13 +89,6 @@ namespace MozaPlugin.Telemetry.Frames
                 MozaLog.Warn($"[AZOM] Property '{path}' {detail}; channel will send 0 until mapping is fixed.");
             }
             catch { /* logging may not be initialised in tests */ }
-        }
-
-        /// <summary>Reset the once-per-path warning tracker. Intended for tests.</summary>
-        public static void ResetWarnings()
-        {
-            _warnedPaths.Clear();
-            Interlocked.Exchange(ref _warnedCount, 0);
         }
     }
 }

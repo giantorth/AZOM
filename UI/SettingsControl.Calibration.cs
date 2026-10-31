@@ -28,37 +28,6 @@ namespace MozaPlugin.UI
     public partial class SettingsControl : UserControl
     {
 
-        // ===== Calibration (experimental) ===================================
-
-        private void MBoosterDirCheck_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
-            s.Direction = MBoosterDirCheck.IsChecked == true ? 1 : 0;
-            _plugin.SaveSettings();
-        }
-        private void MBoosterMinSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_suppressEvents) return;
-            int v = (int)Math.Round(e.NewValue);
-            MBoosterMinValue.Text = v.ToString();
-            var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
-            s.Min = v;
-            _plugin.SaveSettings();
-        }
-        private void MBoosterMaxSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            if (_suppressEvents) return;
-            int v = (int)Math.Round(e.NewValue);
-            MBoosterMaxValue.Text = v.ToString();
-            var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
-            s.Max = v;
-            _plugin.SaveSettings();
-        }
-
         // Output curve — device calibration, the registers Pit House drives
         // (moza-simulator bridge, 2026-10-10): y1..y5 (mbooster-{role}-y1..y5)
         // evenly spaced from range start (Min, mbooster-{role}-min) to range
@@ -118,9 +87,8 @@ namespace MozaPlugin.UI
             MBoosterRangeStartSlider.Value = Clamp(lo, 0, 100);
             MBoosterRangeEndSlider.Value = Clamp(hi, 0, 100);
             var ySliders = new[] { MBoosterY2Slider, MBoosterY3Slider, MBoosterY4Slider, MBoosterY5Slider, MBoosterY6Slider };
-            var yLabels = new[] { MBoosterY2Value, MBoosterY3Value, MBoosterY4Value, MBoosterY5Value, MBoosterY6Value };
             for (int i = 0; i < 5; i++)
-                SetSliderRaw(ySliders[i], yLabels[i], (int)Math.Round(curve[i]), 0, 100, "");
+                SetDataSlider(ySliders[i], (int)Math.Round(curve[i]), 0, 100);
             MBoosterY1Slider.Value = 0;
         }
 
@@ -163,11 +131,11 @@ namespace MozaPlugin.UI
                  : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? "clutch" : null;
         }
 
-        private void MBoosterY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY2Value, "", _ => SetMBoosterCurveY());
-        private void MBoosterY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY3Value, "", _ => SetMBoosterCurveY());
-        private void MBoosterY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY4Value, "", _ => SetMBoosterCurveY());
-        private void MBoosterY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY5Value, "", _ => SetMBoosterCurveY());
-        private void MBoosterY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterY6Value, "", _ => SetMBoosterCurveY());
+        private void MBoosterY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
+        private void MBoosterY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
+        private void MBoosterY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
+        private void MBoosterY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
+        private void MBoosterY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
 
         // Y only, as Pit House's preset buttons (Linear: y1..y4 alone, the
         // range untouched).
@@ -176,11 +144,11 @@ namespace MozaPlugin.UI
             if (CurrentMBoosterEffectTarget() == null) return;
             using (_suppressor.Begin())
             {
-                MBoosterY2Slider.Value = curve[0]; SetValueText(MBoosterY2Value, curve[0].ToString());
-                MBoosterY3Slider.Value = curve[1]; SetValueText(MBoosterY3Value, curve[1].ToString());
-                MBoosterY4Slider.Value = curve[2]; SetValueText(MBoosterY4Value, curve[2].ToString());
-                MBoosterY5Slider.Value = curve[3]; SetValueText(MBoosterY5Value, curve[3].ToString());
-                MBoosterY6Slider.Value = curve[4]; SetValueText(MBoosterY6Value, curve[4].ToString());
+                MBoosterY2Slider.Value = curve[0];
+                MBoosterY3Slider.Value = curve[1];
+                MBoosterY4Slider.Value = curve[2];
+                MBoosterY5Slider.Value = curve[3];
+                MBoosterY6Slider.Value = curve[4];
             }
             SetMBoosterCurveY();
             _plugin.SaveSettings();
@@ -230,12 +198,12 @@ namespace MozaPlugin.UI
             PushMBoosterFeelCurve(s);
         }
 
-        private void MBoosterInputY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY1Value, "", v => SetMBoosterInputCurveY(0, v));
-        private void MBoosterInputY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY2Value, "", v => SetMBoosterInputCurveY(1, v));
-        private void MBoosterInputY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY3Value, "", v => SetMBoosterInputCurveY(2, v));
-        private void MBoosterInputY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY4Value, "", v => SetMBoosterInputCurveY(3, v));
-        private void MBoosterInputY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY5Value, "", v => SetMBoosterInputCurveY(4, v));
-        private void MBoosterInputY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputY6Value, "", v => SetMBoosterInputCurveY(5, v));
+        private void MBoosterInputY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(0, v));
+        private void MBoosterInputY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(1, v));
+        private void MBoosterInputY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(2, v));
+        private void MBoosterInputY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(3, v));
+        private void MBoosterInputY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(4, v));
+        private void MBoosterInputY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(5, v));
 
         // Pedal Feel node X position (0-100% of the Deadzone-Max Force span)
         // — CONFIRMED real hardware calibration alongside InputCurveY (see
@@ -253,12 +221,12 @@ namespace MozaPlugin.UI
             PushMBoosterFeelCurve(s);
         }
 
-        private void MBoosterInputX1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX1Value, "", v => SetMBoosterInputCurveX(0, v));
-        private void MBoosterInputX2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX2Value, "", v => SetMBoosterInputCurveX(1, v));
-        private void MBoosterInputX3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX3Value, "", v => SetMBoosterInputCurveX(2, v));
-        private void MBoosterInputX4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX4Value, "", v => SetMBoosterInputCurveX(3, v));
-        private void MBoosterInputX5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX5Value, "", v => SetMBoosterInputCurveX(4, v));
-        private void MBoosterInputX6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, MBoosterInputX6Value, "", v => SetMBoosterInputCurveX(5, v));
+        private void MBoosterInputX1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(0, v));
+        private void MBoosterInputX2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(1, v));
+        private void MBoosterInputX3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(2, v));
+        private void MBoosterInputX4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(3, v));
+        private void MBoosterInputX5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(4, v));
+        private void MBoosterInputX6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(5, v));
 
         private void ApplyMBoosterInputCurvePreset(int[] curve)
         {
@@ -272,18 +240,18 @@ namespace MozaPlugin.UI
             s.InputCurveX = null;
             using (_suppressor.Begin())
             {
-                MBoosterInputY1Slider.Value = curve[0]; SetValueText(MBoosterInputY1Value, curve[0].ToString());
-                MBoosterInputY2Slider.Value = curve[1]; SetValueText(MBoosterInputY2Value, curve[1].ToString());
-                MBoosterInputY3Slider.Value = curve[2]; SetValueText(MBoosterInputY3Value, curve[2].ToString());
-                MBoosterInputY4Slider.Value = curve[3]; SetValueText(MBoosterInputY4Value, curve[3].ToString());
-                MBoosterInputY5Slider.Value = curve[4]; SetValueText(MBoosterInputY5Value, curve[4].ToString());
-                MBoosterInputY6Slider.Value = curve[5]; SetValueText(MBoosterInputY6Value, curve[5].ToString());
-                MBoosterInputX1Slider.Value = MBoosterInputCurveDefault[0]; SetValueText(MBoosterInputX1Value, MBoosterInputCurveDefault[0].ToString("F0"));
-                MBoosterInputX2Slider.Value = MBoosterInputCurveDefault[1]; SetValueText(MBoosterInputX2Value, MBoosterInputCurveDefault[1].ToString("F0"));
-                MBoosterInputX3Slider.Value = MBoosterInputCurveDefault[2]; SetValueText(MBoosterInputX3Value, MBoosterInputCurveDefault[2].ToString("F0"));
-                MBoosterInputX4Slider.Value = MBoosterInputCurveDefault[3]; SetValueText(MBoosterInputX4Value, MBoosterInputCurveDefault[3].ToString("F0"));
-                MBoosterInputX5Slider.Value = MBoosterInputCurveDefault[4]; SetValueText(MBoosterInputX5Value, MBoosterInputCurveDefault[4].ToString("F0"));
-                MBoosterInputX6Slider.Value = MBoosterInputCurveDefault[5]; SetValueText(MBoosterInputX6Value, MBoosterInputCurveDefault[5].ToString("F0"));
+                MBoosterInputY1Slider.Value = curve[0];
+                MBoosterInputY2Slider.Value = curve[1];
+                MBoosterInputY3Slider.Value = curve[2];
+                MBoosterInputY4Slider.Value = curve[3];
+                MBoosterInputY5Slider.Value = curve[4];
+                MBoosterInputY6Slider.Value = curve[5];
+                MBoosterInputX1Slider.Value = MBoosterInputCurveDefault[0];
+                MBoosterInputX2Slider.Value = MBoosterInputCurveDefault[1];
+                MBoosterInputX3Slider.Value = MBoosterInputCurveDefault[2];
+                MBoosterInputX4Slider.Value = MBoosterInputCurveDefault[3];
+                MBoosterInputX5Slider.Value = MBoosterInputCurveDefault[4];
+                MBoosterInputX6Slider.Value = MBoosterInputCurveDefault[5];
             }
             for (int i = 0; i < n; i++)
                 s.InputCurveY[i] = curve[i];
@@ -740,18 +708,6 @@ namespace MozaPlugin.UI
             }
             ShowMBoosterDampingMode(sd.DampingEnabled);
             PushSegmentedDamping(sd);
-        }
-
-        private void MBoosterReadCalButton_Click(object sender, RoutedEventArgs e)
-        {
-            CurrentMBoosterController()?.RequestCalibrationReads();
-        }
-        private void MBoosterApplyCalButton_Click(object sender, RoutedEventArgs e)
-        {
-            var c = CurrentMBoosterController();
-            var s = CurrentMBoosterSettings();
-            if (c == null || s == null) return;
-            _plugin.HardwareApplier.ApplyMBoosterToHardware(c, s, userRequested: true);
         }
 
         // ------- Language picker (Options tab) -------

@@ -101,30 +101,6 @@ namespace MozaPlugin.Telemetry.Sessions
             BufferOverflow,
         }
 
-        /// <summary>Feed one raw chunk payload (the bytes after session/type/seq).
-        /// No seq tracking — caller doesn't have the seq context. Use the
-        /// <see cref="AddChunk(int, byte[])"/> overload when seq is available so
-        /// gaps are detected instead of corrupting the buffer silently.</summary>
-        public void AddChunk(byte[] chunk)
-        {
-            if (chunk == null || chunk.Length < 4) return;
-            int netLen = chunk.Length - 4;
-            lock (_lock)
-            {
-                if (_count + netLen > MaxBufferBytes)
-                {
-                    if (!_overflowLogged)
-                    {
-                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_count}+{netLen}); dropping buffer");
-                        _overflowLogged = true;
-                    }
-                    ResetBufferLocked();
-                    return;
-                }
-                AppendLocked(chunk, netLen);
-            }
-        }
-
         /// <summary>
         /// Feed one chunk WITH its inbound seq number. Returns true when the
         /// chunk was accepted (including as the start of a new burst after a

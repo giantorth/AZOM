@@ -120,8 +120,6 @@ namespace MozaPlugin
             if (!keepWireAlive)
             {
                 Teardown("telemetry sender dispose", () => _telemetrySender?.Dispose());
-                _fsr1Driver?.Dispose();
-                _cm1Driver?.Dispose();
                 Teardown("connection dispose", () => _connection?.Dispose());
                 // Clear static refs so the next Init takes the cold-start path.
                 if (_connection == s_persistentConnection)

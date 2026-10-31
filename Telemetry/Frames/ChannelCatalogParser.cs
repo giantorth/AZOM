@@ -323,12 +323,6 @@ namespace MozaPlugin.Telemetry.Frames
         /// is the never-pruned union across every generation.</summary>
         public int LiveCount => _liveCatalog?.Count ?? 0;
 
-        /// <summary>URL → 1-based idx for the current catalog (first-occurrence
-        /// wins: stale higher slots ignored after a dashboard switch re-indexes
-        /// from 1). Null until the first parse succeeds. Suitable for callers
-        /// that need to look up many URLs at once.</summary>
-        public IReadOnlyDictionary<string, int>? IdxByUrl => _idxByUrl;
-
         /// <summary>Build the first-occurrence-wins URL → 1-based idx map from
         /// an arbitrary catalog list. Used by callers that receive the catalog
         /// as a parameter rather than going through the parser instance.</summary>
@@ -868,47 +862,6 @@ namespace MozaPlugin.Telemetry.Frames
         /// <see cref="BufferLength"/> to detect "buffer grew since last parse"
         /// without locking.</summary>
         public int LastParsedBufferLen => _lastParseLen;
-
-        /// <summary>
-        /// Scan any session's buffer for a complete catalog: ≥3 plausible 0x04 URL
-        /// entries followed by a 0x06 end-marker. Used by the post-startup
-        /// quiet-window wait to know when to stop polling. Returns true if any
-        /// session's buffer contains a complete catalog.
-        /// </summary>
-        public bool HasCompleteCatalog()
-        {
-            lock (_bufferLock)
-            {
-                foreach (var s in _sessionOrder)
-                {
-                    if (!_buffersBySession.TryGetValue(s, out var buf)) continue;
-                    int cnt = buf.Count;
-                    if (cnt <= 30) continue;
-                    int urlCount = 0;
-                    for (int ci = 0; ci + 5 <= cnt; ci++)
-                    {
-                        byte b = buf[ci];
-                        if (b == 0x04)
-                        {
-                            uint sz = (uint)(buf[ci + 1]
-                                | (buf[ci + 2] << 8)
-                                | (buf[ci + 3] << 16)
-                                | (buf[ci + 4] << 24));
-                            if (sz >= 1 && sz < 200 && ci + 5 + (int)sz <= cnt)
-                            {
-                                urlCount++;
-                                ci += 4 + (int)sz;
-                            }
-                        }
-                        else if (b == 0x06 && urlCount >= 3)
-                        {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-        }
 
         /// <summary>
         /// Parse the wheel's channel catalog from buffered 7c:00 session data. The
@@ -1664,21 +1617,6 @@ namespace MozaPlugin.Telemetry.Frames
             // prior parse passes that older buffer bytes can be trimmed
             // against, even if this particular pass added nothing new.
             TrimProcessedBytes();
-        }
-
-        /// <summary>Compare two catalogs for value-equality. Helper used by
-        /// renegotiation diagnostics in TelemetrySender.</summary>
-        public static bool CatalogEquals(
-            IReadOnlyList<string>? a,
-            IReadOnlyList<string>? b)
-        {
-            if (a == null && b == null) return true;
-            if (a == null || b == null) return false;
-            if (a.Count != b.Count) return false;
-            for (int i = 0; i < a.Count; i++)
-                if (!string.Equals(a[i], b[i], StringComparison.Ordinal))
-                    return false;
-            return true;
         }
     }
 }

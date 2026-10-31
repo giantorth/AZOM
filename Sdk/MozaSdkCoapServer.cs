@@ -22,10 +22,8 @@ namespace MozaPlugin.Sdk
     /// Lifecycle:
     /// <list type="number">
     ///   <item><see cref="Start"/> binds a <see cref="UdpClient"/> to
-    ///   <c>127.0.0.1:</c><see cref="CoapPort"/> (loopback only — the
-    ///   <see cref="MozaPluginSettings.SdkBindLoopbackOnly"/> flag is plumbed
-    ///   for future use but ignored in v1, by design) and spawns a single
-    ///   receive thread.</item>
+    ///   <c>127.0.0.1:</c><see cref="CoapPort"/> (loopback only) and spawns a
+    ///   single receive thread.</item>
     ///   <item>Receive loop parses each datagram, resolves the URI via the
     ///   registry, dispatches to a handler, encodes the response, and ships
     ///   it back to the source endpoint. CoAP CON pings (Code=0, Type=CON)
@@ -92,9 +90,8 @@ namespace MozaPlugin.Sdk
         ///   onto the wheelbase / dash / pedals / etc.</param>
         /// <remarks>
         /// Constructor is internal because <see cref="HardwareApplier"/> is an
-        /// internal type; the public read-only surface (Status, IsRunning,
-        /// etc.) remains accessible to external callers via
-        /// <see cref="MozaPlugin.SdkServer"/>.
+        /// internal type; the public read-only <see cref="Status"/> remains
+        /// accessible to external callers via <see cref="MozaPlugin.SdkServer"/>.
         /// </remarks>
         internal MozaSdkCoapServer(MozaData data, HardwareApplier hw)
         {
@@ -106,26 +103,11 @@ namespace MozaPlugin.Sdk
             ResourceBindings.RegisterAll(_registry, _catalog, data, hw);
         }
 
-        /// <summary>True while the receive thread is alive.</summary>
-        public bool IsRunning
-        {
-            get { return _running; }
-        }
-
         /// <summary>Human-readable status string surfaced to the UI tab.</summary>
         public string Status
         {
             get { lock (_stateGate) return _status; }
         }
-
-        /// <summary>The port the listener actually bound to. 0 when not running.</summary>
-        public int BoundPort
-        {
-            get { lock (_stateGate) return _boundPort; }
-        }
-
-        /// <summary>Diagnostic: the URI suffixes the resource registry currently knows about.</summary>
-        public IEnumerable<string> KnownUriSuffixes => _registry.KnownUriSuffixes;
 
         /// <summary>
         /// Bind the UDP socket and spawn the receive thread. Idempotent —
@@ -386,24 +368,14 @@ namespace MozaPlugin.Sdk
 
             // Resolve and dispatch.
             CoapResourceResponse resourceResponse;
-            CoapResourceHandler? handler = _registry.Resolve(uriPath, out string? deviceId, out string? propertyName);
+            CoapResourceHandler? handler = _registry.Resolve(uriPath, out string? deviceId);
             if (handler == null)
             {
                 resourceResponse = CoapResourceResponse.NotFound("no handler bound");
             }
             else
             {
-                int contentFormat = -1;
-                var cfOpt = request.GetOption(CoapOptionNumber.ContentFormat);
-                if (cfOpt != null) contentFormat = (int)cfOpt.Value.ValueAsUInt();
-
-                var resourceReq = new CoapResourceRequest(
-                    uriPath: uriPath,
-                    deviceId: deviceId,
-                    propertyName: propertyName,
-                    payload: request.Payload,
-                    contentFormat: contentFormat,
-                    token: request.Token);
+                var resourceReq = new CoapResourceRequest(deviceId, request.Payload);
 
                 try
                 {

@@ -51,7 +51,6 @@ namespace MozaPlugin.Telemetry.Display
         private bool _lastConnected;
 
         private volatile StatusDataBase? _latestGameData;
-        private volatile bool _gameRunning;
         private int _tickCounter;
         private int _lastStreamedIndex = -1;
         // Table-7 EEPROM write gate (see Tick): selects (Param 6) and display brightness
@@ -75,7 +74,6 @@ namespace MozaPlugin.Telemetry.Display
 
         public bool IsRunning => _running;
         public void UpdateGameData(StatusDataBase? data) => _latestGameData = data;
-        public void SetGameRunning(bool running) => _gameRunning = running;
 
         public void Start()
         {

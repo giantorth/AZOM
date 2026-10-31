@@ -90,7 +90,6 @@ namespace MozaPlugin.Protocol
         private readonly object _cacheLock = new object();
         private long _cacheTimestamp;                                  // 0 = uninitialised
         private IReadOnlyList<PortInfo> _cachedPorts = Array.Empty<PortInfo>();
-        private string _lastSummary = "(not yet enumerated)";
         private MozaDiscoverySource _lastSource = MozaDiscoverySource.None;
         private int _hasLoggedFirstSuccess; // 0 or 1, atomic
         // Unknown-PID first-sighting log gate. Guarded by _cacheLock so a
@@ -158,7 +157,6 @@ namespace MozaPlugin.Protocol
                 {
                     _cachedPorts = ports;
                     _cacheTimestamp = Stopwatch.GetTimestamp();
-                    _lastSummary = summary;
                     _lastSource = source;
 
                     for (int i = 0; i < ports.Count; i++)
@@ -377,25 +375,6 @@ namespace MozaPlugin.Protocol
                 MozaLog.Debug($"[AZOM] HID ContainerID read failed for '{devicePath}': {ex.GetType().Name}: {ex.Message}");
                 return string.Empty;
             }
-        }
-
-        /// <summary>Force the next <see cref="Enumerate"/> call to re-walk the registry.</summary>
-        public void Invalidate()
-        {
-            lock (_cacheLock)
-            {
-                _cacheTimestamp = 0;
-                _cachedPorts = Array.Empty<PortInfo>();
-            }
-            // Derived from the same enumeration — drop it together or the labels
-            // outlive the ports they name.
-            WineComNameResolver.Invalidate();
-        }
-
-        /// <summary>Human-readable single-line summary of the most recent enumeration. UI binding.</summary>
-        public string LastEnumerationSummary
-        {
-            get { lock (_cacheLock) return _lastSummary; }
         }
 
         /// <summary>

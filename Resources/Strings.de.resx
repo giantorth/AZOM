@@ -136,7 +136,6 @@
   <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>Vibrationsintensität</value></data>
   <data name="Section_MBoosterPedals" xml:space="preserve"><value>MBOOSTER-PEDALE</value></data>
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value>// vom Host gerenderte Effekte · Rolle + Position pro Gerät</value></data>
-  <data name="SliderLabel_Device" xml:space="preserve"><value>Gerät</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Rolle</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Gas</value></data>
@@ -153,7 +152,6 @@
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Beim Drücken</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Beim Loslassen</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-EINGABEZUORDNUNG</value></data>
-  <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// Lastzellen-/Pedalsignal wie in Pit House auf das Spiel abbilden</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Max. Schwellenwert (kg)</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFEKTE</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// Auslöser: ABS bei Spielsignal · Lockup bei Bremse &gt; 0,8 · Threshold an der Flanke · Engine durchgehend</value></data>
@@ -163,7 +161,6 @@
   <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Gangwechsel</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Straßenstruktur</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Aktivieren</value></data>
-  <data name="Button_Test1s" xml:space="preserve"><value>1 s testen</value></data>
   <data name="Label_Test" xml:space="preserve"><value>Testen</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Blockieren</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Schwellwert</value></data>
@@ -174,12 +171,7 @@
   <data name="SliderLabel_Gain" xml:space="preserve"><value>Verstärkung</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Auslöseschwelle</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrationsabklingen</value></data>
-  <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// experimentell — wird ggf. nicht von der mBooster-Firmware übernommen</value></data>
-  <data name="Label_ReversedDirection" xml:space="preserve"><value>Richtung umgekehrt</value></data>
-  <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (roh)</value></data>
-  <data name="SliderLabel_MaxRaw" xml:space="preserve"><value>Max (roh)</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>VOM GERÄT LESEN</value></data>
-  <data name="Button_Apply" xml:space="preserve"><value>ÜBERNEHMEN</value></data>
   <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL-HUB · PEDALE</value></data>
   <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// Pedal-Port (alle 2 Sekunden abgefragt)</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedal-Port</value></data>
@@ -286,22 +278,11 @@
   <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>kein Schreibzugriff auf den Plugin-Ordner</value></data>
   <data name="Section_Updates" xml:space="preserve"><value>AKTUALISIERUNGEN</value></data>
   <data name="Subtitle_Updates" xml:space="preserve"><value>// Update-Benachrichtigung im Plugin</value></data>
-  <data name="Section_Bandwidth" xml:space="preserve"><value>BANDBREITE</value></data>
-  <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// Serielle Datenrate · 30-Sekunden-Fenster</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>EINGEHEND</value></data>
   <data name="Label_Outbound" xml:space="preserve"><value>AUSGEHEND</value></data>
   <data name="Label_Capacity" xml:space="preserve"><value>KAPAZITÄT</value></data>
-  <data name="Label_Peak" xml:space="preserve"><value>SPITZE</value></data>
-  <data name="Label_Session" xml:space="preserve"><value>SITZUNG</value></data>
-  <data name="Section_SerialTrafficCapture" xml:space="preserve"><value>SERIELLE DATEN AUFZEICHNEN</value></data>
-  <data name="Subtitle_SerialTrafficCapture" xml:space="preserve"><value>// zeichnet jeden TX/RX-Frame auf</value></data>
-  <data name="Hint_CaptureDataInMemory" xml:space="preserve"><value>Die Daten liegen nur im Arbeitsspeicher — zwischen Programmstarts wird nichts gespeichert. „Stopp“ drücken, um ein Diagnose-Bundle als ZIP zu exportieren.</value></data>
-  <data name="Button_StartCapture" xml:space="preserve"><value>AUFZEICHNUNG STARTEN</value></data>
-  <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Diagnose-Aufzeichnung beim Start / Spielwechsel immer beginnen</value></data>
-  <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Wenn aktiv, beginnt die serielle Aufzeichnung automatisch bei jedem Plugin-Start.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>BUNDLE EXPORTIEREN (ZIP)…</value></data>
   <data name="Button_CopyReference" xml:space="preserve"><value>REFERENZ KOPIEREN</value></data>
-  <data name="Button_CopyCapture" xml:space="preserve"><value>AUFZEICHNUNG IN ZWISCHENABLAGE KOPIEREN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>VOLLSTÄNDIGER DIAGNOSE-BERICHT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// Debug-Informationen</value></data>
   <data name="Button_Expand" xml:space="preserve"><value>AUSKLAPPEN</value></data>
@@ -311,20 +292,16 @@
   <data name="Hint_FullDiagRendered" xml:space="preserve"><value>// {0} Zeilen · gleicher Inhalt wie Export-Bundle</value></data>
   <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>// Rendern fehlgeschlagen</value></data>
   <data name="Hint_MBoosterIntro" xml:space="preserve"><value>Jeder verbundene mBooster erscheint unten. Wähle eine Rolle (Gas/Bremse/Kupplung) pro Gerät, um seine Pedalposition zu zuweisen. Der Kalibrierungs-Abschnitt ist experimentell.</value></data>
-  <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Noch nicht getestet.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>LED-Farbe wählen</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>PALETTE</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>FEINABSTIMMUNG · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ABBRECHEN</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>OK</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA WHEEL BASE · AMBIENTE LEDS</value></data>
-  <data name="Label_BaseModel" xml:space="preserve"><value>Base-Modell</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Keine Ambiente-LEDs an der Base erkannt. R9/R12-Bases haben keinen LED-Streifen; dieses Panel ist nur bei R21/R25/R27-Bases aktiv.</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>MODUS</value></data>
   <data name="SliderLabel_IndicatorState" xml:space="preserve"><value>Indikator-Status</value></data>
   <data name="Option_Off" xml:space="preserve"><value>Aus</value></data>
   <data name="Option_On" xml:space="preserve"><value>An</value></data>
-  <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Standby-Animation</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Konstant</value></data>
   <data name="Option_Breath" xml:space="preserve"><value>Pulsieren</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Farbwechsel</value></data>
@@ -334,11 +311,7 @@
   <data name="SliderLabel_Brightness" xml:space="preserve"><value>Helligkeit</value></data>
   <data name="Section_Sleep" xml:space="preserve"><value>RUHEZUSTAND</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Ruhezustands-Modus</value></data>
-  <data name="Option_Enabled" xml:space="preserve"><value>Aktiviert</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Ruhezustands-Zeit</value></data>
-  <data name="Section_PowerOnOffColor" xml:space="preserve"><value>EINSCHALT- / AUSSCHALT-FARBE</value></data>
-  <data name="SliderLabel_StartupColor" xml:space="preserve"><value>Startfarbe</value></data>
-  <data name="SliderLabel_ShutdownColor" xml:space="preserve"><value>Abschaltfarbe</value></data>
   <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA-DASHBOARD</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Suche nach Dashboard…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>INDIKATORMODI</value></data>
@@ -373,13 +346,10 @@
   <data name="Label_PaddleCombined" xml:space="preserve"><value>KOMBINIERT</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>AKTIVE TASTEN</value></data>
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
-  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// Richtungs-Stick-Zuweisung</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Das Lenkrad hat noch keine Joystick-Konfiguration gemeldet. Lenkrad anschließen und auf den Abschluss der Identity-Probe warten.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetrie</value></data>
-  <data name="Button_LoadMzdash" xml:space="preserve"><value>.MZDASH LADEN…</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ORDNER WÄHLEN…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-ERKENNUNG</value></data>
-  <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Lokale .mzdash-Datei für Tier-Def-Kanalabgleich laden</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Einen Ordner mit .mzdash-Dateien als Dashboard-Bibliothek festlegen</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Den Dashboard-Ordner für das verbundene Lenkrad automatisch erkennen</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
@@ -401,20 +371,9 @@
   <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Standard wiederherstellen</value></data>
   <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Globaler Kanal-Editor nicht verfügbar (siehe Protokoll)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>FELD ZURÜCKSETZEN</value></data>
-  <data name="Button_SplitField" xml:space="preserve"><value>FELD TEILEN</value></data>
-  <data name="Button_BitSplit" xml:space="preserve"><value>BIT TEILEN</value></data>
-  <data name="Button_MergePrev" xml:space="preserve"><value>VERBINDEN ◀</value></data>
-  <data name="Button_MergeNext" xml:space="preserve"><value>VERBINDEN ▶</value></data>
-  <data name="Button_RemoveSplit" xml:space="preserve"><value>TEILUNG ENTFERNEN</value></data>
   <data name="Viz_Title" xml:space="preserve"><value>LIVE-FSR1-DATEN</value></data>
-  <data name="Edit_StartByte" xml:space="preserve"><value>Startbyte</value></data>
-  <data name="Edit_StartBit" xml:space="preserve"><value>Startbit</value></data>
-  <data name="Edit_BitWidth" xml:space="preserve"><value>Bitbreite</value></data>
-  <data name="Edit_EndByte" xml:space="preserve"><value>Endbyte</value></data>
-  <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-Endian</value></data>
   <data name="Edit_Scale" xml:space="preserve"><value>Skalierung</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Versatz</value></data>
-  <data name="Section_Display" xml:space="preserve"><value>ANZEIGE</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Wird gerendert…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-Zeit</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync-LED</value></data>
@@ -451,9 +410,7 @@
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// Flagge anklicken zum Umfärben</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAGGE 1</value></data>
   <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM-INDIKATOR</value></data>
-  <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// Legacy-ES-Protokoll</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indikatormodus</value></data>
-  <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Anzeigemodus</value></data>
   <data name="Section_ButtonLedMode" xml:space="preserve"><value>TASTEN-LED-MODUS</value></data>
   <data name="SliderLabel_ButtonLedMode" xml:space="preserve"><value>Tasten-LED-Modus</value></data>
   <data name="SliderLabel_ButtonIdleEffect" xml:space="preserve"><value>Tasten-Leerlauf-Effekt</value></data>
@@ -487,18 +444,15 @@
   <data name="SliderLabel_Language" xml:space="preserve"><value>Sprache</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Erfordert einen Neustart nach der Änderung.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
-  <data name="Button_ImportProfile" xml:space="preserve"><value>PROFIL IMPORTIEREN…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>PitHouse-Voreinstellung importieren</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Datei suchen…</value></data>
   <data name="Import_Category_Motor" xml:space="preserve"><value>Wheelbase (Motor)</value></data>
   <data name="Import_Category_Pedals" xml:space="preserve"><value>Pedale</value></data>
   <data name="Import_NoFolderFound" xml:space="preserve"><value>PitHouse-Preset-Ordner nicht gefunden. Pfad festlegen oder Datei suchen.</value></data>
   <data name="Import_SetCustomFolder" xml:space="preserve"><value>Ordner wählen…</value></data>
-  <data name="Import_ConfirmHeader" xml:space="preserve"><value>"{0}" wird auf Profil "{1}" angewendet. Die folgenden Einstellungen werden geändert:</value></data>
   <data name="Import_NoChangesHeader" xml:space="preserve"><value>Alle Werte in dieser Voreinstellung stimmen bereits mit Ihrem aktiven Profil überein.</value></data>
   <data name="Import_NotImportedHeader" xml:space="preserve"><value>Nicht importiert (keine Plugin-Entsprechung):</value></data>
   <data name="Import_ApplyButton" xml:space="preserve"><value>ANWENDEN</value></data>
-  <data name="Import_CancelButton" xml:space="preserve"><value>ABBRECHEN</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>WEITER</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>ZURÜCK</value></data>
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Wählen Sie eine PitHouse- oder Motion-Manager-Voreinstellungsdatei (JSON) von einem beliebigen Ort.</value></data>
@@ -603,7 +557,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_PaddleCalibration" xml:space="preserve"><value>Schaltwippen-Kalibrierung</value></data>
   <data name="Button_RestartWheelbase" xml:space="preserve"><value>Wheelbase neu starten</value></data>
   <data name="Button_CalibrateStart" xml:space="preserve"><value>Starten</value></data>
-  <data name="Button_CalibrateSave" xml:space="preserve"><value>Speichern</value></data>
   <data name="Dialog_RestartWheelbase_Caption" xml:space="preserve"><value>Wheelbase neu starten</value></data>
   <data name="Dialog_RestartWheelbase_Body" xml:space="preserve"><value>Wheelbase jetzt neu starten? Das Force Feedback fällt kurz aus, während die Basis neu startet.</value></data>
   <data name="Hint_PaddleCalibrate" xml:space="preserve"><value>Alle Schaltwippen vollständig betätigen und loslassen. Speichern in {0}s…</value></data>
@@ -630,7 +583,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_WiperStageCount" xml:space="preserve"><value>Wischerstufen</value></data>
   <data name="Label_WiperForwardWraps" xml:space="preserve"><value>Wischertaste läuft um</value></data>
   <data name="SliderLabel_LightStageCount" xml:space="preserve"><value>Lichtstufen</value></data>
-  <data name="Button_ResyncWipers" xml:space="preserve"><value>Wischer neu abgleichen</value></data>
   <data name="Hint_ResyncWipers" xml:space="preserve"><value>Schaltet die Spielwischer auf Aus, um sie mit der vom Plugin verfolgten Stufe abzugleichen.</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Zuletzt gedrückt: Taste {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>ETS2/ATS-Standard laden</value></data>
@@ -646,10 +598,7 @@ Id: {2}</value></data>
   <data name="Button_AddCustomEffect" xml:space="preserve"><value>+ Benutzerdefinierten Effekt hinzufügen</value></data>
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Effekt löschen</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Benutzerdefinierter Effekt</value></data>
-  <data name="Section_PedalRoles" xml:space="preserve"><value>Pedalrollen</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Pedal {0}</value></data>
-  <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Dieser mBooster hostet mehrere Pedale über eine Verbindung. Weisen Sie jeder erkannten Achse eine Spieleingabe zu. Die Standardreihenfolge folgt Mozas Rx/Ry/Rz-Layout (Gas/Bremse/Kupplung) — hier neu zuordnen, wenn ein Pedal die falsche Eingabe steuert.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Pedal konfigurieren:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Dieses Pedal ist passiv (kein Motor) — Vibrationseffekte greifen nicht.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
@@ -669,9 +618,7 @@ Id: {2}</value></data>
   <data name="ShifterColor_Blue" xml:space="preserve"><value>Blau</value></data>
   <data name="ShifterColor_Purple" xml:space="preserve"><value>Lila</value></data>
   <data name="ShifterColor_White" xml:space="preserve"><value>Weiß</value></data>
-  <data name="Section_WheelbaseLfe" xml:space="preserve"><value>BASIS-VIBRATIONSEFFEKTE</value></data>
   <data name="SliderLabel_Trigger" xml:space="preserve"><value>Auslöser</value></data>
-  <data name="Label_EnginePresets" xml:space="preserve"><value>Motor-Presets:</value></data>
   <data name="Preset_AdditiveEngine" xml:space="preserve"><value>Additiver Motor</value></data>
   <data name="Preset_BigRig" xml:space="preserve"><value>Sattelschlepper</value></data>
   <data name="Preset_DetunedV8" xml:space="preserve"><value>Verstimmter V8</value></data>
@@ -690,7 +637,6 @@ Id: {2}</value></data>
   <data name="Mode_Abs" xml:space="preserve"><value>ABS</value></data>
   <data name="Mode_Gearshift" xml:space="preserve"><value>Gangwechsel</value></data>
   <data name="Mode_Custom" xml:space="preserve"><value>Eigen</value></data>
-  <data name="Label_Load" xml:space="preserve"><value>Laden</value></data>
   <data name="Label_Save" xml:space="preserve"><value>Speichern</value></data>
   <data name="Label_Delete" xml:space="preserve"><value>Löschen</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importieren</value></data>
@@ -707,7 +653,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Max. Pedalweg (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Reaktionsgeschwindigkeit (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>PROBLEM MELDEN</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Einen Diagnosebericht an den Entwickler senden</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Problem beschreiben</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beschreiben Sie das Problem: was Sie getan haben, was das Lenkrad oder Dashboard getan hat und wann es begann.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (optional — E-Mail oder Discord)</value></data>
@@ -720,12 +665,6 @@ Id: {2}</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Upload fehlgeschlagen. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.</value></data>
   <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Upload von unserem CDN blockiert, nicht von Ihrer Verbindung — bitte Bundle exportieren.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Bitte beschreiben Sie das Problem, bevor Sie senden.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnose-Mitschnitt</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Hält einen kleinen Mitschnitt des seriellen Verkehrs im Speicher (die erste Minute des Starts plus die letzte Aktivität), damit Fehlerberichte den Verbindungsaufbau enthalten. Nichts verlässt Ihren PC, bis Sie einen Bericht senden.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnose-Mitschnitt ist aus.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Start: {0} Frames ({1} KB, {2}) · Laufend: {3} Frames ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>eingefroren</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>füllt</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Bitte warten Sie einen Moment, bevor Sie einen weiteren Bericht senden.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Das Diagnosepaket als Datei auf diesem PC speichern (es wird nichts hochgeladen).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Spieltasten</value></data>
@@ -753,7 +692,6 @@ Id: {2}</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Eingabekraft</value></data>
-  <data name="Section_PerLedColors" xml:space="preserve"><value>LED-FARBEN EINZELN</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Ruhe · Konstant</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Ruhe · Atmen</value></data>
   <data name="Label_SleepBreathing" xml:space="preserve"><value>Schlaf · Atmen</value></data>
@@ -805,7 +743,6 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Pedalweg wird kalibriert – der Motor bewegt das Pedal selbst, nimm den Fuß weg. Noch {0}s…</value></data>
   <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Motor wird kalibriert – nimm den Fuß vom Pedal. Das dauert etwa eine Minute. Noch {0}s…</value></data>
   <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Pedal wird zum Abschluss neu gestartet – es verbindet sich in wenigen Sekunden wieder.</value></data>
-  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>Auf einem anderen Pedal läuft gerade eine Kalibrierung.</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Kalibrierung fehlgeschlagen: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Dämpfung (Treten)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Dämpfung (Lösen)</value></data>

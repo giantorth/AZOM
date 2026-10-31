@@ -460,10 +460,8 @@ namespace MozaPlugin.Telemetry
             ResetDeviceLogPull();
             _nextFlagBase = 0;
             _activeSubscription = null;
-            _sessionAckSeq = 0;
             _sessionLife.ClearContigAck();
             _dashboardDownloadTriggered = false;
-            ConfigSessionLatch = 0;
             _preambleTickTarget = Math.Max(1, 1000 / _baseTickMs);
             // Default the cold-start preamble gate off; StartInner re-arms it
             // for true cold starts immediately after this call.
@@ -644,7 +642,6 @@ namespace MozaPlugin.Telemetry
             _postSwitchConvergence.Disarm();
             _postSwitchKind4Confirmed = false;
             try { _uploader?.Reset(); } catch { }
-            _sessions.Reset();
             _dispatcher.Reset();
             ResetDeviceLogPull();
             _session09InboundSeq = 0;

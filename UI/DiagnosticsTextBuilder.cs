@@ -21,7 +21,6 @@ namespace MozaPlugin.UI
         public static string Redact(string s) => MozaLog.RedactId(s);
         public static string RedactBytes(byte[] b) => MozaLog.RedactBytesHex(b);
         public static string Hex(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b);
-        public static string HexRaw(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b).Replace("-", "");
         public static string JoinList(IReadOnlyList<string> l)
             => l == null || l.Count == 0 ? "(empty)" : string.Join(", ", l);
         public static string TruncateId(string id)

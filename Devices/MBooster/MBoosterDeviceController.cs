@@ -386,12 +386,6 @@ namespace MozaPlugin.Devices.MBooster
         /// single-pedal branch reads the role from the settings.</summary>
         public void OnSettingsResolved() => RecomputeChainRoleMap();
 
-        public event Action<byte[]>? MessageReceived
-        {
-            add    => _connection.MessageReceived += value;
-            remove => _connection.MessageReceived -= value;
-        }
-
         /// <summary>
         /// Fired on the rising edge of detection (first valid <c>mbooster-*</c>
         /// response on the connection). UI uses this to refresh the tab.
@@ -2491,19 +2485,11 @@ namespace MozaPlugin.Devices.MBooster
                 // motor frames and the keepalive are write-only, and with all
                 // effects disabled (the default for a fresh device) the worker
                 // sends nothing else at all. Without this, MarkDetected() never
-                // fires and the UI sits at "Probing…" until the user manually
-                // clicks "Read from device" in the Calibration section — fire
-                // the same read burst here so detection latches on its own.
+                // fires and the UI sits at "Probing…" — fire the read burst
+                // here so detection latches on its own.
                 RequestCalibrationReads();
             }
             return ok;
-        }
-
-        public void Disconnect()
-        {
-            foreach (var w in _workers) w.Stop();
-            if (_ownsConnection) _connection.Disconnect();
-            _detected = false;
         }
 
         /// <summary>
@@ -2768,8 +2754,8 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Build + send a read for a registered <c>mbooster-*</c> command,
         /// addressed to this lane's host sub-device (0x12 USB / 0x19 routed).
-        /// Read responses (group 35 + 0x80 = 0xA3) land on <see cref="MessageReceived"/>
-        /// and the caller must <see cref="MozaResponseParser.Parse"/> them with
+        /// Read responses (group 35 + 0x80 = 0xA3) are handled by
+        /// <see cref="OnConnectionMessage"/>, which parses them with
         /// <c>busHint: "mbooster"</c> to disambiguate from wheelbase main and AB9.
         /// </summary>
         public bool SendRead(string commandName) => SendRead(commandName, HostDeviceId);
@@ -3000,15 +2986,6 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
-        /// <summary>
-        /// Issue a one-time burst of calibration reads (direction / min / max
-        /// per pedal + 5-point curves). Mirrors the wheelbase pedal seed.
-        /// Called from <see cref="TryConnect"/> (it's also the only thing
-        /// that elicits a response a fresh connection can latch detection
-        /// on), from the rising-edge handler, and from the UI's "Read from
-        /// device" button. Experimental: may produce no responses on
-        /// mBooster firmware.
-        /// </summary>
         /// <summary>Identity/presence reads alone — the routed-lane probe uses
         /// this to identify what's on a base/hub pedal port (model-name is the
         /// mBooster-vs-SGP discriminator) without the calibration burst.</summary>
@@ -3040,6 +3017,15 @@ namespace MozaPlugin.Devices.MBooster
             "mbooster-serial-b",
         };
 
+        /// <summary>
+        /// Issue a one-time burst of calibration reads (direction / min / max
+        /// per pedal + 5-point curves). Mirrors the wheelbase pedal seed.
+        /// Called from <see cref="TryConnect"/> (it's also the only thing
+        /// that elicits a response a fresh connection can latch detection
+        /// on), from the rising-edge handler, and from the registry's routed
+        /// re-detect nudge. Experimental: may produce no responses on
+        /// mBooster firmware.
+        /// </summary>
         public void RequestCalibrationReads()
         {
             if (!_connection.IsConnected) return;

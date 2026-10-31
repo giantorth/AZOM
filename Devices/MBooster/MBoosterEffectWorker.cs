@@ -878,12 +878,8 @@ namespace MozaPlugin.Devices.MBooster
         // instead of snap.AbsActive, and its own Frequency (10-100Hz) and
         // Intensity sliders — no Smoothness slider (unlike ABS), fixed at
         // smoothness01 = 1 instead. The sustained test toggle substitutes
-        // live throttle position for tcActive (there's no live
-        // TC-activation signal to press against outside a real TC event,
-        // and TC engages under acceleration/wheelspin rather than braking,
-        // unlike ABS) — gated at 80% throttle, not any nonzero press, so
-        // the test only fires once you're pressing hard enough to
-        // plausibly trigger real wheelspin, not on a light tap.
+        // the pedal's own press for tcActive, gated at 60% so a light tap
+        // doesn't fire it.
         private void UpdateTractionControlRequest(IMBoosterEffects? effects, double testPress, in MBoosterTelemetrySnapshot snap, ref EffectState st)
         {
             double freqHz = ClampTractionControlFreq(effects?.TractionControl?.FrequencyHz ?? MBoosterUiConstants.TractionControlFreqMinHz);
@@ -1962,14 +1958,6 @@ namespace MozaPlugin.Devices.MBooster
             return b;
         }
 
-        /// <summary>
-        /// Live throttle reading for Traction Control's test pulse. Prefers
-        /// <c>snap.Throttle</c> (the game-telemetry source SimHub publishes)
-        /// and rises to the mBooster's own HID pedal position when its role
-        /// is Throttle — same substitution <see cref="EffectiveBrake"/> makes
-        /// for ABS/Lockup/Threshold, so the user can feel throttle-modulated
-        /// test pulses even with no game running.
-        /// </summary>
         /// <summary>
         /// This pedal's own press (0..1), role-agnostic — the game's value for
         /// whichever role this pedal holds, raised by its own HID position.

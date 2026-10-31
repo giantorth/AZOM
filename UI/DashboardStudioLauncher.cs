@@ -341,13 +341,11 @@ namespace MozaPlugin.UI
         public readonly struct LaunchResult
         {
             public LaunchOutcome Outcome { get; }
-            public string? ExePath { get; }
             public string? Error { get; }
 
-            public LaunchResult(LaunchOutcome outcome, string? exePath, string? error)
+            public LaunchResult(LaunchOutcome outcome, string? error)
             {
                 Outcome = outcome;
-                ExePath = exePath;
                 Error = error;
             }
         }
@@ -393,7 +391,7 @@ namespace MozaPlugin.UI
         private static LaunchResult Start(string arguments, string what)
         {
             string? exe = FindStudioExe();
-            if (exe == null) return new LaunchResult(LaunchOutcome.NotFound, null, null);
+            if (exe == null) return new LaunchResult(LaunchOutcome.NotFound, null);
             try
             {
                 var psi = new ProcessStartInfo
@@ -405,13 +403,13 @@ namespace MozaPlugin.UI
                 };
                 Process.Start(psi)?.Dispose();
                 MozaLog.Info($"[AZOM] Dashboard Studio launched: {what}");
-                return new LaunchResult(LaunchOutcome.Started, exe, null);
+                return new LaunchResult(LaunchOutcome.Started, null);
             }
             catch (Exception ex)
             {
                 MozaLog.Warn($"[AZOM] Dashboard Studio launch failed ({what}): " +
                              $"{ex.GetType().Name}: {ex.Message}");
-                return new LaunchResult(LaunchOutcome.Failed, exe, ex.Message);
+                return new LaunchResult(LaunchOutcome.Failed, ex.Message);
             }
         }
 

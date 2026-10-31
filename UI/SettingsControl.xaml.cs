@@ -47,10 +47,9 @@ namespace MozaPlugin.UI
         private readonly EventSuppressor _suppressor = new EventSuppressor();
         private bool _suppressEvents => _suppressor.Suppressed;
 
-        // Per-pedal Y-curve UI bindings, cached after InitializeComponent so
-        // ApplyPedalCurvePreset can take an arrays pair instead of 10 args.
+        // Per-pedal Y-curve sliders, cached after InitializeComponent so
+        // ApplyPedalCurvePreset can take one array instead of 5 args.
         private Slider[]? _throttleCurveSliders, _brakeCurveSliders, _clutchCurveSliders;
-        private TextBox[]? _throttleCurveLabels, _brakeCurveLabels, _clutchCurveLabels;
 
 
         public SettingsControl(MozaPlugin plugin)
@@ -65,9 +64,6 @@ namespace MozaPlugin.UI
                 _throttleCurveSliders = new[] { ThrottleY1Slider, ThrottleY2Slider, ThrottleY3Slider, ThrottleY4Slider, ThrottleY5Slider };
                 _brakeCurveSliders    = new[] { BrakeY1Slider,    BrakeY2Slider,    BrakeY3Slider,    BrakeY4Slider,    BrakeY5Slider };
                 _clutchCurveSliders   = new[] { ClutchY1Slider,   ClutchY2Slider,   ClutchY3Slider,   ClutchY4Slider,   ClutchY5Slider };
-                _throttleCurveLabels  = new[] { ThrottleY1Value,  ThrottleY2Value,  ThrottleY3Value,  ThrottleY4Value,  ThrottleY5Value };
-                _brakeCurveLabels     = new[] { BrakeY1Value,     BrakeY2Value,     BrakeY3Value,     BrakeY4Value,     BrakeY5Value };
-                _clutchCurveLabels    = new[] { ClutchY1Value,    ClutchY2Value,    ClutchY3Value,    ClutchY4Value,    ClutchY5Value };
                 ConnectionToggle.IsChecked = plugin.ConnectionEnabled;
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;

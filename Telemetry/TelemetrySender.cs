@@ -119,7 +119,6 @@ namespace MozaPlugin.Telemetry
 
         // _tierDefPreambleSent moved to TierDefinitionEmitter.
         private int _preambleTickTarget;
-        internal int _sessionAckSeq;
 
         // Session open/close state machine + ack latch + contig-ack tracking —
         // see Sessions/SessionLifecycle.cs. Constructed in the ctor before the
@@ -164,12 +163,9 @@ namespace MozaPlugin.Telemetry
 
 
         // Upload handshake state.
-        internal int _mgmtAckSeq;
-
         private readonly ManualResetEventSlim _mgmtResponseEvent = new ManualResetEventSlim(false);
 
         // File-transfer session state. See docs/protocol/dashboard-upload/.
-        private readonly SessionRegistry _sessions = new SessionRegistry();
         private readonly SessionDispatcher _dispatcher = new SessionDispatcher();
         // mzdash upload coordinator. Constructed in the ctor after _connection.
         private WheelUploadCoordinator _uploader = null!;
@@ -297,11 +293,10 @@ namespace MozaPlugin.Telemetry
         private const int CatalogGrowthMinDelta = 1;
 
         // Catalog-only profile synthesis: track the catalog generation we last
-        // synthesised against so dashboard switches (wheel emits new catalog,
-        // bumps END marker) cause re-synthesis instead of holding the old
-        // tiers. State only meaningful when _profile.Name == CatalogProfileName.
+        // synthesised against so dashboard switches (catalog count or content
+        // changes) cause re-synthesis instead of holding the old tiers. State
+        // only meaningful when _profile.Name == CatalogProfileName.
         internal const string CatalogProfileName = "WheelCatalog";
-        private uint _catalogEndMarkerAtSynthesis;
         private int _catalogCountAtSynthesis;
         // Content hash of the catalog URLs at the last synthesis. The wheel
         // streams its catalog via abbreviated/back-ref chunks the parser
@@ -381,11 +376,11 @@ namespace MozaPlugin.Telemetry
         }
 
         // CRC32 reject counters for catalog (sess=0x01/FlagByte) and tile-server
-        // (sess=0x03/0x0b) chunks. Surfaced via diagnostics for link-quality.
+        // (sess=0x03/0x0b) chunks. Catalog count is surfaced via diagnostics;
+        // the tile-server count only throttles its mismatch log.
         private int _catalogCrcRejects;
         public int CatalogCrcRejects => Interlocked.CompareExchange(ref _catalogCrcRejects, 0, 0);
         private int _tileServerCrcRejects;
-        public int TileServerCrcRejects => Interlocked.CompareExchange(ref _tileServerCrcRejects, 0, 0);
 
         // Per-session highest seen seq for tile-server sess=0x03 / 0x0b. Dedup
         // retransmits so the parser buffer doesn't accumulate duplicate bytes
@@ -584,10 +579,6 @@ namespace MozaPlugin.Telemetry
         private bool _session09ReplySent;
         public WheelDashboardState? WheelState => _configJson.LastState;
 
-        // Wraps WheelState.ConfigJsonList for the auto-test.
-        public System.Collections.Generic.IReadOnlyList<string>? WheelReportedDashboards
-            => _configJson.LastState?.ConfigJsonList;
-
         /// <summary>
         /// Canonical dashboard library advertised to the wheel on session 0x09.
         /// Wheel echoes these in its next state blob's configJsonList.
@@ -610,15 +601,12 @@ namespace MozaPlugin.Telemetry
             public readonly byte FlagBase;
             public readonly int TierCount;
             public readonly int SubTiersPerBroadcast;
-            public readonly string ProfileName;
 
-            public SubscriptionState(byte flagBase, int tierCount,
-                int subTiersPerBroadcast, string profileName)
+            public SubscriptionState(byte flagBase, int tierCount, int subTiersPerBroadcast)
             {
                 FlagBase = flagBase;
                 TierCount = tierCount;
                 SubTiersPerBroadcast = subTiersPerBroadcast;
-                ProfileName = profileName;
             }
         }
         private volatile SubscriptionState? _activeSubscription;
@@ -628,7 +616,7 @@ namespace MozaPlugin.Telemetry
         private byte _nextFlagBase;
 
         // Monotonic counter — incremented per tier-def emit. Used by
-        // DashboardSwitchAutoTest to detect renegotiate completion.
+        // DashboardSwitchAutoTest to detect the first subscription.
         private int _subscriptionGen;
         public int SubscriptionGen => System.Threading.Volatile.Read(ref _subscriptionGen);
 
@@ -683,10 +671,6 @@ namespace MozaPlugin.Telemetry
             lock (_sessionCounts)
                 return _sessionCounts.TryGetValue(session, out var pair) ? pair.Out : 0;
         }
-
-        // Upload-session dir-listing tracking is owned by _uploader; expose
-        // its refresh flag here for the diag tab via a thin pass-through.
-        public bool Session04DirListingRefreshed => _uploader?.DirListingRefreshed ?? false;
 
         // RPC on 0x09/0x0a (host→device management). See RpcCallChannel.
         // _session0aInbox is shared with the configJson handler (0x09/0x0a
@@ -765,11 +749,6 @@ namespace MozaPlugin.Telemetry
         internal byte _mgmtPort;
         public byte FlagByte { get; set; } = 0x02;
 
-        /// <summary>Which session the configJson exchange latched to: 0 =
-        /// unresolved, 0x0a = modern channel (latched at first sight of a
-        /// wheel push there), 0x09 stays implicit for legacy wheels. Set by
-        /// the inbound dispatcher; reset on Stop.</summary>
-        internal volatile byte ConfigSessionLatch;
         public bool SendTelemetryMode { get; set; } = true;
         public bool SendSequenceCounter { get; set; } = true;
         private bool _testMode;
@@ -1108,21 +1087,8 @@ namespace MozaPlugin.Telemetry
             MozaLog.Debug($"[AZOM] TelemetrySender rebound to {connection.CaptureLabel} connection");
         }
 
-        // Caller passes the MozaPlugin instance directly because Init may call
-        // ApplyTelemetrySettings BEFORE MozaPlugin.Instance is assigned, so the
-        // static accessor is null at this point and the delegate binding throws
-        // ArgumentException("Delegate to an instance method cannot have null 'this'").
-        internal void EnableAutoTest(MozaPlugin plugin)
-        {
-            // Always rebuild: the delegates capture the plugin instance, and this
-            // sender survives the game-switch reload while that instance does not —
-            // a Reset() here kept the first Init's plugin pinned for the process.
-            _autoTest = new DashboardSwitchAutoTest(
-                this,
-                plugin.ResolveDashboardProfileByName,
-                () => plugin.DashCache,
-                name => { plugin.ActiveTelemetryProfileName = name; });
-        }
+        // Re-armed on every call (each ApplyTelemetrySettings).
+        internal void EnableAutoTest() => _autoTest = new DashboardSwitchAutoTest(this);
 
         internal void DisableAutoTest() => _autoTest = null;
 

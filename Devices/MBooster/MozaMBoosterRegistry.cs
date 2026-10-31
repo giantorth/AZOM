@@ -78,16 +78,6 @@ namespace MozaPlugin.Devices.MBooster
         private readonly HashSet<string> _collisionsLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>True iff at least one mBooster is currently detected (UI gate).</summary>
-        public bool AnyDetected
-        {
-            get
-            {
-                lock (_lock)
-                    return _order.Any(c => c.Detected);
-            }
-        }
-
         /// <summary>
         /// True iff an mBooster occupies the relayed pedal sub-device (0x19) on
         /// a base/hub pipe. A routed lane only reaches the registry once the
@@ -205,13 +195,6 @@ namespace MozaPlugin.Devices.MBooster
         {
             get { lock (_calibrationRunnerLock) return _calibrationRunner; }
         }
-
-        /// <summary>Fired (foreground thread NOT guaranteed) on detection rising edge.</summary>
-        public event Action<MBoosterDeviceController>? DeviceDetected;
-        /// <summary>Fired when a new device is added to the registry.</summary>
-        public event Action<MBoosterDeviceController>? DeviceAdded;
-        /// <summary>Fired when a device is removed (port disappeared from registry).</summary>
-        public event Action<MBoosterDeviceController>? DeviceRemoved;
 
         public MozaMBoosterRegistry(
             MozaData data,
@@ -372,11 +355,7 @@ namespace MozaPlugin.Devices.MBooster
                 foreach (var c in added)
                 {
                     MozaLog.Info($"[AZOM/mBooster] Discovered {MBoosterDeviceController.ShortIdentity(c.Identity)} on {c.PortName}");
-                    try
-                    {
-                        c.TryConnect();
-                        try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
-                    }
+                    try { c.TryConnect(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] Connect failed for {c.Identity}: {ex.Message}"); }
                 }
             }
@@ -387,10 +366,9 @@ namespace MozaPlugin.Devices.MBooster
                     MozaLog.Info($"[AZOM/mBooster] Removed {MBoosterDeviceController.ShortIdentity(c.Identity)} (port gone from registry)");
                     try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Dispose: {ex.Message}"); }
                     // A running calibration expects exactly this: its own soft
-                    // reboot takes the port away. Tell the runner before the
-                    // public event so it can't miss the drop.
+                    // reboot takes the port away. Tell the runner so it can't
+                    // miss the drop.
                     try { CalibrationRunnerOrNull?.OnDeviceRemoved(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceRemoved: {ex.Message}"); }
-                    try { DeviceRemoved?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceRemoved handler: {ex.Message}"); }
                 }
             }
 
@@ -503,7 +481,6 @@ namespace MozaPlugin.Devices.MBooster
                 try { _onSerialResolved?.Invoke(c.Identity, c.Serial!); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnSerialResolved replay: {ex.Message}"); }
             }
-            try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
         }
 
         private void OnControllerDetected(MBoosterDeviceController c)
@@ -513,7 +490,6 @@ namespace MozaPlugin.Devices.MBooster
             // After _onDeviceDetectedEdge, so the reconnect's config re-push is
             // already queued when the runner re-arms the effect suspension.
             try { CalibrationRunnerOrNull?.OnDeviceDetected(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceDetected: {ex.Message}"); }
-            try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceDetected handler: {ex.Message}"); }
         }
 
         /// <summary>Route a controller's group-0x0E firmware-log line to a
@@ -760,8 +736,7 @@ namespace MozaPlugin.Devices.MBooster
 
             // Control Y clamped to 0-100 so (convex hull) the output never
             // leaves 0-100 — a first node at Y=0 is then a true flat deadzone
-            // instead of dipping negative. MozaCurveEditor.ClampSplineToPlot
-            // draws the same thing.
+            // instead of dipping negative.
             double c1x = p1x + (p2x - p0x) / 6.0, c1y = Math.Max(0, Math.Min(100, p1y + (p2y - p0y) / 6.0));
             double c2x = p2x - (p3x - p1x) / 6.0, c2y = Math.Max(0, Math.Min(100, p2y - (p3y - p1y) / 6.0));
 
@@ -1078,16 +1053,6 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
-        /// <summary>
-        /// Walk all devices in enumeration order and assign each device's
-        /// position to the matching <c>MozaData</c> field if its role is set.
-        /// First-wins on collision (later devices with the same role are
-        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
-        /// "PD Linked" diagnostic reports as having no pedal are skipped —
-        /// the HID exposes 3 axes regardless of how many pedals are wired,
-        /// and a phantom axis's role claim would otherwise first-wins a real
-        /// pedal's role with a frozen 0 position.
-        /// </summary>
         private readonly HashSet<string> _unmatchedHidLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1112,6 +1077,16 @@ namespace MozaPlugin.Devices.MBooster
                 "See docs/protocol/devices/mbooster.md \"HID identity reconciliation\".");
         }
 
+        /// <summary>
+        /// Walk all devices in enumeration order and assign each device's
+        /// position to the matching <c>MozaData</c> field if its role is set.
+        /// First-wins on collision (later devices with the same role are
+        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
+        /// "PD Linked" diagnostic reports as having no pedal are skipped —
+        /// the HID exposes 3 axes regardless of how many pedals are wired,
+        /// and a phantom axis's role claim would otherwise first-wins a real
+        /// pedal's role with a frozen 0 position.
+        /// </summary>
         /// <param name="updated">The lane whose axis just moved; its
         /// <paramref name="updatedSettings"/> were already fetched.</param>
         private void MergePositions(MBoosterDeviceController updated, MBoosterDeviceSettings? updatedSettings)

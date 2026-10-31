@@ -77,11 +77,11 @@ namespace MozaPlugin.UI
             if (passive)
             {
                 SeedPassivePedal("throttle", ThrottleDirCheck, ThrottleMinSlider, ThrottleMinValue,
-                    ThrottleMaxSlider, ThrottleMaxValue, _throttleCurveSliders!, _throttleCurveLabels!);
+                    ThrottleMaxSlider, ThrottleMaxValue, _throttleCurveSliders!);
                 SeedPassivePedal("brake", BrakeDirCheck, BrakeMinSlider, BrakeMinValue,
-                    BrakeMaxSlider, BrakeMaxValue, _brakeCurveSliders!, _brakeCurveLabels!);
+                    BrakeMaxSlider, BrakeMaxValue, _brakeCurveSliders!);
                 SeedPassivePedal("clutch", ClutchDirCheck, ClutchMinSlider, ClutchMinValue,
-                    ClutchMaxSlider, ClutchMaxValue, _clutchCurveSliders!, _clutchCurveLabels!);
+                    ClutchMaxSlider, ClutchMaxValue, _clutchCurveSliders!);
                 return;
             }
 
@@ -90,11 +90,11 @@ namespace MozaPlugin.UI
             SetValueText(ThrottleMinValue, $"{_data.PedalsThrottleMin}%");
             ThrottleMaxSlider.Value = Clamp(_data.PedalsThrottleMax, 0, 100);
             SetValueText(ThrottleMaxValue, $"{_data.PedalsThrottleMax}%");
-            SetSliderRaw(ThrottleY1Slider, ThrottleY1Value, _data.PedalsThrottleCurve[0], 0, 100, "");
-            SetSliderRaw(ThrottleY2Slider, ThrottleY2Value, _data.PedalsThrottleCurve[1], 0, 100, "");
-            SetSliderRaw(ThrottleY3Slider, ThrottleY3Value, _data.PedalsThrottleCurve[2], 0, 100, "");
-            SetSliderRaw(ThrottleY4Slider, ThrottleY4Value, _data.PedalsThrottleCurve[3], 0, 100, "");
-            SetSliderRaw(ThrottleY5Slider, ThrottleY5Value, _data.PedalsThrottleCurve[4], 0, 100, "");
+            SetDataSlider(ThrottleY1Slider, _data.PedalsThrottleCurve[0], 0, 100);
+            SetDataSlider(ThrottleY2Slider, _data.PedalsThrottleCurve[1], 0, 100);
+            SetDataSlider(ThrottleY3Slider, _data.PedalsThrottleCurve[2], 0, 100);
+            SetDataSlider(ThrottleY4Slider, _data.PedalsThrottleCurve[3], 0, 100);
+            SetDataSlider(ThrottleY5Slider, _data.PedalsThrottleCurve[4], 0, 100);
 
             BrakeDirCheck.IsChecked = _data.PedalsBrakeDir != 0;
             BrakeMinSlider.Value = Clamp(_data.PedalsBrakeMin, 0, 100);
@@ -103,22 +103,22 @@ namespace MozaPlugin.UI
             SetValueText(BrakeMaxValue, $"{_data.PedalsBrakeMax}%");
             BrakeAngleRatioSlider.Value = Clamp(_data.PedalsBrakeAngleRatio, 0, 100);
             SetValueText(BrakeAngleRatioValue, $"{_data.PedalsBrakeAngleRatio}%");
-            SetSliderRaw(BrakeY1Slider, BrakeY1Value, _data.PedalsBrakeCurve[0], 0, 100, "");
-            SetSliderRaw(BrakeY2Slider, BrakeY2Value, _data.PedalsBrakeCurve[1], 0, 100, "");
-            SetSliderRaw(BrakeY3Slider, BrakeY3Value, _data.PedalsBrakeCurve[2], 0, 100, "");
-            SetSliderRaw(BrakeY4Slider, BrakeY4Value, _data.PedalsBrakeCurve[3], 0, 100, "");
-            SetSliderRaw(BrakeY5Slider, BrakeY5Value, _data.PedalsBrakeCurve[4], 0, 100, "");
+            SetDataSlider(BrakeY1Slider, _data.PedalsBrakeCurve[0], 0, 100);
+            SetDataSlider(BrakeY2Slider, _data.PedalsBrakeCurve[1], 0, 100);
+            SetDataSlider(BrakeY3Slider, _data.PedalsBrakeCurve[2], 0, 100);
+            SetDataSlider(BrakeY4Slider, _data.PedalsBrakeCurve[3], 0, 100);
+            SetDataSlider(BrakeY5Slider, _data.PedalsBrakeCurve[4], 0, 100);
 
             ClutchDirCheck.IsChecked = _data.PedalsClutchDir != 0;
             ClutchMinSlider.Value = Clamp(_data.PedalsClutchMin, 0, 100);
             SetValueText(ClutchMinValue, $"{_data.PedalsClutchMin}%");
             ClutchMaxSlider.Value = Clamp(_data.PedalsClutchMax, 0, 100);
             SetValueText(ClutchMaxValue, $"{_data.PedalsClutchMax}%");
-            SetSliderRaw(ClutchY1Slider, ClutchY1Value, _data.PedalsClutchCurve[0], 0, 100, "");
-            SetSliderRaw(ClutchY2Slider, ClutchY2Value, _data.PedalsClutchCurve[1], 0, 100, "");
-            SetSliderRaw(ClutchY3Slider, ClutchY3Value, _data.PedalsClutchCurve[2], 0, 100, "");
-            SetSliderRaw(ClutchY4Slider, ClutchY4Value, _data.PedalsClutchCurve[3], 0, 100, "");
-            SetSliderRaw(ClutchY5Slider, ClutchY5Value, _data.PedalsClutchCurve[4], 0, 100, "");
+            SetDataSlider(ClutchY1Slider, _data.PedalsClutchCurve[0], 0, 100);
+            SetDataSlider(ClutchY2Slider, _data.PedalsClutchCurve[1], 0, 100);
+            SetDataSlider(ClutchY3Slider, _data.PedalsClutchCurve[2], 0, 100);
+            SetDataSlider(ClutchY4Slider, _data.PedalsClutchCurve[3], 0, 100);
+            SetDataSlider(ClutchY5Slider, _data.PedalsClutchCurve[4], 0, 100);
         }
 
         /// <summary>
@@ -160,7 +160,7 @@ namespace MozaPlugin.UI
         /// else what the device last reported, else the CRP defaults.
         /// </summary>
         private void SeedPassivePedal(string pedal, System.Windows.Controls.Primitives.ToggleButton dir, Slider min, TextBox minValue,
-            Slider max, TextBox maxValue, Slider[] curveSliders, TextBox[] curveLabels)
+            Slider max, TextBox maxValue, Slider[] curveSliders)
         {
             var target = PassivePedalFor(pedal);
             if (target == null) return;
@@ -186,7 +186,7 @@ namespace MozaPlugin.UI
             max.Value = hi;
             SetValueText(maxValue, $"{hi}%");
             for (int i = 0; i < 5; i++)
-                SetSliderRaw(curveSliders[i], curveLabels[i], (int)Math.Round(curve[i]), 0, 100, "");
+                SetDataSlider(curveSliders[i], (int)Math.Round(curve[i]), 0, 100);
         }
 
         /// <summary>
@@ -237,10 +237,10 @@ namespace MozaPlugin.UI
             });
         }
 
-        private void PedalCurveChanged(string pedal, double newValue, TextBox label, Slider[] sliders, Action<int> plain)
+        private void PedalCurveChanged(string pedal, double newValue, Slider[] sliders, Action<int> plain)
         {
             var target = PassivePedalFor(pedal);
-            OnIntSliderChanged(newValue, label, "", v =>
+            OnIntSliderChanged(newValue, v =>
             {
                 if (target == null) plain(v);
                 else WritePassiveCurve(pedal, target.Value, sliders);

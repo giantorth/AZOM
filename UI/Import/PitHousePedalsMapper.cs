@@ -360,9 +360,8 @@ namespace MozaPlugin.UI.Import
 
             // min/max are deliberately NOT imported: PitHouse states them as
             // percentages (0/3/16/99/100 across the sample presets) while
-            // MBoosterDeviceSettings.Min/Max are the device's own RAW counts —
-            // the "Min (raw)"/"Max (raw)" sliders run 0..65535 and are seeded
-            // from the device read-back. Writing 99 into a raw field caps the
+            // MBoosterDeviceSettings.Min/Max are the device's own RAW counts
+            // (0..65535, seeded from the device read-back). Writing 99 into a raw field caps the
             // pedal at ~0.15 % of full scale. The scale factor between the two
             // is unverified, so the values are surfaced instead of guessed.
             m.SkipKey("min", "percent vs raw counts — unverified");

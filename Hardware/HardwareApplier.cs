@@ -1787,7 +1787,7 @@ namespace MozaPlugin.Hardware
 
             // FFB Equalizer (sentinel = -1000): mirror always, write when live.
             // Gate on the persisted BaseDetected (not volatile _data.IsBaseConnected)
-            // for the same reason as ApplyBaseSettingIfSet — see the comment there.
+            // — see WriteIfBaseConnected.
             void ApplyEq(int val, Action<int> setData, string cmd)
             {
                 if (val <= -1000) return;
@@ -1821,7 +1821,7 @@ namespace MozaPlugin.Hardware
             if (profile.FfbCurveY3 >= 0) _data.FfbCurveY3 = profile.FfbCurveY3;
             if (profile.FfbCurveY4 >= 0) _data.FfbCurveY4 = profile.FfbCurveY4;
             if (profile.FfbCurveY5 >= 0) _data.FfbCurveY5 = profile.FfbCurveY5;
-            // Persisted BaseDetected gate (see ApplyBaseSettingIfSet comment).
+            // Persisted BaseDetected gate (see WriteIfBaseConnected).
             if (!_detectionState.BaseDetected) return;
             // The device doesn't persist the X breakpoints, so they have to ride
             // every curve write — but the curve only needs re-sending when a
@@ -2080,8 +2080,8 @@ namespace MozaPlugin.Hardware
         // The "base connected" gate uses the persisted DetectionState flag
         // (set on first base-mcu-temp echo and preserved across SimHub plugin
         // reloads via s_persistentDetectionState), not the volatile
-        // _data.IsBaseConnected — see the ApplyBaseSettingIfSet comment for
-        // the hot-reload rationale. _deviceManager.WriteSetting still bails
+        // _data.IsBaseConnected, which is false after a hot-reload until the
+        // first echo. _deviceManager.WriteSetting still bails
         // on a dead wire, so this is correct even mid-reconnect.
         /// <summary>True iff the write was dispatched (base detected, wire up, known command).</summary>
         public bool WriteIfBaseConnected(string command, int value)
@@ -2380,42 +2380,6 @@ namespace MozaPlugin.Hardware
                 return;
             }
             _deviceManager.WriteArray(command, payload);
-        }
-
-        // ===== Per-cluster sentinel-guarded helpers =====
-        //
-        // Base/motor settings used to live in a public ApplyBaseSettingIfSet
-        // here, called once per field from ApplyBaseToHardware alongside a
-        // parallel seed-from-_data block. Those merged into the local `Apply`
-        // helper inside ApplyBaseToHardware (one call site per field, seed +
-        // mirror + write in one pass) — single source of truth, no parallel
-        // list to drift out of sync. See the comment block above the helper.
-
-        public void ApplyHandbrakeSettingIfSet(int value, Action<int> setData, string command)
-        {
-            if (value < 0) return;
-            setData(value);
-            if (_detectionState.HandbrakeDetected)
-                _deviceManager.WriteSetting(command, value);
-        }
-
-        public void ApplyPedalSettingIfSet(int value, Action<int> setData, string command)
-        {
-            if (value < 0) return;
-            setData(value);
-            if (_detectionState.PedalsDetected)
-                _deviceManager.WriteSetting(command, value);
-        }
-
-        public void ApplyCurveIfSet(int[]? curve, int[] dataArray, string commandPrefix, bool deviceConnected)
-        {
-            if (curve == null) return;
-            for (int i = 0; i < Math.Min(5, curve.Length); i++)
-            {
-                dataArray[i] = curve[i];
-                if (deviceConnected)
-                    _deviceManager.WriteFloat($"{commandPrefix}{i + 1}", curve[i]);
-            }
         }
 
         /// <summary>

@@ -481,10 +481,9 @@ namespace MozaPlugin.Protocol
         /// <summary>
         /// Same 0-100% encoding as <see cref="EncodeFrictionPct"/>
         /// (<c>raw = round(pct * 65535 / 100)</c>) — kept as its own named
-        /// pair since it serves a structurally different command
+        /// encoder since it serves a structurally different command
         /// (Segmented Damping's fixed 10-field frame vs Natural Friction's
-        /// prefix+selector commands), matching this file's convention of a
-        /// dedicated Encode/Decode pair per reverse-engineered feature.
+        /// prefix+selector commands).
         /// </summary>
         public static int EncodeSegmentedDampingPct(double pct)
         {
@@ -493,13 +492,6 @@ namespace MozaPlugin.Protocol
             if (raw <= 0) return 0;
             if (raw >= 0xFFFF) return 0xFFFF;
             return (int)raw;
-        }
-
-        /// <summary>Inverse of <see cref="EncodeSegmentedDampingPct"/>.</summary>
-        public static double DecodeSegmentedDampingPct(int raw)
-        {
-            if (raw <= 0) return 0;
-            return raw * 100.0 / 65535.0;
         }
 
         /// <summary>

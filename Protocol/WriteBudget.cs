@@ -28,7 +28,7 @@ namespace MozaPlugin.Protocol
         private readonly long[] _bucketId = new long[BucketCount];
         private readonly int[] _bucketBytes = new int[BucketCount];
 
-        // Peak bytes/sec observed since last ResetPeak; diagnostics only.
+        // Peak bytes/sec observed since construction; diagnostics only.
         private int _peakBytesInWindow;
 
         public WriteBudget()
@@ -59,8 +59,9 @@ namespace MozaPlugin.Protocol
 
         /// <summary>
         /// Additional milliseconds the one-shot lane should sleep beyond the
-        /// existing 4 ms gate. Returns 0 below 80% of target. Ramps linearly
-        /// from 2 ms at 90% to 20 ms at burst-ceiling.
+        /// existing 4 ms gate. 0 up to <see cref="SoftThresholdBytes"/>, then
+        /// linear 0..6 ms up to <see cref="TargetBytesPerWindow"/>, 6..20 ms up
+        /// to <see cref="BurstAllowedBytes"/>, and 20 ms above.
         /// </summary>
         public int RecommendOneShotDelayMs(int wireBytes)
         {
@@ -70,7 +71,7 @@ namespace MozaPlugin.Protocol
             if (total <= SoftThresholdBytes) return 0;
             if (total <= TargetBytesPerWindow)
             {
-                // 80% → 100%: scale 0..6 ms
+                // Soft threshold → target: scale 0..6 ms
                 int span = TargetBytesPerWindow - SoftThresholdBytes;
                 int over = total - SoftThresholdBytes;
                 return Math.Max(0, (over * 6) / span);
@@ -87,7 +88,7 @@ namespace MozaPlugin.Protocol
         }
 
 
-        /// <summary>Snapshot of current bandwidth; peak is monotonic until ResetPeak.</summary>
+        /// <summary>Non-mutating snapshot of current bandwidth; the peak is monotonic.</summary>
         public Snapshot GetSnapshot()
         {
             lock (_lock)
@@ -96,19 +97,6 @@ namespace MozaPlugin.Protocol
                 return new Snapshot(bytes, PercentOf(bytes), _peakBytesInWindow);
             }
         }
-
-        /// <summary>Manually reset the peak counter. UI can offer a "reset
-        /// peak" button so the user can re-baseline after addressing a
-        /// burst event without reloading the plugin.</summary>
-        public void ResetPeak()
-        {
-            lock (_lock) _peakBytesInWindow = SumWindow(CurrentBucketId());
-        }
-
-        /// <summary>Non-mutating peek used by the WriteLoop's periodic warn
-        /// check, so it can't clobber the peak that the diagnostics UI is
-        /// about to read.</summary>
-        public Snapshot PeekSnapshot() => GetSnapshot();
 
         private static int PercentOf(int bytes)
             => TargetBytesPerWindow == 0 ? 0 : (int)((long)bytes * 100 / TargetBytesPerWindow);

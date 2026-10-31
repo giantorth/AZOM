@@ -259,10 +259,6 @@ namespace MozaPlugin.Settings
         // is true. Selected from a preset combo in the UI.
         public int AutoStandbyTimeoutMinutes { get; set; } = 10;
 
-        // When true, resend LED state to wheel every ~1 second even if unchanged.
-        // Some ES wheels need this to stay in telemetry mode.
-        public bool WheelKeepalive { get; set; } = true;
-
         // How long (seconds) to keep re-sending the last LED frame after the LEDs go
         // idle before pausing, so the wheel/dash can enter its own idle/sleep mode.
         // 0 = pause immediately. Applies to both the wheel and dash LED keepalives.
@@ -288,11 +284,6 @@ namespace MozaPlugin.Settings
         // dual-segment ring (SerialTrafficCapture) keeps the first ~60s of
         // startup plus a rolling last-N-minutes window in RAM so a bug report
         // always has the connect/handshake. See MozaPlugin.Init.
-        //
-        // Deprecated capture toggles — kept only so pre-existing settings JSON
-        // still deserializes; no longer read anywhere.
-        public bool DiagnosticCaptureEnabled { get; set; } = true;
-        public bool AlwaysCaptureOnStartup { get; set; } = false;
 
         // Client-side cooldown timestamp for the "Submit bug report" button —
         // guards against accidental double-submits. Server enforces the real
@@ -431,14 +422,6 @@ namespace MozaPlugin.Settings
         /// set this false to force the raw device path if opens start crashing.</para></summary>
         public bool PreferComPortOnWine { get; set; } = true;
 
-        /// <summary>
-        /// Persisted slot the auto-test most recently switched TO. On next
-        /// run the harness picks the OTHER of {Core, Grids} so each launch
-        /// flips direction without manual config. Persisted so debugging
-        /// across restarts alternates dashboards naturally.
-        /// </summary>
-        public int AutoTestLastSlot { get; set; } = -1;
-
         // ===== Update notifier =====
         // In-plugin update check that hits the GitHub Releases API on plugin
         // load (and at most once per 24h thereafter), compares to the running
@@ -516,12 +499,6 @@ namespace MozaPlugin.Settings
         // dismisses the banner or clicks Configure SDK — persisted so it never
         // reappears.
         public bool SdkPromptDismissed { get; set; } = false;
-
-        // Always bind to loopback (127.0.0.1) only. Hidden from the UI in v1
-        // because exposing the partner-API to LAN traffic has no legitimate
-        // use case and only adds attack surface — but plumbed through so a
-        // future power-user switch can flip it without a settings migration.
-        public bool SdkBindLoopbackOnly { get; set; } = true;
 
         // NOTE: ports for both UDP surfaces are NOT settings — they are
         // protocol-mandated and not actually configurable in practice.
@@ -658,11 +635,6 @@ namespace MozaPlugin.Settings
         // User-loaded .mzdash file path (empty = use builtin profile)
         public string TelemetryMzdashPath { get; set; } = "";
 
-        // User-configured folder of .mzdash files (empty = none).
-        // Scanned at init and on picker change. Wheel cache takes priority;
-        // folder acts as fallback library when cache misses.
-        public string TelemetryMzdashFolder { get; set; } = "";
-
         // Files tab -> DASHBOARD UPLOAD -> Source radio. Plugin-global on
         // purpose: it is a preference about how the user likes to PICK a
         // dashboard, not a property of a wheel — so the wheel page and the CM2
@@ -683,9 +655,6 @@ namespace MozaPlugin.Settings
         // correctly disabled until the user actually picks one.
         public string LastUploadFileDirectory { get; set; } = "";
 
-        // Byte limit override (0 = auto from profile)
-        public int TelemetryByteLimitOverride { get; set; } = 0;
-
         // Upload the .mzdash dashboard to the wheel on every telemetry start.
         // PitHouse does this on every connection — the wheel may require it.
         public bool TelemetryUploadDashboard { get; set; } = false;
@@ -697,15 +666,6 @@ namespace MozaPlugin.Settings
         // 0 = the converter's proven default. An oversized dashboard locks the wheel's
         // firmware, so this is the knob for bisecting the real limit against hardware.
         public int DjsonImportMaxNodes { get; set; } = 0;
-
-        // Telemetry send rate in Hz
-        public int TelemetrySendRateHz { get; set; } = 20;
-
-        // Whether to send the 0x40/28:02 telemetry mode frame periodically
-        public bool TelemetrySendModeFrame { get; set; } = true;
-
-        // Whether to send the 0x2D/F5:31 sequence counter to the base (~30 Hz)
-        public bool TelemetrySendSequenceCounter { get; set; } = true;
 
         /// <summary>
         /// FSR V1 active built-in dashboard/page index (0..18), keyed by wheel-page

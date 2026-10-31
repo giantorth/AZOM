@@ -72,11 +72,8 @@ namespace MozaPlugin
             sender?.UpdateGameData(data.NewData);
             sender?.SetGameRunning(data.GameRunning);
             _fsr1Driver?.UpdateGameData(data.NewData);
-            _fsr1Driver?.SetGameRunning(data.GameRunning);
             _cm2Sender?.UpdateGameData(data.NewData);
             _cm2Sender?.SetGameRunning(data.GameRunning);
-            _cm1Driver?.UpdateGameData(data.NewData);
-            _cm1Driver?.SetGameRunning(data.GameRunning);
             _gearshift?.Tick(data);
             if (_motionController?.IsStreaming == true)
             {

@@ -254,30 +254,29 @@ namespace MozaPlugin.Telemetry
             sender.UploadDashboard = false;
             sender.SetDownloadEnabled(false);
             if (_plugin.Settings.EnableAutoTestOnConnect)
-                sender.EnableAutoTest(_plugin);
+                sender.EnableAutoTest();
             else
                 sender.DisableAutoTest();
 
-            // Resolve active multi-stream profile and raw mzdash content.
-            // Precedence: custom file → cached by name → builtin embedded → null (sender synthesises from catalog).
-            MultiStreamProfile? profile = null;
+            // Resolve raw mzdash content + name for the upload path.
+            // Precedence: custom file → cached by name → builtin embedded → none.
             byte[]? mzdashContent = null;
             string mzdashName = "";
 
             if (!string.IsNullOrEmpty(telemPath) && File.Exists(telemPath))
             {
-                profile = _plugin.DashProfileStore.ParseMzdash(telemPath);
                 mzdashContent = File.ReadAllBytes(telemPath);
                 mzdashName = Path.GetFileNameWithoutExtension(telemPath);
             }
             else if (!string.IsNullOrEmpty(telemName))
             {
+                MultiStreamProfile? found = null;
                 if (_plugin.DashCache != null)
                 {
-                    profile = _plugin.DashCache.TryGetByName(telemName);
-                    if (profile != null)
+                    found = _plugin.DashCache.TryGetByName(telemName);
+                    if (found != null)
                     {
-                        mzdashName = profile.Name;
+                        mzdashName = found.Name;
                         mzdashContent = _plugin.DashCache.TryGetRawContent(telemName);
                         MozaLog.Debug($"[AZOM] ApplyTelemetrySettings: found '{telemName}' in cache as '{mzdashName}'");
                     }
@@ -287,16 +286,16 @@ namespace MozaPlugin.Telemetry
                     }
                 }
 
-                if (profile == null)
+                if (found == null)
                 {
                     var builtins = _plugin.DashProfileStore.BuiltinProfiles;
                     if (builtins.Count > 0)
                     {
-                        profile = FindProfile(builtins, telemName);
-                        if (profile != null && mzdashContent == null)
+                        found = FindProfile(builtins, telemName);
+                        if (found != null && mzdashContent == null)
                         {
-                            mzdashName = profile.Name;
-                            string resourceName = $"MozaPlugin.Data.Dashes.{profile.Name.Replace(" ", "_")}.mzdash";
+                            mzdashName = found.Name;
+                            string resourceName = $"MozaPlugin.Data.Dashes.{found.Name.Replace(" ", "_")}.mzdash";
                             var assembly = Assembly.GetExecutingAssembly();
                             using var stream = assembly.GetManifestResourceStream(resourceName);
                             if (stream != null)
@@ -309,50 +308,39 @@ namespace MozaPlugin.Telemetry
                     }
                 }
             }
-            // else: catalog-only mode — profile stays null; sender synthesises post-preamble.
 
             // Telemetry channels ALWAYS come from the wheel's live catalog
-            // (catalog-only synthesis). The parsed mzdash profile is never used
-            // to drive the subscription: trusting it over the wheel's
-            // advertisement misaligned channels and dropped catalog channels the
-            // wheel actually wants (e.g. the wheel's "Core" page advertises Rpm
-            // at idx 4, but a local "Core" mzdash that omits Rpm left the RPM
-            // widget dead). The wheel's catalog is authoritative — Telemetry.json
-            // supplies compression/property/test-signal per URL and the synth
-            // applies user channel mappings itself (see TelemetrySender catalog
-            // synthesis). mzdashContent / mzdashName resolved above are retained
-            // ONLY for the upload path. FSR1 uses neither catalog nor mzdash and
-            // is driven by its own emitter, so this is a no-op there.
-            profile = null;
-
+            // (catalog-only synthesis); the sender synthesises post-preamble.
+            // A parsed mzdash profile is never used to drive the subscription:
+            // trusting it over the wheel's advertisement misaligned channels and
+            // dropped catalog channels the wheel actually wants (e.g. the wheel's
+            // "Core" page advertises Rpm at idx 4, but a local "Core" mzdash that
+            // omits Rpm left the RPM widget dead). The wheel's catalog is
+            // authoritative — Telemetry.json supplies compression/property/
+            // test-signal per URL and the synth applies user channel mappings
+            // itself (see TelemetrySender catalog synthesis). mzdashContent /
+            // mzdashName resolved above are retained ONLY for the upload path.
+            // FSR1 uses neither catalog nor mzdash and is driven by its own
+            // emitter, so this is a no-op there.
             sender.PropertyResolver = _plugin.PropertyResolver.ResolveAsDouble;
             sender.PropertyStringResolver = _plugin.PropertyResolver.ResolveAsString;
-            int tierCount = profile?.Tiers?.Count ?? 0;
-            int chCount = 0;
-            if (profile != null)
-                foreach (var t in profile.Tiers) chCount += t.Channels.Count;
-            // Catalog-only continuity: when the user has no mzdash file for
-            // the new dashboard (profile == null) AND the sender already has
-            // a synthesised catalog-only profile loaded, KEEP it. The
-            // alternative — assigning null and letting MaybeSwap re-synth on
-            // the next tick — sends the wheel a torn-down-and-rebuilt tier-
-            // def for no semantic gain, which we've observed (2026-05-26
-            // moza-wire-...-043633) wedge sess=0x01 in a close/reopen loop
-            // when the user rapid-fires dashboard switches. MaybeSwap will
-            // still pick up any genuine catalog/endMarker change on a future
-            // tick. The non-null case proceeds normally so a user-loaded
-            // mzdash always wins over the synth.
+            // Catalog-only continuity: when the sender already has a synthesised
+            // catalog-only profile loaded, KEEP it. The alternative — assigning
+            // null and letting MaybeSwap re-synth on the next tick — sends the
+            // wheel a torn-down-and-rebuilt tier-def for no semantic gain, which
+            // we've observed (2026-05-26 moza-wire-...-043633) wedge sess=0x01 in
+            // a close/reopen loop when the user rapid-fires dashboard switches.
+            // MaybeSwap will still pick up any genuine catalog change on a
+            // future tick.
             bool keepExistingSynth =
-                profile == null
-                && sender.Profile != null
+                sender.Profile != null
                 && sender.Profile.Name == TelemetrySender.CatalogProfileName;
             MozaLog.Debug(
-                $"[AZOM] ApplyTelemetrySettings: setting profile=" +
-                $"{profile?.Name ?? "null"} tiers={tierCount} channels={chCount} " +
+                $"[AZOM] ApplyTelemetrySettings: setting profile=null tiers=0 channels=0 " +
                 $"mzdash={mzdashName} settingName={telemName}" +
                 (keepExistingSynth ? " (keeping existing synth — catalog-only mode unchanged)" : ""));
             if (!keepExistingSynth)
-                sender.Profile = profile;
+                sender.Profile = null;
             // Re-point the tier frame builders at the resolver we just assigned.
             // When keepExistingSynth kept the profile (so the Profile setter above
             // did NOT run), the builders still hold whatever resolver they were

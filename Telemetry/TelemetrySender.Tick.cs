@@ -80,7 +80,7 @@ namespace MozaPlugin.Telemetry
 
                 // Steady-state (Active).
                 TickAbsorbCatalogIfChanged();
-                _autoTest?.Tick(_baseTickMs);
+                _autoTest?.Tick();
 
                 // Catalog-only mode upkeep: when the user has no mzdash folder
                 // configured, ApplyTelemetrySettings may have just wiped the
@@ -668,18 +668,16 @@ namespace MozaPlugin.Telemetry
             // pure churn. Poll at ~4 Hz — a change is picked up within ≤250 ms,
             // far inside the 15 s keepalive floor.
             if (!CadenceDue(Cadence.StringPoll, StringPollIntervalMs, 0)) return;
-            EmitStringChannels(force: false);
+            EmitStringChannels();
         }
 
         private const int StringPollIntervalMs = 250;
         private const int StringKeepaliveFloorMs = 15000; // PitHouse mean cadence
 
         /// <summary>Iterate the active profile's string channels and emit each
-        /// one via sess=0x01 type=0x05. When <paramref name="force"/> is false,
-        /// emits only on value change or 15 s keepalive expiry and skips
-        /// fully-unmapped channels with no prior state. When true, emits every
-        /// catalog-bound channel regardless — used by the auto-test burst.</summary>
-        private void EmitStringChannels(bool force)
+        /// one via sess=0x01 type=0x05, only on value change or 15 s keepalive
+        /// expiry. Skips fully-unmapped channels with no prior state.</summary>
+        private void EmitStringChannels()
         {
             var profile = _profile;
             if (profile == null || profile.StringChannels.Count == 0) return;
@@ -697,22 +695,19 @@ namespace MozaPlugin.Telemetry
 
                 string value = ResolveStringChannelValue(ch, signalNowMs);
 
-                if (!force)
-                {
-                    // Unmapped channels with no prior state would otherwise
-                    // blast "" at the wheel every 15 s. Wait for a UI mapping.
-                    if (value.Length == 0 && !_stringChannelState.ContainsKey(ch.Url))
-                        continue;
+                // Unmapped channels with no prior state would otherwise
+                // blast "" at the wheel every 15 s. Wait for a UI mapping.
+                if (value.Length == 0 && !_stringChannelState.ContainsKey(ch.Url))
+                    continue;
 
-                    bool send;
-                    if (!_stringChannelState.TryGetValue(ch.Url, out var st))
-                        send = true;
-                    else if (!string.Equals(st.lastValue, value, System.StringComparison.Ordinal))
-                        send = true;
-                    else
-                        send = nowMs - st.lastTickMs >= StringKeepaliveFloorMs;
-                    if (!send) continue;
-                }
+                bool send;
+                if (!_stringChannelState.TryGetValue(ch.Url, out var st))
+                    send = true;
+                else if (!string.Equals(st.lastValue, value, System.StringComparison.Ordinal))
+                    send = true;
+                else
+                    send = nowMs - st.lastTickMs >= StringKeepaliveFloorMs;
+                if (!send) continue;
 
                 EmitOneStringValue((byte)idx, value);
                 _stringChannelState[ch.Url] = (value, nowMs);
@@ -810,14 +805,6 @@ namespace MozaPlugin.Telemetry
                 else _session01OutboundSeq = seq;
             }
         }
-
-        /// <summary>Diagnostic: emit every string channel in the current
-        /// profile right now, bypassing the change-detect + keepalive gate.
-        /// Used by the auto-test harness (PhaseStringBurst) to produce a
-        /// clearly-labelled wire-trace window even when no game is running
-        /// and steady-state cadence is silent. Updates dedup state so the
-        /// subsequent tick doesn't immediately re-emit.</summary>
-        public void ForceStringEmitAll() => EmitStringChannels(force: true);
 
         /// <summary>Sequence-counter, gated on gameRunning because PitHouse only
         /// emits it while a game is actively driving telemetry — bursting it at

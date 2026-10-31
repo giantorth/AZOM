@@ -94,12 +94,6 @@ namespace MozaPlugin.Protocol
             return false;
         }
 
-        /// <summary>Force the next lookup to re-stat.</summary>
-        public static void Invalidate()
-        {
-            lock (s_gate) s_timestamp = 0;
-        }
-
         // Serialises Build(): SimHub's COM scanner calls in from parallel workers,
         // and each Build() walks sysfs and forks a shell per MOZA tty. Taken only
         // around the build; s_gate stays the short leaf lock for the map itself.

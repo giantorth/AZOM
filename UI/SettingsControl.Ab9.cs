@@ -27,18 +27,8 @@ namespace MozaPlugin.UI
 {
     public partial class SettingsControl : UserControl
     {
-
-        // Build a filesystem-safe slug from the active wheel's firmware model name
-        // for use as a filename prefix on diagnostics bundles. Prefers the curated
-        // friendly name (e.g. "CS Pro" for firmware "W17"); falls back to the raw
-        // prefix for unknown wheels. Returns "" when no model is known yet so the
-        // caller can omit the prefix entirely rather than emit a leading dash.
-        
         // ===== AB9 Active Shifter Tab =====
 
-        // Tracks whether the slider/combo values have been seeded from the profile
-        // — without this, the first refresh tick would race the user's drag and
-        // immediately overwrite an in-flight slider value with the saved one.
         private void RefreshAb9Tab()
         {
             if (_plugin?.Ab9Manager == null) { Ab9Tab.Visibility = Visibility.Collapsed; return; }

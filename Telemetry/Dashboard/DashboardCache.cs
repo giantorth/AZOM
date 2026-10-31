@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using MozaPlugin.Diagnostics;
@@ -67,9 +66,6 @@ namespace MozaPlugin.Telemetry.Dashboard
             _cacheDir = cacheDir;
             _store = store;
         }
-
-        /// <summary>Number of cached profiles.</summary>
-        public int Count { get { lock (_lock) return _byHash.Count; } }
 
         /// <summary>
         /// Scan the cache directory for previously-saved .mzdash files and parse them.
@@ -291,13 +287,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Scan a user-configured folder for .mzdash files and parse them.
-        /// These act as a fallback library when wheel cache misses.
-        /// </summary>
-        public void LoadFromFolder(string folderPath) => LoadFromFolders(new[] { folderPath });
-
-        /// <summary>
-        /// Scan several folders into the one folder-library, in order.
+        /// Scan several folders into the one folder-library, in order. These
+        /// act as a fallback library when wheel cache misses.
         /// Entries are keyed by profile name and LATER FOLDERS WIN, so callers
         /// pass least-authoritative first.
         ///
@@ -403,12 +394,6 @@ namespace MozaPlugin.Telemetry.Dashboard
                 TryGetNormalized(_folderFilePaths, name, out var path);
                 return path;
             }
-        }
-
-        /// <summary>All folder-loaded dashboard names.</summary>
-        public IReadOnlyList<string> FolderNames
-        {
-            get { lock (_lock) return _folderProfiles.Keys.ToList(); }
         }
     }
 }

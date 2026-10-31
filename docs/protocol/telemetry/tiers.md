@@ -277,19 +277,19 @@ Wheel firmware reads:
 
 ### Catalog filtering
 
-Before sending a tier definition, plugin filters the profile by the
-wheel's advertised channel catalog (session 0x02 tag 0x04 URLs — see
+Under the `V2Type02` encoding, before sending a tier definition
+`TierDefinitionEmitter.RefilterLiveTiers` filters each tier against the
+wheel's live channel catalog (session 0x02 tag 0x04 URLs — see
 [`../tier-definition/session-02-channel-catalog.md`](../tier-definition/session-02-channel-catalog.md)).
-Channels in the profile whose URL the wheel doesn't know are dropped,
-and any tier ending up empty is also dropped (no flag byte allocated).
+Channels whose URL has no idx in the live catalog are dropped from their
+tier and the rest are sorted by catalog idx. Tiers are never dropped.
 This avoids sending a tier-def the wheel can't decode.
 
 ### Empty-but-still-declared tiers
 
-The catalog filter drops tiers from the definition. The empty-frame stub
-(previous section) only fires for tiers that are *declared* but happen
-to have zero channels for some reason (rare — usually means a
-profile/catalog mismatch on a single-tier-style mzdash).
+The empty-frame stub (previous section) only fires for tiers that are
+*declared* but happen to have zero channels for some reason (rare —
+usually means a profile/catalog mismatch on a single-tier-style mzdash).
 
 ### `BuildTierDefinitionMessage` enable-count quirk
 

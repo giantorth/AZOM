@@ -401,15 +401,6 @@ namespace MozaPlugin
             // on this sweep would just double-read the register every 5 s.
         };
 
-        // --- Per-device settings read commands ---
-        // These are sent only after the corresponding device is detected,
-        // rather than blasting all commands on connect.
-
-        // Settings read after the 0x22-group probe confirms the base ships the
-        // ambient LED strip. brightness is the probe itself — listed here too so
-        // re-syncs cover it; harmless, the second response just refreshes the
-        // already-set value.
-        
         public PluginManager PluginManager { set => _pluginManager = value; }
         public ImageSource? PictureIcon => NavIcon.Value;
         public string LeftMenuTitle => "AZOM";
@@ -650,22 +641,21 @@ namespace MozaPlugin
         internal void ClearDisplayWedgeRecovery() => DisplayWedgeRecoveryFired = false;
 
         /// <summary>
-        /// Whether the plugin should drive the dashboard telemetry pipeline for the
-        /// currently-detected wheel. Trusts <see cref="Devices.WheelModelInfo.HasDisplay"/>
-        /// when known; falls back to the probe result for unknown models.
-        /// </summary>
-        /// <summary>
         /// True when the detected wheel is the FSR V1 display wheel (box "FSR1";
         /// firmware model-name "FSR", hw-version "RS21-D03-*"). This wheel does not
         /// speak the standard tier-definition telemetry protocol — its screen is
-        /// driven by the group-0x42 fixed-schema value push instead. Keyed primarily
+        /// driven by the group-0x42 fixed-schema value push
+        /// (<see cref="Telemetry.Display.Fsr1DisplayDriver"/>) instead. Keyed primarily
         /// on the hw-version (most specific; distinguishes it from FSR V2 "W13"),
-        /// with the model-name as corroboration. Used to (a) bypass the standard
-        /// display-probe gates in StartTelemetryIfReady and (b) put TelemetrySender
-        /// into <see cref="Telemetry.TelemetrySender.Fsr1Mode"/>.
+        /// with the model-name as corroboration.
         /// </summary>
         internal bool IsFsr1DisplayWheel => _data?.IsFsr1DisplayWheel ?? false;
 
+        /// <summary>
+        /// Whether the plugin should drive the main (wheel-screen) dashboard sender for
+        /// the currently-detected wheel. Trusts <see cref="Devices.WheelModelInfo.HasDisplay"/>
+        /// when known; falls back to the probe result for unknown models.
+        /// </summary>
         internal bool ShouldDriveDashboard()
         {
             // DECOUPLED: this gates ONLY the MAIN (wheel-screen) sender. A bus CM2 on a
@@ -799,11 +789,6 @@ namespace MozaPlugin
             return new SettingsControl(this);
         }
 
-        /// <summary>
-        /// Send all-off to wheel and dash LEDs via device manager.
-        /// </summary>
-                // ClearLedsOnHardware moved to HardwareApplier; shim further down.
-
         // ===== Telemetry =====
 
         internal TelemetrySender? TelemetrySender => _telemetrySender;
@@ -823,12 +808,6 @@ namespace MozaPlugin
             || (_cm2Sender?.IsUploadInFlight ?? false);
 
         /// <summary>
-        /// 0..1 progress of the in-flight dashboard upload (whichever pipeline
-        /// is transferring), 0 when none is. Only one upload runs at a time —
-        /// both senders share the wheel's file-transfer sessions — so the max
-        /// is just "the one that is live".
-        /// </summary>
-        /// <summary>
         /// Monotonic ack count for the pipeline currently uploading, 0 when none
         /// is. Liveness only — the absolute value is meaningless across
         /// pipelines, callers just watch it move.
@@ -845,6 +824,12 @@ namespace MozaPlugin
             }
         }
 
+        /// <summary>
+        /// 0..1 progress of the in-flight dashboard upload (whichever pipeline
+        /// is transferring), 0 when none is. Only one upload runs at a time —
+        /// both senders share the wheel's file-transfer sessions — so the max
+        /// is just "the one that is live".
+        /// </summary>
         internal double DashboardUploadProgress
         {
             get
@@ -912,22 +897,5 @@ namespace MozaPlugin
             }
             return turningOn;
         }
-
-        // Build the 3-byte payload shared by per-effect speed commands:
-        //   wheel-{telemetry,buttons,knob}-idle-interval — `[effect_id, ms_msb, ms_lsb]`
-        //   wheel-idle-speed                              — `[mode,      ms_msb, ms_lsb]`
-        // The first byte selects which effect/mode the slider applies to;
-        // the remaining two bytes encode the ms value big-endian.
-        
-        /// <summary>
-        /// Apply dash settings from the SimHub device extension profile system.
-        /// Updates _settings, _data, and writes to hardware if connected.
-        /// </summary>
-        
-        /// <summary>
-        /// Apply base ambient LED settings from the SimHub device extension
-        /// profile system. Mirror of <see cref="ApplyDashExtensionSettings"/>.
-        /// </summary>
-        
     }
 }

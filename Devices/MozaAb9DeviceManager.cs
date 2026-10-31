@@ -77,15 +77,6 @@ namespace MozaPlugin.Devices
                 { Ab9Slider.MaxTorqueLimit,       "ab9-max-torque-limit" },
             };
 
-        public static IReadOnlyList<Ab9Slider> AllSliders { get; } = new[]
-        {
-            Ab9Slider.MechanicalResistance,
-            Ab9Slider.Spring,
-            Ab9Slider.NaturalDamping,
-            Ab9Slider.NaturalFriction,
-            Ab9Slider.MaxTorqueLimit,
-        };
-
         private readonly MozaSerialConnection _connection;
         private volatile bool _detected;
         // Port session the FFB alloc handshake was sent for. The device rebuilds

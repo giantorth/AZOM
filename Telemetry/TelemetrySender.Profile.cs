@@ -373,11 +373,7 @@ namespace MozaPlugin.Telemetry
             try { MozaLog.Debug($"[AZOM] state {prev} → {next} ({reason})"); }
             catch { /* logging may not be initialised in tests */ }
         }
-        // Read-only accessors for DashboardSwitchAutoTest
-        internal byte? ActiveFlagBase => _activeSubscription?.FlagBase;
-        internal int ActiveTierCount => _tiers?.Length ?? 0;
         public string? ActiveProfileName => _profile?.Name;
-        internal int CatalogChannelCount => _catalogParser.Count;
 
         // Catalog-parser internals for the Diagnostics tab. Exposes "why is the
         // wheel-catalog list empty in diag" answers without forcing the user to

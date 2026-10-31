@@ -31,13 +31,14 @@ namespace MozaPlugin.Sdk.Resources.Wheel
         // MozaCommandDatabase that registers wheel-rpm-value{1..10}.
         private const int MaxLedCount = 10;
 
-        private readonly MozaData _data;
         private readonly HardwareApplier _hardware;
         private int _getWarned;
 
+        // 'data' is accepted for constructor uniformity with the other wheel
+        // resources; GET has no MozaData source (see remarks).
         public WheelShiftIndicatorLightRpmResource(MozaData data, HardwareApplier hardware)
         {
-            _data = data ?? throw new ArgumentNullException(nameof(data));
+            if (data == null) throw new ArgumentNullException(nameof(data));
             _hardware = hardware ?? throw new ArgumentNullException(nameof(hardware));
         }
 

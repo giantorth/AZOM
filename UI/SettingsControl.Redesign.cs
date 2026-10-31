@@ -17,11 +17,9 @@ using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 namespace MozaPlugin.UI
 {
     // Partial-class continuation of SettingsControl that holds wiring for the
-    // 2026-05 redesign (new top bar, status bar, SectionCard-wrapped sections,
-    // SteeringArc / TempCell live header, MozaCurveEditor (5-node curves and
-    // 6-band EQ), bandwidth sparklines, Full Diagnostic Report expander).
-    // Lives in a separate file to keep the existing SettingsControl.xaml.cs
-    // untouched.
+    // redesigned layout (top bar, SectionCard-wrapped sections, SteeringArc /
+    // temperature live header, MozaCurveEditor (5-node curves and 6-band EQ),
+    // bandwidth sparklines, Full Diagnostic Report expander).
     public partial class SettingsControl
     {
         // ---- Bandwidth sparkline state (600 samples = 5 min @ 500ms tick,
@@ -36,8 +34,6 @@ namespace MozaPlugin.UI
         private DateTime _bwLastTick = DateTime.MinValue;
         private long _bwPeakIn;
         private long _bwPeakOut;
-        private long _bwSessionIn;
-        private long _bwSessionOut;
 
         // ---- Live-torque sparkline ----
         // Samples and the wire poll live on MozaPlugin (_plugin.TorqueHistory,
@@ -232,8 +228,6 @@ namespace MozaPlugin.UI
                     return null;
                 };
 
-                // Status bar removed — its content was placeholder strings.
-
                 // About-tab version line — same source as the diagnostics dump.
                 if (AboutVersionText != null)
                     AboutVersionText.Text = "v" + DiagnosticsTextBuilder.GetPluginVersion();
@@ -398,7 +392,6 @@ namespace MozaPlugin.UI
         // reading. Per-component brushes stay stable (MCU=red, MOSFET=cyan,
         // Motor=green — match their graph line). Each row shows: dot, name,
         // "{cur} {unit}", "max {peak} {unit}".
-        private static readonly string[] _emptyDash = { "—" };
         private void RenderRankedTempLegend(double mcu, double mosfet, double motor, bool has, string unit,
             int mcuMaxRaw, int mosfetMaxRaw, int motorMaxRaw)
         {
@@ -439,12 +432,6 @@ namespace MozaPlugin.UI
                     ? $"max {ConvertTemp(e.maxRaw):F0} {unit}"
                     : "";
             }
-
-            // Legacy hidden labels — kept written so any code reading them by
-            // name still sees the live value. Cheap; collapses to no-op cost.
-            if (McuTempLegend != null)    McuTempLegend.Text    = has ? $"{mcu:F0} {unit}" : "—";
-            if (MosfetTempLegend != null) MosfetTempLegend.Text = has ? $"{mosfet:F0} {unit}" : "—";
-            if (MotorTempLegend != null)  MotorTempLegend.Text  = has ? $"{motor:F0} {unit}" : "—";
         }
 
         // Called from existing OnSteeringAngleTick — every ~33ms.
@@ -549,8 +536,6 @@ namespace MozaPlugin.UI
                         PushBandwidthSample(_bwInSamples, inRate);
                         PushBandwidthSample(_bwOutSamples, outRate);
 
-                        _bwSessionIn += inDelta;
-                        _bwSessionOut += outDelta;
                         if (inRate > _bwPeakIn) _bwPeakIn = (long)inRate;
                         if (outRate > _bwPeakOut) _bwPeakOut = (long)outRate;
 
@@ -559,8 +544,6 @@ namespace MozaPlugin.UI
                         // Inline "max NN" suffix once any traffic has been seen.
                         BandwidthInPeakText.Text  = _bwPeakIn  > 0 ? $"max {FormatBytesPerSec(_bwPeakIn)}"  : "";
                         BandwidthOutPeakText.Text = _bwPeakOut > 0 ? $"max {FormatBytesPerSec(_bwPeakOut)}" : "";
-                        BandwidthInSessionText.Text = FormatBytesTotal(_bwSessionIn);
-                        BandwidthOutSessionText.Text = FormatBytesTotal(_bwSessionOut);
                     }
                 }
                 _bwLastInBytes = inBytes;
@@ -662,14 +645,6 @@ namespace MozaPlugin.UI
             if (bps < 1024) return $"{bps:F0} B/s";
             if (bps < 1024 * 1024) return $"{bps / 1024:F1} KB/s";
             return $"{bps / (1024.0 * 1024):F2} MB/s";
-        }
-
-        private static string FormatBytesTotal(long bytes)
-        {
-            if (bytes < 1024) return $"{bytes} B";
-            if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-            if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024):F1} MB";
-            return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
         }
 
         // -------- Pedal sub-selector --------

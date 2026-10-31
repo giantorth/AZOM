@@ -542,17 +542,12 @@ namespace MozaPlugin
 
             // Device detection probes — only sent until each device is found.
             //
-            // For dash / handbrake / pedals we now use PitHouse-style empty
-            // presence probes (`0x00 dev=<id>` → `0x80 dev=<swap>`). The prior
-            // approach re-issued the first settings read (`dash-rpm-indicator-mode`
-            // etc.) every PollStatus tick; with no device attached the read
-            // never got a response and PendingResponseTracker amplified each
-            // probe by its 3-retry budget (200/400/800 ms backoff). Net result:
-            // 9 frames/tick of pure noise per absent sub-device. Empty probes
-            // are NOT tracked, so absent devices cost exactly one 5-byte frame
-            // per tick. ACK handling lives in OnPresenceProbeAck (called from
-            // OnMessageReceived) which flips DetectionState and kicks off the
-            // existing per-device settings read batch.
+            // Dash / handbrake / pedals use PitHouse-style empty presence
+            // probes (`0x00 dev=<id>` → `0x80 dev=<swap>`). They are not
+            // tracked by PendingResponseTracker, so an absent device costs one
+            // 5-byte frame per tick instead of a retransmitted settings read.
+            // OnPresenceProbeAck (from OnMessageReceived) flips DetectionState
+            // and starts the per-device settings read batch.
             //
             // Hub stays on the cmd-specific read path because hub shares
             // device id 0x12 with the wheelbase main controller — an empty

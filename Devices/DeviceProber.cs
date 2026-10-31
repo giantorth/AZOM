@@ -189,11 +189,6 @@ namespace MozaPlugin.Devices
                 cmds.Add($"wheel-rpm-color{i}");
             for (int i = 1; i <= info.ButtonLedCount; i++)
                 cmds.Add($"wheel-button-color{i}");
-            if (info.HasFlagLeds)
-            {
-                for (int i = 1; i <= 6; i++)
-                    cmds.Add($"wheel-flag-color{i}");
-            }
 
             // Extended LED group probes (Single/Rotary/Ambient). Sent ONLY for
             // models we've positively identified as having the group — never for
