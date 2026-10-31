@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Timers;
-using GameReaderCommon;
 using MozaPlugin.Protocol;
+using MozaPlugin.Settings;
 using MozaPlugin.Telemetry.TestMode;
 
 namespace MozaPlugin.Telemetry.Display
@@ -52,9 +52,6 @@ namespace MozaPlugin.Telemetry.Display
         private readonly List<Cm1DisplayEmitter.Record> _chunkScratch
             = new List<Cm1DisplayEmitter.Record>(Cm1DisplayEmitter.RecordsPerFrame);
 
-        private volatile StatusDataBase? _latestGameData;
-        private volatile bool _gameRunning;
-
         public Cm1DisplayDriver(MozaSerialConnection connection, Func<string, double> resolve)
         {
             _connection = connection;
@@ -62,8 +59,6 @@ namespace MozaPlugin.Telemetry.Display
         }
 
         public bool IsRunning => _running;
-        public void UpdateGameData(StatusDataBase? data) => _latestGameData = data;
-        public void SetGameRunning(bool running) => _gameRunning = running;
 
         public void Start()
         {
@@ -144,20 +139,24 @@ namespace MozaPlugin.Telemetry.Display
 
             var resolve = _resolve;
             long testNowMs = testMode ? DashboardTestPattern.NowMs() : 0;
+            // Resolved once per tick, not per field; the mapping dict is a copy-on-write snapshot.
+            var cm1Maps = plugin?.GetActiveCm1Mappings();
             float ValueFor(Cm1FieldDef f)
             {
-                var m = plugin?.GetCm1FieldMapping(f.FieldId);
+                Fsr1FieldMapping? m = null;
+                if (cm1Maps != null && !string.IsNullOrEmpty(f.FieldId)
+                    && cm1Maps.TryGetValue(f.FieldId, out var fm))
+                    m = fm;
                 string prop = m?.Property ?? f.DefaultProperty;
                 // Test pattern: sweep each field over an inferred natural range
-                // (the CM1 catalog carries no per-field range). Constants stay put.
+                // (the CM1 catalog carries no per-field range).
                 if (testMode)
                 {
-                    if (f.Constant.HasValue) return (float)f.Constant.Value;
                     double max = DashboardTestPattern.NaturalMax(f.FieldId, prop);
                     return (float)(DashboardTestPattern.Sweep(f.FieldId, max, testNowMs) * f.Scale);
                 }
                 if (string.IsNullOrEmpty(prop))
-                    return f.Constant.HasValue ? (float)f.Constant.Value : 0f;
+                    return 0f;
                 double raw = resolve != null ? resolve(prop) : 0.0;
                 // per-field gain (+ bias for °F unit-variant keys); user Scale overrides the gain
                 return (float)(raw * (m?.Scale ?? f.Scale) + f.Bias);

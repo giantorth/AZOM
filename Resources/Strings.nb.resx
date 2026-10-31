@@ -141,7 +141,6 @@
   <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>Vibrasjonsintensitet</value></data>
   <data name="Section_MBoosterPedals" xml:space="preserve"><value>MBOOSTER-PEDALER</value></data>
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value>// host-genererte effekter · rolle + posisjon per enhet</value></data>
-  <data name="SliderLabel_Device" xml:space="preserve"><value>Enhet</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Rolle</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Deaktivert</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Gass</value></data>
@@ -158,7 +157,6 @@
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>Ved Nedtrykking</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>Ved Utløsning</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>SIM-INNGANGSKARTLEGGING</value></data>
-  <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// kartlegger lastcelle-/pedalsignalet til spillet, Pit House-stil</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Maks terskel (kg)</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>EFFEKTER</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// utløsere: ABS på spillsignal · lockup på brems&gt;0,8 · terskel på flanke · motor kontinuerlig</value></data>
@@ -168,7 +166,6 @@
   <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Girskift</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Veitekstur</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Aktiver</value></data>
-  <data name="Button_Test1s" xml:space="preserve"><value>Test 1s</value></data>
   <data name="Label_Test" xml:space="preserve"><value>Test</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Låsing</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Terskel</value></data>
@@ -179,12 +176,7 @@
   <data name="SliderLabel_Gain" xml:space="preserve"><value>Forsterkning</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
-  <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// eksperimentelt — kanskje ikke respektert av mBooster-firmware</value></data>
-  <data name="Label_ReversedDirection" xml:space="preserve"><value>Reversert retning</value></data>
-  <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Min (rå)</value></data>
-  <data name="SliderLabel_MaxRaw" xml:space="preserve"><value>Maks (rå)</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LES FRA ENHET</value></data>
-  <data name="Button_Apply" xml:space="preserve"><value>BRUK</value></data>
   <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · PEDALER</value></data>
   <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// pedalport (pollet hvert 2. sekund)</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedalport</value></data>
@@ -291,22 +283,11 @@
   <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>kan ikke skrive til plugin-mappen</value></data>
   <data name="Section_Updates" xml:space="preserve"><value>OPPDATERINGER</value></data>
   <data name="Subtitle_Updates" xml:space="preserve"><value>// innebygd oppdateringsvarsel</value></data>
-  <data name="Section_Bandwidth" xml:space="preserve"><value>BÅNDBREDDE</value></data>
-  <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// seriell-gjennomstrømming · 30-sekunders vindu</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>INNKOMMENDE</value></data>
   <data name="Label_Outbound" xml:space="preserve"><value>UTGÅENDE</value></data>
   <data name="Label_Capacity" xml:space="preserve"><value>KAPASITET</value></data>
-  <data name="Label_Peak" xml:space="preserve"><value>TOPP</value></data>
-  <data name="Label_Session" xml:space="preserve"><value>ØKT</value></data>
-  <data name="Section_SerialTrafficCapture" xml:space="preserve"><value>SERIELL-TRAFIKKLOGG</value></data>
-  <data name="Subtitle_SerialTrafficCapture" xml:space="preserve"><value>// logger hver TX/RX-frame</value></data>
-  <data name="Hint_CaptureDataInMemory" xml:space="preserve"><value>Data lever kun i minnet — ingenting lagres mellom oppstarter. Klikk Stopp for å eksportere en ZIP-pakke til diagnose-støtte.</value></data>
-  <data name="Button_StartCapture" xml:space="preserve"><value>START LOGGING</value></data>
-  <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Start diagnoselogg automatisk ved oppstart/spillbytte</value></data>
-  <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Når på, starter seriell-trafikkloggen automatisk hver gang pluginen starter.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>EKSPORTER PAKKE (ZIP)…</value></data>
   <data name="Button_CopyReference" xml:space="preserve"><value>KOPIER REFERANSE</value></data>
-  <data name="Button_CopyCapture" xml:space="preserve"><value>KOPIER LOGG TIL UTKLIPPSTAVLEN</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>FULL DIAGNOSERAPPORT</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// feilsøkingsinformasjon</value></data>
   <data name="Button_Expand" xml:space="preserve"><value>UTVID</value></data>
@@ -316,20 +297,16 @@
   <data name="Hint_FullDiagRendered" xml:space="preserve"><value>// {0} linjer · samme innhold som eksportpakken</value></data>
   <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>// rendring feilet</value></data>
   <data name="Hint_MBoosterIntro" xml:space="preserve"><value>Hver tilkoblet mBooster vises under. Velg en rolle (Gass/Brems/Clutch) per enhet for å rute pedalposisjonen. Kalibreringsseksjonen er eksperimentell.</value></data>
-  <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ikke testet ennå.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Velg LED-farge</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>PALETT</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>FINJUSTER · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>AVBRYT</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>OK</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA WHEEL BASE · AMBIENT-LED</value></data>
-  <data name="Label_BaseModel" xml:space="preserve"><value>Base-modell</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Ingen ambient-LED på base oppdaget. R9/R12-baser har ikke LED-stripen; dette panelet aktiveres kun for R21/R25/R27-baser.</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>MODUS</value></data>
   <data name="SliderLabel_IndicatorState" xml:space="preserve"><value>Indikatorstatus</value></data>
   <data name="Option_Off" xml:space="preserve"><value>Av</value></data>
   <data name="Option_On" xml:space="preserve"><value>På</value></data>
-  <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Standby-animasjon</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Konstant</value></data>
   <data name="Option_Breath" xml:space="preserve"><value>Pust</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Syklus</value></data>
@@ -339,11 +316,7 @@
   <data name="SliderLabel_Brightness" xml:space="preserve"><value>Lysstyrke</value></data>
   <data name="Section_Sleep" xml:space="preserve"><value>HVILE</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Hvilemodus</value></data>
-  <data name="Option_Enabled" xml:space="preserve"><value>Aktivert</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Hvile-timeout</value></data>
-  <data name="Section_PowerOnOffColor" xml:space="preserve"><value>OPPSTART- / AVSLUTNINGSFARGE</value></data>
-  <data name="SliderLabel_StartupColor" xml:space="preserve"><value>Oppstartsfarge</value></data>
-  <data name="SliderLabel_ShutdownColor" xml:space="preserve"><value>Avslutningsfarge</value></data>
   <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA DASHBOARD</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Søker etter dashboard...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>INDIKATORMODUSER</value></data>
@@ -378,17 +351,14 @@
   <data name="Label_PaddleCombined" xml:space="preserve"><value>KOMBINERT</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>AKTIVE KNAPPER</value></data>
   <data name="Section_Joystick" xml:space="preserve"><value>JOYSTICK</value></data>
-  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// retningstildeling for stick</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Rattet har ikke rapportert joystick-konfigurasjon ennå. Koble til rattet og vent til identitetsprøven er ferdig.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Aktiver dashboard-telemetri</value></data>
-  <data name="Button_LoadMzdash" xml:space="preserve"><value>LAST INN .MZDASH…</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetri</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>VELG MAPPE…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DETEKTER</value></data>
-  <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Last inn en lokal .mzdash-fil for tier-def-kanaltilpasning</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Velg en mappe med .mzdash-filer som dashboard-bibliotek</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Auto-detekter dashboard-mappen for det tilkoblede rattet</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ SEND TESTMØNSTER</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ STOPP</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANALTILPASNINGER</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Blyant for å velge en egenskap, eller formelknappen for et NCalc- / js:-uttrykk</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Laster kanaltilpasninger…</value></data>
@@ -406,22 +376,12 @@
   <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Gjenopprett standarden</value></data>
   <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Global kanaltilordning utilgjengelig (se logg)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>TILBAKESTILL FELT</value></data>
-  <data name="Button_SplitField" xml:space="preserve"><value>DEL FELT</value></data>
-  <data name="Button_BitSplit" xml:space="preserve"><value>DEL BIT</value></data>
-  <data name="Button_MergePrev" xml:space="preserve"><value>SLÅ SAMMEN ◀</value></data>
-  <data name="Button_MergeNext" xml:space="preserve"><value>SLÅ SAMMEN ▶</value></data>
-  <data name="Button_RemoveSplit" xml:space="preserve"><value>FJERN DELING</value></data>
   <data name="Viz_Title" xml:space="preserve"><value>SANNTIDS-FSR1-DATA</value></data>
-  <data name="Edit_StartByte" xml:space="preserve"><value>Startbyte</value></data>
-  <data name="Edit_StartBit" xml:space="preserve"><value>Startbit</value></data>
-  <data name="Edit_BitWidth" xml:space="preserve"><value>Bitbredde</value></data>
-  <data name="Edit_EndByte" xml:space="preserve"><value>Sluttbyte</value></data>
-  <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-endian</value></data>
   <data name="Edit_Scale" xml:space="preserve"><value>Skala</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Forskyvning</value></data>
-  <data name="Section_Display" xml:space="preserve"><value>SKJERM</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Skjermlysstyrke</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Gjengir…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-tid</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Synk-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minutt</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutter</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 minutter</value></data>
@@ -455,9 +415,7 @@
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// klikk et flagg for å endre farge</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>FLAGG 1</value></data>
   <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>RPM-INDIKATOR</value></data>
-  <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// eldre ES-protokoll</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Indikatormodus</value></data>
-  <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Visningsmodus</value></data>
   <data name="Section_ButtonLedMode" xml:space="preserve"><value>KNAPP-LED-MODUS</value></data>
   <data name="SliderLabel_ButtonLedMode" xml:space="preserve"><value>Knapp-LED-modus</value></data>
   <data name="SliderLabel_ButtonIdleEffect" xml:space="preserve"><value>Knapp tomgangs-effekt</value></data>
@@ -491,18 +449,15 @@
   <data name="SliderLabel_Language" xml:space="preserve"><value>Språk</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>Krever omstart ved endring.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
-  <data name="Button_ImportProfile" xml:space="preserve"><value>IMPORTER PROFIL…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Importer PitHouse-forhåndsinnstilling</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Bla etter fil…</value></data>
   <data name="Import_Category_Motor" xml:space="preserve"><value>Base (Motor)</value></data>
   <data name="Import_Category_Pedals" xml:space="preserve"><value>Pedaler</value></data>
   <data name="Import_NoFolderFound" xml:space="preserve"><value>Fant ikke PitHouse Presets-mappen. Angi en egendefinert sti eller bruk Bla.</value></data>
   <data name="Import_SetCustomFolder" xml:space="preserve"><value>Velg mappe…</value></data>
-  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Bruker «{0}» på profilen «{1}». Følgende innstillinger endres:</value></data>
   <data name="Import_NoChangesHeader" xml:space="preserve"><value>Alle verdier i denne forhåndsinnstillingen matcher allerede den aktive profilen din.</value></data>
   <data name="Import_NotImportedHeader" xml:space="preserve"><value>Ikke importert (ingen plugin-ekvivalent):</value></data>
   <data name="Import_ApplyButton" xml:space="preserve"><value>BRUK</value></data>
-  <data name="Import_CancelButton" xml:space="preserve"><value>AVBRYT</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>NESTE</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>TILBAKE</value></data>
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Velg en PitHouse- eller Motion Manager-forhåndsinnstillings-JSON-fil fra et sted på systemet ditt.</value></data>
@@ -607,7 +562,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_PaddleCalibration" xml:space="preserve"><value>Kalibrering av padler</value></data>
   <data name="Button_RestartWheelbase" xml:space="preserve"><value>Start wheelbase på nytt</value></data>
   <data name="Button_CalibrateStart" xml:space="preserve"><value>Start</value></data>
-  <data name="Button_CalibrateSave" xml:space="preserve"><value>Lagre</value></data>
   <data name="Dialog_RestartWheelbase_Caption" xml:space="preserve"><value>Start wheelbase på nytt</value></data>
   <data name="Dialog_RestartWheelbase_Body" xml:space="preserve"><value>Starte wheelbase på nytt nå? Krafttilbakemeldingen faller kort bort mens basen starter på nytt.</value></data>
   <data name="Hint_PaddleCalibrate" xml:space="preserve"><value>Trykk alle padlene helt inn og slipp. Lagrer om {0}s…</value></data>
@@ -619,7 +573,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Flysimulering</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Keepalive-tidsavbrudd</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Hvor lenge LED-ene beholder sin siste tilstand etter at effektene stopper, før rattet går tilbake til sin egen belysning.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Skjermrotasjon</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Rotasjon</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Jevn</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Umiddelbar</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Spaker</value></data>
@@ -634,7 +588,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_WiperStageCount" xml:space="preserve"><value>Viskertrinn</value></data>
   <data name="Label_WiperForwardWraps" xml:space="preserve"><value>Viskertast går rundt</value></data>
   <data name="SliderLabel_LightStageCount" xml:space="preserve"><value>Lystrinn</value></data>
-  <data name="Button_ResyncWipers" xml:space="preserve"><value>Synkroniser viskere på nytt</value></data>
   <data name="Hint_ResyncWipers" xml:space="preserve"><value>Setter spillets viskere til av for å samstemme med trinnet programtillegget sporer.</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Sist trykket: knapp {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Last inn ETS2/ATS-standard</value></data>
@@ -650,10 +603,7 @@ Id: {2}</value></data>
   <data name="Button_AddCustomEffect" xml:space="preserve"><value>+ Legg til egendefinert effekt</value></data>
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Slett effekt</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Egendefinert effekt</value></data>
-  <data name="Section_PedalRoles" xml:space="preserve"><value>Pedalroller</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Pedal {0}</value></data>
-  <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Denne mBooster er vert for mer enn ett pedal på én tilkobling. Tildel hver oppdaget akse til en spillinngang. Standardrekkefølgen følger Mozas Rx/Ry/Rz-oppsett (gass/brems/clutch) — tilordne på nytt her hvis et pedal styrer feil inngang.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Konfigurer pedal:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Denne pedalen er passiv (ingen motor) — vibrasjonseffekter gjelder ikke.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
@@ -673,9 +623,7 @@ Id: {2}</value></data>
   <data name="ShifterColor_Blue" xml:space="preserve"><value>Blå</value></data>
   <data name="ShifterColor_Purple" xml:space="preserve"><value>Lilla</value></data>
   <data name="ShifterColor_White" xml:space="preserve"><value>Hvit</value></data>
-  <data name="Section_WheelbaseLfe" xml:space="preserve"><value>VIBRASJONSEFFEKTER FOR BASE</value></data>
   <data name="SliderLabel_Trigger" xml:space="preserve"><value>Utløser</value></data>
-  <data name="Label_EnginePresets" xml:space="preserve"><value>Motorforhåndsinnstillinger:</value></data>
   <data name="Preset_AdditiveEngine" xml:space="preserve"><value>Additiv motor</value></data>
   <data name="Preset_BigRig" xml:space="preserve"><value>Vogntog</value></data>
   <data name="Preset_DetunedV8" xml:space="preserve"><value>Ustemt V8</value></data>
@@ -694,7 +642,6 @@ Id: {2}</value></data>
   <data name="Mode_Abs" xml:space="preserve"><value>ABS</value></data>
   <data name="Mode_Gearshift" xml:space="preserve"><value>Girskift</value></data>
   <data name="Mode_Custom" xml:space="preserve"><value>Egendef.</value></data>
-  <data name="Label_Load" xml:space="preserve"><value>Last inn</value></data>
   <data name="Label_Save" xml:space="preserve"><value>Lagre</value></data>
   <data name="Label_Delete" xml:space="preserve"><value>Slett</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Importer</value></data>
@@ -711,7 +658,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Maks pedalvandring (mm)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Responshastighet (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>MELD ET PROBLEM</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Send en diagnoserapport til utvikleren</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Beskriv problemet</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beskriv problemet: hva du gjorde, hva rattet eller dashbordet gjorde, og når det startet.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (valgfritt — e-post eller Discord)</value></data>
@@ -724,12 +670,6 @@ Id: {2}</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Opplasting mislyktes. Sjekk tilkoblingen og prøv igjen.</value></data>
   <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Opplasting blokkert av vår CDN, ikke av tilkoblingen din — bruk Eksporter pakke.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Beskriv problemet før du sender.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Diagnoseopptak</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Holder et lite spor av seriell trafikk i minnet (det første minuttet av oppstart pluss nylig aktivitet), slik at feilrapporter inkluderer tilkoblingen. Ingenting forlater PC-en din før du sender en rapport.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Diagnoseopptak er av.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Oppstart: {0} rammer ({1} KB, {2}) · Løpende: {3} rammer ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>frosset</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>fyller</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Vent et øyeblikk før du sender en ny rapport.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Lagre diagnosepakken som en fil på denne PC-en (ingenting lastes opp).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Spilltaster</value></data>
@@ -757,7 +697,6 @@ Id: {2}</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Inngangskraft</value></data>
-  <data name="Section_PerLedColors" xml:space="preserve"><value>FARGER PER LED</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Hvile · Konstant</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Hvile · Pust</value></data>
   <data name="Label_SleepBreathing" xml:space="preserve"><value>Dvale · Pust</value></data>
@@ -772,6 +711,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Registrering av aktiv girspak (AB9 / AB6)</value></data>
+  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Kombinert haptikkenhet for pedaler</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graf</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Båndbredde</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Dreiemoment</value></data>
@@ -808,7 +748,6 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Kalibrerer pedalvandring – motoren beveger pedalen selv, så hold foten unna. {0}s igjen…</value></data>
   <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Kalibrerer motoren – hold foten unna pedalen. Dette tar omtrent ett minutt. {0}s igjen…</value></data>
   <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Starter pedalen på nytt for å fullføre – den kobler seg til igjen om noen sekunder.</value></data>
-  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>En kalibrering kjører på en annen pedal.</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Kalibreringen mislyktes: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Demping (trykk)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Demping (slipp)</value></data>
@@ -894,4 +833,19 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Motorvibrasjon</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktil tilbakemelding</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Knapp-debounce (ms)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Forhåndsvisning ikke tilgjengelig</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Trykket</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Sluppet</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Egendefinert fargetonevelger</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Pastellrød</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Pastelloransje</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Pastellgul</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Pastellgrønn</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Pastellcyan</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Pastellblå</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Pastellilla</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Pastellmagenta</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse-forhåndsinnstilling (*.mzpreset;*.json)|*.mzpreset;*.json|Alle filer (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» brukt på den aktive profilen</value></data>
 </root>

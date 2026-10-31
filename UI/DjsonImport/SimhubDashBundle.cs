@@ -36,17 +36,10 @@ namespace MozaPlugin.UI.DjsonImport
         /// <summary>The dashboard to convert.</summary>
         public string MainDjsonPath { get; }
 
-        /// <summary>Where the bundle was expanded. Valid until <see cref="Dispose"/>.</summary>
-        public string RootDirectory => _root;
-
-        /// <summary>Every <c>.djson</c> the bundle holds, main file first.</summary>
-        public IReadOnlyList<string> AllDjson { get; }
-
-        private SimhubDashBundle(string root, string mainDjson, IReadOnlyList<string> allDjson)
+        private SimhubDashBundle(string root, string mainDjson)
         {
             _root = root;
             MainDjsonPath = mainDjson;
-            AllDjson = allDjson;
         }
 
         /// <summary>True when the path names a bundle rather than a bare dashboard.</summary>
@@ -109,8 +102,6 @@ namespace MozaPlugin.UI.DjsonImport
             }
 
             string main = PickMain(djson, root, bundlePath);
-            var ordered = new List<string> { main };
-            ordered.AddRange(djson.Where(p => !string.Equals(p, main, StringComparison.OrdinalIgnoreCase)));
 
             report?.Notes.Add(
                 $"bundle: {files} file(s) expanded, {djson.Count} dashboard(s), "
@@ -120,7 +111,7 @@ namespace MozaPlugin.UI.DjsonImport
             MozaLog.Debug($"[AZOM] DjsonImport: expanded '{Path.GetFileName(bundlePath)}' "
                         + $"({files} files) to {root}");
 
-            return new SimhubDashBundle(root, main, ordered);
+            return new SimhubDashBundle(root, main);
         }
 
         /// <summary>

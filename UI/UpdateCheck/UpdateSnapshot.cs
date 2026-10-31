@@ -9,7 +9,6 @@ namespace MozaPlugin.UI.UpdateCheck
     /// </summary>
     public sealed class ReleaseEntry
     {
-        public string TagName { get; }
         public string Version { get; }
         public string HtmlUrl { get; }
         public string Notes { get; }
@@ -17,10 +16,9 @@ namespace MozaPlugin.UI.UpdateCheck
         public DateTime PublishedAtUtc { get; }
 
         public ReleaseEntry(
-            string tagName, string version, string htmlUrl,
+            string version, string htmlUrl,
             string notes, string assetUrl, DateTime publishedAtUtc)
         {
-            TagName = tagName ?? "";
             Version = version ?? "";
             HtmlUrl = htmlUrl ?? "";
             Notes = notes ?? "";

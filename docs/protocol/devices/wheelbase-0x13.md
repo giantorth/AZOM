@@ -36,6 +36,7 @@
 | soft-limit-retain | `1C` | 2 | int | PitHouse "enable soft limit in games" toggle. PitHouse writes 0 = off, 20 (`0x14`) = on, never 1. Base echoes the write on `A9`/`31`. Verified live 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`, `29 13 1C 00 14` / `1C 00 00`). |
 | soft-limit-stiffness | `1F` | 2 | int | PitHouse UI 1–10 maps linearly to raw 100–500: raw = round(100 + (n−1)·400/9), giving 100, 144, 189, 233, 278, 322, 367, 411, 456, 500. Base echoes the write on `A9`/`31`. Verified live for all 10 steps on 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`). |
 | temp-strategy / performance-output | `1E` | 2 | int | "Performance output" in newer PitHouse builds. 0 = Reserved, 1 = Full. Verified live 2026-05-10 (`bridge-20260510-115644.jsonl` t=41902.486 `1E 00 01`, t=42166.594 `1E 00 00`). |
+| torque-boost | `39` | 2 | int | Ultra-base "+2 Nm" unlock, base fw ≥ 1.2.12.4. 1 = unlocked; 0 = stock. See [Torque boost](#torque-boost-39) below. |
 | ffb-curve-x1 | `22 01` | 1 | int | FFB linearization curve X point 1 |
 | ffb-curve-x2 | `22 02` | 1 | int | |
 | ffb-curve-x3 | `22 03` | 1 | int | |
@@ -86,6 +87,40 @@ discards the hand edit: it rewrites all of y1–y4 from the linear base (seen
 never adds its boost on top of a custom curve. Don't confuse this slider with the main hub's Interpolation
 slider (`0x12` cmd `4C`, value = 10 × position), which is also 0–10 but leaves
 the curve alone.
+
+#### Torque boost (`39`)
+
+Ultra bases on firmware 1.2.12.4 or later have this flag. PitHouse 1.4.2.3
+unlocks the extra 2 Nm with a single write, gated behind an account login.
+The login is a PitHouse-side check, not part of the wire protocol. It sends no torque value; the base raises its own
+peak-torque parameter:
+
+```
+h2b  7e 03 29 13 39 00 01 04    write 0x39 = 1
+b2h  7e 03 a9 31 39 00 01 a2    echo
+```
+
+Within 150 ms the R16's `0x0E` debug log shows two EEPROM writes:
+
+```
+[INFO]param_manage.c:340 Table 5, Param 21 Written: 1099956224   (0x41900000 = 18.0f, was 16.0f)
+[INFO]param_manage.c:340 Table 5, Param 60 Written: 1 0.00000
+```
+
+Param 21 is the peak torque in Nm. At startup the base had written it as
+`1098907648` (16.0f). Param 60 appears to be the boost flag itself. PitHouse
+reads `0x39` (`28 13 39 00 00`) every 4–30 s. Before the write the reads
+returned 0, and the first read after it returned 1. No other base setting
+changed. Verified live on an R16 Ultra on 2026-10-31
+(`pithouse-r16-2nm-20261031.jsonl`, write at 08:44:11.287).
+
+The unlock survives a power cycle of the base (confirmed by hand on the R16,
+2026-10-31).
+
+The plugin only reads the flag (`base-torque-boost`), every 5 s, and only on an
+R16 Ultra (hardware code `D12`), R21 or R25 that reports firmware ≥ 1.2.12.4.
+When it reads 1, `MozaData.BaseRatedNm` adds 2 Nm to the model's rating, which
+raises the Base-tab torque graph's scale and `AZOM.TorqueLimit`.
 
 #### FFB effect equalizer — 10 bands (fw ≥ 1.2.10.10)
 
@@ -289,6 +324,16 @@ Per-effect behaviour (from `lfe-in-game-test.pcapng`):
   slider at 50 %).
 - **Gearshift** (p1=`00`) — a short burst (~2 frames) on each gear change; fixed
   placeholder period `0x000F`, freq + intensity from the sliders.
+
+Plugin transport (`MozaDeviceManager.SendBaseLfe*`): engine and ABS stream on
+their own latest-wins stream slots (`BaseLfeEngine` / `BaseLfeAbs`). Effect id 0
+goes out on the paced one-shot FIFO as a discrete burst (OnChange and test
+bumps, which must not coalesce), and on the `BaseLfeOsc0` stream slot whenever
+it runs continuously — the plugin's gearshift channel in Level trigger mode
+(same placeholder-period frame) and the ShakeIt haptics device's third tone.
+The all-zero disable rides the FIFO; it first clears that effect's pending
+stream slot, because stream slots drain after the FIFO item and a queued tone
+would otherwise replay after the disable.
 
 **Firmware detection.** The numeric base firmware version is read on **group
 `0x04`** addressed to device `0x12` (main). The request carries a 4-byte zero

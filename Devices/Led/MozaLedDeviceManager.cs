@@ -66,9 +66,10 @@ namespace MozaPlugin.Devices.Led
         // keepalive fires) still keeps the gate engaged.
         internal static readonly TimeSpan LivePathActiveWindow = TimeSpan.FromMilliseconds(750);
 
-        // Catalog-negotiation indicator: the first RPM LED pulses blue over the live
-        // frame during the channel catalog advertisement after a telemetry Start or dashboard switch.
-        private static readonly int[] NegotiationPulseBlue = { 24, 58, 140, 221, 255, 221, 140, 58 };
+        // Catalog-negotiation indicator: the first RPM LED pulses over the live
+        // frame during the channel catalog advertisement after a telemetry Start or dashboard
+        // switch, in the user-set colour (NegotiationLedColor).
+        private static readonly int[] NegotiationPulseLevels = { 24, 58, 140, 221, 255, 221, 140, 58 };
         private const int NegotiationPulseStepMs = 150;
         // Display() quiet this long = no live RPM frames; the keepalive timer draws instead.
         private const double NegotiationDisplayIdleMs = 250.0;
@@ -854,8 +855,6 @@ namespace MozaPlugin.Devices.Led
 
                 if (rawColors.Length > 0 || overrideColors.Length > 0)
                 {
-                    // LogRawDiagnostic(rawColors, ledColors.Length, buttonColors.Length);
-
                     int telemetryPhys = modelInfo != null
                         ? modelInfo.RpmLedCount + (modelInfo.HasFlagLeds ? MozaDeviceConstants.FlagLedCount : 0)
                         : ledColors.Length;
@@ -972,7 +971,7 @@ namespace MozaPlugin.Devices.Led
                     // end edge rewrites LED 0's real colour.
                     bool indicatorEnded = indicator < 0 && _indicatorShown >= 0;
                     _indicatorShown = indicator;
-                    var wire = WithIndicator(rpmColors, rpmN, indicator);
+                    var wire = WithIndicator(plugin, rpmColors, rpmN, indicator);
                     if (indicatorEnded && wire.Length < rpmN)
                     {
                         var padded = new Color[rpmN];
@@ -1199,13 +1198,6 @@ namespace MozaPlugin.Devices.Led
                             knobBitmask |= (1 << i);
                     }
 
-
-                    // We're in this block because SimHub is feeding the knob channel, so
-                    // drive the owned knobs every frame. The explicit release paths
-                    // (Default-during-telemetry toggle / static-hold timeout / no owned
-                    // knob left) are what hand the ring back to its stored colours.
-                    bool knobsActive = true;
-
                     // Static-hold restore (WheelKnobStaticTimeoutMs): when the live knob
                     // colours stay unchanged for longer than the timeout, release telemetry
                     // ownership so the wheel shows its native per-position colours — lets a
@@ -1265,7 +1257,7 @@ namespace MozaPlugin.Devices.Led
                         // just don't drive. Crucially, taking THIS branch (not the drive
                         // else-if) for every off frame — even after _lastKnobBitmask was
                         // reset to -1 by the release — is what stops the release ↔ re-drive
-                        // flicker that knobsActive=true would otherwise cause.
+                        // flicker that driving every frame would otherwise cause.
                         if (_lastKnobBitmask > 0 && !ledThrottled)
                         {
                             var layout = KnobLayout(plugin, count);
@@ -1277,8 +1269,11 @@ namespace MozaPlugin.Devices.Led
                         }
                         if (knobStaticTimedOut) _knobStaticHoldReleased = true;
                     }
-                    else if (knobsActive && !_knobStaticHoldReleased)
+                    else if (!_knobStaticHoldReleased)
                     {
+                        // SimHub is feeding the knob channel, so drive the owned knobs every
+                        // frame; the release branch above hands the ring back to its stored
+                        // colours.
                         bool knobResend = Volatile.Read(ref _knobResend) != 0;
                         bool knobsChanged = knobResend || !ColorsEqual(knobColors, _lastKnobs);
                         bool shouldSendKnobs = !ledThrottled
@@ -1510,24 +1505,36 @@ namespace MozaPlugin.Devices.Led
             }
         }
 
-        /// <summary>Blue level of the negotiation pulse right now, or -1 when the
-        /// initial catalog negotiation isn't running.</summary>
+        /// <summary>Level (0..255) of the negotiation pulse right now, or -1 when the
+        /// initial catalog negotiation isn't running or the indicator is disabled.</summary>
         private static int NegotiationIndicatorLevel(MozaPlugin plugin)
         {
+            if (plugin.Settings?.NegotiationLedEnabled == false) return -1;
             if (plugin.TelemetrySender?.WheelInInitialCatalogNegotiation != true) return -1;
             int step = (Environment.TickCount & int.MaxValue) / NegotiationPulseStepMs;
-            return NegotiationPulseBlue[step % NegotiationPulseBlue.Length];
+            return NegotiationPulseLevels[step % NegotiationPulseLevels.Length];
         }
 
         /// <summary>The RPM frame as sent: with <paramref name="level"/> &gt;= 0, a copy
         /// padded to <paramref name="rpmN"/> with the first LED replaced by the pulse.</summary>
-        private static Color[] WithIndicator(Color[] rpm, int rpmN, int level)
+        private static Color[] WithIndicator(MozaPlugin plugin, Color[] rpm, int rpmN, int level)
         {
             if (level < 0) return rpm;
             var o = new Color[Math.Max(rpm.Length, rpmN)];
             Array.Copy(rpm, o, rpm.Length);
-            o[0] = Color.FromArgb(0, 0, level);
+            int packed = plugin.Settings?.NegotiationLedColor ?? 0x0000FF;
+            o[0] = Color.FromArgb(PulseChannel(packed >> 16, level),
+                                  PulseChannel(packed >> 8, level),
+                                  PulseChannel(packed, level));
             return o;
+        }
+
+        // Scales one channel by the pulse level; a lit channel never drops to 0 so the
+        // LED stays in the bitmask through the dim steps.
+        private static int PulseChannel(int c, int level)
+        {
+            c &= 0xFF;
+            return c == 0 ? 0 : Math.Max(1, c * level / 255);
         }
 
         /// <summary>
@@ -1550,7 +1557,7 @@ namespace MozaPlugin.Devices.Led
                 if (want == _indicatorShown) return;
                 var layout = RpmLayout(plugin, rpmN, modelInfo!.UsesLegacyRpmTelemetry);
                 if (layout == null) return;
-                var wire = WithIndicator(_lastLeds ?? Array.Empty<Color>(), rpmN, want);
+                var wire = WithIndicator(plugin, _lastLeds ?? Array.Empty<Color>(), rpmN, want);
                 int mask = LitMask(wire, 0, rpmN);
                 // Full colour rewrite on the engage and release edges only.
                 bool edge = _indicatorShown < 0 || want < 0;
@@ -1595,7 +1602,7 @@ namespace MozaPlugin.Devices.Led
             {
                 // Publishing (not just flagging a refresh) also restores the lane's
                 // state after a flush or reset dropped it.
-                var wire = WithIndicator(leds, rpmN, _indicatorShown);
+                var wire = WithIndicator(plugin, leds, rpmN, _indicatorShown);
                 count = Math.Min(wire.Length, rpmN);
                 var layout = RpmLayout(plugin, count, modelInfo?.UsesLegacyRpmTelemetry == true);
                 if (layout != null && _lastRpmBitmask >= 0)
@@ -1997,29 +2004,6 @@ namespace MozaPlugin.Devices.Led
                 rgb[i] = (colors[i].R << 16) | (colors[i].G << 8) | colors[i].B;
             return rgb;
         }
-
-        // Diagnostic: log rawColors length and per-slot state once per distinct pattern.
-        // Helps verify SimHub's Individual-LEDs output shape (physical-indexed vs other).
-#if MOZA_RAW_LED_DIAG
-        private string? _lastRawDiagKey;
-        private void LogRawDiagnostic(Color[] rawColors, int ledsLen, int buttonsLen)
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.Append($"rawLen={rawColors.Length} leds={ledsLen} buttons={buttonsLen} nonEmpty=[");
-            for (int i = 0; i < rawColors.Length; i++)
-            {
-                var c = rawColors[i];
-                if (c.A != 0 || c.R != 0 || c.G != 0 || c.B != 0)
-                    sb.Append($"{i}:A{c.A}R{c.R}G{c.G}B{c.B} ");
-            }
-            sb.Append(']');
-            string key = sb.ToString();
-            if (key == _lastRawDiagKey) return;
-            _lastRawDiagKey = key;
-            // Very chatty when animation is running
-            MozaLog.Debug($"[AZOM] IndividualLEDs diag {key}");
-        }
-#endif
 
         // Bit i set when colors[offset + i] is lit (any of R/G/B non-zero).
         private static int LitMask(Color[] colors, int offset, int count)

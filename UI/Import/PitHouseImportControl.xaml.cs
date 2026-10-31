@@ -177,7 +177,7 @@ namespace MozaPlugin.UI.Import
         {
             var dlg = new Microsoft.Win32.OpenFileDialog
             {
-                Filter = "PitHouse preset (*.mzpreset;*.json)|*.mzpreset;*.json|All files (*.*)|*.*",
+                Filter = Strings.FileFilter_PitHousePreset,
                 Title = Strings.Import_DialogTitle,
             };
             if (dlg.ShowDialog(Window.GetWindow(this)) != true) return;
@@ -493,7 +493,7 @@ namespace MozaPlugin.UI.Import
             // capture the name first and set the caption afterwards.
             Back_Click(sender, e);
             RefreshLists();
-            FooterStatusText.Text = $"applied “{applied}” to the active profile";
+            FooterStatusText.Text = string.Format(Strings.Import_Footer_Applied, applied);
         }
     }
 }

@@ -52,8 +52,18 @@ namespace MozaPlugin.Devices.Haptics
         private static readonly ConcurrentDictionary<Type, FieldInfo?> FieldCache =
             new ConcurrentDictionary<Type, FieldInfo?>();
 
+        // Enum.GetValues allocates and boxes per call; the sweep walks placements per
+        // leaf. Nested so FFBPlacement only loads with the guarded sweep methods.
+        private static class Placements
+        {
+            public static readonly FFBPlacement[] All = (FFBPlacement[])Enum.GetValues(typeof(FFBPlacement));
+        }
+
         /// <summary>Build the replacement manager lazily, inside a caller's guard.</summary>
         public static object CreateConnectionManager(byte pedal) => new MozaPedalHapticsConnectionManager(pedal);
+
+        /// <summary>Same, for the combined device.</summary>
+        public static object CreateCombinedConnectionManager() => new MozaPedalHapticsConnectionManager(pedal: 0);
 
         /// <summary>
         /// Replace SimHub's <c>StandardProtocolMotorsChannelsSettingsProvider</c>
@@ -66,6 +76,13 @@ namespace MozaPlugin.Devices.Haptics
         /// again and stamps a fresh stock provider over ours.
         /// </summary>
         public static void TryInstallChannelsProvider(object motorsDeviceExtension, byte pedal)
+            => TryInstall(motorsDeviceExtension, (manager, settings) => Install(manager, settings, pedal));
+
+        /// <summary>Same, with the combined device's pedal-per-channel provider.</summary>
+        public static void TryInstallCombinedChannelsProvider(object motorsDeviceExtension)
+            => TryInstall(motorsDeviceExtension, InstallCombined);
+
+        private static void TryInstall(object motorsDeviceExtension, Action<object?, object> install)
         {
             if (!IsSupported) return;
 
@@ -80,9 +97,9 @@ namespace MozaPlugin.Devices.Haptics
                 var settings = MozaBaseHapticsBridge.GetProp(hosted, "Settings");
                 if (settings == null) return;   // not constructed yet; retried next tick
 
-                Install(MozaBaseHapticsBridge.GetProp(settings, "OutputManager"), settings, pedal);
-                Install(MozaBaseHapticsBridge.GetProp(settings, "CurrentOutputManager"), settings, pedal);
-                Install(MozaBaseHapticsBridge.GetProp(MozaBaseHapticsBridge.GetProp(settings, "CurrentProfile"), "OutputManager"), settings, pedal);
+                install(MozaBaseHapticsBridge.GetProp(settings, "OutputManager"), settings);
+                install(MozaBaseHapticsBridge.GetProp(settings, "CurrentOutputManager"), settings);
+                install(MozaBaseHapticsBridge.GetProp(MozaBaseHapticsBridge.GetProp(settings, "CurrentProfile"), "OutputManager"), settings);
             }
             catch (Exception ex)
             {
@@ -108,6 +125,19 @@ namespace MozaPlugin.Devices.Haptics
         /// </summary>
         /// <returns>(assigned, released) counts, for logging.</returns>
         public static (int Assigned, int Released) SyncOscillatorAssignments(object motorsDeviceExtension)
+            => Sweep(motorsDeviceExtension, combined: false);
+
+        /// <summary>
+        /// The combined device's version of <see cref="SyncOscillatorAssignments"/>:
+        /// the same assignment run once per pedal, over that pedal's oscillator
+        /// block, for the effects whose pedal tick is on. A placement's ticks are
+        /// seeded all-on the first time the sweep sees it, as SimHub's stock
+        /// providers default every channel on.
+        /// </summary>
+        public static (int Assigned, int Released) SyncCombinedOscillatorAssignments(object motorsDeviceExtension)
+            => Sweep(motorsDeviceExtension, combined: true);
+
+        private static (int Assigned, int Released) Sweep(object motorsDeviceExtension, bool combined)
         {
             if (!IsSupported) return (0, 0);
 
@@ -123,28 +153,19 @@ namespace MozaPlugin.Devices.Haptics
                     var leaves = new List<(DeviceChannelActivationSettings Activation, bool On)>();
                     CollectLeaves(shakeItProfile.EffectsContainers, true, 0, leaves);
 
-                    // Count what valid assignments already hold before placing newcomers.
-                    var load = new int[MozaPedalHapticsProtocol.ChannelsPerPedal];
-                    var unassigned = new List<DeviceChannelActivationSettings>();
-                    foreach (var (activation, on) in leaves)
+                    if (!combined)
                     {
-                        int current = AssignedChannel(activation);
-                        if (!on)
-                        {
-                            if (ClearChannels(activation)) released++;
-                        }
-                        else if (current >= 0) load[current]++;
-                        else unassigned.Add(activation);
+                        SweepBlock(leaves, 0, _ => true, ref assigned, ref released);
+                        continue;
                     }
 
-                    foreach (var activation in unassigned)
+                    foreach (var (activation, _) in leaves)
+                        SeedPedalTicks(activation);
+                    for (int p = 0; p < MozaPedalHapticsCombinedChannelsProvider.PedalChannels; p++)
                     {
-                        int channel = 0;
-                        for (int ch = 1; ch < load.Length; ch++)
-                            if (load[ch] < load[channel]) channel = ch;
-                        SetSingleChannel(activation, channel);
-                        load[channel]++;
-                        assigned++;
+                        int pedalChannel = p;
+                        SweepBlock(leaves, MozaPedalHapticsCombinedChannelsProvider.OscillatorChannel(p, 0),
+                            pca => IsOn(pca, pedalChannel), ref assigned, ref released);
                     }
                 }
             }
@@ -157,6 +178,71 @@ namespace MozaPlugin.Devices.Haptics
                 MozaLog.Debug($"[AZOM] Pedal-haptics oscillator sweep failed: {ex.Message}");
             }
             return (assigned, released);
+        }
+
+        /// <summary>
+        /// Assign within one oscillator block. <paramref name="wants"/> says
+        /// whether a placement should sound on this block at all — always for a
+        /// per-pedal device, only where the pedal is ticked on the combined one.
+        /// </summary>
+        private static void SweepBlock(List<(DeviceChannelActivationSettings Activation, bool On)> leaves,
+            int blockBase, Func<PlacementChannelsActivation?, bool> wants, ref int assigned, ref int released)
+        {
+            // Count what valid assignments already hold before placing newcomers.
+            var load = new int[MozaPedalHapticsProtocol.ChannelsPerPedal];
+            var unassigned = new List<DeviceChannelActivationSettings>();
+            foreach (var (activation, on) in leaves)
+            {
+                if (!on || !WantsAny(activation, wants))
+                {
+                    if (ClearChannels(activation, blockBase)) released++;
+                    continue;
+                }
+                int current = AssignedChannel(activation, blockBase, wants);
+                if (current >= 0) load[current]++;
+                else unassigned.Add(activation);
+            }
+
+            foreach (var activation in unassigned)
+            {
+                int channel = 0;
+                for (int ch = 1; ch < load.Length; ch++)
+                    if (load[ch] < load[channel]) channel = ch;
+                SetSingleChannel(activation, blockBase, channel, wants);
+                load[channel]++;
+                assigned++;
+            }
+        }
+
+        private static bool WantsAny(DeviceChannelActivationSettings activation,
+            Func<PlacementChannelsActivation?, bool> wants)
+        {
+            foreach (var placement in Placements.All)
+            {
+                activation.Channels.TryGetValue(placement, out var pca);
+                if (wants(pca)) return true;
+            }
+            return false;
+        }
+
+        private static bool IsOn(PlacementChannelsActivation? pca, int channel)
+            => pca != null && pca.Channels.TryGetValue(channel, out var a) && a != null && a.IsEnabled;
+
+        /// <summary>
+        /// Tick every pedal on each placement not seen before. Only placements
+        /// that exist are seeded — the mixer creates the ones an effect plays on.
+        /// </summary>
+        private static void SeedPedalTicks(DeviceChannelActivationSettings activation)
+        {
+            foreach (var pca in activation.Channels.Values)
+            {
+                if (pca == null || pca.Channels.ContainsKey(MozaPedalHapticsCombinedChannelsProvider.PedalsSeededMarker))
+                    continue;
+                for (int p = 0; p < MozaPedalHapticsCombinedChannelsProvider.PedalChannels; p++)
+                    SetChannel(pca, p, true);
+                pca.Channels[MozaPedalHapticsCombinedChannelsProvider.PedalsSeededMarker] =
+                    new ChannelActivation { IsEnabled = false };
+            }
         }
 
         // "On" matches ProcessEffects: own IsEnabled AND every enclosing group's.
@@ -180,23 +266,36 @@ namespace MozaPlugin.Devices.Haptics
         }
 
         /// <summary>
-        /// The one oscillator this effect drives, or -1 when it is not exactly one
-        /// oscillator on every placement — none, several (SimHub's stock defaults
-        /// enable all of them), or placements that disagree.
+        /// The one oscillator in the block this effect drives, or -1 when that is
+        /// not exactly one oscillator on every wanted placement and none on the
+        /// rest — none, several (SimHub's stock defaults enable all of them), or
+        /// placements that disagree.
         /// </summary>
-        private static int AssignedChannel(DeviceChannelActivationSettings activation)
+        private static int AssignedChannel(DeviceChannelActivationSettings activation, int blockBase,
+            Func<PlacementChannelsActivation?, bool> wants)
         {
             int found = -1;
-            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            foreach (var placement in Placements.All)
             {
-                if (!activation.Channels.TryGetValue(placement, out var pca) || pca == null) return -1;
+                activation.Channels.TryGetValue(placement, out var pca);
+                bool want = wants(pca);
+                if (pca == null)
+                {
+                    if (want) return -1;
+                    continue;
+                }
 
                 int single = -1;
                 for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
                 {
-                    if (!pca.Channels.TryGetValue(ch, out var a) || a == null || !a.IsEnabled) continue;
+                    if (!IsOn(pca, blockBase + ch)) continue;
                     if (single >= 0) return -1;
                     single = ch;
+                }
+                if (!want)
+                {
+                    if (single >= 0) return -1;
+                    continue;
                 }
                 if (single < 0 || (found >= 0 && single != found)) return -1;
                 found = single;
@@ -204,29 +303,31 @@ namespace MozaPlugin.Devices.Haptics
             return found;
         }
 
-        private static void SetSingleChannel(DeviceChannelActivationSettings activation, int channel)
+        private static void SetSingleChannel(DeviceChannelActivationSettings activation, int blockBase, int channel,
+            Func<PlacementChannelsActivation?, bool> wants)
         {
-            foreach (FFBPlacement placement in Enum.GetValues(typeof(FFBPlacement)))
+            foreach (var placement in Placements.All)
             {
                 if (!activation.Channels.TryGetValue(placement, out var pca) || pca == null)
                 {
                     pca = new PlacementChannelsActivation();
                     activation.Channels[placement] = pca;
                 }
+                bool want = wants(pca);
                 for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
-                    SetChannel(pca, ch, ch == channel);
+                    SetChannel(pca, blockBase + ch, want && ch == channel);
             }
         }
 
         /// <returns>True when an enabled oscillator was actually switched off.</returns>
-        private static bool ClearChannels(DeviceChannelActivationSettings activation)
+        private static bool ClearChannels(DeviceChannelActivationSettings activation, int blockBase)
         {
             bool changed = false;
             foreach (var pca in activation.Channels.Values)
             {
                 if (pca == null) continue;
                 for (int ch = 0; ch < MozaPedalHapticsProtocol.ChannelsPerPedal; ch++)
-                    if (pca.Channels.TryGetValue(ch, out var a) && a != null && a.IsEnabled)
+                    if (pca.Channels.TryGetValue(blockBase + ch, out var a) && a != null && a.IsEnabled)
                     {
                         a.IsEnabled = false;
                         changed = true;
@@ -260,6 +361,21 @@ namespace MozaPlugin.Devices.Haptics
                        + $"{MozaPedalHapticsProtocol.PedalLabel(pedal).ToLowerInvariant()} pedal "
                        + $"({MozaPedalHapticsProtocol.ChannelsPerPedal} channels)");
         }
+
+        private static void InstallCombined(object? outputManager, object settings)
+        {
+            if (!(outputManager is MotorsOutputManagerBase manager)) return;
+            if (manager.ShakeItChannelsInfoProvider is MozaPedalHapticsCombinedChannelsProvider) return;
+
+            var provider = new MozaPedalHapticsCombinedChannelsProvider();
+            manager.ShakeItChannelsInfoProvider = provider;
+
+            if (settings is SimHub.Plugins.DataPlugins.ShakeItV3.Settings.ShakeItSettings shakeItSettings)
+                provider.SetSettings(shakeItSettings);
+
+            MozaLog.Info("[AZOM] Installed the MOZA pedal-haptics combined channels provider "
+                       + $"({MozaPedalHapticsCombinedChannelsProvider.PedalChannels} pedals)");
+        }
     }
 
     /// <summary>
@@ -274,9 +390,12 @@ namespace MozaPlugin.Devices.Haptics
     internal sealed class MozaPedalHapticsConnectionManager : ILedDeviceManager, IConnectableLedDeviceManager
     {
         private readonly MozaPedalHapticsMotorsDriver _motors;
+        private readonly bool _combined;
 
+        /// <param name="pedal">Motor port, or 0 for the combined device.</param>
         internal MozaPedalHapticsConnectionManager(byte pedal)
         {
+            _combined = pedal == 0;
             _motors = new MozaPedalHapticsMotorsDriver(pedal);
         }
         private bool _lastConnected;
@@ -294,8 +413,9 @@ namespace MozaPlugin.Devices.Haptics
 
         // This device has no LED sub-device to keep alive, so unlike the
         // wheelbase there is no wide-gate/narrow-gate split — the connection and
-        // the motors driver can both use the one real condition.
-        public bool IsConnected() => MozaPlugin.Instance?.IsPedalHapticsReady == true;
+        // the motors driver can both use the one real condition. The unselected
+        // layout reads disconnected, so SimHub shows it as idle rather than live.
+        public bool IsConnected() => MozaPlugin.Instance?.IsPedalHapticsActive(_combined) == true;
 
         /// <summary>Raise SimHub's connect/disconnect events when the state flips. Called from the device extension's DataUpdate.</summary>
         public void UpdateConnectionState()
@@ -331,23 +451,27 @@ namespace MozaPlugin.Devices.Haptics
     }
 
     /// <summary>
-    /// Sink for SimHub's ShakeIt motors mixer. The three MotorStates slots map
-    /// onto one pedal motor's channel list; values go to the
-    /// effect worker through the plugin so the worker stays the single wire
-    /// owner.
+    /// Sink for SimHub's ShakeIt motors mixer. The MotorStates slots map onto
+    /// one pedal motor's channel list — or, on the combined device, one slot per
+    /// pedal; values go to the effect worker through the plugin so the worker
+    /// stays the single wire owner.
+    ///
+    /// Only reached before our channels provider is installed, whose
+    /// UpdateOutput posts directly.
     /// </summary>
     internal sealed class MozaPedalHapticsMotorsDriver : IMotorsDriver
     {
-        private readonly byte _pedal;
         private readonly int _pedalIndex;
+        private readonly bool _combined;
 
+        /// <param name="pedal">Motor port, or 0 for the combined device.</param>
         internal MozaPedalHapticsMotorsDriver(byte pedal)
         {
-            _pedal = pedal;
+            _combined = pedal == 0;
             _pedalIndex = pedal - MozaPedalHapticsProtocol.MinPedal;
         }
 
-        public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsReady == true;
+        public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsActive(_combined) == true;
 
         public string SerialNumber => "";
         public string FirmwareVersion => "";
@@ -356,25 +480,48 @@ namespace MozaPlugin.Devices.Haptics
         {
             var plugin = MozaPlugin.Instance;
             if (plugin == null) return false;
+            if (plugin.PedalHapticsCombined != _combined) return true;
 
             var s = states?.States;
             if (s == null)
             {
-                plugin.ClearShakeItPedalHaptics(_pedalIndex);
+                Clear();
                 return true;
             }
 
             // MotorStates is a fixed-size array whose length SimHub sets from the
-            // definition; do not assume it reaches ChannelsPerPedal, because a
+            // definition; do not assume it reaches the expected count, because a
             // stale definition on disk would hand back a shorter one and indexing
             // past it would throw on the data thread every tick.
+            if (_combined)
+            {
+                // One mixed tone per pedal, on that pedal's first oscillator.
+                int pedals = Math.Min(s.Length, MozaPedalHapticsProtocol.PedalCount);
+                for (int p = 0; p < pedals; p++)
+                    plugin.PostShakeItPedalHapticsChannel(p, 0, s[p].Gain, s[p].Frequency);
+                return true;
+            }
+
             int n = Math.Min(s.Length, MozaPedalHapticsProtocol.ChannelsPerPedal);
             for (int i = 0; i < n; i++)
                 plugin.PostShakeItPedalHapticsChannel(_pedalIndex, i, s[i].Gain, s[i].Frequency);
             return true;
         }
 
-        public void Clear() => MozaPlugin.Instance?.ClearShakeItPedalHaptics(_pedalIndex);
+        // Inactive layout must not clear what the active one is driving.
+        public void Clear()
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || plugin.PedalHapticsCombined != _combined) return;
+
+            if (!_combined)
+            {
+                plugin.ClearShakeItPedalHaptics(_pedalIndex);
+                return;
+            }
+            for (int p = 0; p < MozaPedalHapticsProtocol.PedalCount; p++)
+                plugin.ClearShakeItPedalHaptics(p);
+        }
 
         public void Dispose() => Clear();
     }

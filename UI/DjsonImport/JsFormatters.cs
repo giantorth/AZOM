@@ -43,12 +43,6 @@ namespace MozaPlugin.UI.DjsonImport
             + "m=-3.4028234e+38,s=_result<0?'-':'')=>isNaN(r)?undefined:_result>m?"
             + "`${s}${f(r/60,2)}:${f(r%60,2)}.${f(r%1*1000,3)}`:'--:--.---')()";
 
-        /// <summary>Lap/sector time as <c>m:ss.mmm</c> without a leading zero on minutes.</summary>
-        public const string ChainLapTimeShort =
-            "((r=Math.abs(_result),f=(a,b)=>Math.floor(a).toString().padStart(b,'0'),"
-            + "m=-3.4028234e+38,s=_result<0?'-':'')=>isNaN(r)?undefined:_result>m?"
-            + "`${s}${Math.floor(r/60)}:${f(r%60,2)}.${f(r%1*1000,3)}`:'-:--.---')()";
-
         /// <summary>Signed delta as <c>±s.mmm</c>.</summary>
         public const string ChainDelta =
             "((r=Number(_result))=>isNaN(r)?'--.---':(r<0?'-':'+')+Math.abs(r).toFixed(3))()";

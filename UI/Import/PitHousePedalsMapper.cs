@@ -360,9 +360,8 @@ namespace MozaPlugin.UI.Import
 
             // min/max are deliberately NOT imported: PitHouse states them as
             // percentages (0/3/16/99/100 across the sample presets) while
-            // MBoosterDeviceSettings.Min/Max are the device's own RAW counts —
-            // the "Min (raw)"/"Max (raw)" sliders run 0..65535 and are seeded
-            // from the device read-back. Writing 99 into a raw field caps the
+            // MBoosterDeviceSettings.Min/Max are the device's own RAW counts
+            // (0..65535, seeded from the device read-back). Writing 99 into a raw field caps the
             // pedal at ~0.15 % of full scale. The scale factor between the two
             // is unverified, so the values are surfaced instead of guessed.
             m.SkipKey("min", "percent vs raw counts — unverified");
@@ -531,10 +530,19 @@ namespace MozaPlugin.UI.Import
             private static string Nodes(float[]? a) =>
                 a == null ? "(default)" : string.Join("/", a.Select(FormatCurvePoint));
 
-            private void Add(string label, string oldDisplay, string newDisplay, Action<IMBoosterPedalConfig> apply)
+            private void Add(string label, string oldDisplay, string newDisplay, bool changed,
+                Action<IMBoosterPedalConfig> apply)
             {
-                _plan.Diffs.Add(new FieldDiff($"{_rowPrefix} · {label}", oldDisplay, newDisplay,
+                _plan.Diffs.Add(new FieldDiff($"{_rowPrefix} · {label}", oldDisplay, newDisplay, changed,
                     () => { var cfg = Write(); if (cfg != null) apply(cfg); }));
+            }
+
+            private static bool Differs(float[]? current, float[] next)
+            {
+                if (current == null || current.Length != next.Length) return true;
+                for (int i = 0; i < next.Length; i++)
+                    if (current[i] != next[i]) return true;
+                return false;
             }
 
             // ----- scalar helpers -----
@@ -550,6 +558,7 @@ namespace MozaPlugin.UI.Import
                 Add(label,
                     unsetBelowZero && ov < 0 ? "(unset)" : ov.ToString(CultureInfo.InvariantCulture),
                     nv.ToString(CultureInfo.InvariantCulture),
+                    ov != nv,
                     c => set(c, nv));
             }
 
@@ -563,6 +572,7 @@ namespace MozaPlugin.UI.Import
                 Add(label,
                     ov < 0 ? "(unset)" : ov.ToString(fmt, CultureInfo.InvariantCulture),
                     nv.ToString(fmt, CultureInfo.InvariantCulture),
+                    ov != nv,
                     c => set(c, nv));
             }
 
@@ -591,7 +601,7 @@ namespace MozaPlugin.UI.Import
                 string oldDisplay = old == null ? "(unset)" : string.Join("/", old.Select(FormatCurvePoint));
                 string newDisplay = string.Join("/", y.Select(FormatCurvePoint));
 
-                Add("Output curve (y1..y5)", oldDisplay, newDisplay,
+                Add("Output curve (y1..y5)", oldDisplay, newDisplay, Differs(old, y),
                     c => c.HardwareCurveY = (float[])y.Clone());
             }
 
@@ -633,6 +643,7 @@ namespace MozaPlugin.UI.Import
 
                 float s = start, e = end;
                 Add("Travel start–end (mm)", oldDisplay, newDisplay,
+                    _read.TravelStartMm != s || _read.TravelEndMm != e,
                     c => { c.TravelStartMm = s; c.TravelEndMm = e; });
             }
 
@@ -664,14 +675,14 @@ namespace MozaPlugin.UI.Import
                     float v = dz.Value;
                     Add("Deadzone (kg)",
                         _read.DeadzoneKg < 0 ? "(unset)" : _read.DeadzoneKg.ToString("F1", CultureInfo.InvariantCulture),
-                        v.ToString("F1", CultureInfo.InvariantCulture), c => c.DeadzoneKg = v);
+                        v.ToString("F1", CultureInfo.InvariantCulture), _read.DeadzoneKg != v, c => c.DeadzoneKg = v);
                 }
                 if (mf.HasValue)
                 {
                     float v = mf.Value;
                     Add("Max force (kg)",
                         _read.MaxForceKg < 0 ? "(unset)" : _read.MaxForceKg.ToString("F0", CultureInfo.InvariantCulture),
-                        v.ToString("F0", CultureInfo.InvariantCulture), c => c.MaxForceKg = v);
+                        v.ToString("F0", CultureInfo.InvariantCulture), _read.MaxForceKg != v, c => c.MaxForceKg = v);
                 }
 
                 if (forces != null && forces.Length >= n)
@@ -694,7 +705,7 @@ namespace MozaPlugin.UI.Import
                             if (i > 0 && y[i] < y[i - 1]) y[i] = y[i - 1];
                         }
                         Add("Pedal feel curve (Y, % of deadzone→max force)", Nodes(_read.InputCurveY), Nodes(y),
-                            c => c.InputCurveY = (float[])y.Clone());
+                            Differs(_read.InputCurveY, y), c => c.InputCurveY = (float[])y.Clone());
                     }
                 }
 
@@ -725,7 +736,7 @@ namespace MozaPlugin.UI.Import
                             if (x[i] > cap) x[i] = cap;
                         }
                         Add("Pedal feel curve (X, % of travel) *", Nodes(_read.InputCurveX), Nodes(x),
-                            c => c.InputCurveX = (float[])x.Clone());
+                            Differs(_read.InputCurveX, x), c => c.InputCurveX = (float[])x.Clone());
                     }
                 }
             }
@@ -772,7 +783,7 @@ namespace MozaPlugin.UI.Import
                 if (sw.HasValue)
                 {
                     bool v = sw.Value;
-                    Add("Segmented damping *", sd.DampingEnabled ? "On" : "Off", v ? "On" : "Off",
+                    Add("Segmented damping *", sd.DampingEnabled ? "On" : "Off", v ? "On" : "Off", sd.DampingEnabled != v,
                         c => (c.SegmentedDamping ??= new MBoosterSegmentedDampingSettings()).DampingEnabled = v);
                 }
             }
@@ -784,7 +795,7 @@ namespace MozaPlugin.UI.Import
                 var sw = Bool("damping_" + dir + "_switch");
                 if (sw != false && v == null) return;
                 float nv = sw == false ? 0f : (float)Math.Round(Clamp(v!.Value, 0, 100));
-                Add(label + " (%)", Pct(get(_read)), Pct(nv), c => set(c, nv));
+                Add(label + " (%)", Pct(get(_read)), Pct(nv), get(_read) != nv, c => set(c, nv));
             }
 
             private void SegmentedSide(string label,
@@ -814,6 +825,7 @@ namespace MozaPlugin.UI.Import
                         ? "(unset)"
                         : $"{x1:F0}/{x2:F0}% · {y1:F0}/{y2:F0}/{y3:F0}%";
                 Add(label, Describe(cd1, cd2, cs1, cs2, cs3), Describe(na, nb, n1, n2, n3),
+                    cd1 != na || cd2 != nb || cs1 != n1 || cs2 != n2 || cs3 != n3,
                     c => set(c.SegmentedDamping ??= new MBoosterSegmentedDampingSettings(), na, nb, n1, n2, n3));
             }
 
@@ -835,7 +847,8 @@ namespace MozaPlugin.UI.Import
                 bool nEn = ps ?? curEn;
                 float nPct = p.HasValue ? (float)Math.Round(Clamp(p.Value, 0, 100)) : curPct;
                 string Describe(bool en, float pct) => (en ? "On" : "Off") + " · " + Pct(pct);
-                Add("Natural friction *", Describe(curEn, curPct), Describe(nEn, nPct), c =>
+                Add("Natural friction *", Describe(curEn, curPct), Describe(nEn, nPct),
+                    curEn != nEn || curPct != nPct, c =>
                 {
                     c.NaturalFrictionEnabled = nEn;
                     if (nPct >= 0) c.NaturalFrictionPct = nPct;
@@ -867,7 +880,8 @@ namespace MozaPlugin.UI.Import
                     : cur.ResponseSpeedPct;
                 string Describe(bool en, float m, int s) =>
                     $"{(en ? "On" : "Off")} · {m.ToString("F1", CultureInfo.InvariantCulture)}mm · speed {s.ToString(CultureInfo.InvariantCulture)}%";
-                Add("G-Force", Describe(cur.Enabled, cur.MaxTravelMm, cur.ResponseSpeedPct), Describe(nEn, nMv, nSp), c =>
+                Add("G-Force", Describe(cur.Enabled, cur.MaxTravelMm, cur.ResponseSpeedPct), Describe(nEn, nMv, nSp),
+                    cur.Enabled != nEn || cur.MaxTravelMm != nMv || cur.ResponseSpeedPct != nSp, c =>
                 {
                     var t = c.GForce;
                     if (t == null) return;
@@ -928,8 +942,13 @@ namespace MozaPlugin.UI.Import
                 string oldDisplay = Describe(current.Enabled, current.IntensityPct, current.FrequencyHz,
                     current.SmoothnessPct, current.TriggerLevelPct, current.DecayPct);
                 string newDisplay = Describe(newEnabled, newAmp, newFreq, newSmooth, newTrigger, newDecay);
+                bool changed = current.Enabled != newEnabled || current.IntensityPct != newAmp
+                    || (freqSuffix != null && current.FrequencyHz != newFreq)
+                    || (smoothSuffix != null && current.SmoothnessPct != newSmooth)
+                    || (triggerSuffix != null && current.TriggerLevelPct != newTrigger)
+                    || (decaySuffix != null && current.DecayPct != newDecay);
 
-                Add(label, oldDisplay, newDisplay, c =>
+                Add(label, oldDisplay, newDisplay, changed, c =>
                 {
                     var t = pick(c);
                     if (t == null) return;

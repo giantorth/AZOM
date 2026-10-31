@@ -123,12 +123,6 @@ namespace MozaPlugin.Diagnostics
             }
         }
 
-        /// <summary>Number of lines currently held in the ring buffer.</summary>
-        public int Count
-        {
-            get { lock (_gate) return _entries.Count; }
-        }
-
         /// <summary>Lines recorded across the connection lifetime, including
         /// ones that have fallen out of the ring. Post-dedup — re-delivered
         /// blocks are not counted twice.</summary>

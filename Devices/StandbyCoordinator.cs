@@ -34,6 +34,11 @@ namespace MozaPlugin.Devices
         private volatile int _applied = -1;       // -1 unknown / 0 active / 1 standby
         private const long FeedStaleMs = 3000;
 
+        // Apply runs from DataUpdate, PollStatus and the UI: serialises the
+        // check-then-write on _applied and the HID baseline. Leaf lock; the
+        // write under it only enqueues.
+        private readonly object _applyLock = new object();
+
         // HID-activity baseline (last sampled positions; change past the deadband
         // counts as physical use). _hidBaselined gates the first sample so it
         // seeds the baseline instead of registering as activity.
@@ -96,11 +101,14 @@ namespace MozaPlugin.Devices
         /// </summary>
         internal void Cancel()
         {
-            bool weStandbyed = _applied == 1;
-            _applied = -1;
-            if (!weStandbyed || !_detectionState.BaseDetected) return;
-            if (_data != null) _data.WorkMode = 0;
-            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
+            lock (_applyLock)
+            {
+                bool weStandbyed = _applied == 1;
+                _applied = -1;
+                if (!weStandbyed || !_detectionState.BaseDetected) return;
+                if (_data != null) _data.WorkMode = 0;
+                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
+            }
             MozaLog.Info("[AZOM] Auto-standby disabled — waking base");
         }
 
@@ -118,9 +126,18 @@ namespace MozaPlugin.Devices
         internal void Apply()
         {
             if (MozaPlugin.IsShuttingDown) return;
+            string? logLine;
+            lock (_applyLock)
+                logLine = ApplyLocked();
+            if (logLine != null) MozaLog.Info(logLine);
+        }
+
+        // Caller holds _applyLock. Returns the log line for a write, else null.
+        private string? ApplyLocked()
+        {
             var settings = _plugin.Settings;
-            if (settings == null || !settings.AutoStandbyWhenNoGame) { _applied = -1; return; }
-            if (!_detectionState.BaseDetected) { _applied = -1; return; }
+            if (settings == null || !settings.AutoStandbyWhenNoGame) { _applied = -1; return null; }
+            if (!_detectionState.BaseDetected) { _applied = -1; return null; }
 
             long now = DateTime.UtcNow.Ticks;
             // Lazy baseline: the first reconcile after startup/reload seeds the
@@ -145,12 +162,12 @@ namespace MozaPlugin.Devices
             long timeoutMs = (long)timeoutMin * 60_000L;
 
             int desired = (!gameActive && idleMs >= timeoutMs) ? 1 : 0; // 1 = standby, 0 = active
-            if (_applied == desired) return; // write only on change
+            if (_applied == desired) return null; // write only on change
 
             _applied = desired;
             if (_data != null) _data.WorkMode = desired; // keep the UI toggle in sync
             _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", desired);
-            MozaLog.Info($"[AZOM] Auto-standby: {(desired == 1 ? $"standby (idle {idleMs / 1000}s >= {timeoutMin}m)" : "wake (active)")}");
+            return $"[AZOM] Auto-standby: {(desired == 1 ? $"standby (idle {idleMs / 1000}s >= {timeoutMin}m)" : "wake (active)")}";
         }
 
         /// <summary>

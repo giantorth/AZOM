@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using MozaPlugin.Hardware;
 
 namespace MozaPlugin.Sdk.Resources.Motor
@@ -15,10 +14,8 @@ namespace MozaPlugin.Sdk.Resources.Motor
     /// </summary>
     internal sealed class MotorHighFrequencyTorqueResource : CoapResourceHandler
     {
-        internal const int LogEvery = 60;
-
+        // Logged (sampled) by MozaSdkCoapServer.LogRequest.
         private readonly HardwareApplier _hardware;
-        private int _counter;
 
         public MotorHighFrequencyTorqueResource(HardwareApplier hardware)
         {
@@ -31,11 +28,6 @@ namespace MozaPlugin.Sdk.Resources.Motor
                 return CoapResourceResponse.BadRequest("expected 4-byte LE int32");
 
             _hardware.WriteIfBaseConnected("base-high-freq-torque", value);
-
-            int n = Interlocked.Increment(ref _counter);
-            if ((n % LogEvery) == 1)
-                MozaLog.Debug($"[AZOM.Sdk] HighFrequencyTorque POST id={req.DeviceId} value={value} (sample 1/{LogEvery})");
-
             return CoapResourceResponse.Valid();
         }
 

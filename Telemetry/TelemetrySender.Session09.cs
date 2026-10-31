@@ -259,7 +259,5 @@ namespace MozaPlugin.Telemetry
                     _retransmitter.Track(frame, anyDevice: true);
             }
         }
-
-        internal bool Session09SeqSeeded => _session09SeqSeeded;
     }
 }

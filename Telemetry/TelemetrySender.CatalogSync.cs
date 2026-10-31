@@ -16,41 +16,6 @@ namespace MozaPlugin.Telemetry
 {
     public partial class TelemetrySender
     {
-
-        /// <summary>Tier-def blind retransmit rounds. Some firmwares need the
-        /// tier-def re-sent a few times during cold-start before it sticks;
-        /// fire each blind round at exponential backoff up to
-        /// <see cref="TierDefBlindMaxRounds"/>, then stop (and free the buffer).
-        ///
-        /// Early-exit when the retransmit queue no longer contains any of the
-        /// blind tier-def chunks — that means the wheel acked them all and
-        /// re-sending would just waste bandwidth. Trace analysis 2026-05-09
-        /// showed the prior catalog-activity-timestamp gate never tripped
-        /// (catalog activity is timestamped before tier-def sends), so all
-        /// 6 rounds always fired. Switching to ack-state lets us stop after
-        /// the first round on healthy connects, eliminating the cold-start
-        /// saturation event (~6 KB extra h2b per connect).</summary>
-        
-        /// <summary>True iff every chunk in <see cref="_tierDefBlindFrames"/>
-        /// has been acked by the wheel (and therefore removed from the
-        /// retransmitter queue). Frame layout per <see cref="TierDefinition-
-        /// Builder.ChunkMessage"/> places session at byte 6 and seq at
-        /// bytes 8-9 (LE). Returns false if any chunk is still pending.
-        /// </summary>
-        
-        /// <summary>Re-emit the sess=0x09 prime + ConfigJson open request until
-        /// the wheel device-inits 0x09 (b2h <c>7c 00 09 81 ...</c>) or the retry
-        /// budget is exhausted. Cold-start fires the pair once from
-        /// <see cref="PrimeAndOpenSession09"/>; if the wheel doesn't respond
-        /// (Wine SerialPort R/W contention, dropped chunk, slow firmware) the
-        /// configJson handshake never starts and the dashboard never renders.
-        ///
-        /// Guarded by <c>_sessions.GetOrCreate(0x09).DeviceInitiated</c> — once
-        /// the wheel emits its device-init the retry stops naturally and never
-        /// fires again for this Start cycle. Steady-state and post-switch
-        /// sessions are untouched (we never close 0x09 host-side, so
-        /// DeviceInitiated stays true across switches).</summary>
-        
         /// <summary>
         /// When the most-recent tier-def emission had unbound channels,
         /// schedule a kind=4 dashboard-switch re-emit for the slot the
@@ -179,7 +144,9 @@ namespace MozaPlugin.Telemetry
                 // value and the wheel binds then. Gating logic for first
                 // emission (END handshake + fallback) and pacing for
                 // subsequent emissions both live in the helper.
-                if (!_hotSwitch.ShouldEmitThisTick(act, _catalogParser.LastWheelEndMarkerTickMs))
+                bool endUnsettled = _hotSwitch.LastEmissionTickMs == 0
+                    && _catalogParser.HasUnsettledEndSince(_hotSwitch.ArmTickMs);
+                if (!_hotSwitch.ShouldEmitThisTick(act, _catalogParser.LastWheelEndMarkerTickMs, endUnsettled))
                     return;
 
                 int now = Environment.TickCount;
@@ -192,7 +159,8 @@ namespace MozaPlugin.Telemetry
                     $"#{emissionIdx}, cap {Lifecycle.HotSwitchCoordinator.MinEmissions}-" +
                     $"{Lifecycle.HotSwitchCoordinator.MaxEmissions}): " +
                     $"catalog {prev}→{cur}, wheel END={_catalogParser.LastWheelEndMarker}, " +
-                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _hotSwitch.LastEmissionTickMs)}ms");
+                    $"sinceArm={sinceArm}ms, sinceLast={(isFirstEmission ? -1 : now - _hotSwitch.LastEmissionTickMs)}ms" +
+                    (endUnsettled ? " (END still unsettled — cap reached)" : ""));
                 try
                 {
                     ApplySubscription(force: true);

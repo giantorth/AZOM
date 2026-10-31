@@ -188,9 +188,16 @@ namespace MozaControls
         // render-priority pass per dispatcher frame rebuilds them once.
         private bool _recomputePending;
 
+        public BandwidthSparkline()
+        {
+            // Hosts keep feeding samples while the graph is off-screen (another
+            // tab, panel closed); Recompute skips then, so catch up when shown.
+            IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) ScheduleRecompute(); };
+        }
+
         private void ScheduleRecompute()
         {
-            if (_recomputePending) return;
+            if (_recomputePending || !IsVisible) return;
             _recomputePending = true;
             Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
             {
@@ -199,17 +206,10 @@ namespace MozaControls
             }));
         }
 
-        private static List<double> Collect(System.Collections.IEnumerable? src)
-        {
-            var list = new List<double>();
-            if (src == null) return list;
-            foreach (var v in src)
-            {
-                if (v is IConvertible c)
-                    list.Add(c.ToDouble(System.Globalization.CultureInfo.InvariantCulture));
-            }
-            return list;
-        }
+        // Reused sample buffers, one per series.
+        private double[] _inBuf = new double[0];
+        private double[] _outBuf = new double[0];
+        private double[] _thirdBuf = new double[0];
 
         // Gridlines sit at these fractions of the plot height (i.e. 100/75/50/25
         // when MaxValue is a fixed 100) regardless of the data's own scale —
@@ -217,8 +217,37 @@ namespace MozaControls
         // auto-scaled peak.
         private static readonly double[] GridlineFractions = { 1.0, 0.75, 0.5, 0.25 };
 
+        // Gridlines depend only on size; rebuilt when it changes.
+        private Geometry? _gridCache;
+        private double _gridCacheW, _gridCacheH;
+
+        private Geometry GridFor(double w, double h, double pad, double plotW, double plotH)
+        {
+            if (_gridCache != null && _gridCacheW == w && _gridCacheH == h) return _gridCache;
+            var grid = new GeometryGroup();
+            foreach (double frac in GridlineFractions)
+            {
+                double y = h - pad - frac * plotH;
+                grid.Children.Add(new LineGeometry(new Point(pad, y), new Point(pad + plotW, y)));
+            }
+            grid.Freeze();
+            _gridCache = grid;
+            _gridCacheW = w;
+            _gridCacheH = h;
+            return grid;
+        }
+
+        private static double PeakOf(double[] vals, int n, double peak)
+        {
+            for (int i = 0; i < n; i++)
+                if (vals[i] > peak) peak = vals[i];
+            return peak;
+        }
+
         private void Recompute()
         {
+            if (!IsVisible) return;
+
             double w = ActualWidth;
             double h = ActualHeight;
             if (w <= 0 || h <= 0)
@@ -231,26 +260,12 @@ namespace MozaControls
             double plotW = w - pad * 2;
             double plotH = h - pad * 2;
 
-            if (ShowGridlines)
-            {
-                var grid = new GeometryGroup();
-                foreach (double frac in GridlineFractions)
-                {
-                    double y = h - pad - frac * plotH;
-                    grid.Children.Add(new LineGeometry(new Point(pad, y), new Point(pad + plotW, y)));
-                }
-                grid.Freeze();
-                SetValue(GridGeometryKey, grid);
-            }
-            else
-            {
-                SetValue(GridGeometryKey, null);
-            }
+            SetValue(GridGeometryKey, ShowGridlines ? GridFor(w, h, pad, plotW, plotH) : null);
 
-            var inVals    = Collect(InSamples);
-            var outVals   = Collect(OutSamples);
-            var thirdVals = Collect(ThirdSamples);
-            if (inVals.Count == 0 && outVals.Count == 0 && thirdVals.Count == 0)
+            int inN    = SparklineSeries.Read(InSamples, ref _inBuf);
+            int outN   = SparklineSeries.Read(OutSamples, ref _outBuf);
+            int thirdN = SparklineSeries.Read(ThirdSamples, ref _thirdBuf);
+            if (inN == 0 && outN == 0 && thirdN == 0)
             {
                 ClearSeries();
                 return;
@@ -260,38 +275,24 @@ namespace MozaControls
             // Fixed ceiling (MaxValue) wins when set, else auto-scale to the
             // combined window peak.
             double peak = 0;
-            if (inVals.Count > 0)    peak = Math.Max(peak, inVals.Max());
-            if (outVals.Count > 0)   peak = Math.Max(peak, outVals.Max());
-            if (thirdVals.Count > 0) peak = Math.Max(peak, thirdVals.Max());
+            peak = PeakOf(_inBuf, inN, peak);
+            peak = PeakOf(_outBuf, outN, peak);
+            peak = PeakOf(_thirdBuf, thirdN, peak);
             double scaleRef = MaxValue > 0 ? MaxValue : peak;
             double max = Math.Max(1, scaleRef);
-            double clip = max;
+            double baseY = h - pad;
+            double scale = plotH / max;
+            double tipX = pad + plotW - 3;
 
-            (Geometry? line, Geometry? fill, double tipX, double tipY)
-                Build(List<double> values)
-            {
-                if (values.Count == 0) return (null, null, 0, 0);
-                int n = values.Count;
-                double X(int i) => pad + (n == 1 ? 0 : plotW * i / (n - 1));
-                double Y(int i) => h - pad - Math.Min(values[i], clip) / max * plotH;
-
-                var lineFig = new PathFigure { StartPoint = new Point(X(0), Y(0)), IsClosed = false, IsFilled = false };
-                for (int i = 1; i < n; i++)
-                    lineFig.Segments.Add(new LineSegment(new Point(X(i), Y(i)), true));
-                var lineGeom = new PathGeometry(); lineGeom.Figures.Add(lineFig); lineGeom.Freeze();
-
-                var fillFig = new PathFigure { StartPoint = new Point(pad, h - pad), IsClosed = true, IsFilled = true };
-                for (int i = 0; i < n; i++)
-                    fillFig.Segments.Add(new LineSegment(new Point(X(i), Y(i)), false));
-                fillFig.Segments.Add(new LineSegment(new Point(pad + plotW, h - pad), false));
-                var fillGeom = new PathGeometry(); fillGeom.Figures.Add(fillFig); fillGeom.Freeze();
-
-                return (lineGeom, fillGeom, pad + plotW - 3, Y(n - 1) - 3);
-            }
-
-            var (inLine,    inFill,    inTipX,    inTipY)    = Build(inVals);
-            var (outLine,   outFill,   outTipX,   outTipY)   = Build(outVals);
-            var (thirdLine, thirdFill, thirdTipX, thirdTipY) = Build(thirdVals);
+            SparklineSeries.Build(_inBuf, inN, pad, plotW, baseY, double.NegativeInfinity, max, 0, scale,
+                out var inLine, out var inFill, out double inLastY);
+            SparklineSeries.Build(_outBuf, outN, pad, plotW, baseY, double.NegativeInfinity, max, 0, scale,
+                out var outLine, out var outFill, out double outLastY);
+            SparklineSeries.Build(_thirdBuf, thirdN, pad, plotW, baseY, double.NegativeInfinity, max, 0, scale,
+                out var thirdLine, out var thirdFill, out double thirdLastY);
+            double inTipX = inN > 0 ? tipX : 0, inTipY = inN > 0 ? inLastY - 3 : 0;
+            double outTipX = outN > 0 ? tipX : 0, outTipY = outN > 0 ? outLastY - 3 : 0;
+            double thirdTipX = thirdN > 0 ? tipX : 0, thirdTipY = thirdN > 0 ? thirdLastY - 3 : 0;
 
             SetValue(InLineGeometryKey,  inLine);
             SetValue(InFillGeometryKey,  inFill);

@@ -112,8 +112,15 @@ namespace MozaPlugin.Devices.StalksTruckSim
 
         private void Enqueue(ushort scan, Op op)
         {
-            if (scan != 0 && !_disposed && !_queue.IsAddingCompleted)
-                _queue.TryAdd((scan, op));
+            if (scan == 0 || _disposed) return;
+            // Dispose can complete or dispose the queue after the _disposed check;
+            // callers include timer threads, where an escaped throw ends the process.
+            try
+            {
+                if (!_queue.IsAddingCompleted)
+                    _queue.TryAdd((scan, op));
+            }
+            catch (InvalidOperationException) { }   // includes ObjectDisposedException
         }
 
         /// <summary>Drop any pending taps (e.g. on disable / focus loss).</summary>
@@ -253,7 +260,7 @@ namespace MozaPlugin.Devices.StalksTruckSim
         {
             if (_disposed) return;
             _disposed = true;
-            try { _repeatTimer.Dispose(); } catch { }
+            DisposeTimerAndWait(_repeatTimer);
             // Release any held keys directly — the worker is stopping and won't drain
             // queued key-ups.
             try
@@ -266,6 +273,22 @@ namespace MozaPlugin.Devices.StalksTruckSim
             try { _queue.CompleteAdding(); } catch { }
             try { _worker.Join(500); } catch { }
             try { _queue.Dispose(); } catch { }
+        }
+
+        private const int TimerDisposeWaitMs = 500;
+
+        /// <summary>
+        /// Dispose a timer and wait (bounded) for an in-flight callback to finish.
+        /// Never call from that timer's own callback.
+        /// </summary>
+        internal static void DisposeTimerAndWait(Timer timer)
+        {
+            var done = new ManualResetEvent(false);
+            bool settled;
+            try { settled = !timer.Dispose(done) || done.WaitOne(TimerDisposeWaitMs); }
+            catch { settled = false; }
+            // On a timeout the timer still signals the event later; leave it to the GC.
+            if (settled) done.Dispose();
         }
     }
 }

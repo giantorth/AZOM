@@ -47,6 +47,22 @@ namespace MozaPlugin.UI
             );
         }
 
+        // Issued from Loaded rather than the constructor: SimHub builds this
+        // control on every game switch but only loads it when the page opens.
+        // Each genuine (re)load re-reads; reparent Unload/Load bursts share one.
+        private const int SettingsRequestMinIntervalMs = 2000;
+        private int _lastSettingsRequestTick;
+        private bool _settingsRequested;
+
+        private void RequestAllSettingsThrottled()
+        {
+            int now = Environment.TickCount;
+            if (_settingsRequested && unchecked(now - _lastSettingsRequestTick) < SettingsRequestMinIntervalMs) return;
+            _settingsRequested = true;
+            _lastSettingsRequestTick = now;
+            RequestAllSettings();
+        }
+
         private int _shakeItProbeTick;
 
         private void RefreshDisplay(object sender, EventArgs e)
@@ -85,11 +101,16 @@ namespace MozaPlugin.UI
             }
         }
 
-        // Every tab the pane can hide: the detection-gated device tabs, plus the
-        // ones hidden unconditionally in XAML — the wheel tab (migrated to the
-        // per-wheel device page) and the dashboard upload / wheel files tabs
-        // (feature still in development). Nothing else drives the latter three's
-        // Visibility, so ShowAllTabs is the only thing that surfaces them.
+        // Tab contents only refresh while their tab is selected, so paint a
+        // newly selected tab now rather than on the next tick. Inner selectors'
+        // SelectionChanged bubbles through MainTabs too — ignore those.
+        private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!ReferenceEquals(e.OriginalSource, MainTabs) || !_refreshTimer.IsEnabled) return;
+            RefreshDisplay(this, EventArgs.Empty);
+        }
+
+        // The detection-gated device tabs ShowAllTabs can force visible.
         private TabItem[] HideableTabs => new[]
         {
             BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
@@ -121,35 +142,32 @@ namespace MozaPlugin.UI
             var hidReader = _plugin.HidReader;
             bool connected = hidReader != null && _data.IsHidConnected;
 
-            if (connected && _data.MaxAngle > 0)
+            // Readouts only for the tab that's shown; the next 33 ms tick
+            // catches a newly selected one up.
+            if (BaseTab.IsSelected)
             {
-                double deg = hidReader!.GetCurrentAngleDegrees(_data.MaxAngle * 2);
-                SteeringAngleLabel.Text = $"{deg:0;-0;0}°";
-                UpdateRedesignSteeringAngle(deg, valid: true);
-            }
-            else
-            {
-                SteeringAngleLabel.Text = "--";
-                UpdateRedesignSteeringAngle(0, valid: false);
+                if (connected && _data.MaxAngle > 0)
+                    UpdateRedesignSteeringAngle(hidReader!.GetCurrentAngleDegrees(_data.MaxAngle * 2), valid: true);
+                else
+                    UpdateRedesignSteeringAngle(0, valid: false);
             }
 
-            HandbrakeBar.Value = connected ? _data.HandbrakePosition : 0;
+            if (HandbrakeTab.IsSelected)
+            {
+                HandbrakeBar.Value = connected ? _data.HandbrakePosition : 0;
+                UpdateHandbrakeButtonStatus(connected);
+            }
 
             // Pedals-tab live-input trace (replaced the throttle/brake/clutch
             // bars). Pushed every frame so the sparkline scrolls whether or not a
             // pedal is moving; same merged 0-100 values as the mBooster trace.
+            // Fed while hidden too so the history is there when the tab opens;
+            // the sparkline itself only redraws while visible.
             PushTraceSample(_pedalBrakeTraceSamples,    connected ? _data.BrakePosition : 0);
             PushTraceSample(_pedalThrottleTraceSamples, connected ? _data.ThrottlePosition : 0);
             PushTraceSample(_pedalClutchTraceSamples,   connected ? _data.ClutchPosition : 0);
 
-            UpdateHandbrakeButtonStatus(connected);
             UpdateMBoosterCurveMarkers(connected);
-
-            // Phase 6: fan out live HID data to the per-device wheel control's
-            // Inputs sub-tab so its paddle bars + active-button text update at
-            // the same 30 Hz cadence as the (now hidden) plugin-pane controls.
-            try { global::MozaPlugin.Devices.Ui.MozaWheelSettingsControl.Instance?.PushInputsLiveData(_data); }
-            catch { }
         }
 
         // Live position markers on the mBooster tab's two curve editors,
@@ -162,6 +180,19 @@ namespace MozaPlugin.UI
             if (MBoosterDevicePanel.Visibility != Visibility.Visible) return;
             var selected = _plugin?.MBoosterRegistry?.FindByIdentity(_mboosterSelectedIdentity ?? "");
             if (selected == null) return;
+
+            // Effects card pedal trace — same 30 Hz cadence as the Inputs
+            // tab's pedal bars above, and the same merged 0-100 values
+            // (_data.*Position), so it shows every connected pedal's live
+            // position — mBooster or not, whichever device currently holds
+            // each role — not just an mBooster's own HID reading. Fed while
+            // the tab is hidden too, like the Pedals-tab trace.
+            PushTraceSample(_mboosterBrakeTraceSamples, hidConnected ? _data.BrakePosition : 0);
+            PushTraceSample(_mboosterThrottleTraceSamples, hidConnected ? _data.ThrottlePosition : 0);
+            PushTraceSample(_mboosterClutchTraceSamples, hidConnected ? _data.ClutchPosition : 0);
+
+            if (!MBoosterTab.IsSelected) return;
+
             // Track the SELECTED pedal's own axis, not always the master's —
             // otherwise every pedal page showed the master (throttle) input.
             int idx = _mboosterEffectPedalIndex;
@@ -204,15 +235,6 @@ namespace MozaPlugin.UI
             {
                 MBoosterPedalFeelLiveLabel.Text = Strings.Label_InputForce;
             }
-
-            // Effects card pedal trace — same 30 Hz cadence as the Inputs
-            // tab's pedal bars above, and the same merged 0-100 values
-            // (_data.*Position), so it shows every connected pedal's live
-            // position — mBooster or not, whichever device currently holds
-            // each role — not just an mBooster's own HID reading.
-            PushTraceSample(_mboosterBrakeTraceSamples, hidConnected ? _data.BrakePosition : 0);
-            PushTraceSample(_mboosterThrottleTraceSamples, hidConnected ? _data.ThrottlePosition : 0);
-            PushTraceSample(_mboosterClutchTraceSamples, hidConnected ? _data.ClutchPosition : 0);
         }
 
         // Append one sample to a rolling trace buffer, trimming to PedalTraceSamples.
@@ -229,21 +251,45 @@ namespace MozaPlugin.UI
             if (_data.HandbrakeMode != 1) return;
 
             bool pressed = connected && _data.HandbrakeButtonPressed;
-            HandbrakeButtonStatus.Text = pressed ? "Pressed" : "Released";
+            HandbrakeButtonStatus.Text = pressed ? Strings.Status_Pressed : Strings.Status_Released;
             HandbrakeButtonStatus.FontWeight = pressed ? FontWeights.Bold : FontWeights.Normal;
             HandbrakeButtonStatus.Foreground = pressed ? Brushes.White : Brushes.Gray;
         }
 
         private void RefreshBaseTab()
         {
-            ConnectionIndicator.Fill = _data.IsConnected ? Brushes.LimeGreen : Brushes.Gray;
-            ConnectionLabel.Text = _data.IsConnected ? "Connected" : "Disconnected";
-            UpdateRedesignLiveDisplays();
+            bool baseShown = BaseTab.IsSelected;
+            UpdateRedesignLiveDisplays(baseShown);
 
-            string tempUnit = _data.UseFahrenheit ? "°F" : "°C";
-            McuTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.McuTemp):F0} {tempUnit}" : "--";
-            MosfetTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.MosfetTemp):F0} {tempUnit}" : "--";
-            MotorTempLabel.Text = _data.IsBaseConnected ? $"{ConvertTemp(_data.MotorTemp):F0} {tempUnit}" : "--";
+            var settings = _plugin.Settings;
+            var gsProfile = settings.ProfileStore?.CurrentProfile;
+
+            // Wheelbase LFE effects (base fw >= 1.2.10.10). On LFE-capable
+            // firmware the complex effects card is shown and the classic
+            // gearshift card hidden (the complex gearshift replaces it);
+            // otherwise the reverse. Re-evaluated each tick so the card appears
+            // within one refresh of the firmware-version read landing.
+            // The classic gearshift card stays visible on all firmware (its bump
+            // command coexists with the LFE channels); the LFE card is shown
+            // additionally, full-width below, only on LFE-capable firmware.
+            // Hide the LFE tab when the user routed LFE to SimHub's ShakeIt haptics
+            // — that owns the output, and the two must not both edit the base.
+            // Stamp the cache while we're on the UI thread — the diagnostics dump
+            // (built off the bundle writer's thread) can't enumerate SimHub's
+            // device collection itself. A walk of SimHub's whole device list, so
+            // every ~10 s rather than every 500 ms tick; it feeds a diagnostics line.
+            if (_plugin != null && (_shakeItProbeTick++ % 20) == 0)
+                _plugin.ShakeItLfeDeviceDeployedCached = _plugin.IsShakeItLfeDeviceDeployed;
+            bool lfeSupported = _data.BaseSupportsLfe && _plugin?.WheelbaseLfeRoutedToShakeIt != true;
+            BaseLfeTab.Visibility = lfeSupported
+                ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            if (lfeSupported && BaseLfeTab.IsSelected)
+                SeedBaseLfeControls(gsProfile?.BaseLfe);
+
+            // Above: tab headers, top bar and diagnostics, every tick. Below:
+            // the tab's own contents, only while it is shown
+            // (MainTabs_SelectionChanged repaints it on selection).
+            if (!baseShown) return;
 
             // Reverse expression: *2 (raw → display degrees)
             // Floor 60° = measured firmware clamp (PitHouse stops at 90°);
@@ -284,39 +330,16 @@ namespace MozaPlugin.UI
             // silently overwrote the new active profile's stored values.
             // Suppressor on the surrounding RefreshDisplay scope swallows the
             // ValueChanged events these assignments raise.
-            var gsProfile = _plugin.Settings.ProfileStore?.CurrentProfile;
             bool von = gsProfile?.GearshiftVibrateOnNeutral == 1
-                || (gsProfile?.GearshiftVibrateOnNeutral == -1 && _plugin.Settings.GearshiftVibrateOnNeutral);
+                || (gsProfile?.GearshiftVibrateOnNeutral == -1 && settings.GearshiftVibrateOnNeutral);
             GearshiftVibrateOnNeutralCheck.IsChecked = von;
             int dbMs = gsProfile?.GearshiftDebounceMs ?? -1;
-            if (dbMs < 0) dbMs = _plugin.Settings.GearshiftDebounceMs;
+            if (dbMs < 0) dbMs = settings.GearshiftDebounceMs;
             if (dbMs < 0) dbMs = 500;
             if (dbMs > 1000) dbMs = 1000;
             dbMs = ((dbMs + 25) / 50) * 50;
             GearshiftDebounceSlider.Value = dbMs;
-            GearshiftDebounceValue.Text = $"{dbMs} ms";
-
-            // Wheelbase LFE effects (base fw >= 1.2.10.10). On LFE-capable
-            // firmware the complex effects card is shown and the classic
-            // gearshift card hidden (the complex gearshift replaces it);
-            // otherwise the reverse. Re-evaluated each tick so the card appears
-            // within one refresh of the firmware-version read landing.
-            // The classic gearshift card stays visible on all firmware (its bump
-            // command coexists with the LFE channels); the LFE card is shown
-            // additionally, full-width below, only on LFE-capable firmware.
-            // Hide the LFE tab when the user routed LFE to SimHub's ShakeIt haptics
-            // — that owns the output, and the two must not both edit the base.
-            // Stamp the cache while we're on the UI thread — the diagnostics dump
-            // (built off the bundle writer's thread) can't enumerate SimHub's
-            // device collection itself. A walk of SimHub's whole device list, so
-            // every ~10 s rather than every 500 ms tick; it feeds a diagnostics line.
-            if (_plugin != null && (_shakeItProbeTick++ % 20) == 0)
-                _plugin.ShakeItLfeDeviceDeployedCached = _plugin.IsShakeItLfeDeviceDeployed;
-            bool lfeSupported = _data.BaseSupportsLfe && _plugin?.WheelbaseLfeRoutedToShakeIt != true;
-            BaseLfeTab.Visibility = lfeSupported
-                ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
-            if (lfeSupported)
-                SeedBaseLfeControls(gsProfile?.BaseLfe);
+            SetValueText(GearshiftDebounceValue, $"{dbMs} ms");
 
             // FFB EQ band mode (6 legacy bands vs 10-band fw >= 1.2.10.10) —
             // re-evaluated each tick like the LFE gate above.
@@ -372,34 +395,34 @@ namespace MozaPlugin.UI
 
             // FFB Equalizer (100% = flat). Ranges depend on the band mode:
             // legacy 0-400 on all six; 10-band fw is 0-500 except the 100 Hz
-            // band (Eq6), which keeps its 0-100 cap. SetSliderRaw clamps, so
+            // band (Eq6), which keeps its 0-100 cap. SetDataSlider clamps, so
             // the ranges are load-bearing.
             int eqHi = eq10 ? 500 : 400;
-            SetSliderRaw(Eq1Slider, Eq1Value, _data.Equalizer1, 0, eqHi, "%");
-            SetSliderRaw(Eq2Slider, Eq2Value, _data.Equalizer2, 0, eqHi, "%");
-            SetSliderRaw(Eq3Slider, Eq3Value, _data.Equalizer3, 0, eqHi, "%");
-            SetSliderRaw(Eq4Slider, Eq4Value, _data.Equalizer4, 0, eqHi, "%");
-            SetSliderRaw(Eq5Slider, Eq5Value, _data.Equalizer5, 0, eqHi, "%");
-            SetSliderRaw(Eq6Slider, Eq6Value, _data.Equalizer6, 0, eq10 ? 100 : 400, "%");
+            SetDataSlider(Eq1Slider, _data.Equalizer1, 0, eqHi);
+            SetDataSlider(Eq2Slider, _data.Equalizer2, 0, eqHi);
+            SetDataSlider(Eq3Slider, _data.Equalizer3, 0, eqHi);
+            SetDataSlider(Eq4Slider, _data.Equalizer4, 0, eqHi);
+            SetDataSlider(Eq5Slider, _data.Equalizer5, 0, eqHi);
+            SetDataSlider(Eq6Slider, _data.Equalizer6, 0, eq10 ? 100 : 400);
             if (eq10)
             {
-                SetSliderRaw(Eq7Slider, Eq7Value, _data.Equalizer7, 0, 500, "%");
-                SetSliderRaw(Eq8Slider, Eq8Value, _data.Equalizer8, 0, 500, "%");
-                SetSliderRaw(Eq9Slider, Eq9Value, _data.Equalizer9, 0, 500, "%");
-                SetSliderRaw(Eq10Slider, Eq10Value, _data.Equalizer10, 0, 500, "%");
+                SetDataSlider(Eq7Slider, _data.Equalizer7, 0, 500);
+                SetDataSlider(Eq8Slider, _data.Equalizer8, 0, 500);
+                SetDataSlider(Eq9Slider, _data.Equalizer9, 0, 500);
+                SetDataSlider(Eq10Slider, _data.Equalizer10, 0, 500);
             }
 
             // FFB Curve — X1..X4 are the draggable input positions of points 1-4
             // (point 5 fixed at input=100%); Y1..Y5 the output values.
-            SetSliderRaw(FfbCurveX1Slider, FfbCurveX1Value, _data.FfbCurveX1, 0, 100, "");
-            SetSliderRaw(FfbCurveX2Slider, FfbCurveX2Value, _data.FfbCurveX2, 0, 100, "");
-            SetSliderRaw(FfbCurveX3Slider, FfbCurveX3Value, _data.FfbCurveX3, 0, 100, "");
-            SetSliderRaw(FfbCurveX4Slider, FfbCurveX4Value, _data.FfbCurveX4, 0, 100, "");
-            SetSliderRaw(FfbCurveY1Slider, FfbCurveY1Value, _data.FfbCurveY1, 0, 100, "");
-            SetSliderRaw(FfbCurveY2Slider, FfbCurveY2Value, _data.FfbCurveY2, 0, 100, "");
-            SetSliderRaw(FfbCurveY3Slider, FfbCurveY3Value, _data.FfbCurveY3, 0, 100, "");
-            SetSliderRaw(FfbCurveY4Slider, FfbCurveY4Value, _data.FfbCurveY4, 0, 100, "");
-            SetSliderRaw(FfbCurveY5Slider, FfbCurveY5Value, _data.FfbCurveY5, 0, 100, "");
+            SetDataSlider(FfbCurveX1Slider, _data.FfbCurveX1, 0, 100);
+            SetDataSlider(FfbCurveX2Slider, _data.FfbCurveX2, 0, 100);
+            SetDataSlider(FfbCurveX3Slider, _data.FfbCurveX3, 0, 100);
+            SetDataSlider(FfbCurveX4Slider, _data.FfbCurveX4, 0, 100);
+            SetDataSlider(FfbCurveY1Slider, _data.FfbCurveY1, 0, 100);
+            SetDataSlider(FfbCurveY2Slider, _data.FfbCurveY2, 0, 100);
+            SetDataSlider(FfbCurveY3Slider, _data.FfbCurveY3, 0, 100);
+            SetDataSlider(FfbCurveY4Slider, _data.FfbCurveY4, 0, 100);
+            SetDataSlider(FfbCurveY5Slider, _data.FfbCurveY5, 0, 100);
 
             // Deadzone compensation has no register; read it back off the curve.
             int dz = DeadzoneCompFromCurve();

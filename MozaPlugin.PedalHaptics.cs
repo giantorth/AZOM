@@ -30,6 +30,58 @@ namespace MozaPlugin
             _pedalHapticsRegistry?.AnyReady == true
             && Devices.Haptics.MozaPedalHapticsBridge.IsSupported;
 
+        /// <summary>True when the one all-pedals device drives the unit rather than the per-pedal devices.</summary>
+        internal bool PedalHapticsCombined => _settings?.PedalHapticsCombinedDevice == true;
+
+        /// <summary>
+        /// Ready, and the given layout is the one selected. The other layout's
+        /// devices stay in SimHub (so their effects can be copied across) but
+        /// read as disconnected and post nothing.
+        /// </summary>
+        internal bool IsPedalHapticsActive(bool combined) =>
+            IsPedalHapticsReady && PedalHapticsCombined == combined;
+
+        /// <summary>
+        /// Switch layouts: silence whatever the old one left playing, then deploy
+        /// the new one's definition if it is missing.
+        /// </summary>
+        /// <returns>True when a definition was written and SimHub needs a restart.</returns>
+        internal bool SetPedalHapticsCombined(bool combined)
+        {
+            if (_settings == null || _settings.PedalHapticsCombinedDevice == combined) return false;
+            _settings.PedalHapticsCombinedDevice = combined;
+            SaveSettings();
+            return ApplyPedalHapticsLayout();
+        }
+
+        /// <summary>The side effects of a layout change, for paths that already wrote the setting.</summary>
+        internal bool ApplyPedalHapticsLayout()
+        {
+            bool combined = PedalHapticsCombined;
+
+            // The scheduler re-sends the latest state until told otherwise, and
+            // the old layout's devices stop posting the moment they go inactive.
+            var registry = _pedalHapticsRegistry;
+            if (registry == null) return false;
+            for (int p = 0; p < Protocol.MozaPedalHapticsProtocol.PedalCount; p++)
+                registry.ClearPedal(p);
+
+            // Same rule as detection: no definition until a unit has answered.
+            if (!registry.AnyDetected) return false;
+            string? pid = null;
+            foreach (var controller in registry.Devices)
+            {
+                if (!controller.Detected) continue;
+                pid = controller.DiscoveredPid;
+                break;
+            }
+            pid ??= _deviceManager?.Connection?.DiscoveredPid;
+
+            bool written = DeviceDefinitionDeployer.DeployForPedalHaptics(pid, combined);
+            if (written) DeviceDefinitionDeployed = true;
+            return written;
+        }
+
         /// <summary>
         /// Register a routed lane against a connected base/hub pipe, so the unit
         /// can be probed on it.
@@ -74,7 +126,7 @@ namespace MozaPlugin
             try
             {
                 string? pid = controller.DiscoveredPid ?? _deviceManager?.Connection?.DiscoveredPid;
-                if (DeviceDefinitionDeployer.DeployForPedalHaptics(pid))
+                if (DeviceDefinitionDeployer.DeployForPedalHaptics(pid, PedalHapticsCombined))
                     DeviceDefinitionDeployed = true;
             }
             catch (Exception ex)
@@ -85,8 +137,8 @@ namespace MozaPlugin
 
         /// <summary>
         /// Latest ShakeIt output for one channel (gain 0..1, frequency Hz),
-        /// from the provider on the SimHub data thread. Channels are pedal-major:
-        /// 0-8 throttle, 9-17 brake, 18-26 clutch, each pedal's nine effect slots in order.
+        /// from the provider on the SimHub data thread. <paramref name="channel"/>
+        /// is the oscillator within that pedal.
         /// </summary>
         internal void PostShakeItPedalHapticsChannel(int pedalIndex, int channel, double gain01, double freqHz)
             => _pedalHapticsRegistry?.PostChannel(pedalIndex, channel, gain01, freqHz);

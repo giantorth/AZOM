@@ -125,26 +125,26 @@ A normal user dashboard switch in default config never trips the silence gate.
 
 Even with the silence gate, a single dropped chunk under Wine SerialPort
 R/W contention can stall the prime+open-request emission. The retry loop
-lives in `SessionWatchdogManager.TickRetryS09IfNotEstablished`, driven once
+lives in `DisplayWatchdog.RetryS09IfNotEstablished`, driven once
 per Active tick by `TelemetrySender`:
 
-- Guard: connected AND `_sessions.GetOrCreate(0x09).DeviceInitiated == false`
+- Guard: connected AND no live (this-session) `configJsonList` pushed yet
   AND `_s09RetryRounds < S09RetryMaxRounds (10)`. The inter-round gate is an
   **exponential backoff** array `S09BackoffMs = {250, 500, 1000, 2000, 3000,
   5000, 7000, 10000, 12000, 15000}` indexed by round (not a fixed 1000 ms).
-- Re-emits `SendSessionPrime(0x09, ...)` + `SendConfigJsonOpenRequest(0x09, ...)`
+- Re-emits `SendConfigSessionPrime(0x09, ...)` + `SendConfigJsonOpenRequest(0x09, ...)`
   with fresh seqs (prime seq `0x0001 + round`, open-request seq
   `0x000B + round*0x10`, to dodge wheel-side dedupe).
-- Stops automatically when wheel device-inits 0x09 (the chunk handler
-  sets `info.DeviceInitiated = true`).
+- Stops once the wheel pushes its dashboard list on 0x09. The 0x09
+  device-init alone is not enough: a slow-loading dashboard opens 0x09
+  long before it has a list to push.
 - On budget exhaustion at round 10 it routes through
   `RecoveryDispatcher.Park(...)` (raises `DashboardPipelineParked`) rather
   than an inline Stop.
 - `Stop()` resets the round counter so each Start cycle gets a fresh budget.
 
-Retry guard is `DeviceInitiated == false` — established sessions are
-untouched, including post-dashboard-switch sessions where 0x09 stays
-alive across the switch.
+Once the list has arrived the retry stays idle, including after a
+dashboard switch, where 0x09 stays alive across the switch.
 
 ### ACKs
 
@@ -154,12 +154,12 @@ alive across the switch.
 7E 05 43 17 FC 00 [session] [ack_seq_lo] [ack_seq_hi] [chk]
 ```
 
-Plugin tracks ack state per session:
+Plugin acks per session:
 
 | Session | Ack tracking |
 |---------|--------------|
-| `FlagByte` (0x02) | `_sessionAckSeq` — bumped on every received `7c:00 type=0x01` chunk |
-| `_mgmtPort` (0x01) | `_mgmtAckSeq` — same logic |
+| `FlagByte` (0x02) | every received `7c:00 type=0x01` chunk acked via `SessionLifecycle.GapAwareCatalogAckSeq` |
+| `_mgmtPort` (0x01) | same logic |
 | `_uploadSession` | acks every chunk, plus message-count threshold for sub-msg-reply detection |
 | `0x03` aux | unsolicited data ACKed verbatim |
 
@@ -172,5 +172,3 @@ sends an ACK for every received chunk, not cumulatively.
 (`OnMessageDuringPreamble`, `HandleDeviceInit`).
 [`Telemetry/TelemetrySender.cs`](../../../Telemetry/TelemetrySender.cs)
 (`SendSessionOpen`, `SendSessionAck`, `SendSessionClose`).
-[`Telemetry/Sessions/SessionRegistry.cs`](../../../Telemetry/Sessions/SessionRegistry.cs)
-(`SessionRegistry`, `SessionInfo`).

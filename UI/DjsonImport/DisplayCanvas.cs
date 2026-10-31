@@ -13,22 +13,15 @@ namespace MozaPlugin.UI.DjsonImport
     {
         public int Width { get; }
         public int Height { get; }
-        /// <summary>MOZA's own shape hint — <c>Rectangle</c>, <c>Round</c>,
-        /// <c>CircularTrapezoid</c>. Informational: the fitter works on the bounding box
-        /// either way, but a round display crops the corners of what it is given.</summary>
-        public string Shape { get; }
         /// <summary>Human name for the report, e.g. "CS Pro".</summary>
         public string Note { get; }
 
-        public DisplayCanvas(int width, int height, string shape, string note)
+        public DisplayCanvas(int width, int height, string note)
         {
             Width = width;
             Height = height;
-            Shape = shape ?? "Rectangle";
             Note = note ?? "";
         }
-
-        public double AspectRatio => Height == 0 ? 0 : (double)Width / Height;
     }
 
     /// <summary>
@@ -45,7 +38,7 @@ namespace MozaPlugin.UI.DjsonImport
         private static readonly object Gate = new object();
         private static Dictionary<string, DisplayCanvas>? s_displays;
         private static DisplayCanvas s_default =
-            new DisplayCanvas(CanvasFitter.WheelWidth, CanvasFitter.WheelHeight, "Rectangle", "");
+            new DisplayCanvas(CanvasFitter.WheelWidth, CanvasFitter.WheelHeight, "");
 
         /// <summary>The canvas for a reported <c>productType</c>, or the default
         /// (780x248) when it isn't a display this table knows.</summary>
@@ -88,7 +81,7 @@ namespace MozaPlugin.UI.DjsonImport
                 {
                     int w = (int?)dflt["width"] ?? CanvasFitter.WheelWidth;
                     int h = (int?)dflt["height"] ?? CanvasFitter.WheelHeight;
-                    if (w > 0 && h > 0) s_default = new DisplayCanvas(w, h, "Rectangle", "");
+                    if (w > 0 && h > 0) s_default = new DisplayCanvas(w, h, "");
                 }
 
                 if (root["displays"] is not JObject displays) return;
@@ -103,7 +96,7 @@ namespace MozaPlugin.UI.DjsonImport
                         continue;
                     }
                     s_displays[prop.Name] = new DisplayCanvas(
-                        w, h, (string?)entry["shape"] ?? "Rectangle", (string?)entry["note"] ?? "");
+                        w, h, (string?)entry["note"] ?? "");
                 }
             }
         }

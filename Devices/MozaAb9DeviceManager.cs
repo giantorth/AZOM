@@ -77,15 +77,6 @@ namespace MozaPlugin.Devices
                 { Ab9Slider.MaxTorqueLimit,       "ab9-max-torque-limit" },
             };
 
-        public static IReadOnlyList<Ab9Slider> AllSliders { get; } = new[]
-        {
-            Ab9Slider.MechanicalResistance,
-            Ab9Slider.Spring,
-            Ab9Slider.NaturalDamping,
-            Ab9Slider.NaturalFriction,
-            Ab9Slider.MaxTorqueLimit,
-        };
-
         private readonly MozaSerialConnection _connection;
         private volatile bool _detected;
         // Port session the FFB alloc handshake was sent for. The device rebuilds
@@ -746,53 +737,55 @@ namespace MozaPlugin.Devices
                 SendEngineVibrationStream(intensity0to100: 0, periodTicks: 0x100000);
             }
             // Engine-pulse OFF half (amp16 = 0) flushes any active pulse.
-            SendEnginePulsePair(_lastEnginePulsePhase, intensity0to100: 0);
+            SendEnginePulsePair(_lastEnginePulseCoefficient, intensity0to100: 0);
         }
 
-        private ushort _lastEnginePulsePhase;
+        private int _lastEnginePulseCoefficient;
 
         // ===== Engine-pulse pair (Group 0x20 / cmd 0x0B 0x02 + 0x0B 0x03) =====
         //
-        // 22-byte frames emitted as paired ON/OFF half-cycles. The 16-bit phase
-        // counter at offset 6-7 (duplicated at 8-9, the device cross-checks)
-        // advances per emitted pair. Amplitude16 at offset 19-20 is intensity-
-        // derived for ON, zero for OFF. Constants `ff fa` at offset 16-17 and
-        // `04` tag at offset 18 verbatim from PitHouse.
-        //
-        // The doc's "engine vibration intensity" slider drives the ON amplitude;
-        // PitHouse drove `0x2328` (9000 decimal) at ~68 % captured intensity.
+        // Set Condition on the two Damper effects, emitted as an ON/OFF pair.
+        // The 16-bit value at payload 5-6 (mirrored at 7-8) is a signed damper
+        // coefficient PitHouse drives from RPM: ≈ 9800 × (1 − rpm/maxRpm),
+        // 0..7722 across idle→redline. Values ≥ 0x8000 read as negative damping
+        // and make the lever drive itself. amp16 at payload 18-19 is 0x2328 for
+        // ON, zero for OFF; `ff fa` and the `04` tag are verbatim from PitHouse.
 
         // Match PitHouse's observed full-intensity amplitude. Linear-scale 0..100
         // from the user's "engine vibration intensity" slider through this value.
         private const ushort EnginePulseAmpFullScale = 0x2328;
 
+        /// <summary>Damper coefficient at 0 RPM; PitHouse sends 7722 at an
+        /// rpm/maxRpm of 0.212, i.e. 9800 × (1 − 0.212).</summary>
+        public const int EnginePulseCoefficientFullScale = 9800;
+
         /// <summary>
-        /// Push an engine-pulse ON/OFF pair. The pair shares <paramref name="phase"/>
-        /// — the device pairs the two frames by phase value, not by arrival order.
-        /// <paramref name="intensity0to100"/> drives the ON amplitude; OFF is always zero.
+        /// Push an engine-pulse ON/OFF pair sharing one damper <paramref name="coefficient"/>,
+        /// clamped to 0..<see cref="EnginePulseCoefficientFullScale"/> so it can never
+        /// go negative on the wire. <paramref name="intensity0to100"/> drives the ON
+        /// amplitude; OFF is always zero.
         /// </summary>
-        public bool SendEnginePulsePair(ushort phase, int intensity0to100)
+        public bool SendEnginePulsePair(int coefficient, int intensity0to100)
         {
             if (!_connection.IsConnected) return false;
             if (intensity0to100 < 0) intensity0to100 = 0;
             if (intensity0to100 > 100) intensity0to100 = 100;
+            if (coefficient < 0) coefficient = 0;
+            if (coefficient > EnginePulseCoefficientFullScale) coefficient = EnginePulseCoefficientFullScale;
             ushort amp = (ushort)Math.Round(intensity0to100 / 100.0 * EnginePulseAmpFullScale);
-            _lastEnginePulsePhase = phase;
+            _lastEnginePulseCoefficient = coefficient;
 
-            var on  = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOn), phase, amp);
-            var off = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOff), phase, 0x0000);
+            var on  = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOn), (ushort)coefficient, amp);
+            var off = BuildEnginePulseFrame(EffectIndex(Ab9Effect.EnginePulseOff), (ushort)coefficient, 0x0000);
+            // Adjacent slots: ON then OFF back-to-back in one drain pass, as PitHouse pairs them.
             _connection.SendStream(StreamKind.Ab9EnginePulse, on);
-            // OFF immediately follows on the wire because the lane is latest-wins:
-            // queue the ON first so it goes out, then enqueue OFF to overwrite the
-            // slot for the next drain pass. Result: ON, OFF land back-to-back in
-            // the right order matching PitHouse's pair cadence.
-            _connection.Send(off);
+            _connection.SendStream(StreamKind.Ab9EnginePulseOff, off);
             return true;
         }
 
-        private static byte[] BuildEnginePulseFrame(byte effectIdx, ushort phase, ushort amplitude)
+        private static byte[] BuildEnginePulseFrame(byte effectIdx, ushort coefficient, ushort amplitude)
         {
-            // Wire: 7E 16 20 12 0B XX 00 00 00 [ph ph][ph ph] 00×6 FF FA 04 [amp_hi amp_lo] 00 00
+            // Wire: 7E 16 20 12 0B XX 00 00 00 [cc cc][cc cc] 00×6 FF FA 04 [amp_hi amp_lo] 00 00
             //       len 0x16 = 22 = payload (2 sub-cmd + 20 fixed)
             //
             // Layout verified byte-for-byte against PitHouse capture
@@ -800,15 +793,15 @@ namespace MozaPlugin.Devices
             //
             //   payload[0..1]   = sub-cmd (0B 02/03)
             //   payload[2..4]   = 3 zero pad   ← was 4 before 2026-05-24 fix
-            //   payload[5..6]   = phase counter (16-bit BE)
-            //   payload[7..8]   = phase counter mirror (same value)
+            //   payload[5..6]   = damper coefficient (16-bit BE, signed)
+            //   payload[7..8]   = coefficient mirror (same value)
             //   payload[9..14]  = 6 zero pad
             //   payload[15..16] = FF FA (const)
             //   payload[17]     = 04 (tag)
             //   payload[18..19] = amp16 (0x2328 on, 0x0000 off)
             //   payload[20..21] = 2 zero trailing
             //
-            // Pre-fix the layout was shifted right by 1 byte: phase landed at
+            // Pre-fix the layout was shifted right by 1 byte: the coefficient landed at
             // payload[6..7], amp16 at payload[19..20]. The device firmware
             // reads amp16 from PitHouse's offset (18..19), so our amp_hi
             // landed where the tag byte should be and our tag byte landed in
@@ -823,10 +816,10 @@ namespace MozaPlugin.Devices
             frame[4]  = 0x0B;
             frame[5]  = effectIdx;
             // frame[6..8] zero (3 bytes — payload[2..4])
-            frame[9]  = (byte)(phase >> 8);
-            frame[10] = (byte)(phase & 0xFF);
-            frame[11] = (byte)(phase >> 8);
-            frame[12] = (byte)(phase & 0xFF);
+            frame[9]  = (byte)(coefficient >> 8);
+            frame[10] = (byte)(coefficient & 0xFF);
+            frame[11] = (byte)(coefficient >> 8);
+            frame[12] = (byte)(coefficient & 0xFF);
             // frame[13..18] zero (6 bytes — payload[9..14])
             frame[19] = 0xFF;
             frame[20] = 0xFA;
@@ -921,8 +914,10 @@ namespace MozaPlugin.Devices
             switch (effect)
             {
                 case Ab9Effect.EnginePulseOn:
-                case Ab9Effect.EnginePulseOff:
                     _connection.SendStream(StreamKind.Ab9TriggerA, frame);
+                    break;
+                case Ab9Effect.EnginePulseOff:
+                    _connection.SendStream(StreamKind.Ab9TriggerB, frame);
                     break;
                 case Ab9Effect.EngineVib:
                     _connection.SendStream(StreamKind.Ab9TriggerRpm, frame);
@@ -957,25 +952,14 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Restart both engine-pulse dampers. PitHouse fires them within sub-ms of
-        /// each other; we queue both into the same lane so the second naturally
-        /// follows the first onto the wire.
+        /// each other; the two starts ride adjacent stream slots, so the OFF start
+        /// follows the ON start in the same drain pass.
         /// </summary>
         public bool SendKeepalivePair()
         {
             if (!_connection.IsConnected) return false;
             SendTrigger(Ab9Effect.EnginePulseOn);
-            // Second start uses the one-shot FIFO so it can't be overwritten by
-            // another EnginePulseOn before it reaches the wire.
-            var b = new byte[8];
-            b[0] = MozaProtocol.MessageStart;
-            b[1] = 0x03;
-            b[2] = 0x20;
-            b[3] = MozaProtocol.DeviceAb9;
-            b[4] = 0x0D;
-            b[5] = EffectIndex(Ab9Effect.EnginePulseOff);
-            b[6] = 0x01;
-            b[7] = MozaProtocol.CalculateWireChecksum(b, 7);
-            _connection.Send(b);
+            SendTrigger(Ab9Effect.EnginePulseOff);
             return true;
         }
 

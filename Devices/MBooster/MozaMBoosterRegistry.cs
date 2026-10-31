@@ -35,6 +35,13 @@ namespace MozaPlugin.Devices.MBooster
         private volatile MBoosterDeviceController[] _orderSnapshot = System.Array.Empty<MBoosterDeviceController>();
         private readonly object _lock = new object();
 
+        // HID (identity, containerId) → paired lane, copy-on-write so the per-axis
+        // HID path needs no lock. Every pairing rung depends only on the set of
+        // registered lanes (identity and ContainerId are fixed per controller),
+        // so it is emptied wherever that set changes (under _lock).
+        private volatile Dictionary<(string, string), MBoosterDeviceController> _hidPairings =
+            new Dictionary<(string, string), MBoosterDeviceController>();
+
         // Lock-free fast-path counter for the DataUpdate hot path. Updated
         // only on Refresh() add/drop, which happens on the reconnect timer
         // (5s cadence). Reading is a volatile int load — no lock, no alloc.
@@ -70,16 +77,6 @@ namespace MozaPlugin.Devices.MBooster
         // combo per session to avoid spam.
         private readonly HashSet<string> _collisionsLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>True iff at least one mBooster is currently detected (UI gate).</summary>
-        public bool AnyDetected
-        {
-            get
-            {
-                lock (_lock)
-                    return _order.Any(c => c.Detected);
-            }
-        }
 
         /// <summary>
         /// True iff an mBooster occupies the relayed pedal sub-device (0x19) on
@@ -198,13 +195,6 @@ namespace MozaPlugin.Devices.MBooster
         {
             get { lock (_calibrationRunnerLock) return _calibrationRunner; }
         }
-
-        /// <summary>Fired (foreground thread NOT guaranteed) on detection rising edge.</summary>
-        public event Action<MBoosterDeviceController>? DeviceDetected;
-        /// <summary>Fired when a new device is added to the registry.</summary>
-        public event Action<MBoosterDeviceController>? DeviceAdded;
-        /// <summary>Fired when a device is removed (port disappeared from registry).</summary>
-        public event Action<MBoosterDeviceController>? DeviceRemoved;
 
         public MozaMBoosterRegistry(
             MozaData data,
@@ -355,6 +345,7 @@ namespace MozaPlugin.Devices.MBooster
                 // Publish the new count for the lock-free hot-path gate.
                 _orderSnapshot = _order.ToArray();
                 Volatile.Write(ref _controllerCount, _order.Count);
+                if (added != null || removed != null) ClearHidPairingsLocked();
             }
 
             // Connect newcomers + dispose removed (outside the lock — Connect
@@ -364,11 +355,7 @@ namespace MozaPlugin.Devices.MBooster
                 foreach (var c in added)
                 {
                     MozaLog.Info($"[AZOM/mBooster] Discovered {MBoosterDeviceController.ShortIdentity(c.Identity)} on {c.PortName}");
-                    try
-                    {
-                        c.TryConnect();
-                        try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
-                    }
+                    try { c.TryConnect(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM/mBooster] Connect failed for {c.Identity}: {ex.Message}"); }
                 }
             }
@@ -379,10 +366,9 @@ namespace MozaPlugin.Devices.MBooster
                     MozaLog.Info($"[AZOM/mBooster] Removed {MBoosterDeviceController.ShortIdentity(c.Identity)} (port gone from registry)");
                     try { c.Dispose(); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Dispose: {ex.Message}"); }
                     // A running calibration expects exactly this: its own soft
-                    // reboot takes the port away. Tell the runner before the
-                    // public event so it can't miss the drop.
+                    // reboot takes the port away. Tell the runner so it can't
+                    // miss the drop.
                     try { CalibrationRunnerOrNull?.OnDeviceRemoved(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceRemoved: {ex.Message}"); }
-                    try { DeviceRemoved?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceRemoved handler: {ex.Message}"); }
                 }
             }
 
@@ -483,6 +469,7 @@ namespace MozaPlugin.Devices.MBooster
                 _order.Add(c);
                 _orderSnapshot = _order.ToArray();
                 Volatile.Write(ref _controllerCount, _order.Count);
+                ClearHidPairingsLocked();
             }
             MozaLog.Info($"[AZOM/mBooster] Routed lane registered: {MBoosterDeviceController.ShortIdentity(c.Identity)} ({c.PortName}, dev 0x{c.HostDeviceId:x2})");
             c.StartWorkers();
@@ -494,7 +481,6 @@ namespace MozaPlugin.Devices.MBooster
                 try { _onSerialResolved?.Invoke(c.Identity, c.Serial!); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] OnSerialResolved replay: {ex.Message}"); }
             }
-            try { DeviceAdded?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceAdded handler: {ex.Message}"); }
         }
 
         private void OnControllerDetected(MBoosterDeviceController c)
@@ -504,7 +490,6 @@ namespace MozaPlugin.Devices.MBooster
             // After _onDeviceDetectedEdge, so the reconnect's config re-push is
             // already queued when the runner re-arms the effect suspension.
             try { CalibrationRunnerOrNull?.OnDeviceDetected(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] runner OnDeviceDetected: {ex.Message}"); }
-            try { DeviceDetected?.Invoke(c); } catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] DeviceDetected handler: {ex.Message}"); }
         }
 
         /// <summary>Route a controller's group-0x0E firmware-log line to a
@@ -594,38 +579,9 @@ namespace MozaPlugin.Devices.MBooster
             if (pos01 < 0) pos01 = 0;
             if (pos01 > 1) pos01 = 1;
 
-            MBoosterDeviceController? c;
-            lock (_lock)
-            {
-                if (!_byIdentity.TryGetValue(identity, out c))
-                {
-                    // Container-ID rung: the HID + CDC interfaces of one physical
-                    // device share a Container ID, so this pairs them even when
-                    // Windows gives the two interfaces unrelated instance IDs (the
-                    // common multi-lane case — see docs). No-ops when the ID is
-                    // empty/absent (older drivers / Wine), falling through to the
-                    // prefix + single-device rungs exactly as before.
-                    c = FindByContainerIdLocked(containerId);
-                    if (c == null) c = FindByInstancePrefixLocked(identity);
-                    if (c == null && _byIdentity.Count == 1)
-                    {
-                        // Real-hardware logs show the HID and CDC interfaces of
-                        // the same physical mBooster can get entirely unrelated
-                        // Windows instance IDs (not just a differing trailing
-                        // segment — see docs/protocol/devices/mbooster.md), so
-                        // prefix matching can't always pair them. With exactly
-                        // one mBooster registered there's no ambiguity: it must
-                        // be this one.
-                        using (var e = _byIdentity.GetEnumerator())
-                        {
-                            e.MoveNext();
-                            c = e.Current.Value;
-                        }
-                        LogSingleDeviceFallbackOnceLocked(identity, c.Identity);
-                    }
-                    if (c == null) LogUnmatchedHidIdentityOnceLocked(identity);
-                }
-            }
+            var key = (identity, containerId ?? string.Empty);
+            if (!_hidPairings.TryGetValue(key, out var c))
+                c = PairHidLane(identity, containerId ?? string.Empty, key);
             if (c == null) return;
 
             // Pedal Feel (Deadzone, Max Force, InputCurveY) and the output
@@ -682,7 +638,57 @@ namespace MozaPlugin.Devices.MBooster
 
             // Merge step: re-compute the active positions across all devices
             // every time any one of them ticks. Cheap (N ≤ 3 typically).
-            MergePositions();
+            MergePositions(c, laneSettings);
+        }
+
+        /// <summary>
+        /// Resolve the lane a HID axis stream belongs to and cache it (see
+        /// <see cref="_hidPairings"/>); null, uncached, when nothing matches.
+        /// </summary>
+        private MBoosterDeviceController? PairHidLane(string identity, string containerId,
+            (string, string) key)
+        {
+            MBoosterDeviceController? c;
+            lock (_lock)
+            {
+                if (!_byIdentity.TryGetValue(identity, out c))
+                {
+                    // Container-ID rung: the HID + CDC interfaces of one physical
+                    // device share a Container ID, so this pairs them even when
+                    // Windows gives the two interfaces unrelated instance IDs (the
+                    // common multi-lane case — see docs). No-ops when the ID is
+                    // empty/absent (older drivers / Wine), falling through to the
+                    // prefix + single-device rungs exactly as before.
+                    c = FindByContainerIdLocked(containerId);
+                    if (c == null) c = FindByInstancePrefixLocked(identity);
+                    if (c == null && _byIdentity.Count == 1)
+                    {
+                        // Real-hardware logs show the HID and CDC interfaces of
+                        // the same physical mBooster can get entirely unrelated
+                        // Windows instance IDs (not just a differing trailing
+                        // segment — see docs/protocol/devices/mbooster.md), so
+                        // prefix matching can't always pair them. With exactly
+                        // one mBooster registered there's no ambiguity: it must
+                        // be this one.
+                        using (var e = _byIdentity.GetEnumerator())
+                        {
+                            e.MoveNext();
+                            c = e.Current.Value;
+                        }
+                        LogSingleDeviceFallbackOnceLocked(identity, c.Identity);
+                    }
+                    if (c == null) LogUnmatchedHidIdentityOnceLocked(identity);
+                }
+                if (c != null)
+                    _hidPairings = new Dictionary<(string, string), MBoosterDeviceController>(_hidPairings) { [key] = c };
+            }
+            return c;
+        }
+
+        private void ClearHidPairingsLocked()
+        {
+            if (_hidPairings.Count > 0)
+                _hidPairings = new Dictionary<(string, string), MBoosterDeviceController>();
         }
 
         private static double CubicBezier(double p0, double c1, double c2, double p1, double t)
@@ -730,8 +736,7 @@ namespace MozaPlugin.Devices.MBooster
 
             // Control Y clamped to 0-100 so (convex hull) the output never
             // leaves 0-100 — a first node at Y=0 is then a true flat deadzone
-            // instead of dipping negative. MozaCurveEditor.ClampSplineToPlot
-            // draws the same thing.
+            // instead of dipping negative.
             double c1x = p1x + (p2x - p0x) / 6.0, c1y = Math.Max(0, Math.Min(100, p1y + (p2y - p0y) / 6.0));
             double c2x = p2x - (p3x - p1x) / 6.0, c2y = Math.Max(0, Math.Min(100, p2y - (p3y - p1y) / 6.0));
 
@@ -1048,16 +1053,6 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
-        /// <summary>
-        /// Walk all devices in enumeration order and assign each device's
-        /// position to the matching <c>MozaData</c> field if its role is set.
-        /// First-wins on collision (later devices with the same role are
-        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
-        /// "PD Linked" diagnostic reports as having no pedal are skipped —
-        /// the HID exposes 3 axes regardless of how many pedals are wired,
-        /// and a phantom axis's role claim would otherwise first-wins a real
-        /// pedal's role with a frozen 0 position.
-        /// </summary>
         private readonly HashSet<string> _unmatchedHidLogged =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1082,7 +1077,19 @@ namespace MozaPlugin.Devices.MBooster
                 "See docs/protocol/devices/mbooster.md \"HID identity reconciliation\".");
         }
 
-        private void MergePositions()
+        /// <summary>
+        /// Walk all devices in enumeration order and assign each device's
+        /// position to the matching <c>MozaData</c> field if its role is set.
+        /// First-wins on collision (later devices with the same role are
+        /// ignored). Devices with Role=Disabled contribute nothing. Axes the
+        /// "PD Linked" diagnostic reports as having no pedal are skipped —
+        /// the HID exposes 3 axes regardless of how many pedals are wired,
+        /// and a phantom axis's role claim would otherwise first-wins a real
+        /// pedal's role with a frozen 0 position.
+        /// </summary>
+        /// <param name="updated">The lane whose axis just moved; its
+        /// <paramref name="updatedSettings"/> were already fetched.</param>
+        private void MergePositions(MBoosterDeviceController updated, MBoosterDeviceSettings? updatedSettings)
         {
             bool throttleSet = false, brakeSet = false, clutchSet = false;
             // First-wins iteration over the copy-on-write snapshot (runs per HID
@@ -1098,7 +1105,7 @@ namespace MozaPlugin.Devices.MBooster
                     // HID path — merging the mirrored copies back would just
                     // echo (or, before the mirror ticks, zero) the real values.
                     if (c.IsRouted) continue;
-                    var s = c.CurrentSettings;
+                    var s = ReferenceEquals(c, updated) ? updatedSettings : c.CurrentSettings;
                     int rawAxisCount = c.AxisSlotCount;
 
                     for (int a = 0; a < rawAxisCount; a++)
@@ -1302,6 +1309,7 @@ namespace MozaPlugin.Devices.MBooster
                 _order.Clear();
                 _orderSnapshot = System.Array.Empty<MBoosterDeviceController>();
                 _byIdentity.Clear();
+                ClearHidPairingsLocked();
             }
             foreach (var c in all)
             {

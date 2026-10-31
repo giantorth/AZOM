@@ -50,7 +50,19 @@ namespace MozaPlugin.Sdk
         // executable name. Spaces are intentional.
         private const string StubExeFileName = "MOZA Pit House.exe";
 
-        private static readonly object _gate = new object();
+        // Per-instance: a Stop() abandoned by TryStop may stay wedged in Kill /
+        // JobObject.Dispose holding this, and must not block a fresh manager.
+        private readonly object _gate = new object();
+
+        // Cross-instance: the extracted exe, the HKCU redirect and its backup
+        // file are shared. Held only around those short sections, never across
+        // Kill / JobObject.Dispose.
+        private static readonly object s_sharedGate = new object();
+
+        // Manager whose redirect is currently applied (guarded by s_sharedGate).
+        // A late restore from an abandoned Stop() must not undo a newer
+        // manager's redirect.
+        private static CoapStubManager? s_redirectOwner;
 
         private Process? _process;
         // Raw kernel HANDLE returned by CreateProcess. Distinct from
@@ -64,15 +76,9 @@ namespace MozaPlugin.Sdk
         // abandons a Stop() that wedges under Wine while it still holds _gate, and
         // a getter that waited on the gate pinned the WPF thread behind it.
         private volatile string _status = "Stopped";
-        private volatile string? _lastError;
         private volatile bool _runningCached;
         private volatile int _pidCached;
         private bool _disposed;
-        // True between successful ApplyRegistryRedirect and matching restore.
-        // Gates RestoreRegistryRedirect so we don't touch the registry on
-        // Stop()/Dispose() paths where Start() never reached the redirect
-        // step (e.g., CreateProcess failed).
-        private bool _redirectApplied;
 
         /// <summary>True while the spawned process is alive (as last observed —
         /// updated on start, explicit stop and the Exited event).</summary>
@@ -83,9 +89,6 @@ namespace MozaPlugin.Sdk
 
         /// <summary>Human-readable status string for surfacing in the UI tab.</summary>
         public string Status => _status;
-
-        /// <summary>Most recent error message, if any. Cleared on successful <see cref="Start"/>.</summary>
-        public string? LastError => _lastError;
 
         /// <summary>
         /// Path on disk the stub is extracted to. Exposed for diagnostics/UI.
@@ -146,7 +149,8 @@ namespace MozaPlugin.Sdk
 
                 try
                 {
-                    var exePath = ExtractStubExe();
+                    string exePath;
+                    lock (s_sharedGate) exePath = ExtractStubExe();
 
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -155,7 +159,6 @@ namespace MozaPlugin.Sdk
                         // will never call. Surface a clear "Disabled" status
                         // so the UI doesn't show a misleading "Stopped".
                         _status = "Disabled (non-Windows host)";
-                        _lastError = null;
                         MozaLog.Info("[AZOM] CoapStubManager.Start skipped: host is not Windows.");
                         return;
                     }
@@ -293,7 +296,6 @@ namespace MozaPlugin.Sdk
                         _pidCached = p.Id;
                         _runningCached = true;
                         _status = $"Running (PID {p.Id})";
-                        _lastError = null;
                         MozaLog.Info($"[AZOM] CoAP stub started (PID {p.Id}, exe '{exePath}').");
 
                         // Redirect HKCU\Software\MOZA\PitHouse\path to our
@@ -311,8 +313,11 @@ namespace MozaPlugin.Sdk
                         // ApplyRegistryRedirect swallows its own errors and
                         // logs — the stub stays useful for the process-name
                         // check even if we can't write the registry.
-                        if (ApplyRegistryRedirect(exePath))
-                            _redirectApplied = true;
+                        lock (s_sharedGate)
+                        {
+                            if (ApplyRegistryRedirect(exePath))
+                                s_redirectOwner = this;
+                        }
                     }
                     catch
                     {
@@ -324,7 +329,6 @@ namespace MozaPlugin.Sdk
                 }
                 catch (Exception ex)
                 {
-                    _lastError = ex.Message;
                     _status = "Failed to start";
                     MozaLog.Error($"[AZOM] CoAP stub start failed: {ex}");
                     CleanupProcessLocked();
@@ -655,12 +659,15 @@ namespace MozaPlugin.Sdk
             // read against the shutdown sees a coherent (real path, real
             // process exits) sequence — never (stub path, no process).
             // Restore reads the backup file we wrote in ApplyRegistryRedirect;
-            // both halves are gated by the same _redirectApplied flag.
-            if (_redirectApplied)
+            // only the manager that owns the active redirect restores it.
+            lock (s_sharedGate)
             {
-                try { RestoreRegistryRedirect(); }
-                catch (Exception ex) { MozaLog.Warn($"[AZOM] Registry restore raised in cleanup: {ex.GetType().Name}: {ex.Message}"); }
-                _redirectApplied = false;
+                if (ReferenceEquals(s_redirectOwner, this))
+                {
+                    try { RestoreRegistryRedirect(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Registry restore raised in cleanup: {ex.GetType().Name}: {ex.Message}"); }
+                    s_redirectOwner = null;
+                }
             }
 
             if (_process != null)

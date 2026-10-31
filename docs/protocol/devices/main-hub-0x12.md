@@ -107,9 +107,13 @@ b2h  7E 02 9F 21 13 01 [chk]     ← echo/ack
 `00` for 218 replies, then `01` for every reply after t+844.08 — 687 ms after
 the write, bounded by the poll interval rather than the apply time.
 
-The plugin registers `main-set-compat-mode` / `main-get-compat-mode`
-(`Protocol/MozaCommandDatabase.cs`) but has no caller for either, so a base
-left in compat-mode `1` by PitHouse is invisible to it.
+The plugin drives both from the Options tab's Forza Horizon compatibility
+toggle (`UI/SettingsControl.Options.cs`): toggling writes `main-set-compat-mode`
+(plain `1`/`0`), and `main-get-compat-mode` is part of the settings-page read
+batch issued when the pane is loaded (`RequestAllSettingsThrottled`, not the
+constructor). The reply lands in `MozaData.CompatMode`, which the toggle
+re-syncs from on every refresh tick, so a value PitHouse set is reflected
+the next time the page opens.
 
 ### Group `0x20` / `0x22` (32 / 34) — Base Ambient LEDs
 

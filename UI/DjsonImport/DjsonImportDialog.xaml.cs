@@ -1,5 +1,7 @@
 using System;
+using System.ComponentModel;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -107,37 +109,46 @@ namespace MozaPlugin.UI.DjsonImport
             ReportText.Text = "";
         }
 
-        private void Convert_Click(object sender, RoutedEventArgs e)
+        // True while a conversion runs on the pool; the dialog can't close or start another.
+        private bool _converting;
+
+        private async void Convert_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_sourcePath)) return;
+            if (_converting || string.IsNullOrEmpty(_sourcePath)) return;
 
-            string? outputRoot = ResolveOutputRoot();
-            if (string.IsNullOrEmpty(outputRoot))
-            {
-                ShowSummary(string.Format(Strings.Status_DjsonConvertFailed,
-                    "no output directory"), error: true);
-                return;
-            }
+            // Everything the worker needs is read here, on the dispatcher.
+            string sourcePath = _sourcePath!;
+            string? libraryFolder = _libraryFolder;
+            JArray? idealDeviceInfos = _idealDeviceInfos;
+            string? productType = ProductTypeOf(idealDeviceInfos);
+            int maxNodes = ReadNodeLimit();
 
-            ConversionResult result;
+            ConversionResult? result;
             var previousCursor = Mouse.OverrideCursor;
+            SetConverting(true);
             try
             {
                 Mouse.OverrideCursor = Cursors.Wait;
-                var converter = PluginChannelCatalog.CreateConverter(_store);
-                converter.StudioImageRoot = DashboardStudioLauncher.ResolveImageRoot();
-                converter.IdealDeviceInfos = _idealDeviceInfos;
-                converter.SimHubRoot = FindSimHubRoot();
-                // Size the canvas for the display actually connected. Sizes differ a
-                // lot — a CM2 is 1280x720, the same 16:9 most SimHub dashboards are
-                // authored at, so targeting it needs almost no rescale.
-                converter.TargetDisplay(ProductTypeOf(_idealDeviceInfos));
-                converter.MaxNodes = ReadNodeLimit();
-                if (_settings != null) _settings.DjsonImportMaxNodes = converter.MaxNodes;
-                result = converter.Convert(_sourcePath!, outputRoot!);
+                result = await Task.Run(() =>
+                {
+                    string? outputRoot = ResolveOutputRoot(libraryFolder, sourcePath);
+                    if (string.IsNullOrEmpty(outputRoot)) return null;
+
+                    var converter = PluginChannelCatalog.CreateConverter(_store);
+                    converter.StudioImageRoot = DashboardStudioLauncher.ResolveImageRoot();
+                    converter.IdealDeviceInfos = idealDeviceInfos;
+                    converter.SimHubRoot = FindSimHubRoot();
+                    // Size the canvas for the display actually connected. Sizes differ a
+                    // lot — a CM2 is 1280x720, the same 16:9 most SimHub dashboards are
+                    // authored at, so targeting it needs almost no rescale.
+                    converter.TargetDisplay(productType);
+                    converter.MaxNodes = maxNodes;
+                    return converter.Convert(sourcePath, outputRoot!);
+                });
             }
             catch (Exception ex)
             {
+                if (_settings != null) _settings.DjsonImportMaxNodes = maxNodes;
                 MozaLog.Warn($"[AZOM] DjsonImportDialog: conversion threw: {ex}");
                 ShowSummary(string.Format(Strings.Status_DjsonConvertFailed, ex.Message), error: true);
                 return;
@@ -145,7 +156,16 @@ namespace MozaPlugin.UI.DjsonImport
             finally
             {
                 Mouse.OverrideCursor = previousCursor;
+                SetConverting(false);
             }
+
+            if (result == null)
+            {
+                ShowSummary(string.Format(Strings.Status_DjsonConvertFailed,
+                    "no output directory"), error: true);
+                return;
+            }
+            if (_settings != null) _settings.DjsonImportMaxNodes = maxNodes;
 
             ReportText.Text = result.Report.ToText();
 
@@ -184,6 +204,24 @@ namespace MozaPlugin.UI.DjsonImport
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+        protected override void OnClosing(CancelEventArgs e)
+        {
+            // The caller reads the result once the dialog returns; closing mid-conversion
+            // would drop it while the worker still writes the files.
+            if (_converting) e.Cancel = true;
+            base.OnClosing(e);
+        }
+
+        private void SetConverting(bool converting)
+        {
+            _converting = converting;
+            PickButton.IsEnabled = !converting;
+            NodeLimitBox.IsEnabled = !converting;
+            ConvertButton.IsEnabled = !converting && !string.IsNullOrEmpty(_sourcePath);
+            StudioButton.IsEnabled = !converting && !string.IsNullOrEmpty(_convertedPath);
+            CloseButton.IsEnabled = !converting;
+        }
+
         private void ShowSummary(string text, bool error)
         {
             SummaryText.Text = text;
@@ -200,15 +238,15 @@ namespace MozaPlugin.UI.DjsonImport
         /// the result is still somewhere the editor lists, and only failing both does it
         /// land beside the source file.</para>
         /// </summary>
-        private string? ResolveOutputRoot()
+        private static string? ResolveOutputRoot(string? libraryFolder, string sourcePath)
         {
-            if (!string.IsNullOrWhiteSpace(_libraryFolder) && Directory.Exists(_libraryFolder))
-                return _libraryFolder;
+            if (!string.IsNullOrWhiteSpace(libraryFolder) && Directory.Exists(libraryFolder))
+                return libraryFolder;
 
             string? studio = DashboardStudioLauncher.ResolveProjectRoot();
             if (!string.IsNullOrEmpty(studio)) return studio;
 
-            return Path.GetDirectoryName(_sourcePath);
+            return Path.GetDirectoryName(sourcePath);
         }
 
         /// <summary>The connected display's <c>productType</c> from its own descriptor,

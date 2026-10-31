@@ -46,9 +46,6 @@ namespace MozaPlugin.Diagnostics
         /// exclusive; the driver gates its probe override on this.</summary>
         internal bool Active => _step >= 0 || _fieldProbe != null;
 
-        /// <summary>Current 0-based probe step across the active page's data bytes.</summary>
-        internal int StepIndex => _step;
-
         /// <summary>The record(s) the probe walks — the active page's type(s), or the full
         /// live set as a fallback when the active index is unmapped (mirrors the driver's
         /// own active/fallback selection so the probe targets what is actually streaming).</summary>
@@ -184,7 +181,7 @@ namespace MozaPlugin.Diagnostics
 
         // ── FSR1 live numeric visualization channel ─────────────────────────
         // When the channel-mapping panel is showing an FSR1 wheel, it asks the driver to
-        // publish a per-tick snapshot of the data it streams (each field's resolved span,
+        // publish a periodic (~100 ms) snapshot of the data it streams (each field's resolved span,
         // raw bytes, post-scale value) so the UI can draw a live byte strip. Volatile
         // single-writer (driver) / single-reader (UI 2 Hz timer), matching driver threading.
         private volatile bool _vizActive;

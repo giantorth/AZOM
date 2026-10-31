@@ -273,7 +273,7 @@ namespace MozaPlugin
 
                 // Diagnostic capture is always on (no user toggle): enable before
                 // any device traffic so the startup segment covers the full
-                // connect/handshake. EnsureRunning() — not Start() — so the
+                // connect/handshake. EnsureRunning() is idempotent, so the
                 // dual-segment ring (and its frozen first-minute) survives the
                 // plugin reload on game switches.
                 {
@@ -403,8 +403,6 @@ namespace MozaPlugin
                         _connection.LastDeviceId = _settings.LastWheelbaseDeviceId;
                     s_persistentConnection = _connection;
                 }
-                _connection.MessageReceived += OnMessageReceived;
-                _connection.Disconnected += OnSerialDisconnected;
 
                 _deviceManager = new MozaDeviceManager(_connection, PendingResponses);
 
@@ -757,6 +755,13 @@ namespace MozaPlugin
                     _ab9Manager, _dashboardManager, _hubManager, _baseManager,
                     _hubDeviceProber, _baseDeviceProber);
 
+                // Subscribe only now that every collaborator the handlers touch
+                // exists: on a persistent-wire reload the port is already open and
+                // streaming, and a throw in this handler would also skip every
+                // subscriber after it for that frame.
+                _connection.MessageReceived += OnMessageReceived;
+                _connection.Disconnected += OnSerialDisconnected;
+
                 // Control Mapper variant-provider integration. Construction is in
                 // a try/catch so a TypeLoadException from a missing/renamed SimHub
                 // internal type cannot poison plugin Init. Registration is attempted
@@ -858,7 +863,7 @@ namespace MozaPlugin
                 DashCache = new DashboardCache(cacheDir, DashProfileStore);
                 DashCache.LoadFromDisk();
                 // Per-wheel folder is loaded on wheel-model-name detection via
-                // overlay.TelemetryMzdashFolder. Init only loads the disk cache.
+                // ActiveTelemetryMzdashFolder. Init only loads the disk cache.
                 if (_telemetrySender != null)
                 {
                     _telemetrySender.DashCache = DashCache;
@@ -918,8 +923,11 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Tear down any resources allocated by Init() before it threw. Mirrors End()
-        /// but tolerates null fields and never sets IsShuttingDown (caller may retry).
+        /// Tear down any resources allocated by Init() before it threw. Runs End()'s
+        /// shared teardown steps (MozaPlugin.Shutdown.cs) in End()'s order, minus the
+        /// End-only ones (silence frames, settings save, LED clear, detection-bag
+        /// capture); tolerates null fields and never sets IsShuttingDown (caller may
+        /// retry).
         ///
         /// Persistent-wire safety: if Init() reused the persistent statics
         /// (<see cref="s_persistentConnection"/> / <see cref="s_persistentTelemetrySender"/>)
@@ -929,137 +937,28 @@ namespace MozaPlugin
         /// </summary>
         private void CleanupPartialInit()
         {
-            UnhookPowerMode();
-            UnhookArduinoScanVeto();
-            try { _pollTimer?.Stop(); } catch { }
-            try { _tempHistoryTimer?.Stop(); } catch { }
-            try { _torqueHistoryTimer?.Stop(); } catch { }
-            try { _retryTimer?.Stop(); } catch { }
-            try { _ledKeepaliveTimer?.Stop(); } catch { }
-            try { _reconnectTimer?.Stop(); } catch { }
-            try { _profileCoordinator?.StopSaveDebounceTimer(); } catch { }
+            TeardownStopTimers();
 
             bool ownConnection = _connection != null && !ReferenceEquals(_connection, s_persistentConnection);
             bool ownTelemetrySender = _telemetrySender != null && !ReferenceEquals(_telemetrySender, s_persistentTelemetrySender);
 
-            if (ownTelemetrySender)
-            {
-                try { _telemetrySender?.Stop(); } catch { }
-            }
-
-            // Halt the AB9 engine-vib worker before disposing the AB9 manager.
-            try { _ab9Worker?.Stop(); _ab9Worker = null; } catch { }
-            try { _baseLfeWorker?.Stop(); _baseLfeWorker = null; } catch { }
-            try { _hardwareApplier?.Shutdown(); } catch { }
-            // Release the timer-resolution request + power-throttling opt-out.
-            try { _responsiveness?.Dispose(); _responsiveness = null; } catch { }
-            // Dispose every mBooster controller — same reason: stop workers
-            // before the connections they own get torn down.
-            try { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; } catch { }
-            try { DisposeRoutedMBoosterProbes(); } catch { }
-            // Dispose every standalone-peripheral connection (drops ownership +
-            // closes each dedicated pipe).
-            try { _peripheralRegistry?.Dispose(); _peripheralRegistry = null; } catch { }
-            DisposeMotionLane();
-
-            // Tear down SDK emulation BEFORE the wire / data layers so the
-            // CoAP receive thread can't dispatch into half-disposed handlers.
+            TeardownStopWorkers();
+            TeardownReleaseLanes();
             // ReleaseStubAfterFailedInit mirrors End()'s persistent-stub policy —
             // see Sdk/SdkLifecycleCoordinator.cs. Null when Init threw before
             // the coordinator was constructed.
-            _sdk?.StopServers();
-            _sdk?.ReleaseStubAfterFailedInit();
-
-            // Mirror End()'s detach: these are subscribed early in Init (before
-            // throw-prone steps), and _telemetrySender may be the process-lifetime
-            // persistent instance that survives a failed Init — so a missed -=
-            // here leaks the coordinator and the whole plugin graph it roots onto
-            // the persistent sender's invocation list.
-            try
-            {
-                if (_telemetrySender != null && _dashboardBindingCoordinator != null)
-                {
-                    _telemetrySender.DashboardPipelineParked -= _dashboardBindingCoordinator.OnDashboardPipelineParked;
-                    _telemetrySender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnWheelInitiatedSwitch;
-                }
-            }
-            catch { }
-            // Remove the Control Mapper variant provider from SimHub's global
-            // VariantHelper list (same reason as End()).
-            try { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; } catch { }
-
-            try
-            {
-                if (_connection != null)
-                {
-                    _connection.MessageReceived -= OnMessageReceived;
-                    _connection.Disconnected -= OnSerialDisconnected;
-                }
-            }
-            catch { }
-            try { _profileCoordinator?.DetachProfileStore(); } catch { }
-            try { _deviceManager?.Dispose(); } catch { }
-            try { _hidReader?.Dispose(); } catch { }
-            try { _stalksController?.Dispose(); } catch { }
+            Teardown("SDK stub release", () => _sdk?.ReleaseStubAfterFailedInit());
+            TeardownDisplayDrivers();
+            TeardownDetachEvents();
             if (ownTelemetrySender)
-            {
-                try { _telemetrySender?.Dispose(); } catch { }
-            }
-            // Per-instance (recreated each Init), never persistent — dispose on every
-            // path as End() does. Gated on ownTelemetrySender, a failed Init on the
-            // persistent wire left these ticking next to the next Init's pair.
-            try { _fsr1Driver?.Dispose(); } catch { }
-            _fsr1Driver = null;
-            try
-            {
-                if (_cm2Sender != null && _dashboardBindingCoordinator != null)
-                    _cm2Sender.WheelInitiatedSwitch -= _dashboardBindingCoordinator.OnCm2InitiatedSwitch;
-            }
-            catch { }
-            try { _cm2Sender?.Dispose(); } catch { }
-            _cm2Sender = null;
-            try { _cm1Driver?.Dispose(); } catch { }
-            _cm1Driver = null;
-            // File sink always closes on teardown — new file per Init by design.
-            // The in-memory ring stays enabled across the plugin reload (capture
-            // is always on) so buffered frames survive game switches — next Init's
-            // EnsureRunning is a no-op.
-            try { global::MozaPlugin.Diagnostics.SerialTrafficCapture.Instance.StopFileSink(); } catch { }
+                Teardown("telemetry sender stop", () => _telemetrySender?.Stop());
+            TeardownCloseIo();
+            if (ownTelemetrySender)
+                Teardown("telemetry sender dispose", () => _telemetrySender?.Dispose());
             if (ownConnection)
-            {
-                try { _connection?.Dispose(); } catch { }
-            }
-            try
-            {
-                if (_ab9Manager != null)
-                    _ab9Manager.MessageReceived -= OnAb9MessageReceived;
-            }
-            catch { }
-            try { _ab9Manager?.Dispose(); } catch { }
-            try { _dashboardManager?.Dispose(); } catch { }
-            try
-            {
-                if (_hubManager != null)
-                {
-                    _hubManager.MessageReceived -= OnHubMessageReceived;
-                    _hubManager.Connection.Disconnected -= OnHubDisconnected;
-                }
-                if (_baseManager != null)
-                {
-                    _baseManager.MessageReceived -= OnBaseMessageReceived;
-                    _baseManager.Connection.Disconnected -= OnBaseDisconnected;
-                }
-            }
-            catch { }
-            try { _hubManager?.Dispose(); } catch { }
-            try { _baseManager?.Dispose(); } catch { }
-            try { _pollTimer?.Dispose(); } catch { }
-            try { _tempHistoryTimer?.Dispose(); } catch { }
-            try { _torqueHistoryTimer?.Dispose(); } catch { }
-            try { _retryTimer?.Dispose(); } catch { }
-            try { _ledKeepaliveTimer?.Dispose(); } catch { }
-            try { _reconnectTimer?.Dispose(); } catch { }
-            try { _profileCoordinator?.DisposeSaveDebounceTimer(); } catch { }
+                Teardown("connection dispose", () => _connection?.Dispose());
+            TeardownSubManagers();
+            TeardownDisposeTimers();
 
             // Drop our refs so a successive Init re-entry doesn't see them as
             // "prior state". If we kept the persistent statics alive above, the

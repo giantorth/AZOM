@@ -257,18 +257,19 @@ namespace MozaPlugin.UI.DjsonImport
                 // per dashboard, so one dashboard's must not leak into the next.
                 _channels.ResetAllocations();
 
-                var images = ResourceExtractor.Extract(djsonPath, outputDir, StudioImageRoot, report, SimHubRoot);
+                using var images = ResourceExtractor.Extract(djsonPath, outputDir, StudioImageRoot, report, SimHubRoot);
+                var widgets = new WidgetSource(sourceDir);
 
                 // Pass 1 — the probe. Allocation off, no page expansion. It settles two
                 // things the real pass needs first: which channels the dashboard reads for
                 // their own meaning (reserved, so a borrowed channel can never collide with
                 // one), and what each paged widget would cost to expand. Mapping is pure
-                // apart from the images already extracted, so extra passes cost parse time.
+                // apart from writing the images it resolves, so extra passes cost parse time.
                 _channels.AllocationEnabled = false;
                 var probeReport = new ConversionReport();
                 var probe = new DjsonToIr(
                     new BindingTranslator(_channels, new NCalcToJs(_channels), images,probeReport),
-                    _fonts, probeReport, images, sourceDir);
+                    _fonts, probeReport, images, widgets);
                 var baseline = probe.Convert(root, name);
                 _channels.ReserveDirect(probeReport.Channels);
 
@@ -289,13 +290,13 @@ namespace MozaPlugin.UI.DjsonImport
                     new DjsonToIr(
                         new BindingTranslator(_channels, new NCalcToJs(_channels), images,scratch)
                             { ContainerBindingsOnly = true },
-                        _fonts, scratch, images, sourceDir)
+                        _fonts, scratch, images, widgets)
                         { ExpandedWidgets = set }
                         .Convert(root, name);
 
                     var dry = new DjsonToIr(
                         new BindingTranslator(_channels, new NCalcToJs(_channels), images,scratch),
-                        _fonts, scratch, images, sourceDir)
+                        _fonts, scratch, images, widgets)
                         { ExpandedWidgets = set };
                     int n = CountNodes(dry.Convert(root, name));
 
@@ -321,13 +322,16 @@ namespace MozaPlugin.UI.DjsonImport
                     var priority = new DjsonToIr(
                         new BindingTranslator(_channels, new NCalcToJs(_channels), images,priorityReport)
                             { ContainerBindingsOnly = true },
-                        _fonts, priorityReport, images, sourceDir)
+                        _fonts, priorityReport, images, widgets)
                         { ExpandedWidgets = expanded };
                     priority.Convert(root, name);
                 }
 
+                // The earlier passes resolved images for pages the budget may have held
+                // back; only what this pass references goes into the bundle.
+                images.ResetReferences();
                 var translator = new BindingTranslator(_channels, new NCalcToJs(_channels), images,report);
-                var mapper = new DjsonToIr(translator, _fonts, report, images, sourceDir)
+                var mapper = new DjsonToIr(translator, _fonts, report, images, widgets)
                     { ExpandedWidgets = expanded };
 
                 var dashboard = mapper.Convert(root, name);

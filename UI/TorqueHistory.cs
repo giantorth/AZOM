@@ -29,8 +29,6 @@ namespace MozaPlugin.UI
             _nm = new double[_capacity];
         }
 
-        public int Capacity => _capacity;
-
         /// <summary>Session peak in Nm; 0 until the first non-zero sample.</summary>
         public double PeakNm { get { lock (_gate) return _peakNm; } }
 
@@ -47,7 +45,7 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Chronologically-ordered snapshot, always <see cref="Capacity"/> long so
+        /// Chronologically-ordered snapshot, always capacity-long so
         /// the graph renders full width from the first frame (unfilled slots read
         /// 0). Safe from any thread; the caller owns the returned array.
         /// </summary>
@@ -63,17 +61,6 @@ namespace MozaPlugin.UI
                 for (int i = 0; i < _count; i++)
                     outArr[offset + i] = _nm[(start + i) % _capacity];
                 return outArr;
-            }
-        }
-
-        public void Reset()
-        {
-            lock (_gate)
-            {
-                Array.Clear(_nm, 0, _nm.Length);
-                _writeIndex = 0;
-                _count = 0;
-                _peakNm = 0;
             }
         }
     }

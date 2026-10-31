@@ -5,7 +5,10 @@ namespace MozaPlugin.Protocol
     public struct ParsedResponse
     {
         public string Name;
+        // Float-typed commands: the value truncated toward zero.
         public int IntValue;
+        // Float-typed commands only: the full value.
+        public float? FloatValue;
         public byte[] ArrayValue;
         public byte DeviceId;
         public int PayloadLength;
@@ -200,7 +203,9 @@ namespace MozaPlugin.Protocol
                 }
                 else if (cmd.PayloadType == "float")
                 {
-                    result.IntValue = (int)MozaCommand.ParseFloatValue(data, valueStart);
+                    float f = MozaCommand.ParseFloatValue(data, valueStart);
+                    result.FloatValue = f;
+                    result.IntValue = (int)f;
                 }
                 else
                 {

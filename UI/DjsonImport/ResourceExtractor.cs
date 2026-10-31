@@ -8,35 +8,83 @@ using System.Text;
 namespace MozaPlugin.UI.DjsonImport
 {
     /// <summary>The images a converted dashboard references.</summary>
-    public sealed class ImageSet
+    public sealed class ImageSet : IDisposable
     {
         /// <summary>SimHub image name (no extension) → the mzdash-relative
-        /// <c>MD5/&lt;md5&gt;.&lt;ext&gt;</c> path.</summary>
+        /// <c>MD5/&lt;md5&gt;.&lt;ext&gt;</c> path, for every name resolved so far.</summary>
         public Dictionary<string, string> ByName { get; } =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>The same paths, for the document's <c>imageResources</c> array.</summary>
+        /// <summary>The paths referenced since the last <see cref="ResetReferences"/>, for
+        /// the document's <c>imageResources</c> array.</summary>
         public List<string> Resources { get; } = new List<string>();
+        private readonly HashSet<string> _referenced = new HashSet<string>(StringComparer.Ordinal);
 
         internal string OutputDir { get; set; } = "";
         internal string? StudioImageRoot { get; set; }
         internal string? SimHubRoot { get; set; }
         internal ConversionReport? Report { get; set; }
 
+        /// <summary>Every image the archives and loose files offer, by name, in
+        /// first-wins order. Nothing is decompressed until a name is resolved.</summary>
+        internal Dictionary<string, List<ImageCandidate>> Index { get; } =
+            new Dictionary<string, List<ImageCandidate>>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _unresolvable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, ZipArchive?> _openArchives =
+            new Dictionary<string, ZipArchive?>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Start a fresh <see cref="Resources"/> list. Earlier conversion passes
+        /// resolve images for content the final tree may not keep (pages held back by the
+        /// node budget); the bundle should list only what the final pass references.</summary>
+        internal void ResetReferences()
+        {
+            Resources.Clear();
+            _referenced.Clear();
+        }
+
+        internal void NoteReferenced(string relative)
+        {
+            if (_referenced.Add(relative)) Resources.Add(relative);
+        }
+
         /// <summary>
         /// Resolve an image reference from an item to its <c>MD5/…</c> path.
         ///
-        /// <para>Names are looked up in what the archives yielded. A <c>library:</c>
-        /// reference — <c>library:Icons\ABS.png</c> — is SimHub's shared image library
-        /// at <c>&lt;SimHub&gt;/ImageLibrary/</c>, never in a dashboard's own archive, so
-        /// it is read from there on first use and content-addressed like the rest.</para>
+        /// <para>Names are looked up in what the archives offer; the first source that
+        /// yields a usable image is hashed, written and registered here, on first use. A
+        /// <c>library:</c> reference — <c>library:Icons\ABS.png</c> — is SimHub's shared
+        /// image library at <c>&lt;SimHub&gt;/ImageLibrary/</c>, never in a dashboard's own
+        /// archive, so it is read from there on first use and content-addressed like the
+        /// rest.</para>
         /// </summary>
         public bool TryResolve(string? name, out string src)
         {
             src = "";
             string n = (name ?? "").Trim();
             if (n.Length == 0) return false;
-            if (ByName.TryGetValue(n, out var hit)) { src = hit; return true; }
+            if (ByName.TryGetValue(n, out var hit))
+            {
+                NoteReferenced(hit);
+                src = hit;
+                return true;
+            }
+            if (_unresolvable.Contains(n)) return false;
+
+            if (Index.TryGetValue(n, out var candidates))
+            {
+                foreach (var c in candidates)
+                {
+                    byte[]? content = ReadCandidate(c);
+                    if (content == null) continue;
+                    if (ResourceExtractor.Register(this, n, c.Ext, content))
+                    {
+                        src = ByName[n];
+                        return true;
+                    }
+                }
+                _unresolvable.Add(n);
+                return false;
+            }
 
             const string prefix = "library:";
             if (!n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
@@ -60,6 +108,67 @@ namespace MozaPlugin.UI.DjsonImport
             src = ByName[n];
             return true;
         }
+
+        private byte[]? ReadCandidate(ImageCandidate c)
+        {
+            if (c.ArchivePath == null)
+            {
+                try { return File.ReadAllBytes(c.FilePath!); }
+                catch (Exception ex)
+                {
+                    Report?.Notes.Add($"could not read '{Path.GetFileName(c.FilePath)}': {ex.Message}");
+                    return null;
+                }
+            }
+
+            if (!_openArchives.TryGetValue(c.ArchivePath, out var zip))
+            {
+                try { zip = ZipFile.OpenRead(c.ArchivePath); }
+                catch (Exception ex)
+                {
+                    zip = null;
+                    Report?.Notes.Add($"resource archive '{Path.GetFileName(c.ArchivePath)}' "
+                                    + $"could not be opened: {ex.Message}");
+                }
+                _openArchives[c.ArchivePath] = zip;
+            }
+            if (zip == null) return null;
+
+            try
+            {
+                var entry = zip.Entries[c.EntryIndex];
+                using var stream = entry.Open();
+                using var ms = new MemoryStream();
+                stream.CopyTo(ms);
+                return ms.ToArray();
+            }
+            catch (Exception ex)
+            {
+                Report?.Notes.Add($"image '{c.EntryName}' failed to extract: {ex.Message}");
+                return null;
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach (var zip in _openArchives.Values) zip?.Dispose();
+            _openArchives.Clear();
+        }
+    }
+
+    /// <summary>One place an image of a given name can be read from: an archive entry
+    /// (by position, so the archive can be reopened on demand) or a loose file.</summary>
+    internal sealed class ImageCandidate
+    {
+        /// <summary>Image name as items reference it (no extension).</summary>
+        public string Name { get; set; } = "";
+        public string Ext { get; set; } = "";
+        /// <summary>Archive entry name, for notes.</summary>
+        public string EntryName { get; set; } = "";
+        public string? ArchivePath { get; set; }
+        public int EntryIndex { get; set; }
+        /// <summary>Loose file, when <see cref="ArchivePath"/> is null.</summary>
+        public string? FilePath { get; set; }
     }
 
     /// <summary>
@@ -84,7 +193,11 @@ namespace MozaPlugin.UI.DjsonImport
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { ".png", ".jpg", ".jpeg", ".bmp", ".gif" };
 
-        /// <summary>Extract every image the dashboard could reference.</summary>
+        /// <summary>Index every image the dashboard could reference. Only the names a
+        /// conversion actually resolves (<see cref="ImageSet.TryResolve"/>) are extracted,
+        /// written and listed — the sibling and <c>_Library</c> archives hold every
+        /// installed widget's artwork, nearly all of it unrelated to this dashboard.
+        /// Dispose the set when the conversion is done.</summary>
         /// <param name="djsonPath">The source dashboard file.</param>
         /// <param name="outputDir">The converted dashboard's folder; images land under
         /// <c>Resource/MD5/</c> inside it.</param>
@@ -105,8 +218,15 @@ namespace MozaPlugin.UI.DjsonImport
                 Report = report,
             };
 
-            foreach (var (name, ext, bytes) in EnumerateSources(djsonPath, report))
-                Register(set, name, ext, bytes);
+            foreach (var candidate in EnumerateSources(djsonPath, report))
+            {
+                if (!set.Index.TryGetValue(candidate.Name, out var list))
+                {
+                    list = new List<ImageCandidate>(1);
+                    set.Index[candidate.Name] = list;
+                }
+                list.Add(candidate);
+            }
 
             return set;
         }
@@ -134,7 +254,7 @@ namespace MozaPlugin.UI.DjsonImport
             string relative = $"MD5/{hash}{ext}";
 
             if (!set.ByName.ContainsKey(name)) set.ByName[name] = relative;
-            if (!set.Resources.Contains(relative)) set.Resources.Add(relative);
+            set.NoteReferenced(relative);
 
             Write(Path.Combine(set.OutputDir, "Resource", "MD5", $"{hash}{ext}"), bytes, report);
             if (!string.IsNullOrEmpty(set.StudioImageRoot))
@@ -162,13 +282,13 @@ namespace MozaPlugin.UI.DjsonImport
         /// holds most of its artwork in the widgets' archives, not its own. Reading only
         /// the main file's leaves every inlined widget's images blank.</para>
         /// </summary>
-        private static IEnumerable<(string name, string ext, byte[] bytes)> EnumerateSources(
+        private static IEnumerable<ImageCandidate> EnumerateSources(
             string djsonPath, ConversionReport report)
         {
             string archive = djsonPath + ".ressources";
             if (File.Exists(archive))
             {
-                foreach (var entry in ReadArchive(archive, report)) yield return entry;
+                foreach (var entry in IndexArchive(archive, report)) yield return entry;
             }
 
             string? dir = Path.GetDirectoryName(djsonPath);
@@ -177,7 +297,7 @@ namespace MozaPlugin.UI.DjsonImport
             foreach (var sibling in SafeListFiles(dir!, report, "*.djson.ressources"))
             {
                 if (string.Equals(sibling, archive, StringComparison.OrdinalIgnoreCase)) continue;
-                foreach (var entry in ReadArchive(sibling, report)) yield return entry;
+                foreach (var entry in IndexArchive(sibling, report)) yield return entry;
             }
 
             // Widgets included from SimHub's shared _Library tree keep their images in
@@ -197,7 +317,7 @@ namespace MozaPlugin.UI.DjsonImport
                         archives = Array.Empty<string>();
                     }
                     foreach (var a in archives)
-                        foreach (var entry in ReadArchive(a, report)) yield return entry;
+                        foreach (var entry in IndexArchive(a, report)) yield return entry;
                 }
             }
 
@@ -211,40 +331,37 @@ namespace MozaPlugin.UI.DjsonImport
                 string fileName = Path.GetFileName(file);
                 if (fileName.IndexOf(".djson.", StringComparison.OrdinalIgnoreCase) >= 0) continue;
 
-                byte[] bytes;
-                try { bytes = File.ReadAllBytes(file); }
-                catch (Exception ex)
+                yield return new ImageCandidate
                 {
-                    report.Notes.Add($"could not read '{fileName}': {ex.Message}");
-                    continue;
-                }
-                yield return (Path.GetFileNameWithoutExtension(file), ext, bytes);
+                    Name = Path.GetFileNameWithoutExtension(file),
+                    Ext = ext,
+                    EntryName = fileName,
+                    FilePath = file,
+                };
             }
         }
 
-        private static IEnumerable<(string name, string ext, byte[] bytes)> ReadArchive(
-            string archivePath, ConversionReport report)
+        /// <summary>An archive's non-empty entries, read from its central directory
+        /// only — nothing is decompressed here.</summary>
+        private static List<ImageCandidate> IndexArchive(string archivePath, ConversionReport report)
         {
-            var results = new List<(string, string, byte[])>();
+            var results = new List<ImageCandidate>();
             try
             {
                 using var zip = ZipFile.OpenRead(archivePath);
-                foreach (var entry in zip.Entries)
+                var entries = zip.Entries;
+                for (int i = 0; i < entries.Count; i++)
                 {
+                    var entry = entries[i];
                     if (entry.Length == 0) continue;
-                    try
+                    results.Add(new ImageCandidate
                     {
-                        using var stream = entry.Open();
-                        using var ms = new MemoryStream();
-                        stream.CopyTo(ms);
-                        results.Add((Path.GetFileNameWithoutExtension(entry.Name),
-                                     Path.GetExtension(entry.Name),
-                                     ms.ToArray()));
-                    }
-                    catch (Exception ex)
-                    {
-                        report.Notes.Add($"image '{entry.Name}' failed to extract: {ex.Message}");
-                    }
+                        Name = Path.GetFileNameWithoutExtension(entry.Name),
+                        Ext = Path.GetExtension(entry.Name),
+                        EntryName = entry.Name,
+                        ArchivePath = archivePath,
+                        EntryIndex = i,
+                    });
                 }
             }
             catch (Exception ex)

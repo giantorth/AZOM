@@ -41,8 +41,6 @@ namespace MozaPlugin.UI
             _connected = new bool[_capacity];
         }
 
-        public int Capacity => _capacity;
-
         /// <summary>Append one sample. When <paramref name="connected"/> is false
         /// the raw values are ignored (stored as 0) so the window shows a gap.</summary>
         public void Record(int mcu, int mosfet, int motor, bool connected)

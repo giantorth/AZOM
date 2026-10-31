@@ -16,25 +16,5 @@ namespace MozaControls
                 typeof(OffOnToggle),
                 new FrameworkPropertyMetadata(typeof(OffOnToggle)));
         }
-
-        public static readonly DependencyProperty LabelProperty =
-            DependencyProperty.Register(nameof(Label), typeof(string), typeof(OffOnToggle),
-                new PropertyMetadata(string.Empty));
-
-        public string Label
-        {
-            get => (string)GetValue(LabelProperty);
-            set => SetValue(LabelProperty, value);
-        }
-
-        public static readonly DependencyProperty HintProperty =
-            DependencyProperty.Register(nameof(Hint), typeof(string), typeof(OffOnToggle),
-                new PropertyMetadata(string.Empty));
-
-        public string Hint
-        {
-            get => (string)GetValue(HintProperty);
-            set => SetValue(HintProperty, value);
-        }
     }
 }

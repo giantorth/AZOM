@@ -16,15 +16,5 @@ namespace MozaControls
                 typeof(SegmentedControl),
                 new FrameworkPropertyMetadata(typeof(SegmentedControl)));
         }
-
-        public static readonly DependencyProperty LabelProperty =
-            DependencyProperty.Register(nameof(Label), typeof(string), typeof(SegmentedControl),
-                new PropertyMetadata(string.Empty));
-
-        public string Label
-        {
-            get => (string)GetValue(LabelProperty);
-            set => SetValue(LabelProperty, value);
-        }
     }
 }

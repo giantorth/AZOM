@@ -38,7 +38,6 @@ namespace MozaPlugin.Telemetry.Frames
         private int _lastTierDefUnboundCount = -1;
         private int _lastTierDefTotalCount = -1;
 
-        public int LastTierDefUnboundCount => _lastTierDefUnboundCount;
         public int LastTierDefTotalCount => _lastTierDefTotalCount;
         public bool IsTierDefFullyBound =>
             _lastTierDefUnboundCount == 0 && _lastTierDefTotalCount > 0;
@@ -92,8 +91,7 @@ namespace MozaPlugin.Telemetry.Frames
         /// retx cover.</summary>
         public void DropTrackedTierDefChunks()
         {
-            var frames = _tierDefBlindFrames;
-            _tierDefBlindFrames = null;
+            var frames = Interlocked.Exchange(ref _tierDefBlindFrames, null);
             _tierDefBlindSentRounds = 0;
             _tierDefBlindLastTickCount = 0;
             if (frames == null) return;
@@ -123,55 +121,6 @@ namespace MozaPlugin.Telemetry.Frames
                     return;
                 Thread.Sleep(20);
             }
-        }
-
-        /// <summary>Filter a profile to channels in the catalog (last-segment match accepted).</summary>
-        public static MultiStreamProfile FilterProfileToCatalog(
-            MultiStreamProfile profile,
-            IReadOnlyList<string> catalog)
-        {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in catalog)
-            {
-                if (string.IsNullOrEmpty(entry)) continue;
-                set.Add(entry);
-                int slash = entry.LastIndexOf('/');
-                if (slash >= 0 && slash < entry.Length - 1)
-                    set.Add(entry.Substring(slash + 1));
-            }
-
-            bool ChannelMatches(ChannelDefinition ch)
-            {
-                if (set.Contains(ch.Url)) return true;
-                int slash = ch.Url.LastIndexOf('/');
-                if (slash >= 0 && slash < ch.Url.Length - 1
-                    && set.Contains(ch.Url.Substring(slash + 1))) return true;
-                return false;
-            }
-
-            var result = new MultiStreamProfile
-            {
-                Name = profile.Name,
-                PageCount = profile.PageCount,
-            };
-            foreach (var tier in profile.Tiers)
-            {
-                var kept = new List<ChannelDefinition>();
-                foreach (var ch in tier.Channels)
-                    if (ChannelMatches(ch)) kept.Add(ch);
-                if (kept.Count == 0) continue;
-                result.Tiers.Add(new DashboardProfile
-                {
-                    Name = tier.Name,
-                    Channels = kept,
-                    PackageLevel = tier.PackageLevel,
-                    TotalBits = tier.TotalBits,
-                    TotalBytes = tier.TotalBytes,
-                    FlagByte = tier.FlagByte,
-                });
-            }
-            // Empty filter → fall back to original (wheel rejects empty tier-defs).
-            return result.Tiers.Count == 0 ? profile : result;
         }
 
         /// <summary>Build a V0 subscription profile from the wheel's full catalog (host metadata reused per URL).</summary>
@@ -235,20 +184,16 @@ namespace MozaPlugin.Telemetry.Frames
         /// <summary>
         /// Filter to catalog + sort by catalog idx per unique Channels list.
         /// Builds a FRESH list per unique source-list reference rather than
-        /// mutating in place — the tick thread iterates the same list from
-        /// <see cref="TelemetryFrameBuilder.BuildFrameFromSnapshot"/> and an
-        /// in-place RemoveAll/Sort there would trip "Collection was modified"
-        /// or emit a torn frame. Broadcast replicas that share a source list
-        /// still share the resulting list, so per-tick FrameBuilder behavior
-        /// is unchanged. Recomputes TotalBits/Bytes from the new lists.
+        /// mutating in place, so the pristine OriginalChannels copies and any
+        /// list another holder still references stay intact. Broadcast replicas
+        /// that share a source list still share the resulting list.
+        /// Recomputes TotalBits/Bytes from the new lists.
         ///
-        /// The atomic publication happens via the subsequent
-        /// <see cref="RebuildFrameBuildersFromProfile"/> call: each
-        /// <c>TierState.Builder</c> is replaced with a fresh
-        /// <see cref="TelemetryFrameBuilder"/> bound to the new list, and
-        /// reference assignment of a class field is atomic in C#. A tick that
-        /// captured the old builder before the swap reads the old list to
-        /// completion; the next tick sees the new builder + new list.
+        /// Callers hold <see cref="TelemetrySender.ProfileSetLock"/> and follow
+        /// with <see cref="TelemetrySender.RebuildFrameBuilders"/>, which swaps
+        /// each <c>TierState.Builder</c> for one bound to the new list. A tick
+        /// still holding the old builder encodes from the channel set that
+        /// builder captured at construction, so no frame mixes the two.
         /// </summary>
         public void SortTierChannelsByCatalogIdx(
             MultiStreamProfile profile,
@@ -300,22 +245,40 @@ namespace MozaPlugin.Telemetry.Frames
         }
 
         /// <summary>
-        /// Rebuild per-tier FrameBuilders from the sender's current profile.
-        /// Called after <see cref="SortTierChannelsByCatalogIdx"/> mutates
-        /// the live profile post-Profile-setter.
+        /// Restore each live tier's pristine pre-filter channel list, re-filter
+        /// against <paramref name="catalog"/> when one exists, and rebuild the frame
+        /// builders. Restoring first means a prior call against a stale catalog
+        /// can't permanently strip channels (ApplySubscription stays idempotent
+        /// w.r.t. the catalog). The rebuild is unconditional so the builders always
+        /// match the lists the tier-def declares — a cold re-provoke wipes the
+        /// catalog while the builders still reflect a filtered list. One unit under
+        /// <see cref="TelemetrySender.ProfileSetLock"/>.
         /// </summary>
-        public void RebuildFrameBuildersFromProfile()
+        private void RefilterLiveTiers(MultiStreamProfile profile, IReadOnlyList<string>? catalog)
         {
-            var profile = _sender.ProfileRef;
-            var tiers = _sender.Tiers;
-            if (profile == null || tiers == null) return;
-            if (tiers.Length != profile.Tiers.Count) return;
-            for (int i = 0; i < profile.Tiers.Count; i++)
+            lock (_sender.ProfileSetLock)
             {
-                tiers[i].Builder = new TelemetryFrameBuilder(
-                    profile.Tiers[i], _sender.PropertyResolver,
-                    type02NConvention: false,
-                    deviceId: _sender.TargetDeviceId);
+                var tiers = _sender.Tiers;
+                // _tiers' OriginalChannels pair only with the live profile; if the
+                // setter swapped it since the caller sampled ProfileRef, it already
+                // filtered and rebuilt for the new one.
+                if (tiers != null && ReferenceEquals(profile, _sender.ProfileRef))
+                {
+                    for (int i = 0; i < profile.Tiers.Count && i < tiers.Length; i++)
+                    {
+                        var st = tiers[i];
+                        if (st?.OriginalChannels == null) continue;
+                        var tier = profile.Tiers[i];
+                        // A FRESH list, never Clear()+AddRange(), so the pristine
+                        // snapshot is never aliased onto the live tier.
+                        tier.Channels = new List<ChannelDefinition>(st.OriginalChannels);
+                        tier.TotalBits = st.OriginalTotalBits;
+                        tier.TotalBytes = st.OriginalTotalBytes;
+                    }
+                    if (catalog != null && catalog.Count > 0)
+                        SortTierChannelsByCatalogIdx(profile, catalog);
+                }
+                _sender.RebuildFrameBuilders();
             }
         }
 
@@ -339,7 +302,9 @@ namespace MozaPlugin.Telemetry.Frames
             if (!_sender.ConnectionIsConnected)
                 return;
 
-            // V0: synthesize from catalog. V2/Type02: send all channels. V2 legacy: filter to catalog.
+            // V0: synthesize from catalog. V2Type02: refiltered to the live catalog
+            // below (RefilterLiveTiers); with no catalog yet (compact fallback) all
+            // channels are sent.
             // NEVER assign Profile property here — its setter re-expands tiers exponentially.
             //
             // LiveCatalog, not Catalog: Catalog is the never-pruned merge of every
@@ -382,6 +347,11 @@ namespace MozaPlugin.Telemetry.Frames
             byte flagByte = _sender.FlagByte;
             bool onFlagByte = tierDefSession == flagByte && flagByte != 0;
             object seqLock = onFlagByte ? _sender.Session02SeqLock : _sender.Session01SeqLock;
+
+            // Host-side only (no wire bytes); kept outside the seq lock so the
+            // profile lock never nests inside it.
+            if (policy.Encoding == TierDefEncoding.V2Type02)
+                RefilterLiveTiers(profile, catalog);
 
             // Reserve seq range under the per-session lock so no other writer
             // (V0 value frames, FF property pushes, RPC reply) interleaves a
@@ -464,40 +434,6 @@ namespace MozaPlugin.Telemetry.Frames
                         cspIdx = false;
                     }
 
-                    // Restore pristine pre-filter snapshot before re-filtering,
-                    // so a prior call against a stale catalog hasn't permanently
-                    // stripped channels. Makes ApplySubscription idempotent w.r.t. catalog.
-                    var tiers = _sender.Tiers;
-                    if (tiers != null)
-                    {
-                        for (int i = 0; i < profile.Tiers.Count && i < tiers.Length; i++)
-                        {
-                            var st = tiers[i];
-                            if (st?.OriginalChannels == null) continue;
-                            var tier = profile.Tiers[i];
-                            // Assign a FRESH list rather than Clear()+AddRange() on
-                            // the existing tier.Channels: the tick thread may still
-                            // be iterating the old list through the previous
-                            // FrameBuilder, and in-place mutation here would race.
-                            // The old list is left untouched; it stays valid for
-                            // any in-flight read and is GC'd after the FrameBuilder
-                            // gets rebound below in RebuildFrameBuildersFromProfile.
-                            // A copy keeps OriginalChannels from being aliased onto
-                            // the live tier (so a future in-place edit, however
-                            // unlikely, can't corrupt the pristine snapshot).
-                            tier.Channels = new List<ChannelDefinition>(st.OriginalChannels);
-                            tier.TotalBits = st.OriginalTotalBits;
-                            tier.TotalBytes = st.OriginalTotalBytes;
-                        }
-                    }
-
-                    // Now re-filter+re-sort against the current generation's catalog.
-                    if (catalog != null && catalog.Count > 0)
-                    {
-                        SortTierChannelsByCatalogIdx(profile, catalog);
-                        RebuildFrameBuildersFromProfile();
-                    }
-
                     var prevSub = _sender.ActiveSubscription;
                     // Reuse path: emit at the prior subscription's flagBase so the
                     // wheel's existing channel→idx bindings stay valid. Pass
@@ -527,13 +463,11 @@ namespace MozaPlugin.Telemetry.Frames
                         _sender.CatalogParser.GetEndMarkerForSession(tierDefSession);
                     byte[] message = TierDefinitionBuilder.BuildTierDefinitionMessage(
                         profile, flagBase,
-                        includeEnableEntries: true,
                         useWheelCatalogIndices: cspIdx,
                         wheelCatalog: catalog,
                         endMarkerCounter: endForThisEmission,
                         prevFlagBase: doReuse ? (byte?)null : prevSub?.FlagBase,
-                        prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0),
-                        prevSubPerBroadcast: doReuse ? 0 : (prevSub?.SubTiersPerBroadcast ?? 0));
+                        prevTierCount: doReuse ? 0 : (prevSub?.TierCount ?? 0));
                     var frames = TierDefinitionBuilder.ChunkMessage(message, tierDefSession, ref seq, _sender.TargetDeviceId);
 
                     // Stamp BEFORE the chunks hit the wire — the wheel's reject
@@ -556,8 +490,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _sender.ActiveSubscription = new TelemetrySender.SubscriptionState(
                         flagBase: flagBase,
                         tierCount: profile.Tiers.Count,
-                        subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile),
-                        profileName: profile.Name);
+                        subTiersPerBroadcast: TierDefinitionBuilder.DetectSubTiersPerBroadcast(profile));
                     _sender.IncrementSubscriptionGen();
                     if (!doReuse)
                     {
@@ -684,20 +617,24 @@ namespace MozaPlugin.Telemetry.Frames
         /// <summary>Re-emit blind tier-def chunks (Era2024 doesn't ack sess=0x01).</summary>
         public void TickEmitTierDefBlindRetransmits()
         {
-            if (_tierDefBlindFrames == null) return;
+            // Snapshot once: Stop/Reset and a fresh emission replace the field from
+            // other threads. Clear only if it still holds this snapshot, so a newer
+            // emission's frames are never wiped.
+            var frames = _tierDefBlindFrames;
+            if (frames == null) return;
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
             {
-                _tierDefBlindFrames = null;
+                Interlocked.CompareExchange(ref _tierDefBlindFrames, null, frames);
                 return;
             }
             // Early-exit: every tier-def chunk was tracked via SendAndTrackChunk,
             // so SessionRetransmitter.Contains tells us per-chunk ack state.
-            if (_tierDefBlindSentRounds > 0 && AllBlindChunksAcked())
+            if (_tierDefBlindSentRounds > 0 && AllBlindChunksAcked(frames))
             {
                 MozaLog.Debug(
                     $"[AZOM] Blind retransmit early-exit after round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
                     "(all blind chunks acked by wheel)");
-                _tierDefBlindFrames = null;
+                Interlocked.CompareExchange(ref _tierDefBlindFrames, null, frames);
                 return;
             }
             var schedule = global::MozaPlugin.Telemetry.RetryBackoff.TierDefBlindMs;
@@ -716,10 +653,10 @@ namespace MozaPlugin.Telemetry.Frames
             // without changing behavior for unresponsive wheels (which still
             // get the full re-send budget).
             int sent = 0, skipped = 0;
-            for (int i = 0; i < _tierDefBlindFrames.Length; i++)
+            for (int i = 0; i < frames.Length; i++)
             {
                 if (_sender.StateIsIdle || !_sender.ConnectionIsConnected) break;
-                var frame = _tierDefBlindFrames[i];
+                var frame = frames[i];
                 if (frame == null) continue;
                 if (_tierDefBlindSentRounds > 1 && frame.Length >= 10)
                 {
@@ -738,16 +675,15 @@ namespace MozaPlugin.Telemetry.Frames
             }
             MozaLog.Debug(
                 $"[AZOM] Blind retransmit round {_tierDefBlindSentRounds}/{TierDefBlindMaxRounds} " +
-                $"({sent}/{_tierDefBlindFrames.Length} chunks sent, {skipped} already acked, " +
+                $"({sent}/{frames.Length} chunks sent, {skipped} already acked, " +
                 $"next gate {gateMs}ms)");
             if (_tierDefBlindSentRounds >= TierDefBlindMaxRounds)
-                _tierDefBlindFrames = null;
+                Interlocked.CompareExchange(ref _tierDefBlindFrames, null, frames);
         }
 
-        private bool AllBlindChunksAcked()
+        private bool AllBlindChunksAcked(byte[][] frames)
         {
-            if (_tierDefBlindFrames == null) return true;
-            foreach (var frame in _tierDefBlindFrames)
+            foreach (var frame in frames)
             {
                 if (frame == null || frame.Length < 10) continue;
                 byte session = frame[6];

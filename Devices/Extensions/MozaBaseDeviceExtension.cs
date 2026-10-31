@@ -515,6 +515,7 @@ namespace MozaPlugin.Devices.Extensions
             _originalDriver = null;
             try { _ledDriver?.Release(); } catch { }
             _ledDriver = null;
+            _ledSwapAttempted = false;
 
             LedDriverInjection.RestoreConnectionManager(
                 _connectionDevice, _connectionManager, _originalConnectionManager);

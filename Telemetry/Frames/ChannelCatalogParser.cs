@@ -34,13 +34,19 @@ namespace MozaPlugin.Telemetry.Frames
     /// re-announcing all of them, so back-refs are heavy at switch time and the
     /// merge step preserves prior idx→URL bindings unless the wheel overrides them.
     ///
-    /// All public methods are thread-safe via an internal lock on the buffer map.
-    /// The parsed catalog is published via a volatile field so observers see
-    /// monotonically-grown lists without external synchronisation.
+    /// Locking: <c>_bufferLock</c> guards the per-session buffers and reassembly
+    /// state (the read thread appends under it). <c>_parseLock</c> serialises
+    /// <see cref="TryParse"/>, <see cref="ClearBuffer"/>,
+    /// <see cref="BeginCatalogEpoch"/> and <see cref="Reset"/>, which own the
+    /// generation state (pending/committed markers, live set, epoch flags); it is
+    /// never taken on the read thread and is always acquired before
+    /// <c>_bufferLock</c>. The parsed catalogs are published via volatile fields
+    /// so readers need no lock.
     /// </summary>
     internal sealed class ChannelCatalogParser
     {
         private readonly object _bufferLock = new object();
+        private readonly object _parseLock = new object();
         // Per-session byte buffers. Session 0x01 (mgmt) and FlagByte/0x02
         // (telemetry) can both carry catalog chunks depending on firmware.
         // Keeping them split prevents cross-session corruption when one
@@ -157,6 +163,16 @@ namespace MozaPlugin.Telemetry.Frames
         // only populated when that session's buffer contains a valid
         // tag-0x06 size-4 END record. Guarded by _bufferLock.
         private readonly Dictionary<byte, uint> _endMarkerBySession = new();
+        // END settle tracking, per session. The END marker is a ~1 Hz tick that
+        // carries the wheel's cumulative catalog record count, so a tick can land
+        // mid-announcement (bundle DJQ23F6D: b19 b22 END=179, then 25 back-refs +
+        // 27 URLs, END=231). The announcement is finished once a tick re-asserts the
+        // same value with no records since. Guarded by _bufferLock.
+        private readonly Dictionary<byte, int> _endChangedTickBySession = new();
+        private readonly Dictionary<byte, uint> _settledEndBySession = new();
+        // END value each session buffer was last trimmed through: the walk's
+        // "previous END" for the bytes that remain.
+        private readonly Dictionary<byte, uint> _trimmedEndBySession = new();
         // Sessions that have ever produced ≥1 valid URL/back-ref catalog record
         // in TryParse. Used by HasRealCatalogOnSession to distinguish a session
         // carrying the wheel's real channel catalog from a degenerate one (the
@@ -259,6 +275,25 @@ namespace MozaPlugin.Telemetry.Frames
                 return _endMarkerBySession.TryGetValue(session, out var v) ? v : 0u;
         }
 
+        /// <summary>True while some session's END marker has changed since
+        /// <paramref name="sinceTickMs"/> and the wheel has not yet re-asserted it —
+        /// the latest END is a running count inside an announcement that is still
+        /// arriving, not a finished generation.</summary>
+        public bool HasUnsettledEndSince(int sinceTickMs)
+        {
+            lock (_bufferLock)
+            {
+                foreach (var kv in _endChangedTickBySession)
+                {
+                    if (kv.Value - sinceTickMs <= 0) continue;
+                    if (!_endMarkerBySession.TryGetValue(kv.Key, out var cur)) continue;
+                    if (!_settledEndBySession.TryGetValue(kv.Key, out var settled) || settled != cur)
+                        return true;
+                }
+                return false;
+            }
+        }
+
         /// <summary>True once <paramref name="session"/> has carried BOTH ≥1
         /// valid channel-URL record AND a valid END u32. Used to gate
         /// cold-start tier-def emission: the wheel binds tier-def by the
@@ -317,12 +352,6 @@ namespace MozaPlugin.Telemetry.Frames
         /// is the never-pruned union across every generation.</summary>
         public int LiveCount => _liveCatalog?.Count ?? 0;
 
-        /// <summary>URL → 1-based idx for the current catalog (first-occurrence
-        /// wins: stale higher slots ignored after a dashboard switch re-indexes
-        /// from 1). Null until the first parse succeeds. Suitable for callers
-        /// that need to look up many URLs at once.</summary>
-        public IReadOnlyDictionary<string, int>? IdxByUrl => _idxByUrl;
-
         /// <summary>Build the first-occurrence-wins URL → 1-based idx map from
         /// an arbitrary catalog list. Used by callers that receive the catalog
         /// as a parameter rather than going through the parser instance.</summary>
@@ -354,21 +383,17 @@ namespace MozaPlugin.Telemetry.Frames
         /// Used by quiet-window waits.</summary>
         public int LastActivityMs => _lastActivityMs;
 
-        /// <summary>True when at least one session is holding out-of-order
-        /// chunks behind an unfilled hole. The tick loop polls this so the stall
-        /// escape stays reachable when the head is stuck and the buffer is
-        /// therefore NOT growing — the growth-gated TryParse call alone would
-        /// never run in that state.</summary>
-        public bool HasPendingChunks
+        /// <summary>Run the stall escape for sessions holding chunks behind an
+        /// unfilled hole. Returns true when a head was skipped forward, i.e. a
+        /// parse now has something new to read. The tick loop calls this so the
+        /// escape stays reachable while the head is stuck and the buffer is NOT
+        /// growing, without re-parsing the unchanged buffer every tick.</summary>
+        public bool TryEscapePendingStall()
         {
-            get
+            lock (_bufferLock)
             {
-                lock (_bufferLock)
-                {
-                    foreach (var kv in _pendingChunks)
-                        if (kv.Value.Count > 0) return true;
-                    return false;
-                }
+                if (_headBlockedSinceTickMs.Count == 0) return false;
+                return EscapePendingStallLocked();
             }
         }
 
@@ -542,7 +567,12 @@ namespace MozaPlugin.Telemetry.Frames
                     sessionEnd = scanFinalEnd;
                 }
                 if (foundEndThisSession)
+                {
+                    if (!_endMarkerBySession.TryGetValue(session, out var priorSessionEnd)
+                        || priorSessionEnd != sessionEnd)
+                        _endChangedTickBySession[session] = Environment.TickCount;
                     _endMarkerBySession[session] = sessionEnd;
+                }
                 if (scanFinalEnd != _lastWheelEndMarker)
                 {
                     _lastWheelEndMarker = scanFinalEnd;
@@ -632,14 +662,17 @@ namespace MozaPlugin.Telemetry.Frames
             _headBlockedSinceTickMs.Remove(session);
             _lastAppendTickMs.Remove(session);
             _lastProgressTickMs.Remove(session);
+            _trimmedEndBySession.Remove(session);
             _lastParseLen = 0;
         }
 
         /// <summary>Give up on a hole that never filled and resume from the
         /// lowest held chunk, so one permanently-lost chunk can't wedge a
-        /// session forever. Caller holds <c>_bufferLock</c>.</summary>
-        private void EscapePendingStallLocked()
+        /// session forever. Caller holds <c>_bufferLock</c>. Returns true if any
+        /// session's head was skipped forward.</summary>
+        private bool EscapePendingStallLocked()
         {
+            bool escaped = false;
             int now = Environment.TickCount;
             foreach (var session in _sessionOrder.ToArray())
             {
@@ -661,7 +694,9 @@ namespace MozaPlugin.Telemetry.Frames
                     + $"skipping to seq={resumeAt}; that generation stays incomplete until the wheel re-sends");
                 _nextExpectedSeq[session] = resumeAt;
                 DrainPendingLocked(session);
+                escaped = true;
             }
+            return escaped;
         }
 
         /// <summary>Reset the per-session buffers (typically on session restart
@@ -678,22 +713,28 @@ namespace MozaPlugin.Telemetry.Frames
         /// sessions; the wheel closed 0x02 and never bound.</summary>
         public void ClearBuffer()
         {
-            lock (_bufferLock)
+            lock (_parseLock)
             {
-                _buffersBySession.Clear();
-                _sessionOrder.Clear();
-                // Drop seq-dedup tracking too — fresh buffer means fresh
-                // session, retransmit memory should not bleed across.
-                _appendedSeqs.Clear();
-                _nextExpectedSeq.Clear();
-                _pendingChunks.Clear();
-                _headBlockedSinceTickMs.Clear();
-                _lastAppendTickMs.Clear();
-                _lastProgressTickMs.Clear();
-                _endMarkerBySession.Clear();
-                _sessionsWithValidUrls.Clear();
+                lock (_bufferLock)
+                {
+                    _buffersBySession.Clear();
+                    _sessionOrder.Clear();
+                    // Drop seq-dedup tracking too — fresh buffer means fresh
+                    // session, retransmit memory should not bleed across.
+                    _appendedSeqs.Clear();
+                    _nextExpectedSeq.Clear();
+                    _pendingChunks.Clear();
+                    _headBlockedSinceTickMs.Clear();
+                    _lastAppendTickMs.Clear();
+                    _lastProgressTickMs.Clear();
+                    _endMarkerBySession.Clear();
+                    _endChangedTickBySession.Clear();
+                    _settledEndBySession.Clear();
+                    _trimmedEndBySession.Clear();
+                    _sessionsWithValidUrls.Clear();
+                }
+                _lastParseLen = 0;
             }
-            _lastParseLen = 0;
         }
 
         /// <summary>Hard-limit safety net: wipe any session buffer that
@@ -735,6 +776,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
                     _lastProgressTickMs.Remove(sess);
+                    _trimmedEndBySession.Remove(sess);
                     cleared++;
                     MozaLog.Warn(
                         $"[AZOM] Catalog parser: HARD-LIMIT wipe sess=0x{sess:X2} ({wiped} bytes > {maxPerSession}) — " +
@@ -785,6 +827,7 @@ namespace MozaPlugin.Telemetry.Frames
                     // and overwriting `trimTo` means the last match wins,
                     // matching the "latest committed END" requirement.
                     int trimTo = 0;
+                    uint trimEnd = 0;
                     int n = buf.Count;
                     for (int i = 0; i + 8 < n; i++)
                     {
@@ -798,10 +841,16 @@ namespace MozaPlugin.Telemetry.Frames
                             | (buf[i + 7] << 16)
                             | (buf[i + 8] << 24));
                         if (_committedMarkers.Contains(val))
+                        {
                             trimTo = i + 9; // byte immediately past this END
+                            trimEnd = val;
+                        }
                     }
                     if (trimTo > 0)
+                    {
                         buf.RemoveRange(0, trimTo);
+                        _trimmedEndBySession[sess] = trimEnd;
+                    }
                     newTotal += buf.Count;
                 }
                 // Re-stamp _lastParseLen so the "buffer grew since last
@@ -829,23 +878,29 @@ namespace MozaPlugin.Telemetry.Frames
         /// </summary>
         public void BeginCatalogEpoch()
         {
-            _committedEndMarker = 0;
-            _committedMarkers.Clear();
-            _pendingIdxs.Clear();
-            _lastSeenArmCount = -1;
-            _epochFirstCommitPending = true;
+            lock (_parseLock)
+            {
+                _committedEndMarker = 0;
+                _committedMarkers.Clear();
+                _pendingIdxs.Clear();
+                _lastSeenArmCount = -1;
+                _epochFirstCommitPending = true;
+            }
         }
 
         /// <summary>Reset both buffers AND parsed catalog. Use only on full session
         /// restart (StartInner) where prior bindings are stale.</summary>
         public void Reset()
         {
-            ClearBuffer();
-            _catalog = null;
-            _idxByUrl = null;
-            _lastActivityMs = 0;
-            _liveCatalog = null;
-            BeginCatalogEpoch();
+            lock (_parseLock)
+            {
+                ClearBuffer();
+                _catalog = null;
+                _idxByUrl = null;
+                _lastActivityMs = 0;
+                _liveCatalog = null;
+                BeginCatalogEpoch();
+            }
         }
 
         /// <summary>Returns the total buffer length (across sessions) the last
@@ -853,47 +908,6 @@ namespace MozaPlugin.Telemetry.Frames
         /// <see cref="BufferLength"/> to detect "buffer grew since last parse"
         /// without locking.</summary>
         public int LastParsedBufferLen => _lastParseLen;
-
-        /// <summary>
-        /// Scan any session's buffer for a complete catalog: ≥3 plausible 0x04 URL
-        /// entries followed by a 0x06 end-marker. Used by the post-startup
-        /// quiet-window wait to know when to stop polling. Returns true if any
-        /// session's buffer contains a complete catalog.
-        /// </summary>
-        public bool HasCompleteCatalog()
-        {
-            lock (_bufferLock)
-            {
-                foreach (var s in _sessionOrder)
-                {
-                    if (!_buffersBySession.TryGetValue(s, out var buf)) continue;
-                    int cnt = buf.Count;
-                    if (cnt <= 30) continue;
-                    int urlCount = 0;
-                    for (int ci = 0; ci + 5 <= cnt; ci++)
-                    {
-                        byte b = buf[ci];
-                        if (b == 0x04)
-                        {
-                            uint sz = (uint)(buf[ci + 1]
-                                | (buf[ci + 2] << 8)
-                                | (buf[ci + 3] << 16)
-                                | (buf[ci + 4] << 24));
-                            if (sz >= 1 && sz < 200 && ci + 5 + (int)sz <= cnt)
-                            {
-                                urlCount++;
-                                ci += 4 + (int)sz;
-                            }
-                        }
-                        else if (b == 0x06 && urlCount >= 3)
-                        {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-        }
 
         /// <summary>
         /// Parse the wheel's channel catalog from buffered 7c:00 session data. The
@@ -904,10 +918,15 @@ namespace MozaPlugin.Telemetry.Frames
         /// </summary>
         public void TryParse()
         {
+            lock (_parseLock) TryParseLocked();
+        }
+
+        private void TryParseLocked()
+        {
             // Snapshot all session buffers under lock, in arrival order, then
             // release the lock before parsing (parsing is purely CPU work on
             // the snapshots and shouldn't block appends).
-            List<(byte session, byte[] bytes)> snapshots;
+            List<(byte session, byte[] bytes, uint prevEnd)> snapshots;
             int totalBytes;
             lock (_bufferLock)
             {
@@ -915,12 +934,13 @@ namespace MozaPlugin.Telemetry.Frames
                 // Give up on any hole that never filled before snapshotting, so a
                 // single lost chunk cannot wedge a session's reassembly forever.
                 EscapePendingStallLocked();
-                snapshots = new List<(byte, byte[])>(_sessionOrder.Count);
+                snapshots = new List<(byte, byte[], uint)>(_sessionOrder.Count);
                 totalBytes = 0;
                 foreach (var s in _sessionOrder)
                 {
                     if (!_buffersBySession.TryGetValue(s, out var buf) || buf.Count == 0) continue;
-                    snapshots.Add((s, buf.ToArray()));
+                    snapshots.Add((s, buf.ToArray(),
+                        _trimmedEndBySession.TryGetValue(s, out var te) ? te : 0u));
                     totalBytes += buf.Count;
                 }
             }
@@ -953,7 +973,7 @@ namespace MozaPlugin.Telemetry.Frames
             int totalSizeReject = 0, totalPlausReject = 0;
             var existingCatalog = _catalog;
 
-            foreach (var (session, buffer) in snapshots)
+            foreach (var (session, buffer, trimmedEnd) in snapshots)
             {
                 // Pre-scan: any tag=0x04 URL records OR tag=0x06 END markers
                 // present? Skip the (expensive) parse + diag logging when the
@@ -1236,6 +1256,11 @@ namespace MozaPlugin.Telemetry.Frames
                     _pendingIdxs.Clear();
                 }
 
+                // Settle detection: an END that repeats the previous END's value
+                // with no records in between means the announcement is finished.
+                uint prevEnd = trimmedEnd;
+                int recordsSinceEnd = 0;
+                uint settledEnd = 0;
                 int i = 0;
                 while (i + 6 < buffer.Length)
                 {
@@ -1255,6 +1280,10 @@ namespace MozaPlugin.Telemetry.Frames
                                 | (buffer[i + 6] << 8)
                                 | (buffer[i + 7] << 16)
                                 | (buffer[i + 8] << 24));
+                            if (recordsSinceEnd == 0 && markerValue == prevEnd && markerValue != 0)
+                                settledEnd = markerValue;
+                            prevEnd = markerValue;
+                            recordsSinceEnd = 0;
                             CommitLiveSet(markerValue);
                             i += 9;
                             continue;
@@ -1268,6 +1297,7 @@ namespace MozaPlugin.Telemetry.Frames
                         sSizeReject++;
                         i++; continue;
                     }
+                    recordsSinceEnd++;
                     int idx = buffer[i + 5];  // wheel-firmware-canonical idx (1-based)
                     int urlLen = (int)param - 1;
                     int urlStart = i + 6;
@@ -1485,6 +1515,17 @@ namespace MozaPlugin.Telemetry.Frames
                     i += 5 + (int)param;
                 }
 
+                if (settledEnd != 0)
+                {
+                    lock (_bufferLock)
+                    {
+                        if (!_settledEndBySession.TryGetValue(session, out var priorSettled)
+                            || priorSettled != settledEnd)
+                            MozaLog.Debug($"[AZOM] Catalog END settled sess=0x{session:X2} end={settledEnd}");
+                        _settledEndBySession[session] = settledEnd;
+                    }
+                }
+
                 int distinctIdxAfter = parsed.Count;
                 perSessionStats.Add((session, sFull, sPrefix, sAbbr, sBackref,
                     sBackrefFail, sSizeReject, sPlausReject,
@@ -1583,6 +1624,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _headBlockedSinceTickMs.Remove(sess);
                     _lastAppendTickMs.Remove(sess);
                     _lastProgressTickMs.Remove(sess);
+                    _trimmedEndBySession.Remove(sess);
                     MozaLog.Debug(
                         $"[AZOM] Catalog parser: dropped stale buffer sess=0x{sess:X2} " +
                         $"({wiped}B, no valid records for {ageMs / 1000}s, last append " +
@@ -1644,21 +1686,6 @@ namespace MozaPlugin.Telemetry.Frames
             // prior parse passes that older buffer bytes can be trimmed
             // against, even if this particular pass added nothing new.
             TrimProcessedBytes();
-        }
-
-        /// <summary>Compare two catalogs for value-equality. Helper used by
-        /// renegotiation diagnostics in TelemetrySender.</summary>
-        public static bool CatalogEquals(
-            IReadOnlyList<string>? a,
-            IReadOnlyList<string>? b)
-        {
-            if (a == null && b == null) return true;
-            if (a == null || b == null) return false;
-            if (a.Count != b.Count) return false;
-            for (int i = 0; i < a.Count; i++)
-                if (!string.Equals(a[i], b[i], StringComparison.Ordinal))
-                    return false;
-            return true;
         }
     }
 }

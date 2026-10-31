@@ -304,7 +304,7 @@ namespace MozaPlugin.UI.Import
             int oldRaw = getProfile();
             string oldDisplay = oldRaw < 0 ? "(unset)" : FormatHexColor(oldRaw);
             string newDisplay = FormatHexColor(newVal);
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newVal)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newVal, () => setProfile(newVal)));
         }
 
         // ----- Helpers -----
@@ -341,7 +341,7 @@ namespace MozaPlugin.UI.Import
                 : profileToPreset(oldRaw).ToString() + unit;
             string newDisplay = pithouse.Value.ToString() + unit;
 
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newVal)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newVal, () => setProfile(newVal)));
         }
 
         /// <summary>
@@ -364,7 +364,7 @@ namespace MozaPlugin.UI.Import
             int oldRaw = getProfile();
             string oldDisplay = oldRaw < 0 ? "(unset)" : (oldRaw * 2).ToString() + "°";
             string newDisplay = (newRaw * 2).ToString() + "°";
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newRaw)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newRaw, () => setProfile(newRaw)));
         }
 
         private static void AddScaledInt(
@@ -398,7 +398,7 @@ namespace MozaPlugin.UI.Import
             string Disp(int raw) => ((int)Math.Round(raw / 10.0)).ToString();
             string oldDisplay = oldRaw < 0 ? "(unset)" : Disp(oldRaw);
             string newDisplay = Disp(newRaw);
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newRaw)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newRaw, () => setProfile(newRaw)));
         }
 
         private static void AddBoolToInt(
@@ -414,7 +414,9 @@ namespace MozaPlugin.UI.Import
             int oldRaw = getProfile();
             string oldDisplay = oldRaw < 0 ? "(unset)" : (oldRaw != 0 ? "On" : "Off");
             string newDisplay = newVal != 0 ? "On" : "Off";
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newVal)));
+            // Any non-zero stored value is On, so compare the state, not the raw int.
+            bool changed = oldRaw < 0 || (oldRaw != 0) != (newVal != 0);
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, changed, () => setProfile(newVal)));
         }
 
         // ----- Wheelbase LFE helpers -----
@@ -433,7 +435,7 @@ namespace MozaPlugin.UI.Import
             var cur = profile.BaseLfe != null ? pick(profile.BaseLfe) : null;
             string oldDisplay = cur == null ? "(unset)" : (cur.Enabled ? "On" : "Off");
             string newDisplay = newVal ? "On" : "Off";
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay,
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, cur == null || cur.Enabled != newVal,
                 () => pick(profile.BaseLfe ??= new BaseLfeSettings()).Enabled = newVal));
         }
 
@@ -453,7 +455,8 @@ namespace MozaPlugin.UI.Import
             string oldDisplay = cur == null ? "(unset)"
                 : ((isFreq ? (int)cur.Frequency : cur.Intensity).ToString() + unit);
             string newDisplay = clamped.ToString() + unit;
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay,
+            bool changed = cur == null || (isFreq ? cur.Frequency != clamped : cur.Intensity != clamped);
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, changed,
                 () =>
                 {
                     var e = pick(profile.BaseLfe ??= new BaseLfeSettings());
@@ -473,7 +476,7 @@ namespace MozaPlugin.UI.Import
             int oldRaw = getProfile();
             string oldDisplay = oldRaw <= -1000 ? "(unset)" : oldRaw.ToString();
             string newDisplay = newVal.ToString();
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newVal)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newVal, () => setProfile(newVal)));
         }
 
         private static void AddGameGain(
@@ -488,7 +491,7 @@ namespace MozaPlugin.UI.Import
             int oldRaw = getProfile();
             string oldDisplay = oldRaw < 0 ? "(unset)" : oldRaw.ToString();
             string newDisplay = newVal.ToString();
-            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, () => setProfile(newVal)));
+            plan.Diffs.Add(new FieldDiff(label, oldDisplay, newDisplay, oldRaw != newVal, () => setProfile(newVal)));
         }
 
         /// <summary>
@@ -519,9 +522,13 @@ namespace MozaPlugin.UI.Import
                 $"X {Old(profile.FfbCurveX1)}/{Old(profile.FfbCurveX2)}/{Old(profile.FfbCurveX3)}/{Old(profile.FfbCurveX4)}  " +
                 $"Y {Old(profile.FfbCurveY1)}/{Old(profile.FfbCurveY2)}/{Old(profile.FfbCurveY3)}/{Old(profile.FfbCurveY4)}/{Old(profile.FfbCurveY5)}";
             string newDisplay = $"X {x1}/{x2}/{x3}/{x4}  Y {y1}/{y2}/{y3}/{y4}/{y5}";
+            bool changed =
+                profile.FfbCurveX1 != x1 || profile.FfbCurveX2 != x2 || profile.FfbCurveX3 != x3 || profile.FfbCurveX4 != x4 ||
+                profile.FfbCurveY1 != y1 || profile.FfbCurveY2 != y2 || profile.FfbCurveY3 != y3 ||
+                profile.FfbCurveY4 != y4 || profile.FfbCurveY5 != y5;
 
             plan.Diffs.Add(new FieldDiff("FFB Curve (X + Y points)",
-                oldDisplay, newDisplay,
+                oldDisplay, newDisplay, changed,
                 () =>
                 {
                     profile.FfbCurveX1 = x1;

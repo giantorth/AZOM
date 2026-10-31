@@ -514,7 +514,7 @@ namespace MozaPlugin.Devices.Extensions
                 }
 
                 Directory.CreateDirectory(deviceDir);
-                WriteAllTextAtomic(deviceJsonPath,
+                AtomicFile.WriteAllText(deviceJsonPath,
                     GenerateBaseDeviceJson(guid, BaseModelInfo.GetFriendlyName(prefix), ledCount, wantHaptics, pid));
                 EnsureThumbnail(deviceDir, thumbnailKey);
 
@@ -753,6 +753,11 @@ namespace MozaPlugin.Devices.Extensions
                 int expectedTelemetryCount = rpmCount + (hasFlagLeds ? 6 : 0);
                 bool fileExists = File.Exists(deviceJsonPath);
 
+                // Registry-based discovery always populates DiscoveredPid when
+                // we successfully connected. Fallback only matters if the file
+                // is generated before the first connect.
+                var pid = discoveredPid ?? FallbackPid;
+
                 if (fileExists && !force)
                 {
                     bool stale;
@@ -772,6 +777,8 @@ namespace MozaPlugin.Devices.Extensions
                             .SelectToken("LedsFeature.IsIndividualLedsSectionEnabled")?.Value<bool>();
                         string? existingDescriptorId = existing
                             .SelectToken("DescriptorUniqueId")?.Value<string>();
+                        string? existingPid = existing
+                            .SelectToken("HardwareInterface.HardwareInterface.DeviceDetection.Pid")?.Value<string>();
                         bool expectedIndividual = buttonCount > 0 || knobCount > 0;
                         stale = existingLed != expectedTelemetryCount
                             || existingButtons != buttonCount
@@ -786,6 +793,8 @@ namespace MozaPlugin.Devices.Extensions
                             // the wrong identity would stick, leaving the wheel's LEDs
                             // dark (see MozaLedDeviceManager.IsModelConnected).
                             || !string.Equals(existingDescriptorId, guid, StringComparison.OrdinalIgnoreCase)
+                            // Host composite (base/hub) PID drifted: the rim moved hosts.
+                            || !PidEquals(existingPid, pid)
                             // Content-version bump (e.g. localized TitleOverride) forces a
                             // one-time rewrite for users whose file predates the change.
                             || existingSchema < GeneratedWheelSchemaVersion
@@ -817,12 +826,8 @@ namespace MozaPlugin.Devices.Extensions
 
                 Directory.CreateDirectory(deviceDir);
 
-                // Registry-based discovery always populates DiscoveredPid when
-                // we successfully connected. Fallback only matters if the file
-                // is generated before the first connect.
-                var pid = discoveredPid ?? FallbackPid;
                 var json = GenerateWheelDeviceJson(guid, productName, rpmCount, hasFlagLeds, buttonCount, knobCount, browSegmentSize, pid);
-                WriteAllTextAtomic(deviceJsonPath, json);
+                AtomicFile.WriteAllText(deviceJsonPath, json);
                 EnsureThumbnail(deviceDir, modelPrefix);
 
                 string action = fileExists ? "Refreshed" : "Deployed";
@@ -972,24 +977,6 @@ namespace MozaPlugin.Devices.Extensions
         /// the deploy path and never flips the caller's "restart SimHub" result,
         /// since the picture appears on the next SimHub start regardless.
         /// </summary>
-        // Stage to a sibling .tmp, then move into place: a crash mid-write must not
-        // leave SimHub a truncated device.json (MozaDeviceConstants does the same).
-        private static void WriteAllTextAtomic(string path, string text)
-        {
-            string tmp = path + ".tmp";
-            File.WriteAllText(tmp, text);
-            if (File.Exists(path)) File.Replace(tmp, path, null);
-            else File.Move(tmp, path);
-        }
-
-        private static void WriteAllBytesAtomic(string path, byte[] bytes)
-        {
-            string tmp = path + ".tmp";
-            File.WriteAllBytes(tmp, bytes);
-            if (File.Exists(path)) File.Replace(tmp, path, null);
-            else File.Move(tmp, path);
-        }
-
         private static void EnsureThumbnail(string deviceDir, string thumbnailKey)
         {
             try
@@ -1017,7 +1004,7 @@ namespace MozaPlugin.Devices.Extensions
                         return;
 
                     Directory.CreateDirectory(deviceDir);
-                    WriteAllBytesAtomic(thumbnailPath, bytes);
+                    AtomicFile.WriteAllBytes(thumbnailPath, bytes);
                     MozaLog.Debug($"[AZOM] Wrote device thumbnail for {thumbnailKey}: {thumbnailPath}");
                 }
             }
@@ -1395,7 +1382,7 @@ namespace MozaPlugin.Devices.Extensions
                         MozaLog.Debug($"[AZOM] No PID discovered, using fallback {FallbackPid} for {deviceName}");
                     }
 
-                    WriteAllTextAtomic(deviceJsonPath, json);
+                    AtomicFile.WriteAllText(deviceJsonPath, json);
                 }
 
                 if (thumbnailKey != null)

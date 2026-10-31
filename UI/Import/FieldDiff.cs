@@ -18,15 +18,18 @@ namespace MozaPlugin.UI.Import
         public string NewDisplay { get; }
         public Action Apply { get; }
 
-        /// <summary>True when old and new differ — used by the dialog to
-        /// hide no-op rows so the user only sees real changes.</summary>
-        public bool Changed => !string.Equals(OldDisplay, NewDisplay, StringComparison.Ordinal);
+        /// <summary>True when the stored value differs from what the apply would
+        /// write — decided by the mapper on the RAW values, since the display
+        /// strings are rounded/scaled and can match while the values differ.
+        /// Gates the apply and dims no-op rows in the dialog.</summary>
+        public bool Changed { get; }
 
-        public FieldDiff(string label, string oldDisplay, string newDisplay, Action apply)
+        public FieldDiff(string label, string oldDisplay, string newDisplay, bool changed, Action apply)
         {
             Label = label ?? "";
             OldDisplay = oldDisplay ?? "";
             NewDisplay = newDisplay ?? "";
+            Changed = changed;
             Apply = apply ?? (() => { });
         }
     }

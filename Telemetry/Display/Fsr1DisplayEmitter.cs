@@ -123,56 +123,6 @@ namespace MozaPlugin.Telemetry.Display
         }
 
         /// <summary>
-        /// Build a live record for <paramref name="dash"/>. <paramref name="valueFor"/>
-        /// returns each field's final wire integer (already resolved + scaled to the
-        /// field's range); it is invoked once per field. <c>b1</c>/<c>b2</c> are the
-        /// dashboard's per-config anchors (see <see cref="Fsr1Dashboard.LiveB1"/>/<see cref="Fsr1Dashboard.LiveB2"/>).
-        /// </summary>
-        internal static byte[] BuildRecord(Fsr1Dashboard dash, Func<Fsr1FieldDef, long> valueFor)
-        {
-            if (dash == null) throw new ArgumentNullException(nameof(dash));
-            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
-            foreach (var f in dash.Fields)
-                WriteField(frame, f, valueFor(f));
-            Finish(frame);
-            return frame;
-        }
-
-        /// <summary>
-        /// Build a live record using a per-field <paramref name="layoutFor"/> resolver that
-        /// returns the effective <c>(offsets, encoding, value)</c> — the driver supplies this
-        /// so per-profile boundary/encoding overrides take effect. Falls through to the
-        /// catalog layout for any field whose resolver returns a null offsets array.
-        /// </summary>
-        internal static byte[] BuildRecord(
-            Fsr1Dashboard dash, Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
-            => BuildRecord(dash, dash?.Fields, layoutFor);
-
-        /// <summary>
-        /// As above, but packs an EXPLICIT field list rather than <c>dash.Fields</c> — the
-        /// driver passes the composed list (catalog + synthetic split fields) so net-new
-        /// fields are streamed too. <paramref name="fields"/> null falls back to the catalog.
-        /// </summary>
-        internal static byte[] BuildRecord(
-            Fsr1Dashboard dash, System.Collections.Generic.IReadOnlyList<Fsr1FieldDef>? fields,
-            Func<Fsr1FieldDef, (int[]? offsets, Fsr1Encoding enc, long value)> layoutFor)
-        {
-            if (dash == null) throw new ArgumentNullException(nameof(dash));
-            var frame = NewFrame(dash.RecordType, dash.PayloadLen, dash.LiveB1, dash.LiveB2);
-            var fs = fields ?? dash.Fields;
-            int count = fs.Count;
-            for (int i = 0; i < count; i++)
-            {
-                var f = fs[i];
-                var (offsets, enc, value) = layoutFor(f);
-                if (offsets == null) WriteField(frame, f, value);
-                else WriteField(frame, offsets, enc, value);
-            }
-            Finish(frame);
-            return frame;
-        }
-
-        /// <summary>
         /// Pack a record from a resolved gapless partition (see
         /// <see cref="Fsr1DashboardCatalog.ResolvePartition"/>): each slot's value comes from
         /// <paramref name="valueFor"/> and is written at the slot's offsets/encoding. The
@@ -256,12 +206,8 @@ namespace MozaPlugin.Telemetry.Display
         private static void Finish(byte[] frame) =>
             frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
 
-        // payload offset N is at frame index 4+N. Def-keyed form uses the catalog layout.
-        private static void WriteField(byte[] frame, Fsr1FieldDef f, long value) =>
-            WriteField(frame, f.Offsets, f.Encoding, value);
-
-        // Layout-explicit form: pack value into the given contiguous offsets with the given
-        // encoding (used by the override path; offsets MUST match the encoding's width).
+        // Pack value into the given contiguous payload offsets (payload offset N is at frame
+        // index 4+N) with the given encoding; offsets MUST match the encoding's width.
         private static void WriteField(byte[] frame, int[] offsets, Fsr1Encoding enc, long value)
         {
             if (offsets == null || offsets.Length == 0) return;

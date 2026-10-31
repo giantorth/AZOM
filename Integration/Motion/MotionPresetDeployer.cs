@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text;
+using MozaPlugin.Devices;
 using MozaPlugin.Diagnostics;
 
 namespace MozaPlugin.Integration.Motion
@@ -92,10 +93,7 @@ namespace MozaPlugin.Integration.Motion
             {
                 if (File.Exists(path) && File.ReadAllText(path, Encoding.UTF8) == content) return false;
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                string tmp = path + ".tmp";
-                File.WriteAllText(tmp, content, new UTF8Encoding(false));
-                if (File.Exists(path)) File.Replace(tmp, path, null);
-                else File.Move(tmp, path);
+                AtomicFile.WriteAllText(path, content);
                 return true;
             }
             catch (Exception ex)

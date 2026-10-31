@@ -281,7 +281,8 @@ namespace MozaPlugin.Telemetry
         // (Cm1PageGuid), independent of any wheel. The dashboard-switch command and the
         // Param-6 page-report log are byte-identical to the FSR1's, just on dev 0x14/0x41.
 
-        private Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings()
+        /// <summary>Active profile's CM1 field mappings (copy-on-write snapshot), or null.</summary>
+        internal Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings()
         {
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             if (profile?.Cm1FieldMappings == null) return null;

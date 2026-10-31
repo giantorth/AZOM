@@ -21,7 +21,22 @@ namespace MozaPlugin.UI
         public static string Redact(string s) => MozaLog.RedactId(s);
         public static string RedactBytes(byte[] b) => MozaLog.RedactBytesHex(b);
         public static string Hex(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b);
-        public static string HexRaw(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b).Replace("-", "");
+
+        private static string TorqueBoostText(MozaData d)
+        {
+            if (!Devices.BaseModelInfo.HasTorqueBoost(d.BaseModelName,
+                    Devices.BaseModelInfo.ExtractHardwareCode(d.BaseSwVersion, d.BaseHwVersion)))
+                return "n/a (model)";
+            if (!d.BaseSupportsTorqueBoost)
+                return "n/a (needs >= 1.2.12.4)";
+            switch (d.BaseTorqueBoost)
+            {
+                case MozaData.TorqueBoostUnread: return "unread";
+                case 1: return "unlocked";
+                case 0: return "stock";
+                default: return $"raw {d.BaseTorqueBoost}";
+            }
+        }
         public static string JoinList(IReadOnlyList<string> l)
             => l == null || l.Count == 0 ? "(empty)" : string.Join(", ", l);
         public static string TruncateId(string id)
@@ -135,9 +150,24 @@ namespace MozaPlugin.UI
                 }
             }
 
+            var osPorts = MozaPortDiscovery.LastLiveComPorts;
+            sb.AppendLine($"OS COM ports:   {(osPorts.Count == 0 ? "(none)" : string.Join(", ", osPorts))}");
+            var skipped = MozaPortDiscovery.LastSkippedMozaEntries;
+            if (skipped.Count > 0)
+            {
+                sb.AppendLine($"Registry skips: {skipped.Count} MOZA entr{(skipped.Count == 1 ? "y" : "ies")} not listed as a port");
+                for (int i = 0; i < skipped.Count; i++)
+                    sb.AppendLine($"  {skipped[i]}");
+            }
+
+            // LastPortName is seeded from settings at startup and survives
+            // Disconnect, so it is only the live port while connected.
             string wheelbasePort = plugin.Connection?.LastPortName ?? "";
             sb.Append("Assignments:    Wheelbase ");
-            sb.Append(string.IsNullOrEmpty(wheelbasePort) ? "(disconnected)" : "→ " + wheelbasePort);
+            if (plugin.Connection?.IsConnected == true && wheelbasePort.Length > 0)
+                sb.Append("→ " + wheelbasePort);
+            else
+                sb.Append(wheelbasePort.Length > 0 ? $"(disconnected; saved {wheelbasePort})" : "(disconnected)");
             // AB9/AB6 share one lane. LastPortName survives Disconnect, so gate on
             // IsConnected like the Hub / Base(aux) lines below — otherwise this
             // prints a port for a shifter that was unplugged.
@@ -191,7 +221,9 @@ namespace MozaPlugin.UI
                 var f = conn.LastFailure;
                 sb.AppendLine(
                     $"LastFailure:    kind={f.Kind} port={f.PortName ?? "-"} " +
-                    $"consecutive={conn.ConsecutiveOpenFailures}");
+                    $"consecutive={conn.ConsecutiveOpenFailures}" +
+                    (f.FromProbe ? " (probe of saved port)" : "") +
+                    (f.Kind != ConnectionFailureKind.None && !string.IsNullOrEmpty(f.Message) ? $"  \"{f.Message}\"" : ""));
             }
             return sb.ToString();
         }
@@ -648,7 +680,7 @@ namespace MozaPlugin.UI
                 Cfg("wheel-knob-led-mode"), Bri(d.WheelKnobIdleEffect),
                 Bri(d.KnobRingBrightness), Bri(plugin.WheelLedBrightnessKnob),
                 Bri(plugin.WheelLedAppliedBrightnessKnob), Cfg("wheel-knob-brightness")));
-            sb.Append($"Flags (meter):  wheel={Bri(d.WheelFlagsBrightness)} "
+            sb.Append($"Flags (meter):  wheel={Bri(d.DashFlagsBrightness)} "
                       + $"cache/want={Cfg("dash-flags-brightness")}  (dev 0x14, not a wheel LED group)");
 
             // LED keepalive. srcQuiet is how long since SimHub's LED pipeline last
@@ -716,6 +748,7 @@ namespace MozaPlugin.UI
 
             sb.AppendLine($"LFE support:    {(d.BaseSupportsLfe ? "yes" : "no")}  (needs >= 1.2.10.10)");
             sb.AppendLine($"EQ bands:       {(d.BaseSupportsEq10 ? 10 : 6)}  (same firmware gate as LFE)");
+            sb.AppendLine($"Torque boost:   {TorqueBoostText(d)}  rated {d.BaseRatedNm:0.#} Nm");
 
             if (plugin != null)
             {

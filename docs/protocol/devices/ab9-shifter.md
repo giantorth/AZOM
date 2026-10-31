@@ -1,5 +1,7 @@
 ## AB9 active shifter (2026-04-24)
 
+**Status (2026-10-29, `0x0B` value is an RPM-driven damper coefficient, not a phase counter)**: bundle `JCB5WQ8K` (plugin 1.7.1, Assetto Corsa) reported the lever "possessed" for ~15 s out of every ~40 s while engine vibration ran. The plugin drove `0x0B` payload 5-8 from a free-running 16-bit accumulator (`+39`/pair at idle, 48 Hz), which wrapped every **35.0 s** in the bundle's capture and sat at ≥ `0x8000` for 17.5 s of each cycle. `0x0B` is Set Condition on the two **Damper** effects (indices 2, 3 — see the next status block), so that field is the damper coefficient; a value ≥ `0x8000` is negative damping when read as signed. Re-decoding `usb-capture/AB9/ab9-pithouse-engine-vibration-intensity-2.pcapng` against its own RPM telemetry: PitHouse's value is **bounded 42..7722, moves both directions, and tracks `≈ 9800 × (1 − rpm/maxRpm)`** (7722 at the steady idle fraction 0.212 = 9800 × 0.788; ~50 at redline; ratio 9670–9920 through the sweeps). Never ≥ `0x8000`; fastest change ~11,400/s. One car only (redline 18,800), so `(1 − fraction)` vs an absolute-RPM law is not separable from this capture. Plugin now sends `EnginePulseCoefficientFullScale (9800) × (1 − RedlineFraction)`, slew-limited at 12,000/s and clamped to `0..9800` in `SendEnginePulsePair`. The "monotonic phase counter" wording elsewhere on this page is retracted.
+
 **Status (2026-08-06, group-0x20 second byte resolved = effect index; shift-force ramp corrected)**: a user diagnostics bundle (CS V2.1 + AB9, plugin `1.5.2-dev.924121d`, report "AB9 gear shifts get a bit violent after playing for a while") carried the AB9's own **group-0x0E firmware log** across the FFB init handshake, which settles the open question below:
 
 ```
@@ -228,7 +230,7 @@ Concurrent sub-streams on `Group 0x20 → dev 0x12` during steady-state driving:
 | Sub-cmd | Frame len | Rate at idle | Rate at redline | Role |
 |---|---|---|---|---|
 | `0x0A 0x05` | 19 B | ~85-90 Hz | ~87 Hz | Primary oscillator-period push, one frame per allocated effect slot. See "0x0A 05 payload schema" below — 24-bit BE period field, inversely proportional to vibration frequency (verified 2×). |
-| `0x0B 0x02` + `0x0B 0x03` | 22 B each | 1.7 Hz each | 34.6 Hz each | **Engine-cycle pulse train.** `02` is the on-half (amp16 `0x2328` at offsets 18-19), `03` is the off-half (amp16 `0x0000`). 16-bit phase counter at offsets 5-6 (duplicated at 7-8) advances monotonically per pair, step size scales with RPM. **Rate scales linearly with engine speed at slider=100 %, multiplicatively attenuated by the intensity slider** — drops to zero pulses for 40+ consecutive seconds at stable cruise (load-gated). Best RPM proxy in the stream when emitting. See `0x0B` schema below. |
+| `0x0B 0x02` + `0x0B 0x03` | 22 B each | 1.7 Hz each | 34.6 Hz each | **Engine-cycle pulse train.** `02` is the on-half (amp16 `0x2328` at offsets 18-19), `03` is the off-half (amp16 `0x0000`). 16-bit damper coefficient at offsets 5-6 (duplicated at 7-8), `≈ 9800 × (1 − rpm/maxRpm)` — corrected 2026-10-29, the earlier "monotonic phase counter, step scales with RPM" reading was wrong. **Rate scales linearly with engine speed at slider=100 %, multiplicatively attenuated by the intensity slider** — drops to zero pulses for 40+ consecutive seconds at stable cruise (load-gated). Best RPM proxy in the stream when emitting. See `0x0B` schema below. |
 | `0x0D 0x02` + `0x0D 0x03` | 3 B (payload `01 D0` / `01 D1`) | 9.1 Hz each | 9.2 Hz each | **Heartbeat-rate trigger** — flat regardless of RPM. Purpose unclear; possibly slot-keepalive. |
 | `0x0D 0x04` | 3 B (payload `01`) | not observed at idle | not observed at idle | **Per-shift "engage" trigger** — fires on transition to any non-neutral gear. Resolved 2026-05-24 via `usb-capture/AB9/all_gears.pcapng`. |
 | `0x0D 0x05` | 3 B (payload `01 D3`) | 2.0 Hz | 19.1 Hz | RPM-tracking trigger (≈10× scaling from idle to redline). |
@@ -420,22 +422,24 @@ Full-session decode resolves the doc's previous "open schema questions" below:
 #### `0x0B 0x02 / 0x0B 0x03` engine-pulse pair — 22 byte payload
 
 ```
-0B XX [00 00 00] [pp pp] [pp pp] [00 00 00 00 00 00] [FF FA] 04 [aa aa] [00 00]
-   sub  3 zero pad ╰─ phase counter (16-bit BE, duplicated) ─╯   const   tag amp16  2-zero pad
+0B XX [00 00 00] [cc cc] [cc cc] [00 00 00 00 00 00] [FF FA] 04 [aa aa] [00 00]
+   sub  3 zero pad ╰─ damper coeff (16-bit BE, duplicated) ─╯   const   tag amp16  2-zero pad
 ```
 
 Offsets are 0-indexed payload positions (the wire frame's `frame[4]` is `payload[0]`). Verified byte-for-byte against the 2026-05-13 capture across 17,603 pulse-on and 17,603 pulse-off frames (2026-05-24 re-decode):
 
-- `XX = 0x02` (pulse-on) or `0x03` (pulse-off). Pulses come in tightly-spaced ON/OFF pairs (sub-ms apart) that share the same phase counter value.
+- `XX = 0x02` (pulse-on) or `0x03` (pulse-off). Pulses come in tightly-spaced ON/OFF pairs (sub-ms apart) that share the same coefficient value.
 - **3 zero pad at offsets 2-4** (the prior version of this doc said "4 zero pad" — that was wrong and was the source of the engine-pulse-pair off-by-one bug in the plugin's `BuildEnginePulseFrame` pre-2026-05-24).
-- **Phase counter at offsets 5-6 = offsets 7-8 (duplicated within frame)** is a 16-bit BE counter that advances monotonically across the session; advance per pair scales with RPM (small advance at idle, large advance at redline). **It is NOT a bipolar envelope sample** — the duplicated 16-bit field was the same value, not two independent samples. The duplication is likely a "phase / phase-mirror" or "expected / actual" position pair the device cross-checks.
+- **Damper coefficient at offsets 5-6 = offsets 7-8 (duplicated within frame)**, 16-bit BE, signed. **Corrected 2026-10-29: not a monotonic phase counter.** PitHouse drives it from RPM, `≈ 9800 × (1 − rpm/maxRpm)` — 7722 at idle, ~50 at redline, rising again as revs drop; never ≥ `0x8000`. The duplicate is likely the positive/negative coefficient pair of a Set Condition report. A free-running wrapping counter here drives the lever into negative damping for half of every wrap (bundle `JCB5WQ8K`).
 - **6 zero pad at offsets 9-14**.
 - `FF FA` at offsets 15-16: constant. Unchanged across all observations.
 - Tag byte `0x04` at offset 17: matches the same tag used in `0x0A 0x05`. Constant.
 - **Amplitude16 (offsets 18-19)**: `23 28` = 9000 in `0x0B 0x02`, `00 00` in `0x0B 0x03`. So 0x0B 0x03 is literally "this pulse with amplitude = 0" — encoding the OFF half of a square-wave pulse as a separate frame rather than a single-frame on/off envelope. **Constant across the full session in both directions** — PitHouse never modulates this with slider, RPM, or freq.
 - **2 zero trailing pad at offsets 20-21** (the prior version of this doc said "duty byte 0x28 at offset 21" — that was wrong; offset 20 was misread as a duty field because of the earlier off-by-one, and the "0x28 = 40" value was the low half of amp16 (`0x2328`)).
 
-Implementation rule (**corrected 2026-05-31**): emit pulse pairs at a **constant ~48 Hz** (not RPM- or intensity-driven — the rate is flat across rpm-fraction 0.2..1.0 and across intensity 100/60/40 %); amp16 = `0x2328` constant for ON, `0x0000` for OFF; phase counter advances per pair. **Intensity is NOT encoded here** — it is the linear `0x0A 0x05` amplitude field (offset 6-7); see "Slider effects on the stream" above.
+Implementation rule (**corrected 2026-05-31**): emit pulse pairs at a **constant ~48 Hz** (not RPM- or intensity-driven — the rate is flat across rpm-fraction 0.2..1.0 and across intensity 100/60/40 %); amp16 = `0x2328` constant for ON, `0x0000` for OFF; coefficient = `9800 × (1 − rpm/maxRpm)` (**corrected 2026-10-29**), never a wrapping counter. **Intensity is NOT encoded here** — it is the linear `0x0A 0x05` amplitude field (offset 6-7); see "Slider effects on the stream" above.
+
+Plugin transport: the ON and OFF halves ride adjacent latest-wins stream slots (`StreamKind.Ab9EnginePulse` / `Ab9EnginePulseOff`, ON first). The write loop drains slots in index order, so a pair queued together goes out ON then OFF back-to-back in one pass. The damper-start pair (`0x0D` for the ON and OFF dampers, `MozaAb9DeviceManager.SendKeepalivePair`) is carried the same way on `Ab9TriggerA` / `Ab9TriggerB`.
 
 #### `0x08 <idx>` shift constant-force pair — 11 byte payload
 
@@ -515,7 +519,7 @@ For plugin replication, a **fixed slot table** is sufficient: `0x1996` for prima
 
 These survive the full-session decode and are likely not blockers for plugin replication:
 
-- The `0x0D 0x05` rate model — varies roughly with `(freq × RPM)` but the per-second rate also shows windows of the same period band with different rates, suggesting a load-gate similar to `0x0B 0x02/03`. The 2026-05-15 "intensity-sign flip" wording in the prior version was speculative — the trigger frame's 3-byte payload doesn't contain a sign. For replication, drive it from the same per-RPM-cycle phase accumulator as `0x0B 0x02/03`; the rate will fall out of the cadence naturally without needing a closed-form rate model. (The pre-2026-08-06 version of this bullet also named `0x08 0x04/06` here — do **not** accumulator-drive that one, it is the shift-kick magnitude.)
+- The `0x0D 0x05` rate model — varies roughly with `(freq × RPM)` but the per-second rate also shows windows of the same period band with different rates, suggesting a load-gate similar to `0x0B 0x02/03`. The 2026-05-15 "intensity-sign flip" wording in the prior version was speculative — the trigger frame's 3-byte payload doesn't contain a sign. For replication, drive it from an RPM-scaled tick interval; the rate will fall out of the cadence naturally without needing a closed-form rate model. (`0x0B 0x02/03` carries an RPM-driven damper coefficient, not a phase accumulator — see the 2026-10-29 status block.) (The pre-2026-08-06 version of this bullet also named `0x08 0x04/06` here — do **not** accumulator-drive that one, it is the shift-kick magnitude.)
 - The eight zero bytes between slot ID and period in `0x0A 0x05`, and the four trailing zeros — static across all observations; treat as fixed protocol padding.
 - The `FF FA` constant in `0x0B 0x02/03` and the `0E 00 64 04` tail in `0x0A 0x01` vib-config — neither varies across intensity/RPM sweeps; treat as fixed protocol padding for replication.
 - The pulse-pair load-gate — `0x0B 0x02/03` stops entirely during long stable-RPM cruise (period stable at e.g. `0x250172` for 40+ seconds at 0 pulses/sec, then resumes when RPM starts changing). The trigger is presumably engine load / dRPM-dt, but the 2026-05-13 capture doesn't include game-side telemetry to confirm. Plugin replication: `(slider/100) × rpm_relative_linear_rate` is a workable approximation without throttle telemetry; a future capture with synchronized AC telemetry could resolve the exact gate predicate.

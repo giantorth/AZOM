@@ -144,15 +144,3 @@ sees each unknown PID per process lifetime:
 Will be probed with every known protocol; please report so
 docs/protocol/devices/usb-ids.md can be updated.
 ```
-
-## Legacy constant name caveat
-
-[`MozaUsbIds.cs`](../../../Protocol/MozaUsbIds.cs) defines
-`PidWheelbaseR9 = "0x0006"` and `PidWheelbaseR12 = "0x0002"`. The
-R9/R12 suffixes are **mis-labelled** relative to the hardware mapping
-in the table above (R9 is `0x0002`, R12 is `0x0006`). Renaming would
-churn diffs without changing behaviour because `IsWheelbasePid` accepts
-both PIDs unconditionally. The names are preserved as-is for diff
-hygiene; new code should prefer `MozaUsbIds.Categorize(pid)` or the
-neutral constants (`PidWheelbaseR16R21`, `PidWheelbaseR5`,
-`PidWheelbaseR3`).

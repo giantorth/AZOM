@@ -227,6 +227,30 @@ Scope any "have I already committed this END value?" state to a **catalog
 epoch** — the span between session opens — and treat the first commit of an
 epoch as authoritative for the current dashboard (see live-set rule 5).
 
+### END settle (mid-announcement END ticks)
+
+On the CM2 (S09, fw 1.2.7.14, bundle `DJQ23F6D`) the END value is the
+wheel's **cumulative catalog record count**, emitted on a ~1 Hz tick, not a
+marker placed after the last record. Every value in that session matches:
+27 (cold start, 27 URLs) → 81 (+27 back-refs +27 URLs) → 129 (+27 +21) → … .
+After records stop, the tick re-asserts the same value about seven times at
+1 s intervals, then only empty keepalive chunks follow.
+
+A tick can therefore land **mid-announcement**: on a V1_copy → V1 switch the
+wheel sent `b19 b22 END=179`, then the remaining 25 back-refs plus 27 URLs
+and `END=231`. END=179 marks no boundary. The host treats an END as
+**settled** only once a later END repeats the same value with no records in
+between (`ChannelCatalogParser.HasUnsettledEndSince`). The hot-switch burst
+holds its first tier-def emission until that happens, because echoing an
+unsettled END binds a partial generation: in that bundle only idx 19 and 22
+ever displayed. Live-set commits still happen at every END. The arm-count
+UNION already merges a switch that is split across several ENDs.
+
+Empty keepalive chunks (payload = CRC `00 00 00 00`) consume a seq on the
+catalog sessions. They must reach the seq-ordered reassembler. Before the
+fix, the dispatcher dropped them, so every switch announcement waited 5 s
+behind a phantom hole.
+
 ### Live-set tracking ("which idxs are in the current dashboard?")
 
 `Catalog` (the accumulated URL list) is not dash-specific — it preserves
@@ -310,9 +334,10 @@ before the first live commit (cold start), when no masked view exists yet.
 
 [`TelemetrySender.WheelChannelCatalog`](../../../Telemetry/TelemetrySender.cs)
 parses this stream during preamble and exposes the resulting URL list to
-the UI. The list is also used by `FilterProfileToCatalog` to drop tier
-entries whose URL doesn't appear in the wheel's advertised set, with
-last-path-segment fallback (case-insensitive). See
+the UI. Under the `V2Type02` encoding the list is also used by
+`TierDefinitionEmitter.RefilterLiveTiers` to drop tier entries whose URL
+has no idx in the wheel's live catalog (case-insensitive full-URL match)
+and sort the rest by catalog idx. See
 [`../plugin/tier-impl.md`](../plugin/tier-impl.md).
 
 Catalog-only profile synthesis (`TelemetrySender.MaybeSwapProfileForCatalog`,

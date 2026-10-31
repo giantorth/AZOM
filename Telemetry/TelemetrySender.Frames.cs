@@ -17,7 +17,6 @@ namespace MozaPlugin.Telemetry
 {
     public partial class TelemetrySender
     {
-
         /// <summary>True while a host enable declaration for this dirName is
         /// outstanding — the wheel accepts the list but often never pushes a
         /// confirming delta mid-session, so the UI would otherwise keep
@@ -25,48 +24,6 @@ namespace MozaPlugin.Telemetry
         public bool IsEnableDeclared(string dirName) =>
             !string.IsNullOrEmpty(dirName) && _intentionalEnables.ContainsKey(dirName);
 
-        /// <summary>
-        /// Tiered chunk-drop recovery for sess=0x09 / 0x0a configJson. Tier
-        /// chosen by gap count, cached state, and elapsed time since the gap
-        /// was first observed:
-        ///
-        ///   Tier 0 (LastState present, any gap count): no action required.
-        ///   The cached state is still authoritative for downstream consumers
-        ///   (dashboard library list); the wheel doesn't change state without
-        ///   a user action so a stale-but-correct cache is preferable to a
-        ///   forced re-handshake (which the wheel often ignores anyway).
-        ///
-        ///   Tier 0.5 (LastState absent, gap fresh): passive wait. The
-        ///   cumulative ACK the caller just sent points at HighWaterSeq
-        ///   instead of the just-received seq, so the wheel's outstanding-
-        ///   ack timer will retransmit the missing chunk in ~1.3 s. We give
-        ///   it ConfigJsonGapPassiveWaitMs (5 s) before escalating to an
-        ///   active prime+open-request — most gaps self-heal in that window.
-        ///
-        ///   Tier 1 (LastState absent, passive wait expired): prime +
-        ///   open-request. Some firmwares respond to the prime by resetting
-        ///   their sess=0x09 state machine and re-bursting on next
-        ///   OpenRequest.
-        ///
-        ///   Tier 2 (LastState absent, repeated gaps after prime+open): full
-        ///   RestartForSwitch. The Stop+11s-settle+Start sequence is the only
-        ///   reliable way to force a wheel that's stuck mid-burst back to a
-        ///   cold-start where it'll definitely emit the full state again.
-        ///
-        /// Cooldown gates Tier 2 so a chunk-drop storm can't cycle Restart
-        /// faster than the wheel's settle window.
-        /// </summary>
-        
-        /// <summary>
-        /// Host-initiated session-open request for the configJson channel
-        /// (port 9). PitHouse capture
-        /// (`wireshark/csp/startup, change knob colors, ...pcapng` pno~97431)
-        /// shows it uses a distinct magic <c>7c 1e 6c 80</c> for this port —
-        /// upload-style <c>7c 23 46 80</c> does NOT trigger wheel device-init
-        /// for 0x09. Without this prompt CSP firmware never opens the
-        /// configJson channel, leaving plugin "Wheel Files" tab empty.
-        /// </summary>
-        
         /// <summary>
         /// Universal-Hub 5-slot enumeration burst. Sends `7E 03 64 12 01 NN 00 [chk]`
         /// for slots 1..5 in a tight burst (PitHouse fires all 5 in a single USB

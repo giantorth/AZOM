@@ -81,23 +81,6 @@ namespace MozaPlugin.Devices.Ui
                     if (_suppressEvents) return;
                     int v = chip.SelectedIndex;
                     if (v < 0) return;
-                    // The chip owns the write. Driving the hidden stub's
-                    // SelectedIndex instead drops the edit whenever the two already
-                    // agree; the stub is only kept in sync for the XAML handler
-                    // contract, silently so it can't double-write.
-                    var hidden = knobIdx switch
-                    {
-                        0 => WiKnobSignalMode0Combo,
-                        1 => WiKnobSignalMode1Combo,
-                        2 => WiKnobSignalMode2Combo,
-                        3 => WiKnobSignalMode3Combo,
-                        4 => WiKnobSignalMode4Combo,
-                        _ => null
-                    };
-                    if (hidden != null && hidden.SelectedIndex != v)
-                    {
-                        using (_suppressor.Begin()) hidden.SelectedIndex = v;
-                    }
                     WriteWiKnobSignalMode(knobIdx, v);
                 };
                 // A ListBox raises SelectionChanged only when the selection MOVES, so
@@ -225,8 +208,7 @@ namespace MozaPlugin.Devices.Ui
 
         // Per-knob signal mode as the UI must render it: the per-(profile × wheel-page)
         // overlay wins, _data (the wheel's own readback) only fills an unset slot —
-        // the same overlay-first rule the other input modes follow. Both the chips and
-        // the hidden stubs resolve through here so the two surfaces cannot disagree.
+        // the same overlay-first rule the other input modes follow.
         private int ResolveKnobSignalMode(WheelOverride? ov, int logicalKnob)
         {
             if (_data == null || logicalKnob < 0 || logicalKnob >= MozaData.WheelKnobMax) return -1;

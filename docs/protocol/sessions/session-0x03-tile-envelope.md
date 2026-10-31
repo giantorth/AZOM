@@ -61,7 +61,14 @@ Plugin parser:
 
 The `+4` budget on `comp_sz` matches sessions `0x09`/`0x0a`, but the BE u24
 uncompressed-size field and the `FF 01 00 / FF 00` tag layout are unique to
-session `0x03`. The plugin's `SessionDataReassembler` first tries the 9-byte
-sessions-09/0a layout, falls back to magic-scan for `78 9c`, and ultimately
-relies on `TileServerStateParser` to recognise the `FF 01 00` lead bytes —
-see [`../plugin/reassembly-fallback.md`](../plugin/reassembly-fallback.md).
+session `0x03`. Inbound session `0x03` is not decoded by
+`SessionDataReassembler` (see
+[`../plugin/reassembly-fallback.md`](../plugin/reassembly-fallback.md)) but by
+`TileServerStateParser`, which reads this 12-byte envelope directly: it waits
+until `comp_sz` zlib bytes are buffered, then inflates exactly that span and
+requires both `uncomp_sz` and the Adler-32 trailer to match
+(`SessionDataReassembler.InflateZlibExact`). It decodes every complete
+envelope a chunk completes; leading bytes that aren't an `FF 01 00` start, an
+impossible size, or a fully buffered envelope that fails those checks or JSON
+parsing are skipped to the next `FF 01 00`, so one bad envelope can't block the
+ones after it.

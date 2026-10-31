@@ -50,10 +50,9 @@ namespace MozaPlugin.Devices.MBooster
     /// target unit itself is resolved once at start and pinned (_dev).
     ///
     /// Driven by one <see cref="System.Timers.Timer"/> rather than a
-    /// DispatcherTimer in the settings panel: SettingsControl's
-    /// RunCalibrationCountdown silently drops its stop action if the panel
-    /// unloads mid-countdown, which here would leave the pedal mid-sweep with
-    /// no stop frame and no reboot.
+    /// DispatcherTimer in the settings panel: the run outlives any one panel
+    /// instance, and a step lost with the panel would leave the pedal
+    /// mid-sweep with no stop frame and no reboot.
     ///
     /// PendingResponseTracker is deliberately not used for the motor status
     /// poll: its 60s sunset blacklist expires almost exactly when a ~59.5s
@@ -157,6 +156,9 @@ namespace MozaPlugin.Devices.MBooster
             public string? Identity { get; }
             public int AxisIndex { get; }
 
+            /// <summary>True while a routine owns any lane. The UI disables both
+            /// buttons on every pedal while this holds — the routines reboot the
+            /// unit, so a second one cannot be allowed to interleave.</summary>
             public bool IsRunning => Kind != MBoosterCalKind.None
                 && Step != MBoosterCalStep.Idle
                 && Step != MBoosterCalStep.Done
@@ -168,11 +170,6 @@ namespace MozaPlugin.Devices.MBooster
             lock (_lock)
                 return new Status(_kind, _step, _message, _secondsRemaining, _identity, _axisIndex);
         }
-
-        /// <summary>True while a routine owns any lane. The UI disables both
-        /// buttons on every pedal while this holds — the routines reboot the
-        /// unit, so a second one cannot be allowed to interleave.</summary>
-        public bool IsRunning => Snapshot().IsRunning;
 
         // ---- Entry points ---------------------------------------------------
 
@@ -378,10 +375,10 @@ namespace MozaPlugin.Devices.MBooster
 
                 case MBoosterCalStep.Rebooting:
                     // Observing the port gone counts as the drop, not just the
-                    // registry's DeviceRemoved: Refresh() only disposes a
+                    // registry's OnDeviceRemoved call: Refresh() only disposes a
                     // controller whose PORT disappeared, and reconnects one
-                    // whose port merely wedged — that second path never fires
-                    // DeviceRemoved, so waiting on it alone stalled the verify
+                    // whose port merely wedged — that second path never calls
+                    // OnDeviceRemoved, so waiting on it alone stalled the verify
                     // for the full reconnect timeout.
                     if (!connected)
                     {

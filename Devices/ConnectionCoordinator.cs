@@ -227,7 +227,11 @@ namespace MozaPlugin.Devices
                     $"{dashPid} ({MozaUsbIds.Describe(dashPid)}; {reason})");
             }
 
-            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+            try
+            {
+                if (rising) _plugin.HardwareApplier.ForgetDashFlagsBrightness();
+                _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dashboard profile apply skipped: {ex.Message}"); }
 
             try
@@ -476,6 +480,8 @@ namespace MozaPlugin.Devices
             // tracked reads (including the wheel-evidence probes) explicitly.
             try { _hubManager?.Disconnect(); } catch { }
             try { _hubManager?.PendingResponses?.Clear(); } catch { }
+            // The hub's peripherals re-detect on the primary once it is rebound.
+            _hubDeviceProber.ReleasePeripheralOwnership();
 
             // Latch the wheel-less base BEFORE rebinding so MigratePrimaryToWheelbase
             // (which runs later this tick) skips it, and so the reconnect tick's
@@ -505,6 +511,8 @@ namespace MozaPlugin.Devices
             _detectionState.BaseOwner = null;
             _data.ClearBaseIdentity();
             _data.BaseSettingsRead = false;
+            // Peripherals the primary detected behind the base aren't on the hub.
+            _plugin.DeviceProber.ReleasePeripheralOwnership();
             try { _plugin.PendingResponses.Clear(); } catch { }
 
             // Rebind the primary to the hub; TryConnect probes the wheel there and
@@ -602,12 +610,9 @@ namespace MozaPlugin.Devices
             // Peripherals detected while the primary was wrongly on the hub got
             // their owner pinned to the primary device-manager; reset detection +
             // ownership (mirrors OnHubDisconnected) so they re-enumerate on the
-            // correct pipe — pedals/handbrake via the hub manager, base settings
-            // via the rebound primary.
-            _detectionState.PedalsDetected = false;
-            _detectionState.PedalsOwner = null;
-            _detectionState.HandbrakeDetected = false;
-            _detectionState.HandbrakeOwner = null;
+            // correct pipe — pedals/handbrake/shifter via the hub manager, base
+            // settings via the rebound primary.
+            _plugin.DeviceProber.ReleasePeripheralOwnership();
             _detectionState.HubDetected = false;
 
             // Rebind the primary; TryConnect re-probes the wheel and persists the
@@ -664,17 +669,7 @@ namespace MozaPlugin.Devices
             if (MozaPlugin.IsShuttingDown) return;
             _detectionState.HubDetected = false;
             _data.IsHubConnected = false;
-            var hubDm = _hubManager?.DeviceManager;
-            if (hubDm != null && ReferenceEquals(_detectionState.PedalsOwner, hubDm))
-            {
-                _detectionState.PedalsDetected = false;
-                _detectionState.PedalsOwner = null;
-            }
-            if (hubDm != null && ReferenceEquals(_detectionState.HandbrakeOwner, hubDm))
-            {
-                _detectionState.HandbrakeDetected = false;
-                _detectionState.HandbrakeOwner = null;
-            }
+            _hubDeviceProber.ReleasePeripheralOwnership();
             // The hub's tracked reads will never be answered now — drop them so
             // they don't retransmit against a reconnected (possibly different) hub.
             try { _hubManager?.PendingResponses?.Clear(); } catch { }
@@ -808,6 +803,7 @@ namespace MozaPlugin.Devices
             _data.IsBaseConnected = false;
             _data.ClearBaseIdentity();
             _data.BaseSettingsRead = false;
+            Hardware.HardwareApplier.ForgetBaseAmbientCfg();
             var baseDm = _baseManager?.DeviceManager;
             if (baseDm != null && ReferenceEquals(_detectionState.BaseOwner, baseDm))
                 _detectionState.BaseOwner = null;

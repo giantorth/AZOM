@@ -32,8 +32,11 @@ namespace MozaPlugin.Telemetry
             // alive); a Stop+Start cycle here would close sessions and
             // pay the 11s sess=0x09 settle wait, defeating the whole point
             // of keeping the wire persistent. Short-circuit when already
-            // Active and connected.
-            if (_state == TelemetryState.Active && _connection.IsConnected)
+            // Active, connected, and still ticking — an Active state whose tick
+            // timer is gone (a Stop racing the preamble's Active transition)
+            // is not running and must take the full start.
+            if (_state == TelemetryState.Active && Volatile.Read(ref _sendTimer) != null
+                && _connection.IsConnected)
             {
                 MozaLog.Debug(
                     "[AZOM] Start() skipped — sender already Active with live connection " +
@@ -457,15 +460,14 @@ namespace MozaPlugin.Telemetry
             ResetDeviceLogPull();
             _nextFlagBase = 0;
             _activeSubscription = null;
-            _sessionAckSeq = 0;
             _sessionLife.ClearContigAck();
             _dashboardDownloadTriggered = false;
-            ConfigSessionLatch = 0;
             _preambleTickTarget = Math.Max(1, 1000 / _baseTickMs);
             // Default the cold-start preamble gate off; StartInner re-arms it
             // for true cold starts immediately after this call.
             _coldStartWheelGatePending = false;
             _coldStartGateLogged = false;
+            _reprovokePending = false;
             // Fresh cycle: init handshake not yet sent (so the FF-session re-send
             // guard in ApplySubscription re-evaluates against this connection).
             _initHandshakeSession = 0;
@@ -600,6 +602,7 @@ namespace MozaPlugin.Telemetry
             // all reach it, and the bare "Stop()" reason didn't say which. The
             // top frames name the culprit in the diagnostics bundle.
             TransitionTo(TelemetryState.Idle, "Stop() ← " + DescribeStopCaller());
+            _reprovokePending = false;
             _connection.MessageReceived -= _inboundDispatcher.OnMessageDuringPreamble;
             // Stop() is reachable concurrently (read thread, recovery workers,
             // poll timer, UI) — Exchange picks a single winner for the teardown.
@@ -639,7 +642,6 @@ namespace MozaPlugin.Telemetry
             _postSwitchConvergence.Disarm();
             _postSwitchKind4Confirmed = false;
             try { _uploader?.Reset(); } catch { }
-            _sessions.Reset();
             _dispatcher.Reset();
             ResetDeviceLogPull();
             _session09InboundSeq = 0;
@@ -695,6 +697,9 @@ namespace MozaPlugin.Telemetry
             // wheel-state doesn't change without user action.
             try { _configJson.ClearBuffer(); } catch { }
             try { _tileServerParser.Clear(); } catch { }
+            // A high-water mark left from this session would silently drop every
+            // next-session tile-server chunk at or below it as a retransmit.
+            lock (_tileServerHighestSeq) _tileServerHighestSeq.Clear();
             try { _session0aInbox.Clear(); } catch { }
             // Reset so StartTelemetryIfReady() won't skip us on re-enable
             _framesSent = 0;

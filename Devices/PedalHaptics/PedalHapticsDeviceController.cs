@@ -177,9 +177,6 @@ namespace MozaPlugin.Devices.PedalHaptics
         /// <summary>Drop one pedal to silent (that device's provider Stop path).</summary>
         public void ClearPedal(int pedalIndex) => _effects.ClearPedal(pedalIndex);
 
-        /// <summary>Drop every pedal to silent.</summary>
-        public void ClearAll() => _effects.ClearAll();
-
         private void OnConnectionMessage(byte[] data)
         {
             if (data == null || data.Length < 3) return;

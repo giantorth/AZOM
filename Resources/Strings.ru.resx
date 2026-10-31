@@ -136,7 +136,6 @@
   <data name="SliderLabel_VibrationIntensity" xml:space="preserve"><value>Интенсивность вибрации</value></data>
   <data name="Section_MBoosterPedals" xml:space="preserve"><value>ПЕДАЛИ MBOOSTER</value></data>
   <data name="Subtitle_MBoosterPedals" xml:space="preserve"><value>// эффекты формируются хостом · роль и положение по устройству</value></data>
-  <data name="SliderLabel_Device" xml:space="preserve"><value>Устройство</value></data>
   <data name="SliderLabel_Role" xml:space="preserve"><value>Роль</value></data>
   <data name="Option_Disabled" xml:space="preserve"><value>Отключено</value></data>
   <data name="Option_Throttle" xml:space="preserve"><value>Газ</value></data>
@@ -153,7 +152,6 @@
   <data name="Section_SegmentedDampingPressed" xml:space="preserve"><value>При Нажатии</value></data>
   <data name="Section_SegmentedDampingReleased" xml:space="preserve"><value>При Отпускании</value></data>
   <data name="Section_SimInputMapping" xml:space="preserve"><value>СОПОСТАВЛЕНИЕ ВВОДА СИМУЛЯТОРА</value></data>
-  <data name="Subtitle_SimInputMapping" xml:space="preserve"><value>// сопоставление сигнала тензодатчика/педали с игрой, в стиле Pit House</value></data>
   <data name="SliderLabel_MaxThresholdKg" xml:space="preserve"><value>Макс. порог (кг)</value></data>
   <data name="Section_Effects" xml:space="preserve"><value>ЭФФЕКТЫ</value></data>
   <data name="Subtitle_EffectsTriggers" xml:space="preserve"><value>// триггеры: ABS по сигналу игры · Блокировка при тормозе&gt;0,8 · Порог по фронту · Двигатель непрерывно</value></data>
@@ -163,7 +161,6 @@
   <data name="Section_MBoosterGearShift" xml:space="preserve"><value>Переключение передач</value></data>
   <data name="Section_RoadTexture" xml:space="preserve"><value>Текстура дороги</value></data>
   <data name="Label_Enable" xml:space="preserve"><value>Включить</value></data>
-  <data name="Button_Test1s" xml:space="preserve"><value>Тест 1с</value></data>
   <data name="Label_Test" xml:space="preserve"><value>Тест</value></data>
   <data name="Section_Lockup" xml:space="preserve"><value>Блокировка</value></data>
   <data name="Section_Threshold" xml:space="preserve"><value>Порог</value></data>
@@ -174,12 +171,7 @@
   <data name="SliderLabel_Gain" xml:space="preserve"><value>Усиление</value></data>
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
-  <data name="Subtitle_CalibrationExperimental" xml:space="preserve"><value>// экспериментально — прошивка mBooster может это игнорировать</value></data>
-  <data name="Label_ReversedDirection" xml:space="preserve"><value>Инвертированное направление</value></data>
-  <data name="SliderLabel_MinRaw" xml:space="preserve"><value>Мин (сырое)</value></data>
-  <data name="SliderLabel_MaxRaw" xml:space="preserve"><value>Макс (сырое)</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ПРОЧИТАТЬ С УСТРОЙСТВА</value></data>
-  <data name="Button_Apply" xml:space="preserve"><value>ПРИМЕНИТЬ</value></data>
   <data name="Section_UniversalHubPedals" xml:space="preserve"><value>УНИВЕРСАЛЬНЫЙ ХАБ · ПЕДАЛИ</value></data>
   <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// порт педалей (опрос каждые 2 секунды)</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Порт педалей</value></data>
@@ -286,22 +278,11 @@
   <data name="Status_InstallFailedWriteDenied" xml:space="preserve"><value>нет доступа на запись в папку плагина</value></data>
   <data name="Section_Updates" xml:space="preserve"><value>ОБНОВЛЕНИЯ</value></data>
   <data name="Subtitle_Updates" xml:space="preserve"><value>// встроенный уведомитель об обновлениях</value></data>
-  <data name="Section_Bandwidth" xml:space="preserve"><value>ПРОПУСКНАЯ СПОСОБНОСТЬ</value></data>
-  <data name="Subtitle_Bandwidth" xml:space="preserve"><value>// последовательный трафик · 30-секундное окно</value></data>
   <data name="Label_Inbound" xml:space="preserve"><value>ВХОДЯЩИЙ</value></data>
   <data name="Label_Outbound" xml:space="preserve"><value>ИСХОДЯЩИЙ</value></data>
   <data name="Label_Capacity" xml:space="preserve"><value>ПРОПУСКНАЯ</value></data>
-  <data name="Label_Peak" xml:space="preserve"><value>ПИК</value></data>
-  <data name="Label_Session" xml:space="preserve"><value>СЕАНС</value></data>
-  <data name="Section_SerialTrafficCapture" xml:space="preserve"><value>ЗАХВАТ ПОСЛЕДОВАТЕЛЬНОГО ТРАФИКА</value></data>
-  <data name="Subtitle_SerialTrafficCapture" xml:space="preserve"><value>// записывает каждый кадр TX/RX</value></data>
-  <data name="Hint_CaptureDataInMemory" xml:space="preserve"><value>Данные хранятся только в памяти — между запусками ничего не сохраняется. Нажмите Стоп, чтобы экспортировать ZIP-архив для диагностической поддержки.</value></data>
-  <data name="Button_StartCapture" xml:space="preserve"><value>НАЧАТЬ ЗАХВАТ</value></data>
-  <data name="Label_AlwaysCaptureOnStartup" xml:space="preserve"><value>Всегда начинать захват диагностики при запуске или смене игры</value></data>
-  <data name="Tooltip_AlwaysCaptureOnStartup" xml:space="preserve"><value>Когда включено, захват последовательного трафика начинается автоматически при каждом запуске плагина.</value></data>
   <data name="Button_ExportBundle" xml:space="preserve"><value>ЭКСПОРТ АРХИВА (ZIP)…</value></data>
   <data name="Button_CopyReference" xml:space="preserve"><value>СКОПИРОВАТЬ НОМЕР</value></data>
-  <data name="Button_CopyCapture" xml:space="preserve"><value>СКОПИРОВАТЬ ЗАХВАТ В БУФЕР</value></data>
   <data name="Section_FullDiagReport" xml:space="preserve"><value>ПОЛНЫЙ ДИАГНОСТИЧЕСКИЙ ОТЧЁТ</value></data>
   <data name="Subtitle_FullDiagReport" xml:space="preserve"><value>// отладочная информация</value></data>
   <data name="Button_Expand" xml:space="preserve"><value>РАЗВЕРНУТЬ</value></data>
@@ -311,20 +292,16 @@
   <data name="Hint_FullDiagRendered" xml:space="preserve"><value>// {0} строк · то же содержимое, что и в экспортируемом пакете</value></data>
   <data name="Hint_FullDiagRenderFailed" xml:space="preserve"><value>// сбой отрисовки</value></data>
   <data name="Hint_MBoosterIntro" xml:space="preserve"><value>Каждый подключённый mBooster появляется ниже. Выберите роль (Газ/Тормоз/Сцепление) для каждого устройства, чтобы направить положение его педали. Раздел Калибровка — экспериментальный.</value></data>
-  <data name="Hint_MBoosterCalibrationWarning" xml:space="preserve"><value>Ещё не тестировалось.</value></data>
   <data name="Title_PickLedColor" xml:space="preserve"><value>Выбор цвета LED</value></data>
   <data name="Label_Palette" xml:space="preserve"><value>ПАЛИТРА</value></data>
   <data name="Label_FineTuneRgb" xml:space="preserve"><value>ТОЧНАЯ НАСТРОЙКА · RGB</value></data>
   <data name="Button_Cancel" xml:space="preserve"><value>ОТМЕНА</value></data>
   <data name="Button_Ok" xml:space="preserve"><value>ОК</value></data>
-  <data name="Section_BaseAmbientLeds" xml:space="preserve"><value>MOZA WHEEL BASE · ОКРУЖАЮЩИЕ СВЕТОДИОДЫ</value></data>
-  <data name="Label_BaseModel" xml:space="preserve"><value>Модель базы</value></data>
   <data name="Hint_NoBaseAmbientDetected" xml:space="preserve"><value>Окружающие светодиоды базы не обнаружены. Базы R9/R12 не оснащены LED-лентой; эта панель активируется только на базах R21/R25/R27.</value></data>
   <data name="Section_Mode" xml:space="preserve"><value>РЕЖИМ</value></data>
   <data name="SliderLabel_IndicatorState" xml:space="preserve"><value>Состояние индикатора</value></data>
   <data name="Option_Off" xml:space="preserve"><value>Выкл</value></data>
   <data name="Option_On" xml:space="preserve"><value>Вкл</value></data>
-  <data name="SliderLabel_StandbyAnimation" xml:space="preserve"><value>Анимация в режиме ожидания</value></data>
   <data name="Option_Constant" xml:space="preserve"><value>Постоянный</value></data>
   <data name="Option_Breath" xml:space="preserve"><value>Дыхание</value></data>
   <data name="Option_Cycle" xml:space="preserve"><value>Цикл</value></data>
@@ -334,11 +311,7 @@
   <data name="SliderLabel_Brightness" xml:space="preserve"><value>Яркость</value></data>
   <data name="Section_Sleep" xml:space="preserve"><value>СОН</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Режим сна</value></data>
-  <data name="Option_Enabled" xml:space="preserve"><value>Включено</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Время до сна</value></data>
-  <data name="Section_PowerOnOffColor" xml:space="preserve"><value>ЦВЕТ ВКЛЮЧЕНИЯ / ВЫКЛЮЧЕНИЯ</value></data>
-  <data name="SliderLabel_StartupColor" xml:space="preserve"><value>Цвет включения</value></data>
-  <data name="SliderLabel_ShutdownColor" xml:space="preserve"><value>Цвет выключения</value></data>
   <data name="Section_MozaDashboard" xml:space="preserve"><value>ТАБЛО MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Поиск табло…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>РЕЖИМЫ ИНДИКАТОРА</value></data>
@@ -373,17 +346,14 @@
   <data name="Label_PaddleCombined" xml:space="preserve"><value>ОБЪЕДИНЁННЫЙ</value></data>
   <data name="Section_ActiveButtons" xml:space="preserve"><value>АКТИВНЫЕ КНОПКИ</value></data>
   <data name="Section_Joystick" xml:space="preserve"><value>ДЖОЙСТИК</value></data>
-  <data name="Subtitle_JoystickAssignment" xml:space="preserve"><value>// назначение направленного стика</value></data>
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Руль ещё не сообщил конфигурацию джойстика. Подключите руль и дождитесь завершения опроса идентификации.</value></data>
-  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Включить телеметрию табло</value></data>
-  <data name="Button_LoadMzdash" xml:space="preserve"><value>ЗАГРУЗИТЬ .MZDASH…</value></data>
+  <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Телеметрия</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ВЫБРАТЬ ПАПКУ…</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>АВТО-ОПРЕДЕЛЕНИЕ</value></data>
-  <data name="Tooltip_LoadMzdash" xml:space="preserve"><value>Загрузить локальный .mzdash для сопоставления каналов tier-def</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Указать папку с файлами .mzdash как библиотеку панелей</value></data>
   <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Автоопределить папку панелей для подключённого руля</value></data>
-  <data name="Button_SendTestPattern" xml:space="preserve"><value>▶ ОТПРАВИТЬ ТЕСТОВЫЙ ПАТТЕРН</value></data>
-  <data name="Button_StopTest" xml:space="preserve"><value>■ СТОП</value></data>
+  <data name="Button_SendTestPattern" xml:space="preserve"><value>ТЕСТ</value></data>
+  <data name="Button_StopTest" xml:space="preserve"><value>СТОП</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>НАЗНАЧЕНИЕ КАНАЛОВ</value></data>
   <data name="Hint_ClickPencilForProperty" xml:space="preserve"><value>Карандаш — выбрать свойство, кнопка формулы — выражение NCalc / js:</value></data>
   <data name="Status_LoadingChannelMappings" xml:space="preserve"><value>Загрузка назначений каналов…</value></data>
@@ -401,22 +371,12 @@
   <data name="Tooltip_RevertToDefault" xml:space="preserve"><value>Восстановить значение по умолчанию</value></data>
   <data name="Status_MasterMapperUnavailable" xml:space="preserve"><value>Глобальный редактор каналов недоступен (см. журнал)</value></data>
   <data name="Button_ResetField" xml:space="preserve"><value>СБРОС ПОЛЯ</value></data>
-  <data name="Button_SplitField" xml:space="preserve"><value>РАЗДЕЛИТЬ ПОЛЕ</value></data>
-  <data name="Button_BitSplit" xml:space="preserve"><value>РАЗДЕЛИТЬ БИТЫ</value></data>
-  <data name="Button_MergePrev" xml:space="preserve"><value>ОБЪЕДИНИТЬ ◀</value></data>
-  <data name="Button_MergeNext" xml:space="preserve"><value>ОБЪЕДИНИТЬ ▶</value></data>
-  <data name="Button_RemoveSplit" xml:space="preserve"><value>УБРАТЬ РАЗДЕЛЕНИЕ</value></data>
   <data name="Viz_Title" xml:space="preserve"><value>ДАННЫЕ FSR1 В РЕАЛЬНОМ ВРЕМЕНИ</value></data>
-  <data name="Edit_StartByte" xml:space="preserve"><value>Начальный байт</value></data>
-  <data name="Edit_StartBit" xml:space="preserve"><value>Начальный бит</value></data>
-  <data name="Edit_BitWidth" xml:space="preserve"><value>Ширина в битах</value></data>
-  <data name="Edit_EndByte" xml:space="preserve"><value>Конечный байт</value></data>
-  <data name="Edit_Endian_LE" xml:space="preserve"><value>Little-endian</value></data>
   <data name="Edit_Scale" xml:space="preserve"><value>Масштаб</value></data>
   <data name="Edit_Bias" xml:space="preserve"><value>Смещение</value></data>
-  <data name="Section_Display" xml:space="preserve"><value>ДИСПЛЕЙ</value></data>
-  <data name="SliderLabel_DisplayBrightness" xml:space="preserve"><value>Яркость дисплея</value></data>
+  <data name="Status_RenderingPreview" xml:space="preserve"><value>Отрисовка…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Время ожидания</value></data>
+  <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Индикатор синхр.</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 минута</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 минуты</value></data>
   <data name="Option_Time3Min" xml:space="preserve"><value>3 минуты</value></data>
@@ -450,9 +410,7 @@
   <data name="Subtitle_ClickFlagToRecolor" xml:space="preserve"><value>// нажмите флаг для перекраски</value></data>
   <data name="Label_FlagPlaceholder" xml:space="preserve"><value>ФЛАГ 1</value></data>
   <data name="Section_EsWheelRpmIndicator" xml:space="preserve"><value>ИНДИКАТОР RPM</value></data>
-  <data name="Subtitle_EsLegacy" xml:space="preserve"><value>// унаследованный протокол ES</value></data>
   <data name="SliderLabel_IndicatorMode" xml:space="preserve"><value>Режим индикатора</value></data>
-  <data name="SliderLabel_DisplayMode" xml:space="preserve"><value>Режим отображения</value></data>
   <data name="Section_ButtonLedMode" xml:space="preserve"><value>РЕЖИМ LED КНОПОК</value></data>
   <data name="SliderLabel_ButtonLedMode" xml:space="preserve"><value>Режим LED кнопок</value></data>
   <data name="SliderLabel_ButtonIdleEffect" xml:space="preserve"><value>Эффект простоя кнопок</value></data>
@@ -486,18 +444,15 @@
   <data name="SliderLabel_Language" xml:space="preserve"><value>Язык</value></data>
   <data name="Hint_LanguageChangeRestart" xml:space="preserve"><value>После изменения требуется перезапуск.</value></data>
   <!-- PitHouse preset import (Button_ImportProfile + Import_*) -->
-  <data name="Button_ImportProfile" xml:space="preserve"><value>ИМПОРТ ПРОФИЛЯ…</value></data>
   <data name="Import_DialogTitle" xml:space="preserve"><value>Импорт пресета PitHouse</value></data>
   <data name="Import_Tab_Browse" xml:space="preserve"><value>Выбрать файл…</value></data>
   <data name="Import_Category_Motor" xml:space="preserve"><value>База руля (Мотор)</value></data>
   <data name="Import_Category_Pedals" xml:space="preserve"><value>Педали</value></data>
   <data name="Import_NoFolderFound" xml:space="preserve"><value>Папка пресетов PitHouse не найдена. Укажите пользовательский путь или используйте «Обзор».</value></data>
   <data name="Import_SetCustomFolder" xml:space="preserve"><value>Указать папку…</value></data>
-  <data name="Import_ConfirmHeader" xml:space="preserve"><value>Применение «{0}» к профилю «{1}». Изменятся следующие настройки:</value></data>
   <data name="Import_NoChangesHeader" xml:space="preserve"><value>Все значения этого пресета уже совпадают с вашим активным профилем.</value></data>
   <data name="Import_NotImportedHeader" xml:space="preserve"><value>Не импортировано (нет аналога в плагине):</value></data>
   <data name="Import_ApplyButton" xml:space="preserve"><value>ПРИМЕНИТЬ</value></data>
-  <data name="Import_CancelButton" xml:space="preserve"><value>ОТМЕНА</value></data>
   <data name="Import_NextButton" xml:space="preserve"><value>ДАЛЕЕ</value></data>
   <data name="Import_BackButton" xml:space="preserve"><value>НАЗАД</value></data>
   <data name="Import_BrowseDescription" xml:space="preserve"><value>Выберите JSON-файл пресета PitHouse или Motion Manager в любом месте системы.</value></data>
@@ -602,7 +557,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_PaddleCalibration" xml:space="preserve"><value>Калибровка лепестков</value></data>
   <data name="Button_RestartWheelbase" xml:space="preserve"><value>Перезапустить базу</value></data>
   <data name="Button_CalibrateStart" xml:space="preserve"><value>Старт</value></data>
-  <data name="Button_CalibrateSave" xml:space="preserve"><value>Сохранить</value></data>
   <data name="Dialog_RestartWheelbase_Caption" xml:space="preserve"><value>Перезапуск базы</value></data>
   <data name="Dialog_RestartWheelbase_Body" xml:space="preserve"><value>Перезапустить базу сейчас? Обратная связь по усилию ненадолго пропадёт во время перезагрузки.</value></data>
   <data name="Hint_PaddleCalibrate" xml:space="preserve"><value>Полностью нажмите все лепестки и отпустите. Сохранение через {0}с…</value></data>
@@ -614,7 +568,7 @@ Id: {2}</value></data>
   <data name="Option_Ab9FlightSim" xml:space="preserve"><value>Авиасимулятор</value></data>
   <data name="SliderLabel_KeepaliveTimeout" xml:space="preserve"><value>Тайм-аут keepalive</value></data>
   <data name="Hint_KeepaliveTimeout" xml:space="preserve"><value>Как долго светодиоды сохраняют последнее состояние после остановки эффектов, прежде чем руль вернётся к собственной подсветке.</value></data>
-  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Поворот дисплея</value></data>
+  <data name="SliderLabel_DisplayRotation" xml:space="preserve"><value>Поворот</value></data>
   <data name="Option_RotationSmooth" xml:space="preserve"><value>Плавный</value></data>
   <data name="Option_RotationImmediate" xml:space="preserve"><value>Мгновенный</value></data>
   <data name="TabHeader_Stalks" xml:space="preserve"><value>Подрулевые</value></data>
@@ -629,7 +583,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_WiperStageCount" xml:space="preserve"><value>Ступени стеклоочистителей</value></data>
   <data name="Label_WiperForwardWraps" xml:space="preserve"><value>Клавиша стеклоочистителей зациклена</value></data>
   <data name="SliderLabel_LightStageCount" xml:space="preserve"><value>Ступени света</value></data>
-  <data name="Button_ResyncWipers" xml:space="preserve"><value>Пересинхронизировать стеклоочистители</value></data>
   <data name="Hint_ResyncWipers" xml:space="preserve"><value>Возвращает стеклоочистители в игре в выключенное состояние для выравнивания со ступенью, отслеживаемой плагином.</value></data>
   <data name="Label_StalksLastPressed" xml:space="preserve"><value>Последнее нажатие: кнопка {0}</value></data>
   <data name="Button_LoadEts2Defaults" xml:space="preserve"><value>Загрузить настройки ETS2/ATS по умолчанию</value></data>
@@ -645,10 +598,7 @@ Id: {2}</value></data>
   <data name="Button_AddCustomEffect" xml:space="preserve"><value>+ Добавить пользовательский эффект</value></data>
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Удалить эффект</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Пользовательский эффект</value></data>
-  <data name="Section_PedalRoles" xml:space="preserve"><value>Роли педалей</value></data>
   <data name="Label_PedalAxis" xml:space="preserve"><value>Педаль {0}</value></data>
-  <data name="Hint_MBoosterAxisRoles" xml:space="preserve"><value>Этот mBooster обслуживает несколько педалей по одному подключению. Назначьте каждую обнаруженную ось на игровой вход. Порядок по умолчанию соответствует раскладке Moza Rx/Ry/Rz (газ/тормоз/сцепление) — переназначьте здесь, если педаль управляет не тем входом.</value></data>
-  <data name="Label_EffectsForPedal" xml:space="preserve"><value>Настройка педали:</value></data>
   <data name="Note_PassivePedalNoEffects" xml:space="preserve"><value>Эта педаль пассивная (без мотора) — вибрационные эффекты не действуют.</value></data>
   <data name="TabHeader_ShifterHgp" xml:space="preserve"><value>HGP</value></data>
   <data name="TabHeader_ShifterSgp" xml:space="preserve"><value>SGP</value></data>
@@ -668,9 +618,7 @@ Id: {2}</value></data>
   <data name="ShifterColor_Blue" xml:space="preserve"><value>Синий</value></data>
   <data name="ShifterColor_Purple" xml:space="preserve"><value>Фиолетовый</value></data>
   <data name="ShifterColor_White" xml:space="preserve"><value>Белый</value></data>
-  <data name="Section_WheelbaseLfe" xml:space="preserve"><value>ЭФФЕКТЫ ВИБРАЦИИ БАЗЫ</value></data>
   <data name="SliderLabel_Trigger" xml:space="preserve"><value>Триггер</value></data>
-  <data name="Label_EnginePresets" xml:space="preserve"><value>Пресеты двигателя:</value></data>
   <data name="Preset_AdditiveEngine" xml:space="preserve"><value>Аддитивный двигатель</value></data>
   <data name="Preset_BigRig" xml:space="preserve"><value>Фура</value></data>
   <data name="Preset_DetunedV8" xml:space="preserve"><value>Расстроенный V8</value></data>
@@ -689,7 +637,6 @@ Id: {2}</value></data>
   <data name="Mode_Abs" xml:space="preserve"><value>ABS</value></data>
   <data name="Mode_Gearshift" xml:space="preserve"><value>Передача</value></data>
   <data name="Mode_Custom" xml:space="preserve"><value>Свой</value></data>
-  <data name="Label_Load" xml:space="preserve"><value>Загрузить</value></data>
   <data name="Label_Save" xml:space="preserve"><value>Сохранить</value></data>
   <data name="Label_Delete" xml:space="preserve"><value>Удалить</value></data>
   <data name="Label_Import" xml:space="preserve"><value>Импорт</value></data>
@@ -706,7 +653,6 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxTravelMm" xml:space="preserve"><value>Максимальный ход педали (мм)</value></data>
   <data name="SliderLabel_ResponseSpeedPct" xml:space="preserve"><value>Скорость отклика (%)</value></data>
   <data name="Section_BugReport" xml:space="preserve"><value>СООБЩИТЬ О ПРОБЛЕМЕ</value></data>
-  <data name="Subtitle_BugReport" xml:space="preserve"><value>Отправить диагностический отчёт разработчику</value></data>
   <data name="Label_BugReportDescription" xml:space="preserve"><value>Опишите проблему</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Опишите проблему: что вы делали, как повёл себя руль или приборная панель и когда это началось.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Контакт (необязательно — email или Discord)</value></data>
@@ -719,12 +665,6 @@ Id: {2}</value></data>
   <data name="Status_BugReportFailed" xml:space="preserve"><value>Не удалось отправить. Проверьте подключение и повторите попытку.</value></data>
   <data name="Status_BugReportEdgeBlocked" xml:space="preserve"><value>Отправка заблокирована нашей CDN, а не вашим подключением — воспользуйтесь экспортом архива.</value></data>
   <data name="Status_BugReportNeedDescription" xml:space="preserve"><value>Опишите проблему перед отправкой.</value></data>
-  <data name="Label_DiagnosticCapture" xml:space="preserve"><value>Диагностическая запись</value></data>
-  <data name="Tooltip_DiagnosticCapture" xml:space="preserve"><value>Хранит в памяти небольшую трассировку обмена по последовательному порту (первая минута запуска и недавняя активность), чтобы отчёты включали подключение. Ничего не покидает ваш ПК, пока вы не отправите отчёт.</value></data>
-  <data name="Status_CaptureOff" xml:space="preserve"><value>Диагностическая запись отключена.</value></data>
-  <data name="Status_CaptureSegments" xml:space="preserve"><value>Запуск: {0} кадров ({1} KB, {2}) · Текущее: {3} кадров ({4} KB)</value></data>
-  <data name="Word_Frozen" xml:space="preserve"><value>заморожено</value></data>
-  <data name="Word_Filling" xml:space="preserve"><value>заполнение</value></data>
   <data name="Status_BugReportCooldown" xml:space="preserve"><value>Подождите немного перед отправкой следующего отчёта.</value></data>
   <data name="Tooltip_ExportBundle" xml:space="preserve"><value>Сохранить диагностический архив в файл на этом ПК (ничего не отправляется).</value></data>
   <data name="Section_StalksGameKeys" xml:space="preserve"><value>Игровые клавиши</value></data>
@@ -752,7 +692,6 @@ Id: {2}</value></data>
   <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// усиление по полосам · 100% = нейтраль · 500% = максимум</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ЧУВСТВИТЕЛЬНОСТЬ</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Входное усилие</value></data>
-  <data name="Section_PerLedColors" xml:space="preserve"><value>ЦВЕТА ПО СВЕТОДИОДАМ</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Ожидание · Постоянный</value></data>
   <data name="Label_IdleBreathing" xml:space="preserve"><value>Ожидание · Дыхание</value></data>
   <data name="Label_SleepBreathing" xml:space="preserve"><value>Сон · Дыхание</value></data>
@@ -767,6 +706,7 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Обнаружение активного переключателя передач (AB9 / AB6)</value></data>
+  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Объединённое устройство тактильной отдачи педалей</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
@@ -803,7 +743,6 @@ Id: {2}</value></data>
   <data name="Hint_MBoosterTravelCal" xml:space="preserve"><value>Калибровка хода педали — мотор двигает педаль сам, не нажимайте её. Осталось {0}с…</value></data>
   <data name="Hint_MBoosterMotorCal" xml:space="preserve"><value>Калибровка мотора — не нажимайте педаль. Занимает около минуты. Осталось {0}с…</value></data>
   <data name="Hint_MBoosterCalRebooting" xml:space="preserve"><value>Педаль перезапускается для завершения — подключится снова через несколько секунд.</value></data>
-  <data name="Hint_MBoosterCalBusyElsewhere" xml:space="preserve"><value>Калибровка выполняется на другой педали.</value></data>
   <data name="Status_CalibrationFailed" xml:space="preserve"><value>Калибровка не удалась: {0}</value></data>
   <data name="SliderLabel_DampingPress" xml:space="preserve"><value>Демпфирование (нажатие)</value></data>
   <data name="SliderLabel_DampingRelease" xml:space="preserve"><value>Демпфирование (отпускание)</value></data>
@@ -889,4 +828,19 @@ Id: {2}</value></data>
   <data name="Motion_Effect_EngineVibration" xml:space="preserve"><value>Вибрация двигателя</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Тактильная отдача</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Антидребезг кнопок (мс)</value></data>
+  <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Предпросмотр недоступен</value></data>
+  <data name="Status_Pressed" xml:space="preserve"><value>Нажато</value></data>
+  <data name="Status_Released" xml:space="preserve"><value>Отпущено</value></data>
+  <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Выбор своего оттенка</value></data>
+  <data name="Swatch_Magenta" xml:space="preserve"><value>Пурпурный</value></data>
+  <data name="Swatch_PastelRed" xml:space="preserve"><value>Пастельный красный</value></data>
+  <data name="Swatch_PastelOrange" xml:space="preserve"><value>Пастельный оранжевый</value></data>
+  <data name="Swatch_PastelYellow" xml:space="preserve"><value>Пастельный жёлтый</value></data>
+  <data name="Swatch_PastelGreen" xml:space="preserve"><value>Пастельный зелёный</value></data>
+  <data name="Swatch_PastelCyan" xml:space="preserve"><value>Пастельный голубой</value></data>
+  <data name="Swatch_PastelBlue" xml:space="preserve"><value>Пастельный синий</value></data>
+  <data name="Swatch_PastelPurple" xml:space="preserve"><value>Пастельный фиолетовый</value></data>
+  <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Пастельный пурпурный</value></data>
+  <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Пресет PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Все файлы (*.*)|*.*</value></data>
+  <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
 </root>

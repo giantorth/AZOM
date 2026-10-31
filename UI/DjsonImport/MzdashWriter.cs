@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Text;
 using Newtonsoft.Json;
@@ -430,9 +429,5 @@ namespace MozaPlugin.UI.DjsonImport
             string s = sb.ToString().Trim();
             return s.Length == 0 ? "Converted" : s;
         }
-
-        /// <summary>Formatting helper for the report.</summary>
-        internal static string Fmt(double v)
-            => v.ToString("0.###", CultureInfo.InvariantCulture);
     }
 }

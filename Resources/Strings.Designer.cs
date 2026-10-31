@@ -91,7 +91,6 @@ namespace MozaPlugin.Resources
         public static string Brand_Motor => Get("Brand_Motor");
         public static string Section_CoreSettings => Get("Section_CoreSettings");
         public static string Section_GearshiftVibration => Get("Section_GearshiftVibration");
-        public static string Section_WheelbaseLfe => Get("Section_WheelbaseLfe");
         public static string SliderLabel_Trigger => Get("SliderLabel_Trigger");
         public static string SliderLabel_WheelRotationAngle => Get("SliderLabel_WheelRotationAngle");
         public static string SliderLabel_GameFfbStrength => Get("SliderLabel_GameFfbStrength");
@@ -216,7 +215,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_VibrationIntensity => Get("SliderLabel_VibrationIntensity");
         public static string Section_MBoosterPedals => Get("Section_MBoosterPedals");
         public static string Subtitle_MBoosterPedals => Get("Subtitle_MBoosterPedals");
-        public static string SliderLabel_Device => Get("SliderLabel_Device");
         public static string SliderLabel_Role => Get("SliderLabel_Role");
         public static string Option_Disabled => Get("Option_Disabled");
         public static string Option_Throttle => Get("Option_Throttle");
@@ -234,7 +232,6 @@ namespace MozaPlugin.Resources
         public static string Section_SegmentedDampingPressed => Get("Section_SegmentedDampingPressed");
         public static string Section_SegmentedDampingReleased => Get("Section_SegmentedDampingReleased");
         public static string Section_SimInputMapping => Get("Section_SimInputMapping");
-        public static string Subtitle_SimInputMapping => Get("Subtitle_SimInputMapping");
         public static string SliderLabel_MaxThresholdKg => Get("SliderLabel_MaxThresholdKg");
         public static string Section_Effects => Get("Section_Effects");
         public static string Subtitle_EffectsTriggers => Get("Subtitle_EffectsTriggers");
@@ -245,7 +242,6 @@ namespace MozaPlugin.Resources
         public static string Section_RoadTexture => Get("Section_RoadTexture");
         public static string Section_BrakeFade => Get("Section_BrakeFade");
         public static string Label_Enable => Get("Label_Enable");
-        public static string Button_Test1s => Get("Button_Test1s");
         public static string Label_Test => Get("Label_Test");
         public static string Section_Lockup => Get("Section_Lockup");
         public static string Section_Threshold => Get("Section_Threshold");
@@ -273,12 +269,7 @@ namespace MozaPlugin.Resources
         public static string Button_AddCustomEffect => Get("Button_AddCustomEffect");
         public static string Button_DeleteCustomEffect => Get("Button_DeleteCustomEffect");
         public static string DefaultName_CustomEffect => Get("DefaultName_CustomEffect");
-        public static string Subtitle_CalibrationExperimental => Get("Subtitle_CalibrationExperimental");
-        public static string Label_ReversedDirection => Get("Label_ReversedDirection");
-        public static string SliderLabel_MinRaw => Get("SliderLabel_MinRaw");
-        public static string SliderLabel_MaxRaw => Get("SliderLabel_MaxRaw");
         public static string Button_ReadFromDevice => Get("Button_ReadFromDevice");
-        public static string Button_Apply => Get("Button_Apply");
         public static string Section_UniversalHubPedals => Get("Section_UniversalHubPedals");
         public static string Subtitle_PedalsPort => Get("Subtitle_PedalsPort");
         public static string Label_PedalsPort => Get("Label_PedalsPort");
@@ -390,23 +381,12 @@ namespace MozaPlugin.Resources
         public static string Status_InstallFailedWriteDenied => Get("Status_InstallFailedWriteDenied");
         public static string Section_Updates => Get("Section_Updates");
         public static string Subtitle_Updates => Get("Subtitle_Updates");
-        public static string Section_Bandwidth => Get("Section_Bandwidth");
-        public static string Subtitle_Bandwidth => Get("Subtitle_Bandwidth");
         public static string Label_Inbound => Get("Label_Inbound");
         public static string Label_Outbound => Get("Label_Outbound");
         public static string Label_Capacity => Get("Label_Capacity");
-        public static string Label_Peak => Get("Label_Peak");
-        public static string Label_Session => Get("Label_Session");
-        public static string Section_SerialTrafficCapture => Get("Section_SerialTrafficCapture");
-        public static string Subtitle_SerialTrafficCapture => Get("Subtitle_SerialTrafficCapture");
-        public static string Hint_CaptureDataInMemory => Get("Hint_CaptureDataInMemory");
-        public static string Button_StartCapture => Get("Button_StartCapture");
-        public static string Label_AlwaysCaptureOnStartup => Get("Label_AlwaysCaptureOnStartup");
-        public static string Tooltip_AlwaysCaptureOnStartup => Get("Tooltip_AlwaysCaptureOnStartup");
         public static string Button_ExportBundle => Get("Button_ExportBundle");
         public static string Button_CopyReference => Get("Button_CopyReference");
         public static string Tooltip_ExportBundle => Get("Tooltip_ExportBundle");
-        public static string Button_CopyCapture => Get("Button_CopyCapture");
         public static string Section_FullDiagReport => Get("Section_FullDiagReport");
         public static string Subtitle_FullDiagReport => Get("Subtitle_FullDiagReport");
         public static string Button_Expand => Get("Button_Expand");
@@ -416,7 +396,6 @@ namespace MozaPlugin.Resources
         public static string Hint_FullDiagRendered => Get("Hint_FullDiagRendered");
         public static string Hint_FullDiagRenderFailed => Get("Hint_FullDiagRenderFailed");
         public static string Hint_MBoosterIntro => Get("Hint_MBoosterIntro");
-        public static string Hint_MBoosterCalibrationWarning => Get("Hint_MBoosterCalibrationWarning");
 
         // ----- ColorPickerDialog
         public static string Title_PickLedColor => Get("Title_PickLedColor");
@@ -427,14 +406,11 @@ namespace MozaPlugin.Resources
         public static string Button_Ok => Get("Button_Ok");
 
         // ----- MozaBaseSettingsControl
-        public static string Section_BaseAmbientLeds => Get("Section_BaseAmbientLeds");
-        public static string Label_BaseModel => Get("Label_BaseModel");
         public static string Hint_NoBaseAmbientDetected => Get("Hint_NoBaseAmbientDetected");
         public static string Section_Mode => Get("Section_Mode");
         public static string SliderLabel_IndicatorState => Get("SliderLabel_IndicatorState");
         public static string Option_Off => Get("Option_Off");
         public static string Option_On => Get("Option_On");
-        public static string SliderLabel_StandbyAnimation => Get("SliderLabel_StandbyAnimation");
         public static string Option_Constant => Get("Option_Constant");
         public static string Option_Breath => Get("Option_Breath");
         public static string Option_Cycle => Get("Option_Cycle");
@@ -444,11 +420,7 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_Brightness => Get("SliderLabel_Brightness");
         public static string Section_Sleep => Get("Section_Sleep");
         public static string SliderLabel_SleepMode => Get("SliderLabel_SleepMode");
-        public static string Option_Enabled => Get("Option_Enabled");
         public static string SliderLabel_SleepTimeout => Get("SliderLabel_SleepTimeout");
-        public static string Section_PowerOnOffColor => Get("Section_PowerOnOffColor");
-        public static string SliderLabel_StartupColor => Get("SliderLabel_StartupColor");
-        public static string SliderLabel_ShutdownColor => Get("SliderLabel_ShutdownColor");
 
         // ----- MozaDashSettingsControl
         public static string Section_MozaDashboard => Get("Section_MozaDashboard");
@@ -489,13 +461,10 @@ namespace MozaPlugin.Resources
         public static string Label_PaddleCombined => Get("Label_PaddleCombined");
         public static string Section_ActiveButtons => Get("Section_ActiveButtons");
         public static string Section_Joystick => Get("Section_Joystick");
-        public static string Subtitle_JoystickAssignment => Get("Subtitle_JoystickAssignment");
         public static string Hint_NoJoystickConfig => Get("Hint_NoJoystickConfig");
         public static string Label_EnableDashboardTelemetry => Get("Label_EnableDashboardTelemetry");
-        public static string Button_LoadMzdash => Get("Button_LoadMzdash");
         public static string Button_SetFolder => Get("Button_SetFolder");
         public static string Button_AutoDetect => Get("Button_AutoDetect");
-        public static string Tooltip_LoadMzdash => Get("Tooltip_LoadMzdash");
         public static string Tooltip_SetFolder => Get("Tooltip_SetFolder");
         public static string Tooltip_AutoDetect => Get("Tooltip_AutoDetect");
         public static string Button_SendTestPattern => Get("Button_SendTestPattern");
@@ -517,22 +486,12 @@ namespace MozaPlugin.Resources
         public static string Tooltip_RevertToDefault => Get("Tooltip_RevertToDefault");
         public static string Status_MasterMapperUnavailable => Get("Status_MasterMapperUnavailable");
         public static string Button_ResetField => Get("Button_ResetField");
-        public static string Button_SplitField => Get("Button_SplitField");
-        public static string Button_BitSplit => Get("Button_BitSplit");
-        public static string Button_RemoveSplit => Get("Button_RemoveSplit");
-        public static string Button_MergePrev => Get("Button_MergePrev");
-        public static string Button_MergeNext => Get("Button_MergeNext");
         public static string Viz_Title => Get("Viz_Title");
-        public static string Edit_StartByte => Get("Edit_StartByte");
-        public static string Edit_StartBit => Get("Edit_StartBit");
-        public static string Edit_BitWidth => Get("Edit_BitWidth");
-        public static string Edit_EndByte => Get("Edit_EndByte");
-        public static string Edit_Endian_LE => Get("Edit_Endian_LE");
         public static string Edit_Scale => Get("Edit_Scale");
         public static string Edit_Bias => Get("Edit_Bias");
-        public static string Section_Display => Get("Section_Display");
-        public static string SliderLabel_DisplayBrightness => Get("SliderLabel_DisplayBrightness");
+        public static string Status_RenderingPreview => Get("Status_RenderingPreview");
         public static string SliderLabel_StandbyTime => Get("SliderLabel_StandbyTime");
+        public static string SliderLabel_SyncStatusLed => Get("SliderLabel_SyncStatusLed");
         public static string Option_Time1Min => Get("Option_Time1Min");
         public static string Option_Time2Min => Get("Option_Time2Min");
         public static string Option_Time3Min => Get("Option_Time3Min");
@@ -566,9 +525,7 @@ namespace MozaPlugin.Resources
         public static string Subtitle_ClickFlagToRecolor => Get("Subtitle_ClickFlagToRecolor");
         public static string Label_FlagPlaceholder => Get("Label_FlagPlaceholder");
         public static string Section_EsWheelRpmIndicator => Get("Section_EsWheelRpmIndicator");
-        public static string Subtitle_EsLegacy => Get("Subtitle_EsLegacy");
         public static string SliderLabel_IndicatorMode => Get("SliderLabel_IndicatorMode");
-        public static string SliderLabel_DisplayMode => Get("SliderLabel_DisplayMode");
         public static string Section_ButtonLedMode => Get("Section_ButtonLedMode");
         public static string SliderLabel_ButtonLedMode => Get("SliderLabel_ButtonLedMode");
         public static string SliderLabel_ButtonIdleEffect => Get("SliderLabel_ButtonIdleEffect");
@@ -602,18 +559,15 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_Color => Get("SliderLabel_Color");
 
         // PitHouse preset import (Button_ImportProfile + Import_*).
-        public static string Button_ImportProfile => Get("Button_ImportProfile");
         public static string Import_DialogTitle => Get("Import_DialogTitle");
         public static string Import_Tab_Browse => Get("Import_Tab_Browse");
         public static string Import_Category_Motor => Get("Import_Category_Motor");
         public static string Import_Category_Pedals => Get("Import_Category_Pedals");
         public static string Import_NoFolderFound => Get("Import_NoFolderFound");
         public static string Import_SetCustomFolder => Get("Import_SetCustomFolder");
-        public static string Import_ConfirmHeader => Get("Import_ConfirmHeader");
         public static string Import_NoChangesHeader => Get("Import_NoChangesHeader");
         public static string Import_NotImportedHeader => Get("Import_NotImportedHeader");
         public static string Import_ApplyButton => Get("Import_ApplyButton");
-        public static string Import_CancelButton => Get("Import_CancelButton");
         public static string Import_NextButton => Get("Import_NextButton");
         public static string Import_BackButton => Get("Import_BackButton");
         public static string Import_BrowseDescription => Get("Import_BrowseDescription");
@@ -699,7 +653,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_PaddleCalibration => Get("SliderLabel_PaddleCalibration");
         public static string Button_RestartWheelbase => Get("Button_RestartWheelbase");
         public static string Button_CalibrateStart => Get("Button_CalibrateStart");
-        public static string Button_CalibrateSave => Get("Button_CalibrateSave");
         public static string Dialog_RestartWheelbase_Caption => Get("Dialog_RestartWheelbase_Caption");
         public static string Dialog_RestartWheelbase_Body => Get("Dialog_RestartWheelbase_Body");
         public static string Hint_PaddleCalibrate => Get("Hint_PaddleCalibrate");
@@ -724,15 +677,11 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_WiperStageCount => Get("SliderLabel_WiperStageCount");
         public static string Label_WiperForwardWraps => Get("Label_WiperForwardWraps");
         public static string SliderLabel_LightStageCount => Get("SliderLabel_LightStageCount");
-        public static string Button_ResyncWipers => Get("Button_ResyncWipers");
         public static string Hint_ResyncWipers => Get("Hint_ResyncWipers");
         public static string Label_StalksLastPressed => Get("Label_StalksLastPressed");
         public static string Button_LoadEts2Defaults => Get("Button_LoadEts2Defaults");
         public static string Button_ResyncStages => Get("Button_ResyncStages");
-        public static string Section_PedalRoles => Get("Section_PedalRoles");
         public static string Label_PedalAxis => Get("Label_PedalAxis");
-        public static string Hint_MBoosterAxisRoles => Get("Hint_MBoosterAxisRoles");
-        public static string Label_EffectsForPedal => Get("Label_EffectsForPedal");
         public static string Note_PassivePedalNoEffects => Get("Note_PassivePedalNoEffects");
         public static string TabHeader_ShifterHgp => Get("TabHeader_ShifterHgp");
         public static string TabHeader_ShifterSgp => Get("TabHeader_ShifterSgp");
@@ -752,7 +701,6 @@ namespace MozaPlugin.Resources
         public static string ShifterColor_Blue => Get("ShifterColor_Blue");
         public static string ShifterColor_Purple => Get("ShifterColor_Purple");
         public static string ShifterColor_White => Get("ShifterColor_White");
-        public static string Label_EnginePresets => Get("Label_EnginePresets");
         public static string Preset_AdditiveEngine => Get("Preset_AdditiveEngine");
         public static string Preset_BigRig => Get("Preset_BigRig");
         public static string Preset_DetunedV8 => Get("Preset_DetunedV8");
@@ -771,14 +719,12 @@ namespace MozaPlugin.Resources
         public static string Mode_Abs => Get("Mode_Abs");
         public static string Mode_Gearshift => Get("Mode_Gearshift");
         public static string Mode_Custom => Get("Mode_Custom");
-        public static string Label_Load => Get("Label_Load");
         public static string Label_Save => Get("Label_Save");
         public static string Label_Delete => Get("Label_Delete");
         public static string Label_Import => Get("Label_Import");
         public static string Label_Export => Get("Label_Export");
         public static string Preset_RoadRumble => Get("Preset_RoadRumble");
         public static string Section_BugReport => Get("Section_BugReport");
-        public static string Subtitle_BugReport => Get("Subtitle_BugReport");
         public static string Label_BugReportDescription => Get("Label_BugReportDescription");
         public static string Placeholder_BugReportDescription => Get("Placeholder_BugReportDescription");
         public static string Label_BugReportContact => Get("Label_BugReportContact");
@@ -792,12 +738,6 @@ namespace MozaPlugin.Resources
         public static string Status_BugReportEdgeBlocked => Get("Status_BugReportEdgeBlocked");
         public static string Status_BugReportNeedDescription => Get("Status_BugReportNeedDescription");
         public static string Status_BugReportCooldown => Get("Status_BugReportCooldown");
-        public static string Label_DiagnosticCapture => Get("Label_DiagnosticCapture");
-        public static string Tooltip_DiagnosticCapture => Get("Tooltip_DiagnosticCapture");
-        public static string Status_CaptureOff => Get("Status_CaptureOff");
-        public static string Status_CaptureSegments => Get("Status_CaptureSegments");
-        public static string Word_Frozen => Get("Word_Frozen");
-        public static string Word_Filling => Get("Word_Filling");
         public static string Section_StalksGameKeys => Get("Section_StalksGameKeys");
         public static string Label_WiperForwardKey => Get("Label_WiperForwardKey");
         public static string Label_WiperBackKey => Get("Label_WiperBackKey");
@@ -822,7 +762,6 @@ namespace MozaPlugin.Resources
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
         public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
         public static string Label_EqSensitivity => Get("Label_EqSensitivity");
-        public static string Section_PerLedColors => Get("Section_PerLedColors");
         public static string Label_IdleConstant => Get("Label_IdleConstant");
         public static string Label_IdleBreathing => Get("Label_IdleBreathing");
         public static string Label_SleepBreathing => Get("Label_SleepBreathing");
@@ -837,6 +776,7 @@ namespace MozaPlugin.Resources
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
         public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
         public static string SliderLabel_Ab9Detection => Get("SliderLabel_Ab9Detection");
+        public static string SliderLabel_PedalHapticsCombined => Get("SliderLabel_PedalHapticsCombined");
         public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
         public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
         public static string Option_GraphTorque => Get("Option_GraphTorque");
@@ -864,7 +804,6 @@ namespace MozaPlugin.Resources
         public static string Hint_MBoosterTravelCal => Get("Hint_MBoosterTravelCal");
         public static string Hint_MBoosterMotorCal => Get("Hint_MBoosterMotorCal");
         public static string Hint_MBoosterCalRebooting => Get("Hint_MBoosterCalRebooting");
-        public static string Hint_MBoosterCalBusyElsewhere => Get("Hint_MBoosterCalBusyElsewhere");
         public static string Status_CalibrationFailed => Get("Status_CalibrationFailed");
         public static string SliderLabel_DampingPress => Get("SliderLabel_DampingPress");
         public static string SliderLabel_DampingRelease => Get("SliderLabel_DampingRelease");
@@ -947,5 +886,20 @@ namespace MozaPlugin.Resources
         public static string Motion_Effect_EngineVibration => Get("Motion_Effect_EngineVibration");
         public static string Motion_Effect_TactileFeedback => Get("Motion_Effect_TactileFeedback");
         public static string SliderLabel_StalkDebounce => Get("SliderLabel_StalkDebounce");
+        public static string Status_PreviewUnavailable => Get("Status_PreviewUnavailable");
+        public static string Status_Pressed => Get("Status_Pressed");
+        public static string Status_Released => Get("Status_Released");
+        public static string Tooltip_CustomHuePicker => Get("Tooltip_CustomHuePicker");
+        public static string Swatch_Magenta => Get("Swatch_Magenta");
+        public static string Swatch_PastelRed => Get("Swatch_PastelRed");
+        public static string Swatch_PastelOrange => Get("Swatch_PastelOrange");
+        public static string Swatch_PastelYellow => Get("Swatch_PastelYellow");
+        public static string Swatch_PastelGreen => Get("Swatch_PastelGreen");
+        public static string Swatch_PastelCyan => Get("Swatch_PastelCyan");
+        public static string Swatch_PastelBlue => Get("Swatch_PastelBlue");
+        public static string Swatch_PastelPurple => Get("Swatch_PastelPurple");
+        public static string Swatch_PastelMagenta => Get("Swatch_PastelMagenta");
+        public static string FileFilter_PitHousePreset => Get("FileFilter_PitHousePreset");
+        public static string Import_Footer_Applied => Get("Import_Footer_Applied");
     }
 }

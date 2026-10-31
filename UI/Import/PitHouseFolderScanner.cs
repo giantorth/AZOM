@@ -71,9 +71,7 @@ namespace MozaPlugin.UI.Import
         public sealed class PresetHeader
         {
             public string Path { get; set; } = "";
-            public string Id { get; set; } = "";
             public string Name { get; set; } = "";
-            public string DeviceType { get; set; } = "";
             public List<string> Devices { get; set; } = new List<string>();
 
             public string DisplayLabel
@@ -135,12 +133,12 @@ namespace MozaPlugin.UI.Import
                 // .mzpreset ZIP container or reads legacy raw JSON transparently.
                 var (root, _) = PitHousePresetArchive.LoadRoot(file);
                 if (root == null) return null;
+                // Malformed id/deviceType stays out of the picker.
+                if (root["id"] is JContainer || root["deviceType"] is JContainer) return null;
                 var header = new PresetHeader
                 {
                     Path = file,
-                    Id = (string?)root["id"] ?? "",
                     Name = (string?)root["name"] ?? "",
-                    DeviceType = (string?)root["deviceType"] ?? "",
                 };
                 if (root["devices"] is JArray arr)
                 {

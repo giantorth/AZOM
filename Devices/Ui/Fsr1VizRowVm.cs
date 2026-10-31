@@ -104,8 +104,6 @@ namespace MozaPlugin.Devices.Ui
             return sb.ToString();
         }
 
-        private static Brush Freeze(Brush b) { if (b.CanFreeze) b.Freeze(); return b; }
-
         public event PropertyChangedEventHandler? PropertyChanged;
         private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }

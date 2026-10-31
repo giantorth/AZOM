@@ -117,7 +117,16 @@ _tickCounter++;
 ```
 
 So tier 0 fires every tick, tier 1 every 16th tick, tier 2 every 66th
-tick. Send order within a tick is fast → slow.
+tick. Send order within a tick is fast → slow. Tiers 0–7 each ride a
+latest-wins `StreamKind.TierDash0..7` slot; tiers ≥ 8 (radar/track-map
+dashboards split into more sub-tiers) ride the connection's per-pipeline
+tier-overflow slots (`SendTierOverflow`), with the same latest-wins
+coalescing.
+
+The intervals are computed against `_baseTickMs`, which a profile
+assignment can move after the timer was armed (e.g. a catalog-synthesised
+profile replacing the preamble one). The tick re-syncs the timer period to
+the current `_baseTickMs` (`SyncTickTimerToBaseTick`) so the tier rates hold.
 
 (Source:
 [`Telemetry/TelemetrySender.cs:231`](../../../Telemetry/TelemetrySender.cs)
@@ -268,19 +277,19 @@ Wheel firmware reads:
 
 ### Catalog filtering
 
-Before sending a tier definition, plugin filters the profile by the
-wheel's advertised channel catalog (session 0x02 tag 0x04 URLs — see
+Under the `V2Type02` encoding, before sending a tier definition
+`TierDefinitionEmitter.RefilterLiveTiers` filters each tier against the
+wheel's live channel catalog (session 0x02 tag 0x04 URLs — see
 [`../tier-definition/session-02-channel-catalog.md`](../tier-definition/session-02-channel-catalog.md)).
-Channels in the profile whose URL the wheel doesn't know are dropped,
-and any tier ending up empty is also dropped (no flag byte allocated).
+Channels whose URL has no idx in the live catalog are dropped from their
+tier and the rest are sorted by catalog idx. Tiers are never dropped.
 This avoids sending a tier-def the wheel can't decode.
 
 ### Empty-but-still-declared tiers
 
-The catalog filter drops tiers from the definition. The empty-frame stub
-(previous section) only fires for tiers that are *declared* but happen
-to have zero channels for some reason (rare — usually means a
-profile/catalog mismatch on a single-tier-style mzdash).
+The empty-frame stub (previous section) only fires for tiers that are
+*declared* but happen to have zero channels for some reason (rare —
+usually means a profile/catalog mismatch on a single-tier-style mzdash).
 
 ### `BuildTierDefinitionMessage` enable-count quirk
 
@@ -297,7 +306,8 @@ section. Wheel firmware appears to treat the orphan enable as a no-op.
 
 ### Timing precision
 
-`tickInterval = max(1, tier.PackageLevel / _baseTickMs)`. For the
+`tickInterval = max(1, tier.PackageLevel / _baseTickMs)`, with the timer
+period kept equal to `_baseTickMs` across mid-session profile changes. For the
 default 30/500/2000 mix, `_baseTickMs = 30` and intervals are 1/16/66.
 500 ms isn't an exact multiple of 30, so tier 1 fires at 16×30 = 480 ms
 intervals (slightly faster than declared); tier 2 at 66×30 = 1980 ms

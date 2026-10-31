@@ -73,9 +73,9 @@ namespace MozaPlugin.Settings
         // Telemetry — per-game dashboard selection (per-wheel-page-per-game).
         public string? TelemetryProfileName { get; set; }
         public string? TelemetryMzdashPath { get; set; }
-        // NOTE: TelemetryEnabled / TelemetryMzdashFolder / TelemetryWheelEra
-        // moved to MozaPluginSettings dicts (per-wheel-page, shared across
-        // games) — schema v4/v5/v6.
+        // Telemetry enable and mzdash folder are per-wheel-page (shared across
+        // games): MozaPluginSettings.WheelTelemetryEnabledByPageGuid /
+        // WheelMzdashFolderByPageGuid.
 
         public WheelOverride Clone()
         {
@@ -117,11 +117,6 @@ namespace MozaPlugin.Settings
     }
 
     /// <summary>
-    /// Persisted AB9 active shifter configuration. All slider values are 0..100
-    /// (matching the on-wire single-byte payload range). Stored per-profile so a
-    /// user can save game-specific feel presets alongside wheelbase FFB tuning.
-    /// </summary>
-    /// <summary>
     /// One user assignment of a SimHub property to an FSR V1 dashboard field, with
     /// the source input range mapped onto the field's full-scale output capability.
     /// </summary>
@@ -149,6 +144,12 @@ namespace MozaPlugin.Settings
             };
     }
 
+    /// <summary>
+    /// Persisted AB9 active shifter configuration. Slider values are 0..100
+    /// unless noted (matching the on-wire single-byte payload range). Stored
+    /// per-profile so a user can save game-specific feel presets alongside
+    /// wheelbase FFB tuning.
+    /// </summary>
     public sealed class Ab9Settings
     {
         public Ab9Mode Mode { get; set; } = Ab9Mode.SevenPlusR_L1;
@@ -206,15 +207,6 @@ namespace MozaPlugin.Settings
         }
     }
 
-    /// <summary>
-    /// One wheelbase LFE channel (Engine / ABS / Gearshift). Each of the four
-    /// parameters is dual-mode: a static slider value, OR an NCalc/property
-    /// formula that overrides it (empty formula → slider). The formula is a bare
-    /// SimHub property path or an NCalc/js: expression, evaluated live per tick
-    /// via the same resolver the channel-mapper uses. The "trigger" gates the
-    /// channel: non-zero = active (level, for Engine/ABS) or fires a burst on
-    /// change (edge, for Gearshift). See BaseLfeEffectWorker.
-    /// </summary>
     /// <summary>How a channel's trigger gates it.</summary>
     public enum BaseLfeTriggerMode
     {
@@ -238,6 +230,14 @@ namespace MozaPlugin.Settings
         Custom = 3,
     }
 
+    /// <summary>
+    /// One wheelbase LFE slot. Frequency, intensity and smoothness are each
+    /// dual-mode: a static slider value, OR a formula that overrides it (empty
+    /// formula → slider). A formula is a bare SimHub property path or an
+    /// NCalc/js: expression, evaluated live per tick via the same resolver the
+    /// channel-mapper uses. The trigger formula gates the slot per
+    /// <see cref="TriggerMode"/>. See BaseLfeEffectWorker.
+    /// </summary>
     public sealed class BaseLfeChannel
     {
         public bool Enabled { get; set; } = false;
@@ -932,7 +932,7 @@ namespace MozaPlugin.Settings
         /// Pass <c>null</c> to leave <see cref="TelemetryDashboardKey"/> untouched
         /// (e.g. when the plugin can't resolve a key — early init, no profile loaded).
         /// </param>
-        public void CaptureFromCurrent(MozaPluginSettings settings, MozaData data, string? activeDashboardKey = null)
+        public void CaptureFromCurrent(MozaData data, string? activeDashboardKey = null)
         {
             if (!string.IsNullOrEmpty(activeDashboardKey))
                 TelemetryDashboardKey = activeDashboardKey;

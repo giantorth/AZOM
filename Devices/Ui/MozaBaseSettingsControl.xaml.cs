@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -105,11 +104,11 @@ namespace MozaPlugin.Devices.Ui
                 {
                     // 0 off, 1 SimHub mode, 2 on — the selector index IS the register value
                     // written to 0x1C.
-                    SetComboSafe(IndicatorStateCombo, Clamp(data.BaseAmbientIndicatorState, 0, 2));
+                    UiHelpers.SetComboSafe(IndicatorStateCombo, Clamp(data.BaseAmbientIndicatorState, 0, 2));
                     // Standby dropdown index == device mode: 0 off, 1 constant,
                     // 2 breathing, 3 color cycle, 4 rainbow, 5 sand flow.
-                    SetComboSafe(StandbyModeCombo, Clamp(data.BaseAmbientStandbyMode, 0, 5));
-                    SetComboSafe(SleepModeCombo, Clamp(data.BaseAmbientSleepMode, 0, 1));
+                    UiHelpers.SetComboSafe(StandbyModeCombo, Clamp(data.BaseAmbientStandbyMode, 0, 5));
+                    UiHelpers.SetComboSafe(SleepModeCombo, Clamp(data.BaseAmbientSleepMode, 0, 1));
 
                     BrightnessSlider.Value = Clamp(data.BaseAmbientBrightness, 0, 100);
                     BrightnessValue.Text = $"{(int)BrightnessSlider.Value}";
@@ -422,13 +421,7 @@ namespace MozaPlugin.Devices.Ui
 
         private static void UpdateSwatch(Border swatch, byte[] rgb)
         {
-            swatch.Background = new SolidColorBrush(Color.FromRgb(rgb[0], rgb[1], rgb[2]));
-        }
-
-        private static void SetComboSafe(Selector combo, int index)
-        {
-            if (index >= 0 && index < combo.Items.Count)
-                combo.SelectedIndex = index;
+            swatch.Background = WheelUiHelpers.GetCachedBrush(rgb[0], rgb[1], rgb[2]);
         }
 
         private static int Clamp(int value, int min, int max)

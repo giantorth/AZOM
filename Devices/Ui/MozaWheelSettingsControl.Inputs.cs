@@ -24,13 +24,21 @@ namespace MozaPlugin.Devices.Ui
     // hidden and its handlers no longer fire.
     public partial class MozaWheelSettingsControl
     {
-        internal static MozaWheelSettingsControl? Instance { get; private set; }
-
         // 33Hz timer just for live paddle + button display — too fast for the
         // 500ms RefreshWheel tick, separate from it so HID input feels live
         // even when no telemetry is streaming.
         private DispatcherTimer? _inputsLiveTimer;
         private readonly DateTime[] _wiButtonLastPressed = new DateTime[MozaData.MaxButtons];
+
+        // Run the live timer only while the Inputs tab is showing (the ES wheel's
+        // headerless single page is the Inputs tab too).
+        private void UpdateInputsLiveTimer()
+        {
+            if (IsLoaded && ReferenceEquals(WheelTabs.SelectedItem, InputsTab))
+                EnsureInputsLiveTimer();
+            else
+                StopInputsLiveTimer();
+        }
 
         private void EnsureInputsLiveTimer()
         {
@@ -51,14 +59,6 @@ namespace MozaPlugin.Devices.Ui
         }
 
         // ── Live paddle bars + active buttons ──────────────────────────
-
-        // Fed by the plugin pane's own 30 Hz HID timer; while this page's live
-        // timer is running that would be a second 30 Hz driver of the same text.
-        internal void PushInputsLiveData(MozaData data)
-        {
-            if (_inputsLiveTimer != null) return;
-            RefreshInputsLive();
-        }
 
         // Signature of the last rendered button list ("3,7*," — star = pressed) so
         // the Inlines are only rebuilt when the visible content changes.
@@ -223,12 +223,6 @@ namespace MozaPlugin.Devices.Ui
             _plugin.SaveSettings();
         }
 
-        private void WiKnobSignalMode0Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(0, WiKnobSignalMode0Combo.SelectedIndex);
-        private void WiKnobSignalMode1Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(1, WiKnobSignalMode1Combo.SelectedIndex);
-        private void WiKnobSignalMode2Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(2, WiKnobSignalMode2Combo.SelectedIndex);
-        private void WiKnobSignalMode3Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(3, WiKnobSignalMode3Combo.SelectedIndex);
-        private void WiKnobSignalMode4Combo_Changed(object sender, SelectionChangedEventArgs e) => WriteWiKnobSignalMode(4, WiKnobSignalMode4Combo.SelectedIndex);
-
         // force = the user clicked the segment that was already selected. That is a
         // deliberate "put this back on the wheel", so it must bypass the write-on-change
         // gate — the whole point is that the wheel's real state disagrees with what the
@@ -236,7 +230,7 @@ namespace MozaPlugin.Devices.Ui
         private void WriteWiKnobSignalMode(int index, int value, bool force = false)
         {
             if (_suppressEvents || _plugin == null || _data == null) return;
-            if (value < 0) return; // ComboBox SelectionChanged can fire during refresh
+            if (value < 0) return; // no selection
             _data.WheelKnobSignalModes[index] = value;
             _plugin.UpdateActiveWheelOverlay(o =>
                 o.WheelKnobSignalModes = (int[])_data.WheelKnobSignalModes.Clone());
@@ -322,19 +316,7 @@ namespace MozaPlugin.Devices.Ui
                     // a selector that writes nowhere.
                     WiKnobModeLegacyPanel.Visibility = (!perKnob && HasKnobEncoders())
                         ? Visibility.Visible : Visibility.Collapsed;
-                    if (perKnob)
-                    {
-                        // Per-knob mode: the visible chips own the write; these hidden
-                        // stubs exist for the XAML handler contract and just mirror the
-                        // same resolved value.
-                        var combos = new[] { WiKnobSignalMode0Combo, WiKnobSignalMode1Combo, WiKnobSignalMode2Combo, WiKnobSignalMode3Combo, WiKnobSignalMode4Combo };
-                        for (int i = 0; i < 5; i++)
-                        {
-                            int v = ResolveKnobSignalMode(ov, i);
-                            if (v >= 0) SetComboSafe(combos[i], v);
-                        }
-                    }
-                    else
+                    if (!perKnob)
                     {
                         SetComboSafe(WiKnobModeCombo, ov != null && ov.WheelKnobMode >= 0
                             ? ov.WheelKnobMode : _data.WheelKnobMode);

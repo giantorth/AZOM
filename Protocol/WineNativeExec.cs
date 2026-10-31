@@ -123,8 +123,12 @@ namespace MozaPlugin.Protocol
         /// same rule the serial probe follows (<see cref="MozaSerialConnection"/>
         /// ProbeWithTimeout). The thread owns the unmanaged argv it allocated and
         /// frees it itself, so an abandoned call can't be freed out from under.</para>
+        ///
+        /// <para><paramref name="onExit"/> runs on the spawn thread once the child
+        /// has returned, including after a timeout. Not called when the outcome is
+        /// <see cref="NativeSpawnOutcome.Unavailable"/>.</para>
         /// </summary>
-        public static NativeSpawnResult Run(string[] argv, int timeoutMs)
+        public static NativeSpawnResult Run(string[] argv, int timeoutMs, Action? onExit = null)
         {
             Probe();
             var spawn = s_spawn;
@@ -155,6 +159,8 @@ namespace MozaPlugin.Protocol
                     if (block != IntPtr.Zero) Marshal.FreeHGlobal(block);
                     for (int i = 0; i < parts.Length; i++)
                         if (parts[i] != IntPtr.Zero) Marshal.FreeHGlobal(parts[i]);
+                    if (onExit != null)
+                        try { onExit(); } catch { }
                 }
             })
             { IsBackground = true, Name = "MozaNativeExec" };

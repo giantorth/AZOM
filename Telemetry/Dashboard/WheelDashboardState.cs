@@ -273,15 +273,11 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             missingFields = Array.Empty<string>();
             // Cheap structural pre-check: skip JObject.Parse entirely when
-            // the buffer is obviously not a complete root JSON object yet.
-            // ConfigJsonClient.OnChunk calls us after every wire chunk —
-            // _deviceInbox.TryDecompress returns whatever DeflateStream has
-            // inflated so far, which is partial JSON (truncated mid-string)
-            // until the final chunk lands. Without this check JObject.Parse
-            // throws JsonReaderException(Unterminated string) once per
-            // chunk, the catch below absorbs it, but SimHub's
-            // AppDomain.FirstChanceException listener still logs every
-            // throw — spamming SimHub.txt during every configJson reload.
+            // the blob is obviously not a complete root JSON object. The
+            // reassembler only hands over Adler-verified streams, but a blob
+            // that isn't JSON would still make JObject.Parse throw, and
+            // SimHub's AppDomain.FirstChanceException listener logs every
+            // throw even though the catch below absorbs it.
             // The try/catch below stays as the backstop for edge cases
             // where this heuristic passes but the inner JSON is malformed.
             if (!LooksStructurallyComplete(jsonBytes)) return null;
@@ -348,9 +344,6 @@ namespace MozaPlugin.Telemetry.Dashboard
                 return null;
             }
         }
-
-        /// <summary>Overload without missing-fields output, kept for existing callers.</summary>
-        public static WheelDashboardState? Parse(byte[] jsonBytes) => Parse(jsonBytes, out _);
 
         /// <summary>
         /// One-pass byte scan that returns true only when <paramref name="jsonBytes"/>

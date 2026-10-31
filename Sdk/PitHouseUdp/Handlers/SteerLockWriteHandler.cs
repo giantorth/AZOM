@@ -35,12 +35,10 @@ namespace MozaPlugin.Sdk.PitHouseUdp.Handlers
         private const int MinDegrees = 90;
         private const int MaxDegrees = 2000;
 
-        private readonly MozaData _data;
         private readonly HardwareApplier _hardware;
 
-        public SteerLockWriteHandler(MozaData data, HardwareApplier hardware)
+        public SteerLockWriteHandler(HardwareApplier hardware)
         {
-            _data = data ?? throw new ArgumentNullException(nameof(data));
             _hardware = hardware ?? throw new ArgumentNullException(nameof(hardware));
         }
 
@@ -77,21 +75,6 @@ namespace MozaPlugin.Sdk.PitHouseUdp.Handlers
             int? appliedMaxRaw = appliedMaxDeg / 2;
             int? appliedLimitRaw = appliedLimitDeg / 2;
 
-            // Snapshot once to keep the reported reason consistent with what
-            // WriteIfBaseConnected actually saw. Avoids the race where the
-            // flag flips between our check and the write call.
-            bool baseConnected = _data.IsBaseConnected;
-
-            if (!baseConnected)
-            {
-                // WriteIfBaseConnected would have silently no-op'd. Surface
-                // that to the UI so the user doesn't think the wheel applied
-                // a value it never received.
-                ctx.Summary = $"SKIPPED — base not connected (would have set max={appliedMaxDeg?.ToString() ?? "-"}° limit={appliedLimitDeg?.ToString() ?? "-"}°)";
-                MozaLog.Warn($"[PitHouseUdp] SteerLock write SKIPPED (base not connected) — requested max={appliedMaxDeg?.ToString() ?? "-"}° limit={appliedLimitDeg?.ToString() ?? "-"}° from={ctx.OriginalSender}");
-                return;
-            }
-
             // Apply each field independently — the wire allows either or both.
             // ORDER IS LOAD-BEARING: write base-limit BEFORE base-max-angle. The
             // wheelbase clamps max-angle to >= the current limit, so when LOWERING the
@@ -101,8 +84,20 @@ namespace MozaPlugin.Sdk.PitHouseUdp.Handlers
             // limit first lets the max-angle write land live, in one shot. Matches the
             // UI rotation slider (SettingsControl) and button action (SimHubRegistrar).
             // Capture-confirmed 2026-06-23 (Param 33 stuck at 1350 with max-first).
-            if (appliedLimitRaw.HasValue) _hardware.WriteIfBaseConnected("base-limit", appliedLimitRaw.Value);
-            if (appliedMaxRaw.HasValue) _hardware.WriteIfBaseConnected("base-max-angle", appliedMaxRaw.Value);
+            // The base gate is WriteIfBaseConnected's own, so the skip report below
+            // reflects what it actually did.
+            bool wrote = false;
+            if (appliedLimitRaw.HasValue) wrote |= _hardware.WriteIfBaseConnected("base-limit", appliedLimitRaw.Value);
+            if (appliedMaxRaw.HasValue) wrote |= _hardware.WriteIfBaseConnected("base-max-angle", appliedMaxRaw.Value);
+
+            if (!wrote)
+            {
+                // Surface the no-op so the user doesn't think the wheel applied
+                // a value it never received.
+                ctx.Summary = $"SKIPPED — base not connected (would have set max={appliedMaxDeg?.ToString() ?? "-"}° limit={appliedLimitDeg?.ToString() ?? "-"}°)";
+                MozaLog.Warn($"[PitHouseUdp] SteerLock write SKIPPED (base not connected) — requested max={appliedMaxDeg?.ToString() ?? "-"}° limit={appliedLimitDeg?.ToString() ?? "-"}° from={ctx.OriginalSender}");
+                return;
+            }
 
             string summary = $"applied max={appliedMaxDeg?.ToString() ?? "-"}° limit={appliedLimitDeg?.ToString() ?? "-"}° (raw {appliedMaxRaw?.ToString() ?? "-"}/{appliedLimitRaw?.ToString() ?? "-"})";
             ctx.Summary = summary;

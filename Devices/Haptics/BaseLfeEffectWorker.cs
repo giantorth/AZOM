@@ -120,6 +120,10 @@ namespace MozaPlugin.Devices.Haptics
 
         private long _burstTicks, _feedStaleTicks;
 
+        // Per-slot (freq, amp) senders, built once: a this-capturing lambda at the
+        // call site would allocate a delegate every tick.
+        private readonly Action<double, double> _sendEngine, _sendAbs, _sendGearshiftBurst, _sendOsc0;
+
         public BaseLfeEffectWorker(
             MozaDeviceManager baseManager,
             DeviceDetectionState detectionState,
@@ -134,6 +138,10 @@ namespace MozaPlugin.Devices.Haptics
             _lookup = lookup;
             _evalFormula = evalFormula ?? (_ => 0.0);
             _isShuttingDown = isShuttingDown;
+            _sendEngine = (f, a) => _base.SendBaseLfeEngineStream(playing: true, f, a);
+            _sendAbs = (f, a) => _base.SendBaseLfeAbsStream(playing: true, f, a);
+            _sendGearshiftBurst = (f, a) => _base.SendBaseLfeGearshiftBurst(f, a);
+            _sendOsc0 = (f, a) => _base.SendBaseLfeOsc0Stream(playing: true, f, a);
         }
 
         public void Start()
@@ -175,22 +183,15 @@ namespace MozaPlugin.Devices.Haptics
         public void PostGearshiftTest() => Interlocked.Exchange(ref _gearTestStart, Stopwatch.GetTimestamp());
 
         private void Loop()
-        {
-            long stopwatchFreq = Stopwatch.Frequency;
-            long periodTicks = stopwatchFreq * TickPeriodMs / 1000;
-            long next = Stopwatch.GetTimestamp() + periodTicks;
-            while (!_stop)
-            {
-                try { Tick(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM/LFE] tick: {ex.Message}"); }
+            => PacedWorkerLoop.Run(TickPeriodMs, () => _stop, IsActive, Tick, "[AZOM/LFE] tick");
 
-                long now = Stopwatch.GetTimestamp();
-                long delta = next - now;
-                if (delta <= 0) { next = now + periodTicks; continue; }
-                int sleepMs = (int)Math.Min(50, Math.Max(1, delta * 1000 / stopwatchFreq));
-                Thread.Sleep(sleepMs);
-                next += periodTicks;
-            }
+        // False exactly when Tick is a no-op: no base, or no LFE support and no
+        // slot left to silence. The loop idles instead of ticking.
+        private bool IsActive()
+        {
+            if (_isShuttingDown()) return false;
+            if (_base == null || !_base.IsConnected || !_detectionState.BaseDetected) return false;
+            return _data.BaseSupportsLfe || _engineSt.Active || _absSt.Active || _gearSt.Active;
         }
 
         private void Tick()
@@ -256,8 +257,7 @@ namespace MozaPlugin.Devices.Haptics
         private void TickEngine(BaseLfeSettings lfe, bool feedLive)
         {
             var ch = lfe.Engine ?? DefaultLfe.Engine;
-            if (TickTest(ref _engineTestStart, ch, ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine,
-                         (f, a) => _base.SendBaseLfeEngineStream(playing: true, f, a))) return;
+            if (TickTest(ref _engineTestStart, ch, ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine, _sendEngine)) return;
             if (!ActiveByGame(ch, feedLive, ref _engineSt)) { DisableIf(ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine); return; }
             EvalRender(ch, out double freq, out double int01, out double smooth01);
             double amp = Envelope(int01, ref _engineSt.Phase, freq, smooth01);
@@ -270,8 +270,7 @@ namespace MozaPlugin.Devices.Haptics
         private void TickAbs(BaseLfeSettings lfe, bool feedLive)
         {
             var ch = lfe.Abs ?? DefaultLfe.Abs;
-            if (TickTest(ref _absTestStart, ch, ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs,
-                         (f, a) => _base.SendBaseLfeAbsStream(playing: true, f, a))) return;
+            if (TickTest(ref _absTestStart, ch, ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs, _sendAbs)) return;
             if (!ActiveByGame(ch, feedLive, ref _absSt)) { DisableIf(ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs); return; }
             EvalRender(ch, out double freq, out double int01, out double smooth01);
             double amp = Envelope(int01, ref _absSt.Phase, freq, smooth01);
@@ -280,16 +279,20 @@ namespace MozaPlugin.Devices.Haptics
             _absSt.ScopeFreq = freq; _absSt.ScopeAmp = amp;
         }
 
-        // ── Gearshift slot (wire id 0, one-shot burst) ────────────────────────
+        // ── Gearshift slot (wire id 0, one-shot burst; continuous in Level mode) ──
         private void TickGearshift(BaseLfeSettings lfe, bool feedLive)
         {
             var ch = lfe.Gearshift ?? DefaultLfe.Gearshift;
-            if (TickTest(ref _gearTestStart, ch, ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift,
-                         (f, a) => _base.SendBaseLfeGearshiftBurst(f, a))) return;
+            if (TickTest(ref _gearTestStart, ch, ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift, _sendGearshiftBurst)) return;
             if (!ActiveByGame(ch, feedLive, ref _gearSt)) { DisableIf(ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift); return; }
             EvalRender(ch, out double freq, out double int01, out double smooth01);
             double amp = Envelope(int01, ref _gearSt.Phase, freq, smooth01);
-            _base.SendBaseLfeGearshiftBurst(freq, amp);
+            // Level mode streams every tick, so it takes the latest-wins lane; an
+            // OnChange burst must not coalesce, so it stays on the FIFO.
+            if (ch.TriggerMode == BaseLfeTriggerMode.Level)
+                _base.SendBaseLfeGearshiftStream(freq, amp);
+            else
+                _base.SendBaseLfeGearshiftBurst(freq, amp);
             _gearSt.Active = true;
             _gearSt.ScopeFreq = freq; _gearSt.ScopeAmp = amp;
         }
@@ -392,12 +395,9 @@ namespace MozaPlugin.Devices.Haptics
         // unmapped oscillator stays silent and can't latch a residual tone.
         private void TickShakeIt(ShakeItSnapshot s)
         {
-            RenderShakeItSlot(ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine, s.Gain0, s.Freq0,
-                (f, a) => _base.SendBaseLfeEngineStream(playing: true, f, a));
-            RenderShakeItSlot(ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs, s.Gain1, s.Freq1,
-                (f, a) => _base.SendBaseLfeAbsStream(playing: true, f, a));
-            RenderShakeItSlot(ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift, s.Gain2, s.Freq2,
-                (f, a) => _base.SendBaseLfeOsc0Stream(playing: true, f, a));
+            RenderShakeItSlot(ref _engineSt, MozaBaseLfeProtocol.LfeEffect.Engine, s.Gain0, s.Freq0, _sendEngine);
+            RenderShakeItSlot(ref _absSt, MozaBaseLfeProtocol.LfeEffect.Abs, s.Gain1, s.Freq1, _sendAbs);
+            RenderShakeItSlot(ref _gearSt, MozaBaseLfeProtocol.LfeEffect.Gearshift, s.Gain2, s.Freq2, _sendOsc0);
         }
 
         private void RenderShakeItSlot(ref ChannelState st, MozaBaseLfeProtocol.LfeEffect id,

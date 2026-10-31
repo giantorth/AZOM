@@ -16,9 +16,8 @@ namespace MozaPlugin.Sdk.Resources.Motor
     /// GET response shape (captured from PitHouse):
     /// <c>{"GameMaximumAngle": int, "LimitAngle": int}</c>. Key order is
     /// preserved because some CoAP clients sniff map keys positionally; we
-    /// emit via <see cref="CborWriter.WriteMap(IReadOnlyList{KeyValuePair{string,object}})"/>
-    /// which honours list order rather than using the dictionary overload
-    /// (which is hash-order in .NET Framework 4.8).
+    /// emit via <see cref="CborWriter.WriteMap(IReadOnlyList{KeyValuePair{string,object}})"/>,
+    /// which honours list order.
     /// </para>
     /// <para>
     /// POST consumes the same shape and writes <c>base-max-angle</c> +
@@ -41,8 +40,7 @@ namespace MozaPlugin.Sdk.Resources.Motor
 
         public override CoapResourceResponse HandleGet(CoapResourceRequest req)
         {
-            // Preserve the captured key order. WriteMap(KeyValuePair list)
-            // emits in list order; the Dictionary overload would not. Wire
+            // Preserve the captured key order: WriteMap emits in list order. Wire
             // values are degrees; the wheelbase stores half-degrees in
             // _data.MaxAngle / _data.Limit so we multiply by 2 to convert
             // (same boundary conversion as Sdk/PitHouseUdp/Handlers/SteerLockReadHandler).

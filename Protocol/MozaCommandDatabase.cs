@@ -66,6 +66,9 @@ namespace MozaPlugin.Protocol
             // Wheel uses persisted base-gearshift-vibration intensity; no echo on 0xAD.
             AddCommand("base-gearshift-event",    "base", 0xFF, 45, new byte[] { 0x76 }, 2, "int");
             AddCommand("base-ffb-disable",        "base", 40, 41, new byte[] { 254 },    2, "int");
+            // cmd 0x39 Ultra-base +2 Nm torque boost (fw >= 1.2.12.4): 0 = stock,
+            // 1 = unlocked. Read-only here.
+            AddCommand("base-torque-boost",       "base", 40, 0xFF, new byte[] { 0x39 }, 2, "int");
 
             // FFB curve (read group 40, write group 41)
             AddCommand("base-ffb-curve-x1", "base", 40, 41, new byte[] { 34, 1 }, 1, "int");
@@ -348,11 +351,6 @@ namespace MozaPlugin.Protocol
             for (byte i = 0; i < 56; i++)
                 AddCommand($"wheel-knob-bg-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x01, i }, 3, "array");
 
-            // LEGACY wheel-flag-color: flag LEDs live on the Meter sub-device
-            // (dev 0x14 / grp 50). Kept for rollback on very old firmware.
-            // for (byte i = 0; i < 6; i++)
-            //     AddCommand($"wheel-flag-color{i + 1}", "wheel", 64, 63, new byte[] { 21, 2, i }, 3, "array");
-
             // Wheel RPM blink colors (write-only, id [15, index])
             for (byte i = 0; i < 10; i++)
                 AddCommand($"wheel-rpm-blink-color{i + 1}", "wheel", 0xFF, 63, new byte[] { 15, i }, 3, "array");
@@ -360,9 +358,8 @@ namespace MozaPlugin.Protocol
             // Wheel brightness (by zone: 0=rpm, 1=buttons, 2=flags)
             AddCommand("wheel-rpm-brightness",     "wheel", 64, 63, new byte[] { 27, 0, 0xFF }, 1, "int");
             AddCommand("wheel-buttons-brightness",  "wheel", 64, 63, new byte[] { 27, 1, 0xFF }, 1, "int");
-            // LEGACY: wheel-flags-brightness on device 0x17. Replaced by dash-flags-brightness
-            // (Meter sub-device, write group 50, id [10, 2] — MeterSetCfg_SetFlagGroupBrightness_o).
-            // AddCommand("wheel-flags-brightness",    "wheel", 64, 63, new byte[] { 27, 2, 0xFF }, 1, "int");
+            // Flag-zone brightness lives on the Meter sub-device: dash-flags-brightness
+            // (write group 50, id [10, 2] — MeterSetCfg_SetFlagGroupBrightness_o).
 
             // Wheel telemetry mode and idle effects
             AddCommand("wheel-telemetry-mode",          "wheel", 64, 63, new byte[] { 28, 0 },  1, "int");

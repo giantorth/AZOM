@@ -74,16 +74,6 @@ namespace MozaPlugin.Telemetry.Frames
         // The wheel's outline for this track, when MOZA has one (TrackOutlines).
         public TrackOutline? Outline;
 
-        // Per-car position RELATIVE to the player (already rotated into the
-        // player's frame by SimHub), for the radar (patch/ri*) channels. Each
-        // entry feeds one uint32 ri slot, packed by TelemetryFrameBuilder as
-        // two int16 (X, Y) — the wire format reverse-engineered from the
-        // PitHouse FSR2 radar capture. Indexed by Opponents[] order; (0,0)
-        // when SimHub has no relative coordinate for that car (out of radar
-        // range), which matches PitHouse's empty-slot behaviour. Source:
-        // Opponent.RelativeCoordinatesToPlayer (PointF, metres).
-        public (float X, float Y)[]? CarRelative;
-
         /// <summary>Populate from a live StatusDataBase instance. When
         /// <paramref name="includeCarPositions"/> is false the per-car track-map /
         /// radar arrays are NOT built — skips the reflection chain and the
@@ -156,7 +146,6 @@ namespace MozaPlugin.Telemetry.Frames
                 snap.Outline         = s_carPosCache.Outline;
                 snap.PlayerLocation  = s_carPosCache.PlayerLocation;
                 snap.CarLocations    = s_carPosCache.CarLocations;
-                snap.CarRelative     = s_carPosCache.CarRelative;
                 snap.PlayerIndex     = s_carPosCache.PlayerIndex;
                 snap.RadarSlotCarIds = s_carPosCache.RadarSlotCarIds;
             }
@@ -299,10 +288,6 @@ namespace MozaPlugin.Telemetry.Frames
             //      recorded track map (ToGroundPlane) so lap-relative-coordinate
             //      games (iRacing) map to world space; a passthrough otherwise.
             //      Mirrors SimHub's own RadarItem.UpdateData.
-            // CarRelative (Δ from player, WORLD-frame, unrotated) feeds the radar
-            // patch/ri* channels — the player-relative "cars nearby" view — which
-            // stays disabled until that format is verified; heading rotation is
-            // deferred.
             float[]? raw = TryReadRawCarCoordinates(data);
 
             // The radar (patch/ri*) and track-map (patch/Location*) channels need
@@ -321,13 +306,11 @@ namespace MozaPlugin.Telemetry.Frames
             bool rawCarIdIndexed = raw != null && raw.Length >= count * 3;
 
             (float X, float Y, float Z)[] locs;
-            (float X, float Y)[] rels;
             int playerIdx = 0;
 
             if (rawCarIdIndexed)
             {
                 locs = new (float X, float Y, float Z)[count];
-                rels = new (float X, float Y)[count];
                 double bestD = double.MaxValue;
                 bool playerByDist = false;
                 for (int i = 0; i < count; i++)             // i == carId
@@ -338,7 +321,6 @@ namespace MozaPlugin.Telemetry.Frames
                     locs[i] = abs;
                     if (havePlayer && (abs.X != 0f || abs.Z != 0f))
                     {
-                        rels[i] = (abs.X - px, abs.Z - pz);
                         double d = (abs.X - px) * (abs.X - px) + (abs.Z - pz) * (abs.Z - pz);
                         if (d < bestD) { bestD = d; playerIdx = i; playerByDist = true; }
                     }
@@ -353,7 +335,6 @@ namespace MozaPlugin.Telemetry.Frames
                 for (int i = 0; i < count; i++)
                     if (slotOf[i] > maxSlot) maxSlot = slotOf[i];
                 locs = new (float X, float Y, float Z)[maxSlot + 1];
-                rels = new (float X, float Y)[maxSlot + 1];
                 for (int i = 0; i < count; i++)
                 {
                     int s = slotOf[i];
@@ -364,14 +345,11 @@ namespace MozaPlugin.Telemetry.Frames
                         ? ResolveXyz(map, line, lineScale, c)
                         : (0f, 0f, 0f);
                     locs[s] = abs;
-                    if (havePlayer && (abs.X != 0f || abs.Z != 0f))
-                        rels[s] = (abs.X - px, abs.Z - pz);
                     if (opp?.IsPlayer ?? false) playerIdx = s;
                 }
             }
 
             snap.CarLocations = locs;
-            snap.CarRelative = rels;
             snap.PlayerIndex = playerIdx;
 
             // The radar works in metres; an outline line without a track length has none.

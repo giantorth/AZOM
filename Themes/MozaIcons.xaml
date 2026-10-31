@@ -7,10 +7,6 @@
          Stretch=Uniform + Stroke=Cyan + StrokeThickness=1.5 + Fill=None. -->
 
     <!-- Plugin-tab top-bar icons -->
-    <Geometry x:Key="IconBase">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M8,12 A4,4 0 1 1 16,12 A4,4 0 1 1 8,12 Z M12,3 V6 M12,18 V21 M3,12 H6 M18,12 H21</Geometry>
-
-    <Geometry x:Key="IconWheel">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M9.5,12 A2.5,2.5 0 1 1 14.5,12 A2.5,2.5 0 1 1 9.5,12 Z M12,9.5 V4.5 M14.5,13.5 L18.5,17 M9.5,13.5 L5.5,17</Geometry>
-
     <Geometry x:Key="IconHandbrake">M7,4 V14 M7,14 A3,3 0 0 0 10,17 H14 A3,3 0 0 0 17,14 V12 M5,2 H9 V5 H5 Z M11,17 V21 M15,17 V21</Geometry>
 
     <Geometry x:Key="IconPedals">M3,6 H9 V20 H3 Z M11,9 H17 V20 H11 Z M19,12 H22 V20 H19 Z</Geometry>
@@ -20,12 +16,6 @@
     <Geometry x:Key="IconDiag">M3,12 H7 L10,4 L14,20 L17,12 H21</Geometry>
 
     <!-- Section header icons -->
-    <Geometry x:Key="IconSteer">M4,12 A8,8 0 1 1 20,12 A8,8 0 1 1 4,12 Z M10,12 A2,2 0 1 1 14,12 A2,2 0 1 1 10,12 Z M12,10 V4 M14,13 L19,17 M10,13 L5,17</Geometry>
-
-    <Geometry x:Key="IconTemp">M14,14 V5 A2,2 0 1 0 10,5 V14 A4,4 0 1 0 14,14 Z</Geometry>
-
-    <Geometry x:Key="IconPower">M13,2 L4,14 H11 L10,22 L19,10 H12 L13,2 Z</Geometry>
-
     <Geometry x:Key="IconDamper">M3,17 C5,17 5,13 7,13 S9,17 11,17 S13,9 15,9 S17,17 19,17 S21,13 23,13</Geometry>
 
     <Geometry x:Key="IconGame">M2,10 V16 A3,3 0 0 0 5,19 H19 A3,3 0 0 0 22,16 V10 A3,3 0 0 0 19,7 H5 A3,3 0 0 0 2,10 Z M7,12 H10 M8.5,10.5 V13.5 M14.7,12.2 L15.3,12.2 M17.2,14.2 L17.8,14.2</Geometry>
@@ -50,8 +40,6 @@
 
     <Geometry x:Key="IconButtons">M4.6,7 A2.4,2.4 0 1 1 9.4,7 A2.4,2.4 0 1 1 4.6,7 Z M14.6,7 A2.4,2.4 0 1 1 19.4,7 A2.4,2.4 0 1 1 14.6,7 Z M4.6,17 A2.4,2.4 0 1 1 9.4,17 A2.4,2.4 0 1 1 4.6,17 Z M14.6,17 A2.4,2.4 0 1 1 19.4,17 A2.4,2.4 0 1 1 14.6,17 Z</Geometry>
 
-    <Geometry x:Key="IconRange">M4,12 H20 M4,9 V15 M20,9 V15 M9,12 L12,9 M9,12 L12,15 M15,12 L12,9 M15,12 L12,15</Geometry>
-
     <Geometry x:Key="IconCal">M12,2 V5 M12,19 V22 M2,12 H5 M19,12 H22 M5,5 L7,7 M17,17 L19,19 M5,19 L7,17 M17,7 L19,5 M8,12 A4,4 0 1 1 16,12 A4,4 0 1 1 8,12 Z</Geometry>
 
     <Geometry x:Key="IconLed">M9,18 H15 M10,21 H14 M12,3 A7,7 0 0 0 8,15 C8.7,15.7 9,16.5 9,17.5 H15 C15,16.5 15.3,15.7 16,15 A7,7 0 0 0 12,3 Z</Geometry>
@@ -66,6 +54,12 @@
 
     <!-- Pencil/edit icon for inline-edit affordances (e.g. channel-mapping row). -->
     <Geometry x:Key="IconEdit">M4,20 L4,16 L14,6 L18,10 L8,20 Z M14,6 L17,3 A1.4,1.4 0 0 1 19,3 L21,5 A1.4,1.4 0 0 1 21,7 L18,10</Geometry>
+
+    <!-- Filled transport glyphs and stroked chevrons. -->
+    <Geometry x:Key="IconPlay">M7,4 L20,12 L7,20 Z</Geometry>
+    <Geometry x:Key="IconStop">M6,6 H18 V18 H6 Z</Geometry>
+    <Geometry x:Key="IconChevronLeft">M15,4 L7,12 L15,20</Geometry>
+    <Geometry x:Key="IconChevronRight">M9,4 L17,12 L9,20</Geometry>
 
     <!-- Brand tile: cyan rounded square with the wheel-with-screen knocked out.
          Geometry from tools/icon-smooth/smooth.py; EvenOdd makes screen + grips holes. -->
