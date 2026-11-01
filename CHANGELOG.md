@@ -11,6 +11,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Dashboard page shows a preview of the selected dashboard,** requires Dashboard Studio.
 - **S12 pedal haptics can run as one SimHub device** with a channel per pedal; toggle in Options, existing per-pedal devices are kept.
 - **Torque graph and `AZOM.TorqueLimit` include the +2 Nm Ultra torque boost** once it's unlocked in Pit House (R16/R21/R25 Ultra, fw 1.2.12.4+).
+- **Banner when a MOZA device stops responding on USB,** suggesting another USB port or hub, or removing extension cables.
 
 ## Fixed
 

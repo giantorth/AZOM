@@ -467,6 +467,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Ein MOZA-Gerät wurde an {0} gefunden, aber der Port wird von einer anderen Anwendung belegt. Schließen Sie MOZA PitHouse (oder jede andere Anwendung, die mit der Wheelbase kommuniziert) und klicken Sie auf Aktualisieren.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA-Port verschwunden</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Das MOZA-Gerät an {0} reagiert nicht mehr beim Öffnen. Stecken Sie die Wheelbase (oder ihr USB-Kabel) neu ein und klicken Sie auf Aktualisieren.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>MOZA-Gerät reagiert nicht mehr</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Das MOZA-Gerät an {0} reagiert über USB nicht mehr. Versuchen Sie einen anderen USB-Anschluss oder Hub, oder entfernen Sie verwendete USB-Verlängerungskabel.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA-Lenkrad hat kein Display</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Das ist bei Lenkrädern ohne Bildschirm normal – keine Aktion erforderlich.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Telemetrie nach wiederholten Fehlern angehalten</value></data>

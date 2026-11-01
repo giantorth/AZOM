@@ -466,6 +466,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Βρέθηκε συσκευή MOZA στη θύρα {0}, αλλά η θύρα κατέχεται από άλλη εφαρμογή. Κλείστε το MOZA PitHouse (ή οτιδήποτε άλλο επικοινωνεί με τη βάση τιμονιού) και κάντε κλικ στο Ανανέωση.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Η θύρα MOZA εξαφανίστηκε</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Η συσκευή MOZA στη θύρα {0} σταμάτησε να αποκρίνεται στο άνοιγμα. Συνδέστε ξανά τη βάση τιμονιού (ή το καλώδιο USB της) και κάντε κλικ στο Ανανέωση.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Η συσκευή MOZA σταμάτησε να αποκρίνεται</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Η συσκευή MOZA στη θύρα {0} σταμάτησε να αποκρίνεται μέσω USB. Δοκιμάστε διαφορετική θύρα ή διανομέα USB, ή αφαιρέστε τυχόν καλώδια προέκτασης USB που χρησιμοποιείτε.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Το τιμόνι MOZA δεν έχει οθόνη</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Αυτό είναι αναμενόμενο για τιμόνια χωρίς οθόνη — δεν απαιτείται καμία ενέργεια.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Η τηλεμετρία σταμάτησε μετά από επανειλημμένες αποτυχίες</value></data>

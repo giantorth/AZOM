@@ -467,6 +467,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Устройство MOZA найдено на {0}, но порт занят другим приложением. Закройте MOZA PitHouse (или другое приложение, обращающееся к базе) и нажмите «Обновить».</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Порт MOZA пропал</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Устройство MOZA на {0} перестало отвечать на открытие. Переподключите базу (или её USB-кабель) и нажмите «Обновить».</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Устройство MOZA перестало отвечать</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Устройство MOZA на {0} перестало отвечать по USB. Попробуйте другой USB-порт или концентратор либо отключите используемые USB-удлинители.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>У руля MOZA нет дисплея</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Это нормально для рулей без экрана — никаких действий не требуется.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Телеметрия остановлена после повторных сбоев</value></data>

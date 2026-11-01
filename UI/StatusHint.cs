@@ -28,6 +28,9 @@ namespace MozaPlugin.UI
         // Registry saw the MOZA port but Open can't find it (hot-unplug / pty
         // teardown) — remediation is replug, distinct from PortLockedByOtherApp.
         PortVanished,
+        // The device stopped answering at the USB level (write/close/open hung).
+        // Remediation is a different USB port/hub or dropping extension cables.
+        DeviceUnresponsive,
         // The recovery ladder exhausted its restart budget / hit a terminal park
         // and stopped the telemetry pipeline. Surfaces the park reason + how to retry.
         TelemetryParked,

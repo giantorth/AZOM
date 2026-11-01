@@ -493,6 +493,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Bark Yowl Grr Wuff Woof Bork {0} Woof Boof Boof Awoo Barff Bork!</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Yip!</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Awoo Woof Barff Rrrf Awoo Boof {0} Wan Snarf Boof Awoo Ruff Arf!</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Awoo Grr!</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Woof Bark Arf {0} Yip Boof Ruff Awoo Snarf Wuff Bork Grr Woof!</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Howl Grr!</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Boof Arf Rrrf Ruff!</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Wuff Awoo!</value></data>

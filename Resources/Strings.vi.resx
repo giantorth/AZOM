@@ -467,6 +467,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Đã tìm thấy thiết bị MOZA trên {0}, nhưng cổng đang bị một ứng dụng khác chiếm giữ. Hãy đóng MOZA PitHouse (hoặc bất kỳ ứng dụng nào đang giao tiếp với wheelbase) rồi nhấp Làm mới.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Cổng MOZA đã biến mất</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Thiết bị MOZA trên {0} đã ngừng phản hồi khi mở. Hãy cắm lại wheelbase (hoặc cáp USB của nó) rồi nhấp Làm mới.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Thiết bị MOZA đã ngừng phản hồi</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Thiết bị MOZA trên {0} đã ngừng phản hồi qua USB. Hãy thử cổng USB hoặc hub khác, hoặc tháo mọi cáp nối dài USB đang dùng.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Vô-lăng MOZA không có màn hình</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Đây là điều bình thường với vô-lăng không có màn hình — không cần thao tác gì.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Telemetry đã dừng sau nhiều lần lỗi liên tiếp</value></data>

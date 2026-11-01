@@ -466,6 +466,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>{0}에서 MOZA 장치를 찾았지만 다른 응용 프로그램이 포트를 사용 중입니다. MOZA PitHouse(또는 휠베이스와 통신하는 다른 프로그램)를 닫고 새로 고침을 클릭하세요.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA 포트가 사라졌습니다</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>{0}의 MOZA 장치가 열기에 응답하지 않습니다. 휠베이스(또는 USB 케이블)를 다시 연결하고 새로 고침을 클릭하세요.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>MOZA 장치가 응답하지 않습니다</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>{0}의 MOZA 장치가 USB에서 응답을 멈췄습니다. 다른 USB 포트나 허브를 사용하거나, 사용 중인 USB 연장 케이블을 제거해 보세요.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA 휠에 디스플레이가 없습니다</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>화면이 없는 휠에서는 정상입니다 — 별도의 조치가 필요하지 않습니다.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>반복된 실패 후 텔레메트리가 중지되었습니다</value></data>

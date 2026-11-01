@@ -470,6 +470,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Trovato un dispositivo MOZA su {0}, ma la porta è occupata da un'altra applicazione. Chiudi MOZA PitHouse (o qualsiasi altra cosa comunichi con la base) e fai clic su Aggiorna.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>La porta MOZA è scomparsa</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Il dispositivo MOZA su {0} ha smesso di rispondere all'apertura. Ricollega la base (o il suo cavo USB) e fai clic su Aggiorna.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Il dispositivo MOZA ha smesso di rispondere</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Il dispositivo MOZA su {0} ha smesso di rispondere via USB. Prova un'altra porta o un altro hub USB, oppure rimuovi eventuali prolunghe USB in uso.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Il volante MOZA non ha display</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>È normale per i volanti senza schermo: non è richiesta alcuna azione.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Telemetria interrotta dopo ripetuti errori</value></data>

@@ -467,6 +467,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>在 {0} 上找到 MOZA 设备，但端口被其他应用程序占用。请关闭 MOZA PitHouse（或任何与底座通信的程序）后点击刷新。</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA 端口已消失</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>{0} 上的 MOZA 设备已停止响应打开操作。请重新插拔底座（或其 USB 线）后点击刷新。</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>MOZA 设备已停止响应</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>{0} 上的 MOZA 设备已停止通过 USB 响应。请尝试更换 USB 端口或集线器，或移除正在使用的 USB 延长线。</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA 方向盘没有显示屏</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>对于没有屏幕的方向盘这是正常现象——无需任何操作。</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>多次失败后遥测已停止</value></data>

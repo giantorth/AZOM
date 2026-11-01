@@ -472,6 +472,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Fant en MOZA-enhet på {0}, men porten holdes av et annet program. Lukk MOZA PitHouse (eller annet som kommuniserer med wheelbasen) og klikk Oppdater.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA-porten forsvant</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>MOZA-enheten på {0} sluttet å svare på åpning. Koble til wheelbasen (eller USB-kabelen) på nytt og klikk Oppdater.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>MOZA-enheten sluttet å svare</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>MOZA-enheten på {0} sluttet å svare over USB. Prøv en annen USB-port eller hub, eller fjern eventuelle USB-skjøtekabler som er i bruk.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA-rattet har ingen skjerm</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>Dette er forventet for ratt uten skjerm – ingen handling nødvendig.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Telemetri stoppet etter gjentatte feil</value></data>

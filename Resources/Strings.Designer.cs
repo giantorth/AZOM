@@ -577,6 +577,8 @@ namespace MozaPlugin.Resources
         public static string Banner_PortLocked_Body => Get("Banner_PortLocked_Body");
         public static string Banner_PortVanished_Title => Get("Banner_PortVanished_Title");
         public static string Banner_PortVanished_Body => Get("Banner_PortVanished_Body");
+        public static string Banner_DeviceUnresponsive_Title => Get("Banner_DeviceUnresponsive_Title");
+        public static string Banner_DeviceUnresponsive_Body => Get("Banner_DeviceUnresponsive_Body");
         public static string Banner_TelemetryDegraded_Title => Get("Banner_TelemetryDegraded_Title");
         public static string Banner_TelemetryDegraded_Body => Get("Banner_TelemetryDegraded_Body");
         public static string Banner_TelemetryParked_Title => Get("Banner_TelemetryParked_Title");

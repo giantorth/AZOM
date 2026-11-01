@@ -109,6 +109,21 @@ namespace MozaPlugin.UI
                     string.Format(Strings.Banner_PortVanished_Body, port)));
             }
 
+            // Rule 1b2: DeviceUnresponsive — a write/close/open on the port hung.
+            // No open-failure debounce: the stuck call isn't retried, so the
+            // counter stays at 0–1, and the hang thresholds are already seconds.
+            if (elapsed >= PortLockedSettling
+                && connection != null
+                && !(data?.IsConnected ?? false)
+                && connection.LastFailure.Kind == ConnectionFailureKind.DeviceUnresponsive)
+            {
+                var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
+                list.Add(new StatusHint(
+                    StatusHintKind.DeviceUnresponsive,
+                    Strings.Banner_DeviceUnresponsive_Title,
+                    string.Format(Strings.Banner_DeviceUnresponsive_Body, port)));
+            }
+
             // Rule 1c: TelemetryParked — the recovery ladder exhausted its restart
             // budget (or hit a terminal park) and stopped the telemetry pipeline.
             // Surface WHY (the verbatim park reason) and how to retry.

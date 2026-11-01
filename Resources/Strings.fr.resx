@@ -467,6 +467,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Un périphérique MOZA a été trouvé sur {0}, mais le port est occupé par une autre application. Fermez MOZA PitHouse (ou toute autre application communiquant avec la base) et cliquez sur Actualiser.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>Le port MOZA a disparu</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>Le périphérique MOZA sur {0} ne répond plus à l'ouverture. Rebranchez la base (ou son câble USB) et cliquez sur Actualiser.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>Le périphérique MOZA ne répond plus</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>Le périphérique MOZA sur {0} ne répond plus via USB. Essayez un autre port ou concentrateur USB, ou retirez les rallonges USB utilisées.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>Le volant MOZA n'a pas d'écran</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>C'est normal pour les volants sans écran — aucune action nécessaire.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Télémétrie arrêtée après des échecs répétés</value></data>

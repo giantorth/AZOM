@@ -496,6 +496,8 @@
   <data name="Banner_PortLocked_Body" xml:space="preserve"><value>Found a MOZA device on {0}, but the port is held by another application. Close MOZA PitHouse (or anything else talking to the wheelbase) and click Refresh.</value></data>
   <data name="Banner_PortVanished_Title" xml:space="preserve"><value>MOZA port disappeared</value></data>
   <data name="Banner_PortVanished_Body" xml:space="preserve"><value>The MOZA device on {0} stopped responding to open. Replug the wheelbase (or its USB cable) and click Refresh.</value></data>
+  <data name="Banner_DeviceUnresponsive_Title" xml:space="preserve"><value>MOZA device stopped responding</value></data>
+  <data name="Banner_DeviceUnresponsive_Body" xml:space="preserve"><value>The MOZA device on {0} stopped responding over USB. Try a different USB port or hub, or remove any USB extension cables in use.</value></data>
   <data name="Banner_TelemetryDegraded_Title" xml:space="preserve"><value>MOZA wheel has no display</value></data>
   <data name="Banner_TelemetryDegraded_Body" xml:space="preserve"><value>This is expected for wheels without a screen — no action needed.</value></data>
   <data name="Banner_TelemetryParked_Title" xml:space="preserve"><value>Telemetry stopped after repeated failures</value></data>
