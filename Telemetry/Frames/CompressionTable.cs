@@ -90,19 +90,12 @@ namespace MozaPlugin.Telemetry.Frames
             // 16-bit speed (×10, 0..65535)
             Add(new Entry("float_6000_1", 0x0F, 16,
                 v => (ulong)Clamp(Sanitize(v) * 10.0, 0, 65535), (0, 400)));
-            Add(new Entry("float_600_2", 0x15, 16,
+            // PitHouse emits 0x10/16 for NavigationSpeedLimit (stock compression
+            // float_600_2) in truck-sim tier-defs (bridge-20260514-170002 idx=18);
+            // ×100 confirmed on hardware. The inferred 0x15 made Type02 reject the
+            // whole tier (bundles DJQ23F6D, F6WV5S95: InstantConsumption_L100KM).
+            Add(new Entry("float_600_2", 0x10, 16,
                 v => (ulong)Clamp(Sanitize(v) * 100.0, 0, 65535), (0, 400)));
-
-            // 16-bit navigation speed limit. PitHouse emits comp=0x10 width=16
-            // for NavigationSpeedLimit in truck-sim (ETS2/ATS) tier-defs
-            // (bridge-20260514-170002 idx=18) — the only place 0x10 appears
-            // (the earlier "0x10 never used" note was from circuit captures,
-            // which lack this channel). The firmware's 0x10 codec is ×100
-            // (confirmed on hardware: a 0–130 test sweep displayed 0–1 at ×1,
-            // i.e. raw/100). Same scale as float_600_2 — the original bug was
-            // the wrong CODE (0x15), not the scale.
-            Add(new Entry("nav_speed_limit", 0x10, 16,
-                v => (ulong)Clamp(Sanitize(v) * 100.0, 0, 65535), (0, 130)));
 
             // 12-bit tyre pressure (×10, 0..4095). Code confirmed by decoding
             // PitHouse value frames in bridge-20260503-112940.jsonl flag=0x04/0x0a/0x10:

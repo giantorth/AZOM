@@ -5189,7 +5189,7 @@
       },
       "package_level": 500,
       "default_value": 0,
-      "compression": "nav_speed_limit",
+      "compression": "float_600_2",
       "is_visible": true,
       "simhub_property": "DataCorePlugin.GameData.NavigationSpeedLimit"
     },
