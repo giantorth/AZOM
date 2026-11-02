@@ -16,19 +16,6 @@ namespace MozaPlugin.Telemetry
 {
     public partial class TelemetrySender
     {
-
-        /// <summary>
-        /// Probe the Display sub-device inside the wheel.
-        /// Pithouse sends the same identity commands used for the main wheel
-        /// (0x09, 0x04, 0x06, 0x02, 0x05) but via group 0x43 to route them
-        /// through the SerialStream to the Display sub-module.
-        ///
-        /// Responses arrive asynchronously via OnMessageDuringPreamble:
-        /// - 0x87 data=01 "Display" → model name (confirms display present)
-        /// - 0x89 data=00:01 → presence check (1 sub-device)
-        /// - 0x82 data=02 → product type
-        /// </summary>
-
         /// <summary>
         /// Push an empty-state tile-server blob on session 0x03. Matches
         /// PitHouse behaviour observed in 5 captures — PitHouse sends this on
@@ -57,16 +44,6 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>
-        /// Fire once per session: reply to the wheel's configJson state blob
-        /// with a <c>configJson()</c> canonical library list. Wheel uses this
-        /// to refresh its <c>configJsonList</c> field, which PitHouse reads
-        /// back from <see cref="WheelDashboardState.ConfigJsonList"/>. Sent
-        /// on the SAME session the wheel pushed state on (older firmware =
-        /// 0x09; KS Pro / 2026-04+ firmware = 0x0a per
-        /// usb-capture/ksp/mozahubstartup.pcapng OUT seq=0x0010..0x0017,
-        /// decompressed: <c>{"configJson()":{"dashboards":[...]},"id":11}</c>).
-        /// </summary>
         // Session the last configJson reply targeted (0x09 on most firmware,
         // 0x0a on KS Pro / 2026-04+). The post-upload enable re-send reuses it.
         private volatile byte _lastConfigJsonReplySession = 0x09;
@@ -82,6 +59,8 @@ namespace MozaPlugin.Telemetry
         // BuildWireLibraryList). Short TTL bounds ghost-manufacture when the
         // wheel never answers at all.
         private const long IntentTtlTicks = TimeSpan.TicksPerMinute * 2;
+        // Settle margin before a still-disabled enable intent counts as refused.
+        private const int EnableRefusalMarginSeconds = 45;
 
         /// <summary>
         /// Build the library list actually sent to the wheel. The list is the
@@ -123,7 +102,7 @@ namespace MozaPlugin.Telemetry
                 // margin killed healthy enables (2026-08-16 evening: uploads
                 // stuck disabled); keep it comfortably beyond one reconnect
                 // cycle.
-                long refusalMarginTicks = TimeSpan.TicksPerSecond * 45;
+                long refusalMarginTicks = TimeSpan.TicksPerSecond * EnableRefusalMarginSeconds;
                 long stateTicks = state.CapturedAt.Ticks;
                 foreach (var e in state.DisabledDashboards)
                 {
@@ -134,7 +113,7 @@ namespace MozaPlugin.Telemetry
                         _intentionalEnables.TryRemove(e.DirName, out _);
                         MozaLog.Info(
                             $"[AZOM] Enable intent for \"{e.DirName}\" expired — still classified " +
-                            "disabled 3s+ after declaration (enable-confirm delta may have been " +
+                            $"disabled {EnableRefusalMarginSeconds}s+ after declaration (enable-confirm delta may have been " +
                             "lost, or the wheel declined); click Enable to retry. Intent dropped " +
                             "rather than re-declared to avoid manufacturing a ghost slot");
                     }
@@ -167,6 +146,16 @@ namespace MozaPlugin.Telemetry
             return list;
         }
 
+        /// <summary>
+        /// Fire once per session: reply to the wheel's configJson state blob
+        /// with a <c>configJson()</c> canonical library list. Wheel uses this
+        /// to refresh its <c>configJsonList</c> field, which PitHouse reads
+        /// back from <see cref="WheelDashboardState.ConfigJsonList"/>. Sent
+        /// on the SAME session the wheel pushed state on (older firmware =
+        /// 0x09; KS Pro / 2026-04+ firmware = 0x0a per
+        /// usb-capture/ksp/mozahubstartup.pcapng OUT seq=0x0010..0x0017,
+        /// decompressed: <c>{"configJson()":{"dashboards":[...]},"id":11}</c>).
+        /// </summary>
         private void MaybeSendConfigJsonReply(WheelDashboardState state, byte session)
         {
             _lastConfigJsonReplySession = session;
@@ -249,8 +238,8 @@ namespace MozaPlugin.Telemetry
             // switched to slot 15 landed on the wrong dash). PitHouse's list
             // merely coincides with the wheel's table because both are
             // ordinal-sorted over the same set. The wheel-reported list is the
-            // only slot authority; mutations re-sync it via
-            // RequestConfigJsonStateRefresh.
+            // only slot authority; host mutations are predicted via
+            // ConfigJsonClient.ApplyLibraryDelta / CompactConfirmedDeletes.
             MozaLog.Info(
                 $"[AZOM] Sent configJson() reply on session 0x{session:X2}: " +
                 $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
@@ -307,10 +296,6 @@ namespace MozaPlugin.Telemetry
             // prime/open nudges with a full push, and synthetic-seq frames
             // desync the sess=0x09 reassembler.
         }
-
-        // Nonce for post-mutation state-refresh seqs (distinct ranges from the
-        // watchdog's gap-recovery nudges at 0x100/0x200).
-        private int _stateRefreshNonce;
 
         // ── Library-sync restart (last-resort reconcile) ─────────────────
         // Rebuilds the wheel's REGISTRY/configJsonList at connect. It does
@@ -401,33 +386,6 @@ namespace MozaPlugin.Telemetry
                     Interlocked.Exchange(ref _librarySyncRestartScheduled, 0);
                 }
             });
-        }
-
-        /// <summary>
-        /// UNUSED — kept for reference. Mid-session prime + open-request does
-        /// NOT make the wheel re-push its full state (full TitleId=1 pushes
-        /// happen only at connect), and the synthetic-seq frames desync the
-        /// sess=0x09 reassembler (forward-gap storm; config channel dead until
-        /// reconnect). Do not call after mutations; the wheel's unprompted
-        /// TitleId=4 deltas carry the confirmations.
-        /// </summary>
-        internal void RequestConfigJsonStateRefresh(string reason)
-        {
-            byte session = _lastConfigJsonReplySession;
-            int n = Interlocked.Increment(ref _stateRefreshNonce) & 0x7F;
-            ushort primeSeq = (ushort)(0x300 + n);
-            ushort openSeq = (ushort)(0x380 + n);
-            MozaLog.Debug(
-                $"[AZOM] Requesting fresh configJson state on sess=0x{session:X2} ({reason})");
-            try
-            {
-                SendSessionPrime(session, primeSeq);
-                _watchdog.SendConfigJsonOpenRequest(session, openSeq);
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Debug($"[AZOM] configJson state-refresh request failed: {ex.Message}");
-            }
         }
 
         // ── Pending delete (confirm-gated, mid-session reconcile) ─────────
@@ -636,6 +594,17 @@ namespace MozaPlugin.Telemetry
             });
         }
 
+        /// <summary>
+        /// Probe the Display sub-device inside the wheel.
+        /// Pithouse sends the same identity commands used for the main wheel
+        /// (0x09, 0x04, 0x06, 0x02, 0x05) but via group 0x43 to route them
+        /// through the SerialStream to the Display sub-module.
+        ///
+        /// Responses arrive asynchronously via OnMessageDuringPreamble:
+        /// - 0x87 data=01 "Display" → model name (confirms display present)
+        /// - 0x89 data=00:01 → presence check (1 sub-device)
+        /// - 0x82 data=02 → product type
+        /// </summary>
         private void SendDisplayProbe()
         {
             if (!_connection.IsConnected) return;
@@ -658,14 +627,6 @@ namespace MozaPlugin.Telemetry
             _connection.Send(_frames.BuildDisplayFrameWithData(0x10, new byte[] { 0x00 }));
         }
 
-        // ── Preamble message handling ───────────────────────────────────────
-
-        /// <summary>
-        /// Handle incoming messages during port probing and the ~1s preamble phase.
-        /// Detects fc:00 session acks (for port probing) and acks incoming 7c:00
-        /// channel data on the telemetry session.
-        /// </summary>
-        
         // ── Timer loop ──────────────────────────────────────────────────────
 
         // Re-entry guard. System.Timers.Timer fires Elapsed on the ThreadPool,

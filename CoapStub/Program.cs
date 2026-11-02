@@ -28,8 +28,8 @@ namespace MozaPlugin.CoapStub
     /// <c>%LOCALAPPDATA%\SimHub\MozaPlugin\CoapStub\stub-trace-&lt;pid&gt;-&lt;launchstamp&gt;.log</c>.
     /// Output-only — the stub writes nothing to stdout/stderr (deliberately, so
     /// we can observe the vendor's request without our reply mutating the
-    /// conversation). Heartbeat lines fire every 2s and double as the
-    /// parent-liveness poll.
+    /// conversation). The parent-liveness poll runs every 2s; a heartbeat line
+    /// is written about every 5 minutes.
     /// </summary>
     internal static class Program
     {
@@ -64,26 +64,27 @@ namespace MozaPlugin.CoapStub
                 AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
                 AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
-                // Main loop: heartbeat once every 2s, which doubles as the
-                // parent-liveness poll. When the parent (SimHub) exits we exit
-                // too — the Wine-proof primary teardown path; the plugin's
-                // JobObject is the backstop.
+                // Main loop: parent-liveness poll every 2s. When the parent
+                // (SimHub) exits we exit too — the Wine-proof primary teardown
+                // path; the plugin's JobObject is the backstop.
                 var sw = Stopwatch.StartNew();
+                int polls = 0;
                 while (true)
                 {
                     Thread.Sleep(2000);
                     if (HasExitedSafe(parent))
                     {
-                        Trace($"parent exited — shutting down (uptime={sw.Elapsed:hh\\:mm\\:ss})");
+                        TraceLifecycle($"parent exited — shutting down (uptime={sw.Elapsed:hh\\:mm\\:ss})");
                         return 0;
                     }
-                    Trace($"heartbeat uptime={sw.Elapsed:hh\\:mm\\:ss}");
+                    if (++polls % HeartbeatEveryPolls == 0)
+                        Trace($"heartbeat uptime={sw.Elapsed:hh\\:mm\\:ss}");
                 }
             }
             catch (Exception ex)
             {
-                Trace($"FATAL in Main: {ex.GetType().FullName}: {ex.Message}");
-                Trace(ex.StackTrace ?? "");
+                TraceLifecycle($"FATAL in Main: {ex.GetType().FullName}: {ex.Message}");
+                TraceLifecycle(ex.StackTrace ?? "");
                 return 1;
             }
         }
@@ -167,7 +168,7 @@ namespace MozaPlugin.CoapStub
             {
                 // If we can no longer query the handle, assume the process is
                 // gone — better to exit a still-orphaned stub than to leak one.
-                Trace($"parent HasExited query failed ({ex.GetType().Name}: {ex.Message}); treating as exited");
+                TraceLifecycle($"parent HasExited query failed ({ex.GetType().Name}: {ex.Message}); treating as exited");
                 return true;
             }
         }
@@ -206,31 +207,37 @@ namespace MozaPlugin.CoapStub
 
         private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
         {
-            Trace($"Console.CancelKeyPress SpecialKey={e.SpecialKey}");
+            TraceLifecycle($"Console.CancelKeyPress SpecialKey={e.SpecialKey}");
             // Don't cancel — let the SDK / job-object kill us so we can see it.
             e.Cancel = true;
         }
 
         private static void OnProcessExit(object? sender, EventArgs e)
         {
-            Trace("ProcessExit event");
+            TraceLifecycle("ProcessExit event");
             lock (_traceGate) { _trace?.Flush(); _trace?.Close(); }
         }
 
         private static void OnUnhandledException(object? sender, UnhandledExceptionEventArgs e)
         {
             var ex = e.ExceptionObject as Exception;
-            Trace($"UnhandledException IsTerminating={e.IsTerminating}: {ex?.GetType().FullName}: {ex?.Message}");
-            Trace(ex?.StackTrace ?? "");
+            TraceLifecycle($"UnhandledException IsTerminating={e.IsTerminating}: {ex?.GetType().FullName}: {ex?.Message}");
+            TraceLifecycle(ex?.StackTrace ?? "");
             lock (_traceGate) { _trace?.Flush(); }
         }
 
-        // One file per launch with a 2 s heartbeat: cap the file and prune old
-        // ones, or a rig that runs SimHub for weeks fills the folder unattended.
+        // One file per launch: cap the file and prune old ones, or a rig that
+        // runs SimHub for weeks fills the folder unattended.
         private const long TraceMaxBytes = 4L * 1024 * 1024;
         private static readonly TimeSpan TraceKeep = TimeSpan.FromDays(7);
         private static long _traceBytes;
         private static bool _traceCapped;
+        // 150 × 2 s poll ≈ 5 min between heartbeat lines.
+        private const int HeartbeatEveryPolls = 150;
+        // Lifecycle lines (exit, fatal, unhandled) bypass TraceMaxBytes so the
+        // end of the trace survives the cap; their own budget bounds a crash loop.
+        private const long LifecycleReserveBytes = 64L * 1024;
+        private static long _lifecycleBytes;
 
         private static void OpenTrace(string[] args)
         {
@@ -281,20 +288,33 @@ namespace MozaPlugin.CoapStub
                 : "(no --parent-pid; will bind to a running SimHub by name)";
         }
 
-        private static void Trace(string line)
+        private static void Trace(string line) => WriteTrace(line, lifecycle: false);
+
+        private static void TraceLifecycle(string line) => WriteTrace(line, lifecycle: true);
+
+        private static void WriteTrace(string line, bool lifecycle)
         {
             var stamped = $"[{DateTime.UtcNow:HH:mm:ss.fff}] {line}";
+            long cost = stamped.Length + 2;
             lock (_traceGate)
             {
-                if (_traceCapped) return;
                 try
                 {
-                    _traceBytes += stamped.Length + 2;
-                    if (_traceBytes > TraceMaxBytes)
+                    if (lifecycle)
                     {
-                        _traceCapped = true;
-                        _trace?.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] trace cap reached ({TraceMaxBytes} bytes) — logging stopped");
-                        return;
+                        if (_lifecycleBytes + cost > LifecycleReserveBytes) return;
+                        _lifecycleBytes += cost;
+                    }
+                    else
+                    {
+                        if (_traceCapped) return;
+                        _traceBytes += cost;
+                        if (_traceBytes > TraceMaxBytes)
+                        {
+                            _traceCapped = true;
+                            _trace?.WriteLine($"[{DateTime.UtcNow:HH:mm:ss.fff}] trace cap reached ({TraceMaxBytes} bytes) — logging stopped except lifecycle lines");
+                            return;
+                        }
                     }
                     _trace?.WriteLine(stamped);
                 }

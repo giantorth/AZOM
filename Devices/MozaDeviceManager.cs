@@ -189,9 +189,9 @@ namespace MozaPlugin.Devices
         /// <summary>Model-name (grp 0x07 cmd 01) + hw-version (grp 0x08 cmd 01) reads at an
         /// explicit device id — the two identity groups <see cref="SendPithouseIdentityProbe"/>
         /// doesn't cover. UNTRACKED on purpose: this is an exploratory probe at a relayed
-        /// sub-device that may not implement the groups at all, and a tracked read retries
-        /// for the life of the connection (<c>ReadRetryMaxAttempts</c> is int.MaxValue), so
-        /// a silent device would carry a permanent unanswered-pending entry.</summary>
+        /// sub-device that may not implement the groups at all, and a tracked read
+        /// retransmits for up to 60 s before sunsetting its name, so a silent device would
+        /// cost a minute of retries plus a sunset log.</summary>
         public void SendNameIdentityProbe(byte deviceId)
         {
             if (!_connection.IsConnected) return;
@@ -277,14 +277,11 @@ namespace MozaPlugin.Devices
         /// device responds with <c>7e 00 80 (deviceId&lt;&lt;swap) chk</c> if
         /// alive. Cheap (single 5-byte frame) and NOT tracked by
         /// <see cref="MozaPlugin.PendingResponses"/> — absent devices don't
-        /// burn the 3-attempt retry budget every PollStatus tick.
+        /// pile tracked retransmits on every PollStatus tick.
         ///
-        /// Used for sub-device presence detection (dash / handbrake / pedals)
-        /// where the prior approach (re-issuing the first settings read every
-        /// 5 s) generated 3 retry frames per absent device per tick — the bulk
-        /// of the steady-state wire noise in single-base setups. The wheel +
-        /// base are detected via their cmd-specific responses and don't go
-        /// through this path.
+        /// Used for sub-device presence detection (dash / handbrake / pedals).
+        /// The wheel + base are detected via their cmd-specific responses and
+        /// don't go through this path.
         /// </summary>
         public void SendPresenceProbe(byte deviceId)
         {
@@ -384,16 +381,14 @@ namespace MozaPlugin.Devices
         }
 
         // Default backoff for tracked reads. Exponential growth caps at the
-        // array's last value, which PendingResponseTracker reuses indefinitely:
+        // array's last value, which PendingResponseTracker reuses:
         // {200, 400, 800, 1600, 3200, 6400, 10000} — fast catch of transient
         // drops in the first ~1.4 s, then graceful widening up to one retry
         // per 10 s. Entries are NOT dropped on attempt count; the tracker
-        // re-emits forever until the wheel acks or the connection drops.
-        // ReadRetryMaxAttempts is retained for API compatibility but ignored
-        // by the tracker.
+        // re-emits until the wheel acks, the name sunsets (60 s unanswered)
+        // or the connection drops.
         private static readonly int[] ReadRetryBackoffMs =
             { 200, 400, 800, 1600, 3200, 6400, 10000 };
-        private const int ReadRetryMaxAttempts = int.MaxValue;
 
         public bool ReadSettingForDevice(string commandName, byte deviceId)
         {
@@ -404,7 +399,7 @@ namespace MozaPlugin.Devices
             if (msg == null) return false;
             _connection.SendDeviceCommand(msg);
             Tracker?.Track(
-                cmd.Name, msg, ReadRetryBackoffMs, ReadRetryMaxAttempts);
+                cmd.Name, msg, ReadRetryBackoffMs);
             return true;
         }
 
@@ -417,7 +412,7 @@ namespace MozaPlugin.Devices
             if (msg == null) return false;
             _connection.SendDeviceCommand(msg);
             Tracker?.Track(
-                cmd.Name, msg, ReadRetryBackoffMs, ReadRetryMaxAttempts);
+                cmd.Name, msg, ReadRetryBackoffMs);
             return true;
         }
 
@@ -509,11 +504,6 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        public bool WriteColorForDevice(string commandName, byte deviceId, byte r, byte g, byte b)
-        {
-            return WriteArrayForDevice(commandName, deviceId, new byte[] { r, g, b });
-        }
-
         // ============================================================
         // Stream-lane variants. Identical frame construction to the Send
         // counterparts above, but enqueued via SendStream (latest-wins,
@@ -524,28 +514,6 @@ namespace MozaPlugin.Devices
         // end-state-idempotent writes — an intermediate frame may be
         // coalesced away; never for ordered/setup writes.
         // ============================================================
-
-        public bool WriteSettingStream(string commandName, int value, StreamKind slot)
-        {
-            if (!_connection.IsConnected) return false;
-            var cmd = MozaCommandDatabase.Get(commandName);
-            if (cmd == null) return false;
-            var msg = cmd.BuildWriteInt(GetDeviceId(cmd.DeviceType), value);
-            if (msg == null) return false;
-            _connection.SendStream(slot, msg);
-            return true;
-        }
-
-        public bool WriteArrayStream(string commandName, byte[] payload, StreamKind slot)
-        {
-            if (!_connection.IsConnected) return false;
-            var cmd = MozaCommandDatabase.Get(commandName);
-            if (cmd == null) return false;
-            var msg = cmd.BuildWriteMessage(GetDeviceId(cmd.DeviceType), payload);
-            if (msg == null) return false;
-            _connection.SendStream(slot, msg);
-            return true;
-        }
 
         public bool WriteSettingForDeviceStream(string commandName, byte deviceId, int value, StreamKind slot)
         {
@@ -571,9 +539,10 @@ namespace MozaPlugin.Devices
 
         // ============================================================
         // Wheelbase LFE (low-frequency effects) host-rendered streams —
-        // cmd 0x2D/0x77 on the base (dev 0x13). Engine/ABS ride their own
-        // latest-wins stream lanes; the discrete gearshift burst and the
-        // disable edge go out the paced one-shot FIFO. See MozaBaseLfeProtocol.
+        // cmd 0x2D/0x77 on the base (dev 0x13). Engine/ABS, and the gearshift
+        // slot when it runs continuously (Level mode), ride their own latest-wins
+        // stream lanes; the discrete gearshift burst and the disable edge go out
+        // the paced one-shot FIFO. See MozaBaseLfeProtocol.
         // Only valid on the base primary connection (base == primary pipe).
         // ============================================================
 
@@ -604,9 +573,9 @@ namespace MozaPlugin.Devices
             return true;
         }
 
-        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt only). The three LFE
-        // slots are identical oscillators — plugin LFE mode happens to drive id 0 as
-        // a one-shot gearshift burst, but nothing stops it streaming like ids 1/2.
+        // The id-0 oscillator as a CONTINUOUS tone (ShakeIt). The three LFE slots
+        // are identical oscillators — plugin LFE mode drives id 0 as the gearshift
+        // channel (fixed GearshiftPeriod), but nothing stops it streaming like ids 1/2.
         // Period is a timing hint on a host-modulated tone (per wheelbase-0x13.md);
         // reuse the engine ParamK so all three continuous tones encode it the same.
         public bool SendBaseLfeOsc0Stream(bool playing, double freqHz, double amp01)
@@ -621,26 +590,47 @@ namespace MozaPlugin.Devices
             return true;
         }
 
+        // Gearshift burst (OnChange bumps, test bumps): one-shot FIFO, not coalesced.
         public bool SendBaseLfeGearshiftBurst(double freqHz, double amp01)
         {
             if (!_connection.IsConnected) return false;
-            // Gearshift burst: fixed placeholder period, freq+amplitude from the
-            // channel. One-shot FIFO (not coalesced).
-            var f = MozaBaseLfeProtocol.BuildFrame(
+            _connection.Send(BuildBaseLfeGearshiftFrame(freqHz, amp01));
+            return true;
+        }
+
+        // The same gearshift frame while the slot runs continuously (Level mode):
+        // latest-wins, so a write stall can't back stale frames up in the FIFO.
+        public bool SendBaseLfeGearshiftStream(double freqHz, double amp01)
+        {
+            if (!_connection.IsConnected) return false;
+            _connection.SendStream(StreamKind.BaseLfeOsc0, BuildBaseLfeGearshiftFrame(freqHz, amp01));
+            return true;
+        }
+
+        // Fixed placeholder period, freq + amplitude from the channel.
+        private static byte[] BuildBaseLfeGearshiftFrame(double freqHz, double amp01)
+            => MozaBaseLfeProtocol.BuildFrame(
                 MozaBaseLfeProtocol.LfeEffect.Gearshift, playing: true,
                 MozaBaseLfeProtocol.GearshiftPeriod,
                 MozaMBoosterProtocol.EncodeFreq(freqHz),
                 MozaMBoosterProtocol.EncodeAmp(amp01));
-            _connection.Send(f);
-            return true;
-        }
 
         public bool SendBaseLfeDisable(MozaBaseLfeProtocol.LfeEffect id)
         {
             if (!_connection.IsConnected) return false;
+            // Drop the effect's pending stream frame first: stream slots drain after
+            // the FIFO item, so it would replay the tone after the disable.
+            _connection.ClearStreamSlots((int)BaseLfeStreamSlot(id), 1);
             _connection.Send(MozaBaseLfeProtocol.BuildDisable(id));
             return true;
         }
+
+        private static StreamKind BaseLfeStreamSlot(MozaBaseLfeProtocol.LfeEffect id) => id switch
+        {
+            MozaBaseLfeProtocol.LfeEffect.Engine => StreamKind.BaseLfeEngine,
+            MozaBaseLfeProtocol.LfeEffect.Abs => StreamKind.BaseLfeAbs,
+            _ => StreamKind.BaseLfeOsc0,
+        };
 
         public void ReadSettings(params string[] commandNames)
         {

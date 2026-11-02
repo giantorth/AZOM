@@ -90,12 +90,14 @@ namespace MozaPlugin.Protocol
         private readonly object _cacheLock = new object();
         private long _cacheTimestamp;                                  // 0 = uninitialised
         private IReadOnlyList<PortInfo> _cachedPorts = Array.Empty<PortInfo>();
-        private string _lastSummary = "(not yet enumerated)";
         private MozaDiscoverySource _lastSource = MozaDiscoverySource.None;
         private int _hasLoggedFirstSuccess; // 0 or 1, atomic
         // Unknown-PID first-sighting log gate. Guarded by _cacheLock so a
         // concurrent cache refresh doesn't double-log the same PID.
         private readonly HashSet<ushort> _loggedUnknownPids = new HashSet<ushort>();
+        // Wine-registry-declared ports already logged. Guarded by _cacheLock.
+        private readonly HashSet<string> _loggedDeclaredPorts =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ForeignPortVids cache — separate lock and timestamp from the MOZA port
         // cache so neither invalidates the other (the probe sweep and the
@@ -109,48 +111,79 @@ namespace MozaPlugin.Protocol
 
         private MozaPortDiscovery() { }
 
-        /// <summary>Enumerate MOZA CDC ACM ports (cached for <see cref="CacheTtlTicks"/>).</summary>
-        public IReadOnlyList<PortInfo> Enumerate()
+        // Serialises the rebuild: lane reconnect timers and the UI miss the cache
+        // together on expiry, and each would otherwise walk the registry/sysfs.
+        // Taken only around the build; _cacheLock stays the short leaf lock.
+        private readonly object _buildGate = new object();
+
+        private bool TryGetFresh(out IReadOnlyList<PortInfo> ports)
         {
             lock (_cacheLock)
             {
-                long now = Stopwatch.GetTimestamp();
-                if (_cacheTimestamp != 0 && (now - _cacheTimestamp) < CacheTtlTicks)
-                    return _cachedPorts;
+                ports = _cachedPorts;
+                return _cacheTimestamp != 0 && (Stopwatch.GetTimestamp() - _cacheTimestamp) < CacheTtlTicks;
             }
+        }
 
-            // Wine/Proton has no Enum\USB tree, so the registry walk is dead
-            // there; sysfs carries the same identity. Native Windows never
-            // reaches the sysfs branch (WineHost.UnixRoot is null).
-            bool useSysfs = LinuxUsbEnumerator.Available;
-            var ports = useSysfs ? WithWineRegistryPorts(EnumerateFromSysfs()) : EnumerateFromRegistry();
-            var source = ports.Count > 0
-                ? (useSysfs ? MozaDiscoverySource.Sysfs : MozaDiscoverySource.Registry)
-                : MozaDiscoverySource.None;
-            var summary = SummarizePorts(ports);
+        /// <summary>Enumerate MOZA CDC ACM ports (cached for <see cref="CacheTtlTicks"/>).</summary>
+        public IReadOnlyList<PortInfo> Enumerate()
+        {
+            if (TryGetFresh(out var cached)) return cached;
 
-            // Collect first-sighting unknown PIDs while holding the lock,
-            // then emit log lines after releasing it (MozaLog can call
-            // into SimHub on the same thread; don't run user-supplied
-            // code under our own lock).
+            IReadOnlyList<PortInfo> ports;
+            bool useSysfs;
+            string summary;
+            // First-sighting unknown PIDs and Wine-declared ports, collected under
+            // the lock and logged after releasing it (MozaLog can call into SimHub
+            // on the same thread; don't run user-supplied code under our own lock).
             List<PortInfo>? newUnknown = null;
-            lock (_cacheLock)
+            List<string>? newDeclared = null;
+            lock (_buildGate)
             {
-                _cachedPorts = ports;
-                _cacheTimestamp = Stopwatch.GetTimestamp();
-                _lastSummary = summary;
-                _lastSource = source;
+                if (TryGetFresh(out cached)) return cached;
 
-                for (int i = 0; i < ports.Count; i++)
+                // Wine/Proton has no Enum\USB tree, so the registry walk is dead
+                // there; sysfs carries the same identity. Native Windows never
+                // reaches the sysfs branch (WineHost.UnixRoot is null).
+                useSysfs = LinuxUsbEnumerator.Available;
+                List<(PortInfo port, string? target)>? declared = null;
+                ports = useSysfs ? WithWineRegistryPorts(EnumerateFromSysfs(), out declared) : EnumerateFromRegistry();
+                var source = ports.Count > 0
+                    ? (useSysfs ? MozaDiscoverySource.Sysfs : MozaDiscoverySource.Registry)
+                    : MozaDiscoverySource.None;
+                summary = SummarizePorts(ports);
+
+                lock (_cacheLock)
                 {
-                    var p = ports[i];
-                    if (p.Category != MozaDeviceCategory.Unknown) continue;
-                    if (_loggedUnknownPids.Add(p.Pid))
+                    _cachedPorts = ports;
+                    _cacheTimestamp = Stopwatch.GetTimestamp();
+                    _lastSource = source;
+
+                    for (int i = 0; i < ports.Count; i++)
                     {
-                        (newUnknown ??= new List<PortInfo>()).Add(p);
+                        var p = ports[i];
+                        if (p.Category != MozaDeviceCategory.Unknown) continue;
+                        if (_loggedUnknownPids.Add(p.Pid))
+                        {
+                            (newUnknown ??= new List<PortInfo>()).Add(p);
+                        }
+                    }
+
+                    if (declared != null)
+                    {
+                        foreach (var (p, target) in declared)
+                        {
+                            if (_loggedDeclaredPorts.Add(p.PortName))
+                                (newDeclared ??= new List<string>()).Add(
+                                    $"[AZOM] Wine registry declares {p.PortName} as MOZA PID 0x{p.Pid:X4}"
+                                    + $" -> {target ?? "(no Wine port mapping)"} (test harness port)");
+                        }
                     }
                 }
             }
+
+            if (newDeclared != null)
+                foreach (var line in newDeclared) MozaLog.Info(line);
 
             if (newUnknown != null)
             {
@@ -344,25 +377,6 @@ namespace MozaPlugin.Protocol
             }
         }
 
-        /// <summary>Force the next <see cref="Enumerate"/> call to re-walk the registry.</summary>
-        public void Invalidate()
-        {
-            lock (_cacheLock)
-            {
-                _cacheTimestamp = 0;
-                _cachedPorts = Array.Empty<PortInfo>();
-            }
-            // Derived from the same enumeration — drop it together or the labels
-            // outlive the ports they name.
-            WineComNameResolver.Invalidate();
-        }
-
-        /// <summary>Human-readable single-line summary of the most recent enumeration. UI binding.</summary>
-        public string LastEnumerationSummary
-        {
-            get { lock (_cacheLock) return _lastSummary; }
-        }
-
         /// <summary>
         /// Wine/Proton source. <c>PortName</c> becomes the tty name ("ttyACM2") —
         /// it stays the process-wide dedup/display key — and <c>DevicePath</c>
@@ -403,9 +417,13 @@ namespace MozaPlugin.Protocol
         /// name at a sim tty with the device's real VID/PID. An entry whose Wine
         /// port mapping (<c>Software\Wine\Ports</c>) targets a tty sysfs already
         /// found is skipped, so a real device is never listed twice.
+        /// <paramref name="added"/> lists each declared port merged in, with its
+        /// Wine port mapping, for the caller's first-sighting log.
         /// </summary>
-        private static IReadOnlyList<PortInfo> WithWineRegistryPorts(IReadOnlyList<PortInfo> sysfs)
+        private static IReadOnlyList<PortInfo> WithWineRegistryPorts(IReadOnlyList<PortInfo> sysfs,
+            out List<(PortInfo port, string? target)>? added)
         {
+            added = null;
             var declared = EnumerateFromRegistry();
             if (declared.Count == 0) return sysfs;
             var merged = new List<PortInfo>(sysfs);
@@ -418,15 +436,10 @@ namespace MozaPlugin.Protocol
                 string leaf = target == null ? "" : target.Substring(target.LastIndexOf('/') + 1);
                 if (leaf.Length > 0 && sysfsTtys.Contains(leaf)) continue;
                 merged.Add(p);
-                if (s_loggedDeclaredPorts.Add(p.PortName))
-                    MozaLog.Info($"[AZOM] Wine registry declares {p.PortName} as MOZA PID 0x{p.Pid:X4}"
-                        + $" -> {target ?? "(no Wine port mapping)"} (test harness port)");
+                (added ??= new List<(PortInfo, string?)>()).Add((p, target));
             }
             return merged;
         }
-
-        private static readonly HashSet<string> s_loggedDeclaredPorts =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>The unix device a Wine COM name maps to (Software\Wine\Ports), or null.</summary>
         private static string? WinePortTarget(string comName)
@@ -455,6 +468,24 @@ namespace MozaPlugin.Protocol
         private static readonly object s_walkLock = new object();
         private static long s_walkTimestamp;                       // 0 = uninitialised
         private static List<PortInfo> s_walkCache = new List<PortInfo>();
+        private static IReadOnlyList<string> s_walkLiveCom = Array.Empty<string>();
+        private static IReadOnlyList<string> s_walkSkippedMoza = Array.Empty<string>();
+
+        /// <summary>OS COM port list (<see cref="SerialPort.GetPortNames"/>) from the last registry walk.</summary>
+        public static IReadOnlyList<string> LastLiveComPorts
+        {
+            get { lock (s_walkLock) return s_walkLiveCom; }
+        }
+
+        /// <summary>
+        /// MOZA-VID registry entries the last walk did not list as a port, each
+        /// with the reason: a serial interface on another driver, a usbser entry
+        /// without a PortName, or a PortName the OS isn't currently mounting.
+        /// </summary>
+        public static IReadOnlyList<string> LastSkippedMozaEntries
+        {
+            get { lock (s_walkLock) return s_walkSkippedMoza; }
+        }
 
         private static List<PortInfo> WalkUsbSerialPortsCached()
         {
@@ -464,12 +495,19 @@ namespace MozaPlugin.Protocol
                 if (s_walkTimestamp != 0 && (now - s_walkTimestamp) < CacheTtlTicks)
                     return s_walkCache;
             }
-            var fresh = WalkUsbSerialPorts();
+            var fresh = WalkUsbSerialPorts(out var liveCom, out var skipped);
             lock (s_walkLock)
             {
                 s_walkCache = fresh;
+                s_walkLiveCom = liveCom;
+                s_walkSkippedMoza = skipped;
                 s_walkTimestamp = Stopwatch.GetTimestamp();
             }
+            MozaLog.DebugIfChanged("registry-walk",
+                $"[AZOM] Registry walk: OS COM ports [{string.Join(", ", liveCom)}]; " +
+                (skipped.Count == 0
+                    ? "no skipped MOZA entries"
+                    : $"skipped MOZA entries: {string.Join("; ", skipped)}"));
             return fresh;
         }
 
@@ -480,21 +518,28 @@ namespace MozaPlugin.Protocol
         /// <see cref="ForeignPortVids"/> takes everything else. Go through
         /// <see cref="WalkUsbSerialPortsCached"/> rather than calling this directly.
         /// </summary>
-        private static List<PortInfo> WalkUsbSerialPorts()
+        private static List<PortInfo> WalkUsbSerialPorts(out IReadOnlyList<string> liveComList,
+                                                         out IReadOnlyList<string> skippedMoza)
         {
             // Live COM port set — drops ghost registry entries left by previous
             // USB-port attachments. SerialPort.GetPortNames reads the same
             // SERIALCOMM table the kernel populates with currently-mounted ports.
             HashSet<string> liveCom;
+            string[] osPorts;
             try
             {
-                liveCom = new HashSet<string>(SerialPort.GetPortNames(), StringComparer.OrdinalIgnoreCase);
+                osPorts = SerialPort.GetPortNames();
             }
             catch (Exception ex)
             {
                 MozaLog.Debug($"[AZOM] SerialPort.GetPortNames failed: {ex.GetType().Name}: {ex.Message}");
-                liveCom = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                osPorts = Array.Empty<string>();
             }
+            liveCom = new HashSet<string>(osPorts, StringComparer.OrdinalIgnoreCase);
+            Array.Sort(osPorts, StringComparer.OrdinalIgnoreCase);
+            liveComList = osPorts;
+            var skipped = new List<string>();
+            skippedMoza = skipped;
 
             var results = new List<PortInfo>();
             try
@@ -523,19 +568,37 @@ namespace MozaPlugin.Protocol
                         // against future MOZA devices that bind a different
                         // service (WinUSB, custom driver) and shouldn't be
                         // treated as a serial pipe.
+                        bool isMoza = vid == MozaVid;
                         var service = instanceKey.GetValue("Service") as string;
-                        if (!string.Equals(service, "usbser", StringComparison.OrdinalIgnoreCase))
-                            continue;
+                        bool usbser = string.Equals(service, "usbser", StringComparison.OrdinalIgnoreCase);
+                        if (!usbser && !isMoza) continue;
 
                         using var paramsKey = instanceKey.OpenSubKey("Device Parameters", writable: false);
-                        if (paramsKey == null) continue;
+                        var portName = paramsKey?.GetValue("PortName") as string;
+                        string entry = $@"{deviceKeyName}\{instanceName}";
 
-                        var portName = paramsKey.GetValue("PortName") as string;
-                        if (string.IsNullOrEmpty(portName)) continue;
+                        if (!usbser)
+                        {
+                            // HID and composite-parent interfaces land here too;
+                            // only one carrying a COM name is a serial interface
+                            // that moved to another driver.
+                            if (!string.IsNullOrEmpty(portName))
+                                skipped.Add($"{entry}: {portName} on driver '{service ?? "(none)"}', not usbser");
+                            continue;
+                        }
+                        if (string.IsNullOrEmpty(portName))
+                        {
+                            if (isMoza) skipped.Add($"{entry}: usbser without a PortName");
+                            continue;
+                        }
 
                         // Filter ghosts: PortName is in the registry but the
                         // COM is not currently mounted.
-                        if (!liveCom.Contains(portName!)) continue;
+                        if (!liveCom.Contains(portName!))
+                        {
+                            if (isMoza) skipped.Add($"{entry}: {portName} not in the OS COM port list");
+                            continue;
+                        }
 
                         var friendly = (instanceKey.GetValue("FriendlyName") as string) ?? string.Empty;
                         // ContainerID groups all interfaces of one physical device;

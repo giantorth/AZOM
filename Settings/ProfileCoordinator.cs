@@ -36,7 +36,7 @@ namespace MozaPlugin.Settings
                 if (cands.Count > 0) activeDashKey = cands[0];
             }
             catch { /* candidate resolver is conservative; ignore early-init errors */ }
-            _plugin.Settings.ProfileStore?.CurrentProfile?.CaptureFromCurrent(_plugin.Settings, _plugin.Data, activeDashKey);
+            _plugin.Settings.ProfileStore?.CurrentProfile?.CaptureFromCurrent(_plugin.Data, activeDashKey);
             // Single source of truth = profile + overlay. UI handlers write
             // overlay/profile directly; CaptureFromCurrent picks up device-read
             // state. No more legacy slot/UID mirror.
@@ -46,26 +46,6 @@ namespace MozaPlugin.Settings
         internal void PersistSettings()
         {
             ScheduleSave();
-        }
-
-        // Trace log helper — emit the active wheel page's sleep bundle state
-        // so we can correlate disk-write contents with what the user reported.
-        // Cheap (single string format) and only fires at save points, not per-tick.
-        private void LogSleepBundleStateForSaveTrace(string trigger)
-        {
-            try
-            {
-                var g = _plugin.GetCurrentWheelPageGuid();
-                if (!g.HasValue) { MozaLog.Debug($"[AZOM] SLEEP-TRACE [{trigger}]: page guid unresolvable"); return; }
-                var dict = _plugin.Settings?.WheelSleepByPageGuid;
-                if (dict == null || !dict.TryGetValue(g.Value, out var b) || b == null)
-                {
-                    MozaLog.Debug($"[AZOM] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} bundle=null");
-                    return;
-                }
-                MozaLog.Info($"[AZOM] SLEEP-TRACE [{trigger}]: page={g.Value.ToString().Substring(0,8)} Mode={b.Mode} TimeoutMin={b.TimeoutMin} SpeedMs={b.SpeedMs}");
-            }
-            catch (Exception ex) { MozaLog.Debug($"[AZOM] SLEEP-TRACE failed: {ex.Message}"); }
         }
 
         private readonly object _saveDebounceLock = new object();
@@ -100,7 +80,6 @@ namespace MozaPlugin.Settings
         {
             try
             {
-                LogSleepBundleStateForSaveTrace("debounced-save");
                 _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
                 _saveFailureStreak = 0;
             }

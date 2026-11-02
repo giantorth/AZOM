@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -40,15 +39,6 @@ namespace MozaPlugin.Devices.Ui
                 var c = colors[i];
                 swatches[i].Background = GetCachedBrush(c[0], c[1], c[2]);
             }
-        }
-
-        /// <summary>Center a swatch in a fixed-width grid cell for row layout.</summary>
-        public static FrameworkElement WrapInCell(Border swatch)
-        {
-            var cell = new Grid { Width = 60, HorizontalAlignment = HorizontalAlignment.Center };
-            swatch.HorizontalAlignment = HorizontalAlignment.Center;
-            cell.Children.Add(swatch);
-            return cell;
         }
 
         /// <summary>

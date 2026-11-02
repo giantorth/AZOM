@@ -218,7 +218,9 @@ live bit stream.
 > containing one with `TelemetryBitPackageError:type size not match`
 > and then drops that tier's value frames **entirely**, blanking every
 > healthy channel packed with it. All three emit as `float` since
-> 2026-08-14. Still unconfirmed: `0x15` (`float_600_2`), `0x17`
+> 2026-08-14. `float_600_2` did the same at `0x15`/16 (bundles
+> `DJQ23F6D`, `F6WV5S95`) and now emits as `0x10`/16, the code
+> PitHouse uses for it. Still unconfirmed: `0x17`
 > (`float_001`), `0x14` (`uint3`/`uint8`) — though `0x17`/10 and
 > `0x14`/4 are known to render on W17. Use `float` until
 > a PitHouse capture proves otherwise. Codes confirmed working live:

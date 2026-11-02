@@ -386,12 +386,6 @@ namespace MozaPlugin.Devices.MBooster
         /// single-pedal branch reads the role from the settings.</summary>
         public void OnSettingsResolved() => RecomputeChainRoleMap();
 
-        public event Action<byte[]>? MessageReceived
-        {
-            add    => _connection.MessageReceived += value;
-            remove => _connection.MessageReceived -= value;
-        }
-
         /// <summary>
         /// Fired on the rising edge of detection (first valid <c>mbooster-*</c>
         /// response on the connection). UI uses this to refresh the tab.
@@ -409,7 +403,9 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Fired when the device's own connectivity diagnostic ("PD Linked" /
         /// "Pedals connected state") has been parsed — i.e. LIVE data, never a
-        /// seed. Arg: the channel-indexed [T,B,C] connected flags. The plugin
+        /// seed — on the first reading and whenever it changes (a pedal
+        /// unplugged or re-plugged). Arg: the channel-indexed [T,B,C]
+        /// connected flags. The plugin
         /// persists these per device so the next controller (plugin restart,
         /// next session) can be seeded instead of waiting for the broadcast.
         /// </summary>
@@ -1453,10 +1449,32 @@ namespace MozaPlugin.Devices.MBooster
                 || (field.Length == 2 && field[0] == 'y' && field[1] >= '1' && field[1] <= '5');
         }
 
-        private void StoreOutputRegister(byte device, string name, int value)
+        // Float output registers (y1..y5, sensor ratio) as reported, unrounded —
+        // what a float write is compared against. Guarded by _statusLock.
+        private readonly Dictionary<string, float> _outputFloatRegs = new Dictionary<string, float>();
+        // Well below the profile's resolution, above float round-trip noise.
+        private const float FloatRegisterTolerance = 0.01f;
+
+        private void StoreOutputRegister(byte device, in ParsedResponse r)
         {
-            if (!IsOutputRegister(name)) return;
-            lock (_statusLock) _outputRegs[$"{device:x2}:{name}"] = value;
+            if (!IsOutputRegister(r.Name)) return;
+            string key = $"{device:x2}:{r.Name}";
+            lock (_statusLock)
+            {
+                _outputRegs[key] = RegisterValue(r);
+                if (r.FloatValue is float f) _outputFloatRegs[key] = f;
+            }
+        }
+
+        /// <summary>
+        /// A read-back as the int cache holds it: float registers rounded (the
+        /// parser's IntValue truncates them).
+        /// </summary>
+        private static int RegisterValue(in ParsedResponse r)
+        {
+            if (r.FloatValue is float f && !float.IsNaN(f) && !float.IsInfinity(f))
+                return (int)Math.Round(f);
+            return r.IntValue;
         }
 
         /// <summary>Device-reported value of a per-role output register on
@@ -1465,6 +1483,16 @@ namespace MozaPlugin.Devices.MBooster
         {
             lock (_statusLock)
                 return _outputRegs.TryGetValue($"{device:x2}:{name}", out var v) ? v : -1;
+        }
+
+        /// <summary>Whether <paramref name="device"/> already reports float
+        /// output register <paramref name="name"/> at <paramref name="value"/>
+        /// (read-back or write echo). False until it has reported.</summary>
+        public bool UnitHoldsFloat(byte device, string name, float value)
+        {
+            lock (_statusLock)
+                return _outputFloatRegs.TryGetValue($"{device:x2}:{name}", out var v)
+                    && Math.Abs(v - value) < FloatRegisterTolerance;
         }
 
         // Every one of these registers is a flash parameter on the unit
@@ -1490,7 +1518,7 @@ namespace MozaPlugin.Devices.MBooster
                 _lastSegDamp[device] = frame;
                 _plainDampingLatest.Remove(device);
             }
-            SendOneShot(frame);
+            SendSettingsFrame(frame);
         }
 
         /// <summary>Write plain Virtual Damping (0xAD press/release raw). Both
@@ -1783,7 +1811,7 @@ namespace MozaPlugin.Devices.MBooster
             lock (_statusLock) _statusRegs.Clear();
             // Register values describe a live unit; a stale one would let the
             // next apply skip a write the reconnected unit needs.
-            lock (_statusLock) _outputRegs.Clear();
+            lock (_statusLock) { _outputRegs.Clear(); _outputFloatRegs.Clear(); }
             // The next connect-time apply resends every feel-curve X.
             lock (_lastFeelX) _lastFeelX.Clear();
             lock (_lastSegDamp) { _lastSegDamp.Clear(); _plainDampingLatest.Clear(); }
@@ -1838,7 +1866,7 @@ namespace MozaPlugin.Devices.MBooster
                     // motor-locate status back through this branch, not the
                     // host arm below.
                     StoreStatusRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
-                    StoreOutputRegister((byte)unswapped, probe.Value.Name, probe.Value.IntValue);
+                    StoreOutputRegister((byte)unswapped, probe.Value);
                     StoreUnitIdentity((byte)unswapped, probe.Value.Name, probe.Value.ArrayValue);
                 }
                 // Log each distinct READ response once; write-echoes change with
@@ -1923,7 +1951,7 @@ namespace MozaPlugin.Devices.MBooster
                         DeviceReportedMaxThresholdKg =
                             (float)MozaMBoosterProtocol.DecodeThresholdKg(r.IntValue);
                     StoreStatusRegister(HostDeviceId, r.Name, r.IntValue);
-                    StoreOutputRegister(HostDeviceId, r.Name, r.IntValue);
+                    StoreOutputRegister(HostDeviceId, r);
                     StoreCalib(HostDeviceId, r.Name, r.IntValue);
                     MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} {r.Name} = {r.IntValue}");
                     if (r.Name == "mbooster-status-21" || r.Name == "mbooster-status-22" || r.Name == "mbooster-status-23")
@@ -1949,9 +1977,13 @@ namespace MozaPlugin.Devices.MBooster
 
         // Each distinct diagnostic line logged once — the device re-streams these
         // continuously, so an unguarded log would flood the support bundle.
+        // Dedupes the LOG only: every line is still parsed.
         private readonly HashSet<string> _diagLinesLogged = new HashSet<string>(StringComparer.Ordinal);
-        // Both once-only sets are keyed by device-emitted text; cap them.
+        // The once-only log sets are keyed by device-emitted text; cap them.
+        // Once full, new entries just go unlogged.
         private const int LoggedSetCap = 256;
+        // _slotConnected holds a live "PD Linked" reading, not the seed.
+        private bool _slotConnectedLive;
 
         // EXPERIMENTAL chain-mapping probe (see ProbeChainDevices): fired once
         // per connection when a chain is detected; each distinct chain-device
@@ -2062,8 +2094,13 @@ namespace MozaPlugin.Devices.MBooster
                 ascii.IndexOf("pedal is connected", StringComparison.OrdinalIgnoreCase) < 0 &&
                 ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) < 0)
                 return;
-            lock (_diagLinesLogged) { if (_diagLinesLogged.Count >= LoggedSetCap || !_diagLinesLogged.Add(ascii)) return; }
-            MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} diag: {ascii}");
+            bool firstSeen;
+            lock (_diagLinesLogged) firstSeen = _diagLinesLogged.Count < LoggedSetCap && _diagLinesLogged.Add(ascii);
+            if (firstSeen) MozaLog.Debug($"[AZOM/mBooster] {ShortIdentity(Identity)} diag: {ascii}");
+
+            // The heartbeat repeats these lines every block, so each one below
+            // acts only when it changes the state it carries — a re-plugged
+            // pedal brings back a line already seen once.
 
             // "PD Linked:[T 0 B 1 C 1]" — or, on newer firmware (device-type
             // 01-02-07-05, support bundle 2026-07-30), the long form "Pedals
@@ -2077,9 +2114,14 @@ namespace MozaPlugin.Devices.MBooster
                 int t = shortForm ? FlagAfter(ascii, 'T') : WordFlagAfter(ascii, "throttle");
                 int b = shortForm ? FlagAfter(ascii, 'B') : WordFlagAfter(ascii, "brake");
                 int c = shortForm ? FlagAfter(ascii, 'C') : WordFlagAfter(ascii, "clutch");
-                if (t >= 0 && b >= 0 && c >= 0)
+                var live = new[] { t == 1, b == 1, c == 1 };
+                var prev = _slotConnected;
+                // The first live reading lands even when it matches the seed:
+                // ConnectivityResolved must see live data.
+                if (t >= 0 && b >= 0 && c >= 0
+                    && (!_slotConnectedLive || prev == null || !System.Linq.Enumerable.SequenceEqual(prev, live)))
                 {
-                    var live = new[] { t == 1, b == 1, c == 1 };
+                    _slotConnectedLive = true;
                     _slotConnected = live;
                     RederiveAxisViews();
                     MozaLog.Info($"[AZOM/mBooster] {ShortIdentity(Identity)} connected pedals: T={t == 1} B={b == 1} C={c == 1}");
@@ -2101,18 +2143,22 @@ namespace MozaPlugin.Devices.MBooster
                     byte type = ascii.IndexOf("not connected", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)0
                               : ascii.IndexOf("passive", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)2
                               : ascii.IndexOf("active", StringComparison.OrdinalIgnoreCase) >= 0 ? (byte)1 : (byte)0;
-                    var arr = _slotTypes != null ? (byte[])_slotTypes.Clone() : new byte[3];
-                    if (slot < arr.Length) arr[slot] = type;
-                    _slotTypes = arr;
-                    if (slot < _axisTypeSeen.Length) _axisTypeSeen[slot] = true;
-                    RederiveAxisViews();
-                    // Active/passive is what actually decides chain-ness (see
-                    // ActiveAxisCount / MotorDeviceForCurrentAxis), so re-derive
-                    // the role→motor map. The routing verdict itself waits for
-                    // the block end (CommitHeartbeatBlock): a role's link
-                    // statistics follow its type line.
-                    _blockOpen = true;
-                    RecomputeChainRoleMap();
+                    var cur = _slotTypes;
+                    if (!_axisTypeSeen[slot] || cur == null || cur[slot] != type)
+                    {
+                        var arr = cur != null ? (byte[])cur.Clone() : new byte[3];
+                        arr[slot] = type;
+                        _slotTypes = arr;
+                        _axisTypeSeen[slot] = true;
+                        RederiveAxisViews();
+                        // Active/passive is what actually decides chain-ness (see
+                        // ActiveAxisCount / MotorDeviceForCurrentAxis), so re-derive
+                        // the role→motor map. The routing verdict itself waits for
+                        // the block end (CommitHeartbeatBlock): a role's link
+                        // statistics follow its type line.
+                        _blockOpen = true;
+                        RecomputeChainRoleMap();
+                    }
                 }
             }
         }
@@ -2439,19 +2485,11 @@ namespace MozaPlugin.Devices.MBooster
                 // motor frames and the keepalive are write-only, and with all
                 // effects disabled (the default for a fresh device) the worker
                 // sends nothing else at all. Without this, MarkDetected() never
-                // fires and the UI sits at "Probing…" until the user manually
-                // clicks "Read from device" in the Calibration section — fire
-                // the same read burst here so detection latches on its own.
+                // fires and the UI sits at "Probing…" — fire the read burst
+                // here so detection latches on its own.
                 RequestCalibrationReads();
             }
             return ok;
-        }
-
-        public void Disconnect()
-        {
-            foreach (var w in _workers) w.Stop();
-            if (_ownsConnection) _connection.Disconnect();
-            _detected = false;
         }
 
         /// <summary>
@@ -2508,6 +2546,19 @@ namespace MozaPlugin.Devices.MBooster
             _connection.Send(frame);
         }
 
+        /// <summary>
+        /// Settings reads/writes go on the device-command lane: a routed lane
+        /// shares the base/hub pipe, and a telemetry Stop's FlushPendingWrites
+        /// keeps those frames. Motor, keepalive and disable frames stay on
+        /// <see cref="SendOneShot"/>/<see cref="SendMotorStream"/> so a Stop can
+        /// still silence them.
+        /// </summary>
+        private void SendSettingsFrame(byte[] frame)
+        {
+            if (frame == null || !_connection.IsConnected) return;
+            _connection.SendDeviceCommand(frame);
+        }
+
         /// <summary>Publish latest telemetry to the worker.</summary>
         public void PostTelemetry(in MBoosterTelemetrySnapshot snap)
         {
@@ -2533,7 +2584,7 @@ namespace MozaPlugin.Devices.MBooster
             if (cmd == null) return false;
             var msg = cmd.BuildWriteInt(dev, value);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -2545,12 +2596,12 @@ namespace MozaPlugin.Devices.MBooster
         {
             if (!_connection.IsConnected) return false;
             byte dev = device ?? HostDeviceId;
-            if (UnitHolds(dev, commandName, (int)Math.Round(value))) return true;
+            if (UnitHoldsFloat(dev, commandName, value)) return true;
             var cmd = MozaCommandDatabase.Get(commandName);
             if (cmd == null) return false;
             var msg = cmd.BuildWriteFloat(dev, value);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -2703,8 +2754,8 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>
         /// Build + send a read for a registered <c>mbooster-*</c> command,
         /// addressed to this lane's host sub-device (0x12 USB / 0x19 routed).
-        /// Read responses (group 35 + 0x80 = 0xA3) land on <see cref="MessageReceived"/>
-        /// and the caller must <see cref="MozaResponseParser.Parse"/> them with
+        /// Read responses (group 35 + 0x80 = 0xA3) are handled by
+        /// <see cref="OnConnectionMessage"/>, which parses them with
         /// <c>busHint: "mbooster"</c> to disambiguate from wheelbase main and AB9.
         /// </summary>
         public bool SendRead(string commandName) => SendRead(commandName, HostDeviceId);
@@ -2718,7 +2769,7 @@ namespace MozaPlugin.Devices.MBooster
             if (cmd == null) return false;
             var msg = cmd.BuildReadMessage(device);
             if (msg == null) return false;
-            _connection.Send(msg);
+            SendSettingsFrame(msg);
             return true;
         }
 
@@ -2935,15 +2986,6 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
-        /// <summary>
-        /// Issue a one-time burst of calibration reads (direction / min / max
-        /// per pedal + 5-point curves). Mirrors the wheelbase pedal seed.
-        /// Called from <see cref="TryConnect"/> (it's also the only thing
-        /// that elicits a response a fresh connection can latch detection
-        /// on), from the rising-edge handler, and from the UI's "Read from
-        /// device" button. Experimental: may produce no responses on
-        /// mBooster firmware.
-        /// </summary>
         /// <summary>Identity/presence reads alone — the routed-lane probe uses
         /// this to identify what's on a base/hub pedal port (model-name is the
         /// mBooster-vs-SGP discriminator) without the calibration burst.</summary>
@@ -2975,6 +3017,15 @@ namespace MozaPlugin.Devices.MBooster
             "mbooster-serial-b",
         };
 
+        /// <summary>
+        /// Issue a one-time burst of calibration reads (direction / min / max
+        /// per pedal + 5-point curves). Mirrors the wheelbase pedal seed.
+        /// Called from <see cref="TryConnect"/> (it's also the only thing
+        /// that elicits a response a fresh connection can latch detection
+        /// on), from the rising-edge handler, and from the registry's routed
+        /// re-detect nudge. Experimental: may produce no responses on
+        /// mBooster firmware.
+        /// </summary>
         public void RequestCalibrationReads()
         {
             if (!_connection.IsConnected) return;
@@ -3047,10 +3098,9 @@ namespace MozaPlugin.Devices.MBooster
             "mbooster-status-24",
         };
 
-        /// <summary>Fire all five disable frames; called on disconnect / shutdown.
-        /// Traction Control and Custom Effects share Engine's wire ID (no
-        /// verified ID of their own), so the Engine disable frame below
-        /// already covers them too.</summary>
+        /// <summary>Fire a disable frame for every effect wire id; called on
+        /// shutdown. Traction Control, Wheel Spin, Gear Shift, Bite Point and
+        /// Custom Effects share Engine's wire ID, so its disable covers them.</summary>
         public void SendAllDisableFrames()
         {
             if (!_connection.IsConnected) return;
@@ -3060,13 +3110,8 @@ namespace MozaPlugin.Devices.MBooster
             // motor can't latch its last waveform after the port closes;
             // routed: the tunneled pedal sub-device only).
             foreach (var dev in MotorIds)
-            {
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Abs, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Lockup, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Threshold, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.Engine, dev));
-                SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(MBoosterEffectId.RoadTexture, dev));
-            }
+                foreach (var id in MozaMBoosterProtocol.AllEffectIds)
+                    SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, dev));
         }
 
         /// <summary>
@@ -3077,11 +3122,8 @@ namespace MozaPlugin.Devices.MBooster
         /// always allowed (even if disconnected) so a stuck toggle can
         /// always be cleared; turning on requires a live connection.
         /// </summary>
-        public void SetEngineTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetEngineTestSustained(on);
-        }
+        public void SetEngineTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.Engine, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs the ABS effect — substituting live brake
@@ -3091,11 +3133,8 @@ namespace MozaPlugin.Devices.MBooster
         /// for the analogous Engine toggle; same live-tracking and
         /// always-allow-off semantics apply here.
         /// </summary>
-        public void SetAbsTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetAbsTestSustained(on);
-        }
+        public void SetAbsTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.Abs, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Traction Control — substituting live throttle
@@ -3105,11 +3144,8 @@ namespace MozaPlugin.Devices.MBooster
         /// <see cref="SetAbsTestActive"/> for the analogous ABS toggle; same
         /// live-tracking and always-allow-off semantics apply here.
         /// </summary>
-        public void SetTcTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetTcTestSustained(on);
-        }
+        public void SetTcTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.TractionControl, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Wheel Spin — substituting live throttle
@@ -3120,11 +3156,8 @@ namespace MozaPlugin.Devices.MBooster
         /// toggle; same live-tracking and always-allow-off semantics apply
         /// here.
         /// </summary>
-        public void SetWheelSpinTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetWheelSpinTestSustained(on);
-        }
+        public void SetWheelSpinTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.WheelSpin, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Gear Shift at its currently configured
@@ -3135,11 +3168,8 @@ namespace MozaPlugin.Devices.MBooster
         /// for the analogous Traction Control toggle; same live-tracking and
         /// always-allow-off semantics apply here.
         /// </summary>
-        public void SetGearShiftTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetGearShiftTestSustained(on);
-        }
+        public void SetGearShiftTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.GearShift, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Road Texture at its currently configured
@@ -3150,11 +3180,8 @@ namespace MozaPlugin.Devices.MBooster
         /// for the analogous Engine toggle; same live-tracking and
         /// always-allow-off semantics apply here.
         /// </summary>
-        public void SetRoadTextureTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetRoadTextureTestSustained(on);
-        }
+        public void SetRoadTextureTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.RoadTexture, on, pedalIndex);
 
         /// <summary>
         /// Continuously alternates G-Force's commanded travel offset
@@ -3165,11 +3192,8 @@ namespace MozaPlugin.Devices.MBooster
         /// toggle; same live-tracking and always-allow-off semantics apply
         /// here.
         /// </summary>
-        public void SetGForceTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetGForceTestSustained(on);
-        }
+        public void SetGForceTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.GForce, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Lockup — substituting live brake position for
@@ -3180,11 +3204,8 @@ namespace MozaPlugin.Devices.MBooster
         /// toggle; same live-tracking and always-allow-off semantics apply
         /// here.
         /// </summary>
-        public void SetLockupTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetLockupTestSustained(on);
-        }
+        public void SetLockupTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.Lockup, on, pedalIndex);
 
         /// <summary>
         /// Continuously runs Threshold — skipping the rising-edge hysteresis
@@ -3195,20 +3216,14 @@ namespace MozaPlugin.Devices.MBooster
         /// Engine toggle; same live-tracking and always-allow-off semantics
         /// apply here.
         /// </summary>
-        public void SetThresholdTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetThresholdTestSustained(on);
-        }
+        public void SetThresholdTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.Threshold, on, pedalIndex);
 
         /// <summary>Turn Bite Point's (Clutch-only) sustained test toggle on/off for
         /// pedal <paramref name="pedalIndex"/> — same live-tracking and always-allow-off
         /// semantics as SetThresholdTestActive.</summary>
-        public void SetBitePointTestActive(bool on, int pedalIndex = 0)
-        {
-            if (on && !_connection.IsConnected) return;
-            WorkerFor(pedalIndex)?.SetBitePointTestSustained(on);
-        }
+        public void SetBitePointTestActive(bool on, int pedalIndex = 0) =>
+            SetTestActive(MBoosterTestEffect.BitePoint, on, pedalIndex);
 
         /// <summary>
         /// Forces Travel End and Max Threshold to their Brake Fade caps
@@ -3225,16 +3240,38 @@ namespace MozaPlugin.Devices.MBooster
         /// (see <see cref="SetEngineTestActive"/>) so a stuck toggle can
         /// still restore the base values even if disconnected.
         /// </summary>
-        public void SetBrakeFadeTestActive(bool on)
+        public void SetBrakeFadeTestActive(bool on) =>
+            SetTestActive(MBoosterTestEffect.BrakeFade, on);
+
+        /// <summary>
+        /// Turn one sustained Test toggle on/off for pedal
+        /// <paramref name="pedalIndex"/>. Turning off is always allowed (even
+        /// disconnected) so a stuck toggle can always be cleared; turning on
+        /// requires a live connection.
+        /// </summary>
+        public void SetTestActive(MBoosterTestEffect test, bool on, int pedalIndex = 0)
         {
             if (on && !_connection.IsConnected) return;
-            // Broadcast to every worker — Brake Fade only actually acts on
-            // whichever axis's role resolves to Brake (see
-            // MBoosterEffectWorker.Tick), which isn't necessarily axis 0/the
-            // primary worker (a standalone unit's sole pedal can report on
-            // any HID axis). The other workers' flag just sits unused since
-            // their own Tick() gate never lets Brake Fade run.
-            foreach (var w in _workers) w.SetBrakeFadeTestSustained(on);
+            if (test == MBoosterTestEffect.BrakeFade)
+            {
+                // Lane-wide: Brake Fade only acts on whichever axis's role
+                // resolves to Brake (see MBoosterEffectWorker.Tick), which
+                // isn't necessarily axis 0 — a standalone unit's sole pedal can
+                // report on any HID axis. The other workers' bit sits unused.
+                foreach (var w in _workers) w.SetTestSustained(test, on);
+                return;
+            }
+            WorkerFor(pedalIndex)?.SetTestSustained(test, on);
+        }
+
+        /// <summary>
+        /// Stop every sustained test on this lane — all built-in effects,
+        /// Brake Fade and every custom effect, on every pedal. The one call any
+        /// UI path that hides or re-targets the Test toggles must make.
+        /// </summary>
+        public void StopAllTests()
+        {
+            foreach (var w in _workers) w.StopAllTests();
         }
 
         /// <summary>
@@ -3276,6 +3313,12 @@ namespace MozaPlugin.Devices.MBooster
             // connection is still open at this point.
             try { StopCalibFlushTimer(flush: true); } catch { }
             _disposed = true;
+            // Workers first, so no tick can stream a motor frame after the
+            // disables below; Stop() restores Brake Fade while still connected.
+            // Signal all three first so their joins overlap (≤1 s total, not ≤3 s
+            // serially on the reconnect timer / End()).
+            foreach (var w in _workers) { try { w.RequestStop(); } catch { } }
+            foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try
             {
                 // Best-effort emit disable frames before tearing down so the
@@ -3288,10 +3331,6 @@ namespace MozaPlugin.Devices.MBooster
                     SendAllDisableFrames();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Disable on dispose: {ex.Message}"); }
-            // Signal all three first so their joins overlap (≤1 s total, not ≤3 s
-            // serially on the reconnect timer / End()).
-            foreach (var w in _workers) { try { w.RequestStop(); } catch { } }
-            foreach (var w in _workers) { try { w.Stop(); } catch { } }
             try { _connection.MessageReceived -= OnConnectionMessage; } catch { }
             try { _connection.Disconnected -= OnConnectionDisconnected; } catch { }
             // A routed lane shares its owner's pipe — never dispose it.

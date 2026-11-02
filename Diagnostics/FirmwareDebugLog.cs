@@ -25,14 +25,12 @@ namespace MozaPlugin.Diagnostics
         public readonly struct Entry
         {
             public readonly DateTime TimestampUtc;
-            public readonly byte RawDeviceId;
             public readonly string SourceName;
             public readonly string Text;
 
-            public Entry(DateTime timestampUtc, byte rawDeviceId, string sourceName, string text)
+            public Entry(DateTime timestampUtc, string sourceName, string text)
             {
                 TimestampUtc = timestampUtc;
-                RawDeviceId = rawDeviceId;
                 SourceName = sourceName;
                 Text = text;
             }
@@ -72,7 +70,6 @@ namespace MozaPlugin.Diagnostics
         {
             var entry = new Entry(
                 DateTime.UtcNow,
-                rawDeviceId,
                 SourceNameFor(rawDeviceId),
                 text ?? string.Empty);
             lock (_gate)
@@ -136,12 +133,6 @@ namespace MozaPlugin.Diagnostics
         {
             while (_recentParamFails.Count > 0 && nowUtc - _recentParamFails.Peek() > StormWindow)
                 _recentParamFails.Dequeue();
-        }
-
-        /// <summary>Number of entries currently held in the ring buffer.</summary>
-        public int Count
-        {
-            get { lock (_gate) return _entries.Count; }
         }
 
         /// <summary>Total number of frames recorded across the connection

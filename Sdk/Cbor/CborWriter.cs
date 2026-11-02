@@ -82,55 +82,6 @@ namespace MozaPlugin.Sdk.Cbor
         }
 
         /// <summary>
-        /// Encode a map (major type 5) of text-string keys to unsigned-int
-        /// values. Used for the LimitAngle / EqualizerAmp PUT shapes which
-        /// carry two named scalars per call.
-        /// </summary>
-        public static byte[] WriteMap(IReadOnlyDictionary<string, int> entries)
-        {
-            if (entries == null) throw new ArgumentNullException(nameof(entries));
-
-            using (var ms = new MemoryStream())
-            {
-                WriteTypeAndArg(ms, MajorMap, (ulong)entries.Count);
-                foreach (var kvp in entries)
-                {
-                    if (kvp.Key == null)
-                        throw new ArgumentException("Map contains null key; not supported by this subset.", nameof(entries));
-                    if (kvp.Value < 0)
-                        throw new ArgumentException($"Map value for key '{kvp.Key}' is negative ({kvp.Value}); negative ints are out of subset scope.", nameof(entries));
-                    WriteText(ms, kvp.Key);
-                    WriteTypeAndArg(ms, MajorUnsigned, (ulong)(uint)kvp.Value);
-                }
-                return ms.ToArray();
-            }
-        }
-
-        /// <summary>
-        /// Encode a map (major type 5) of text-string keys to text-string
-        /// values. Useful for purely-string manifest payloads.
-        /// </summary>
-        public static byte[] WriteMap(IReadOnlyDictionary<string, string> entries)
-        {
-            if (entries == null) throw new ArgumentNullException(nameof(entries));
-
-            using (var ms = new MemoryStream())
-            {
-                WriteTypeAndArg(ms, MajorMap, (ulong)entries.Count);
-                foreach (var kvp in entries)
-                {
-                    if (kvp.Key == null)
-                        throw new ArgumentException("Map contains null key; not supported by this subset.", nameof(entries));
-                    if (kvp.Value == null)
-                        throw new ArgumentException($"Map value for key '{kvp.Key}' is null; not supported by this subset.", nameof(entries));
-                    WriteText(ms, kvp.Key);
-                    WriteText(ms, kvp.Value);
-                }
-                return ms.ToArray();
-            }
-        }
-
-        /// <summary>
         /// Encode a map of text keys to mixed-type values. Each value must
         /// be a boxed <see cref="int"/>, <see cref="uint"/>, or
         /// <see cref="string"/>. Other types throw — this writer does not

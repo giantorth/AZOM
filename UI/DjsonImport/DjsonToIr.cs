@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.UI.DjsonImport
@@ -12,8 +11,6 @@ namespace MozaPlugin.UI.DjsonImport
     {
         public string File { get; set; } = "";
         public int Pages { get; set; }
-        /// <summary>How many times the dashboard places this widget.</summary>
-        public int Instances { get; set; }
         /// <summary>Nodes added beyond the single static page, summed over instances.
         /// Widgets nested inside those pages are counted as one item each, so this
         /// undercounts a little — enough for budgeting, not for the id cap.</summary>
@@ -34,7 +31,7 @@ namespace MozaPlugin.UI.DjsonImport
         private readonly FontMap _fonts;
         private readonly ConversionReport _report;
         private readonly ImageSet _images;
-        private readonly string _sourceDir;
+        private readonly WidgetSource _widgets;
 
         /// <summary>Guards against a widget cycle (A includes B includes A), which would
         /// otherwise recurse until the stack gives out.</summary>
@@ -53,19 +50,18 @@ namespace MozaPlugin.UI.DjsonImport
         public Dictionary<string, PageExpansionCandidate> PagedWidgets { get; } =
             new Dictionary<string, PageExpansionCandidate>(StringComparer.OrdinalIgnoreCase);
 
-        // Parsed widget files, for pricing nested widgets without re-reading a file that
-        // a dashboard may place 25 times.
+        // Widget roots already priced by this pass, by file name.
         private readonly Dictionary<string, JObject?> _widgetRoots =
             new Dictionary<string, JObject?>(StringComparer.OrdinalIgnoreCase);
 
         public DjsonToIr(BindingTranslator bindings, FontMap fonts, ConversionReport report,
-                         ImageSet images, string sourceDir)
+                         ImageSet images, WidgetSource widgets)
         {
             _bindings = bindings;
             _fonts = fonts;
             _report = report;
             _images = images;
-            _sourceDir = sourceDir;
+            _widgets = widgets;
         }
 
         /// <summary>Item types this converter does not emit, and why.
@@ -146,12 +142,12 @@ namespace MozaPlugin.UI.DjsonImport
 
             if (Unsupported.TryGetValue(shortType, out var why))
             {
-                _report.Record(shortType, name, ItemOutcome.Dropped, why);
+                _report.Record(shortType, ItemOutcome.Dropped, why);
                 yield break;
             }
             if (BindingTranslator.IsUnsupportedBuiltIn(shortType, out var builtInWhy))
             {
-                _report.Record(shortType, name, ItemOutcome.Dropped, builtInWhy);
+                _report.Record(shortType, ItemOutcome.Dropped, builtInWhy);
                 yield break;
             }
 
@@ -196,7 +192,7 @@ namespace MozaPlugin.UI.DjsonImport
                     && !shortType.EndsWith("Time", StringComparison.Ordinal)
                     && !string.Equals(shortType, "TextItem", StringComparison.Ordinal))
                 {
-                    _report.Record(shortType, name, ItemOutcome.Dropped, "unrecognised item type");
+                    _report.Record(shortType, ItemOutcome.Dropped, "unrecognised item type");
                     yield break;
                 }
                 node = Text(item);
@@ -208,12 +204,12 @@ namespace MozaPlugin.UI.DjsonImport
             bool sourceOk = _bindings.Apply(item, node, shortType);
             if (!sourceOk)
             {
-                _report.Record(shortType, name, ItemOutcome.Dropped,
+                _report.Record(shortType, ItemOutcome.Dropped,
                     "its telemetry source has no MOZA channel");
                 yield break;
             }
 
-            _report.Record(shortType, name, OutcomeFor(shortType));
+            _report.Record(shortType, OutcomeFor(shortType));
             yield return node;
         }
 
@@ -264,7 +260,7 @@ namespace MozaPlugin.UI.DjsonImport
                 if (layer.Children.Count > 0) yield return layer;
             }
 
-            _report.Record("Layer", name,
+            _report.Record("Layer",
                 reps > 1 ? ItemOutcome.Substituted : ItemOutcome.Converted,
                 reps > 1 ? $"expanded {reps} repetitions to concrete copies" : "");
         }
@@ -283,31 +279,31 @@ namespace MozaPlugin.UI.DjsonImport
             string fileName = DjsonReader.Str(item, "FileName");
             if (fileName.Length == 0)
             {
-                _report.Record("WidgetItem", name, ItemOutcome.Dropped, "no FileName");
+                _report.Record("WidgetItem", ItemOutcome.Dropped, "no FileName");
                 yield break;
             }
 
             string? path = ResolveWidgetPath(fileName);
             if (path == null)
             {
-                _report.Record("WidgetItem", name, ItemOutcome.Dropped,
+                _report.Record("WidgetItem", ItemOutcome.Dropped,
                     $"referenced file '{fileName}' not found");
                 yield break;
             }
 
             if (!_widgetStack.Add(path))
             {
-                _report.Record("WidgetItem", name, ItemOutcome.Dropped,
+                _report.Record("WidgetItem", ItemOutcome.Dropped,
                     $"'{fileName}' includes itself");
                 yield break;
             }
 
             try
             {
-                var (root, error) = DjsonReader.Load(path);
+                var (root, error) = _widgets.Load(path);
                 if (root == null)
                 {
-                    _report.Record("WidgetItem", name, ItemOutcome.Dropped,
+                    _report.Record("WidgetItem", ItemOutcome.Dropped,
                         $"'{fileName}' failed to parse: {error}");
                     yield break;
                 }
@@ -354,7 +350,7 @@ namespace MozaPlugin.UI.DjsonImport
                 foreach (var c in host.Children)
                     CanvasFitter.ScaleAndOffset(c, scale, left, top);
 
-                _report.Record("WidgetItem", name, ItemOutcome.Converted,
+                _report.Record("WidgetItem", ItemOutcome.Converted,
                     $"inlined '{fileName}'");
                 if (host.Children.Count > 0) yield return host;
             }
@@ -398,7 +394,6 @@ namespace MozaPlugin.UI.DjsonImport
                     cand = new PageExpansionCandidate { File = fileName, Pages = screens.Count };
                     PagedWidgets[fileName] = cand;
                 }
-                cand.Instances++;
                 var visiting = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { fileName };
                 for (int i = 0; i < screens.Count; i++)
                     if (i != pick) cand.ExtraNodes += 1 + CountItems(screens[i]["Items"], visiting);
@@ -485,32 +480,17 @@ namespace MozaPlugin.UI.DjsonImport
         {
             if (_widgetRoots.TryGetValue(fileName, out var cached)) return cached;
             string? path = ResolveWidgetPath(fileName);
-            var (root, _) = path == null ? (null, "") : DjsonReader.Load(path);
+            var (root, _) = path == null ? (null, "") : _widgets.Load(path);
             _widgetRoots[fileName] = root;
             return root;
         }
 
         private string? ResolveWidgetPath(string fileName)
         {
-            // Same folder first, then SimHub's shared _Library tree one level up.
-            string direct = Path.Combine(_sourceDir, fileName);
-            if (File.Exists(direct)) return direct;
-
-            try
-            {
-                var parent = Directory.GetParent(_sourceDir);
-                if (parent == null) return null;
-                string library = Path.Combine(parent.FullName, "_Library");
-                if (!Directory.Exists(library)) return null;
-
-                foreach (var hit in Directory.GetFiles(library, fileName, SearchOption.AllDirectories))
-                    return hit;
-            }
-            catch (Exception ex)
-            {
-                _report.Notes.Add($"widget lookup for '{fileName}' failed: {ex.Message}");
-            }
-            return null;
+            string? path = _widgets.Resolve(fileName, out var lookupError);
+            if (lookupError != null)
+                _report.Notes.Add($"widget lookup for '{fileName}' failed: {lookupError}");
+            return path;
         }
 
         // ── Leaf items ────────────────────────────────────────────────────────
@@ -768,7 +748,7 @@ namespace MozaPlugin.UI.DjsonImport
                     Format = "((function(m){return m[String(_result)]||'';})({'true':"
                            + NCalcToJs.JsString(onSrc) + ",'false':" + NCalcToJs.JsString(offSrc) + "}))",
                 });
-                _report.Record("ShiftLightItem", name, ItemOutcome.Converted,
+                _report.Record("ShiftLightItem", ItemOutcome.Converted,
                     "on/off images switched at the LED's RPM threshold");
                 yield return led;
                 yield break;
@@ -788,7 +768,7 @@ namespace MozaPlugin.UI.DjsonImport
                 Format = JsFormatters.ChainIdentity,
             });
 
-            _report.Record("ShiftLightItem", name, ItemOutcome.Substituted,
+            _report.Record("ShiftLightItem", ItemOutcome.Substituted,
                 "LED images not in the bundle — replaced by an RPM-threshold ellipse");
             yield return node;
         }
@@ -800,7 +780,7 @@ namespace MozaPlugin.UI.DjsonImport
             var box = Rectangle(item);
             box.Name = name;
             ApplyCommon(item, box);
-            _report.Record("ButtonItem", name, ItemOutcome.Substituted,
+            _report.Record("ButtonItem", ItemOutcome.Substituted,
                 "rendered as a static box — the wheel has no click target");
             yield return box;
 

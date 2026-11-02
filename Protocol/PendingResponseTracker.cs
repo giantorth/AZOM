@@ -11,19 +11,21 @@ namespace MozaPlugin.Protocol
     /// <list type="number">
     /// <item>Exponential backoff per caller's <c>backoffMs</c> schedule (cap = last value), reused indefinitely.</item>
     /// <item>At <see cref="LongPendingWarnMs"/> (30 s) without a response: one-shot WARN log.</item>
-    /// <item>At <see cref="SunsetAfterMs"/> (60 s) without a response: name is added to the sunset set, entry removed, one-shot INFO log. Future <see cref="Track"/> calls for that name silently no-op until <see cref="Clear"/> is called.</item>
+    /// <item>At <see cref="SunsetAfterMs"/> (60 s) without a response: name is added to the sunset set, entry removed, one-shot INFO log. Future <see cref="Track"/> calls for that name silently no-op until <see cref="Clear"/> is called or a response for that name arrives.</item>
     /// </list>
     /// Sunset captures the "hardware variant doesn't support this command" case
     /// — e.g. a wheel without an ambient LED strip never answers a brightness
     /// read. Without sunset the entry would re-emit every 10 s for the entire
     /// session; with sunset it stops after 60 s and PollStatus retracks become
     /// silent no-ops. <see cref="Clear"/> is called on serial disconnect and
-    /// wheel hot-swap so a different hardware variant gets fresh attempts.
+    /// wheel hot-swap so a different hardware variant gets fresh attempts. A
+    /// response for a sunset name lifts it: names are shared across device IDs,
+    /// so probes to absent IDs can sunset a name the attached device answers.
     ///
-    /// Re-tracking the same <c>expectedName</c> while still pending overwrites
-    /// the existing entry, which is the intended behaviour for callers that
-    /// probe multiple device IDs with the same command name
-    /// (<c>ProbeWheelDetection</c>).
+    /// Re-tracking the same <c>expectedName</c> while still pending replaces
+    /// the frame — callers that probe multiple device IDs with the same command
+    /// name (<c>ProbeWheelDetection</c>) rely on that — but keeps the entry's
+    /// age and attempt count, so a name re-polled every few seconds still sunsets.
     /// </summary>
     public sealed class PendingResponseTracker
     {
@@ -49,52 +51,21 @@ namespace MozaPlugin.Protocol
 
         private readonly Dictionary<string, Entry> _pending = new();
         // Names declared unsupported on this connection. Track() silently
-        // skips these; Clear() empties the set.
+        // skips these; a response for one lifts it; Clear() empties the set.
         private readonly HashSet<string> _sunset = new();
         private readonly object _lock = new object();
-        // Lock-free count mirror; NoteResponse early-outs when idle (~50-200 Hz path).
+        // Lock-free count mirrors; NoteResponse early-outs when idle (~50-200 Hz path).
         private volatile int _pendingCount;
         private volatile int _sunsetCount;
 
         public int PendingCount => _pendingCount;
 
-        /// <summary>Number of command names that have been sunset on the
-        /// current connection (no response within <see cref="SunsetAfterMs"/>).
-        /// Reset on <see cref="Clear"/>. A growing value across reconnects
-        /// indicates the user's hardware variant doesn't implement those
-        /// commands; not necessarily an error.</summary>
-        public int SunsetCount => _sunsetCount;
-
-        /// <summary>Wall-clock milliseconds the oldest still-pending entry has
-        /// been waiting for its response. Zero when nothing is pending.
-        /// Useful as a diagnostic: a value that grows without bound indicates
-        /// the wheel never produced the expected named response.</summary>
-        public long LongestPendingMs
-        {
-            get
-            {
-                if (_pendingCount == 0) return 0;
-                long oldest = long.MaxValue;
-                lock (_lock)
-                {
-                    foreach (var kv in _pending)
-                    {
-                        if (kv.Value.EnqueuedAtTicks < oldest)
-                            oldest = kv.Value.EnqueuedAtTicks;
-                    }
-                }
-                if (oldest == long.MaxValue) return 0;
-                return (DateTime.UtcNow.Ticks - oldest) / TimeSpan.TicksPerMillisecond;
-            }
-        }
-
         /// <summary>Track an outbound frame awaiting a named response (caller
-        /// has already Send'd). The <paramref name="maxAttempts"/> parameter
-        /// is accepted for API stability but no longer enforced — retries are
-        /// bounded by <see cref="SunsetAfterMs"/>, not attempt count.
+        /// has already Send'd). Retries are bounded by
+        /// <see cref="SunsetAfterMs"/>, not attempt count.
         /// Silently no-ops if <paramref name="expectedName"/> has been sunset
         /// on this connection.</summary>
-        public void Track(string expectedName, byte[] frame, int[] backoffMs, int maxAttempts)
+        public void Track(string expectedName, byte[] frame, int[] backoffMs)
         {
             if (string.IsNullOrEmpty(expectedName) || frame == null || backoffMs == null) return;
             if (backoffMs.Length == 0) return;
@@ -104,6 +75,15 @@ namespace MozaPlugin.Protocol
                 // Caller owns the backoff array (callers pass static-readonly
                 // schedules). Frame buffer is cloned because callers may reuse
                 // their build buffer across Sends.
+                if (_pending.TryGetValue(expectedName, out var existing))
+                {
+                    // Caller just sent it, so the backoff gate restarts from now,
+                    // but Attempts / EnqueuedAtTicks stay with the first send.
+                    existing.Frame = (byte[])frame.Clone();
+                    existing.BackoffMs = backoffMs;
+                    existing.LastSentTickCount = Environment.TickCount;
+                    return;
+                }
                 _pending[expectedName] = new Entry
                 {
                     Name = expectedName,
@@ -119,21 +99,24 @@ namespace MozaPlugin.Protocol
 
         /// <summary>
         /// Note a response from the wheel matching <paramref name="responseName"/>.
-        /// Clears the pending entry if present. Called from the response-dispatch
-        /// path so retries stop immediately on first match.
+        /// Clears the pending entry if present, and lifts a sunset on that name.
+        /// Called from the response-dispatch path so retries stop immediately on
+        /// first match.
         /// </summary>
         public void NoteResponse(string responseName)
         {
             if (string.IsNullOrEmpty(responseName)) return;
-            // Fast-path: in steady state nothing is pending and this fires on
-            // every response — skipping the lock + dictionary hash here is the
+            // Fast-path: when nothing is pending or sunset this fires on every
+            // response — skipping the lock + dictionary hash here is the
             // difference between ~0 and ~50–200 lock acquisitions/sec on the
             // read thread.
-            if (_pendingCount == 0) return;
+            if (_pendingCount == 0 && _sunsetCount == 0) return;
             lock (_lock)
             {
                 if (_pending.Remove(responseName))
                     _pendingCount = _pending.Count;
+                if (_sunset.Remove(responseName))
+                    _sunsetCount = _sunset.Count;
             }
         }
 
@@ -210,7 +193,7 @@ namespace MozaPlugin.Protocol
             if (newlySunset != null)
             {
                 global::MozaPlugin.MozaLog.Info(
-                    $"[AZOM] PendingResponseTracker sunset {newlySunset.Count} name(s) (no response after {SunsetAfterMs / 1000} s; future Track() calls for these will no-op until disconnect): {string.Join(", ", newlySunset)}");
+                    $"[AZOM] PendingResponseTracker sunset {newlySunset.Count} name(s) (no response after {SunsetAfterMs / 1000} s; future Track() calls for these will no-op until disconnect or a reply): {string.Join(", ", newlySunset)}");
             }
         }
 

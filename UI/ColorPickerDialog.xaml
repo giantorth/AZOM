@@ -12,8 +12,8 @@
     <Window.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
-                <ResourceDictionary Source="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
+                <ctrl:SharedResourceDictionary SharedSource="pack://application:,,,/MozaPlugin;component/Themes/MozaTheme.xaml"/>
+                <ctrl:SharedResourceDictionary SharedSource="pack://application:,,,/MozaPlugin;component/Themes/MozaIcons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <Style TargetType="Button" BasedOn="{StaticResource MozaButton}"/>
             <Style TargetType="Slider" BasedOn="{StaticResource MozaSlider}"/>

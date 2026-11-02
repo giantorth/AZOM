@@ -39,7 +39,7 @@ namespace MozaPlugin.UI
         {
             bool detected = _plugin.IsHgpShifterDetected;
             HgpTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
-            if (!detected) return;
+            if (!detected || !HgpTab.IsSelected) return;
 
             using (_suppressor.Begin())
             {
@@ -54,7 +54,7 @@ namespace MozaPlugin.UI
         {
             bool detected = _plugin.IsSgpShifterDetected;
             SgpTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
-            if (!detected) return;
+            if (!detected || !SgpTab.IsSelected) return;
 
             EnsureShifterCombos();
 

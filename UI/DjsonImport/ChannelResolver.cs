@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -122,6 +123,9 @@ namespace MozaPlugin.UI.DjsonImport
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _aliases =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Property claimed by several catalog channels -> the one it binds to.
+        private readonly Dictionary<string, string> _primary =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _synthetic =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _unmappable =
@@ -139,6 +143,8 @@ namespace MozaPlugin.UI.DjsonImport
         private int _poolNext;
         private readonly Dictionary<string, ChannelAllocation> _allocated =
             new Dictionary<string, ChannelAllocation>(StringComparer.OrdinalIgnoreCase);
+        // _allocated's keys in allocation order, for Allocations and rollback.
+        private readonly List<string> _allocationOrder = new List<string>();
 
         /// <summary>Let unresolvable properties borrow a spare channel instead of being
         /// dropped. Off by default so a plain conversion stays side-effect free.</summary>
@@ -146,18 +152,39 @@ namespace MozaPlugin.UI.DjsonImport
 
         /// <summary>The borrowings made, in allocation order. The caller must publish
         /// these as per-dashboard channel mappings or the widgets read nothing.</summary>
-        public IReadOnlyCollection<ChannelAllocation> Allocations => _allocated.Values;
-
-        /// <summary>How many spare channels remain.</summary>
-        public int FreeChannels => Math.Max(0, _pool.Count - _poolNext);
+        public IReadOnlyCollection<ChannelAllocation> Allocations
+            => _allocationOrder.ConvertAll(k => _allocated[k]);
 
         /// <summary>Return every borrowed channel to the pool. Call between dashboards —
         /// allocations are per-dashboard settings, so they must not carry over.</summary>
         public void ResetAllocations()
         {
             _allocated.Clear();
+            _allocationOrder.Clear();
             _reserved.Clear();
             _poolNext = 0;
+        }
+
+        /// <summary>A point to roll allocations back to with <see cref="RollbackAllocations"/>.</summary>
+        internal readonly struct AllocationMark
+        {
+            public readonly int PoolNext;
+            public readonly int Count;
+            public AllocationMark(int poolNext, int count) { PoolNext = poolNext; Count = count; }
+        }
+
+        internal AllocationMark MarkAllocations() => new AllocationMark(_poolNext, _allocationOrder.Count);
+
+        /// <summary>Return the channels borrowed since <paramref name="mark"/> — for a
+        /// formula that failed after some of its properties had already borrowed one.</summary>
+        internal void RollbackAllocations(AllocationMark mark)
+        {
+            for (int i = _allocationOrder.Count - 1; i >= mark.Count; i--)
+            {
+                _allocated.Remove(_allocationOrder[i]);
+                _allocationOrder.RemoveAt(i);
+            }
+            _poolNext = mark.PoolNext;
         }
 
         /// <summary>Spare channels left once the reserved set is excluded.</summary>
@@ -179,7 +206,12 @@ namespace MozaPlugin.UI.DjsonImport
 
         public ChannelResolver(IEnumerable<ChannelRow> catalog)
         {
-            foreach (var entry in catalog)
+            var rows = catalog as IReadOnlyList<ChannelRow> ?? new List<ChannelRow>(catalog);
+
+            // Every URL claiming each property, so the choice between them can't
+            // depend on the order the catalog arrives in.
+            var claims = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in rows)
             {
                 if (string.IsNullOrEmpty(entry.Url)) continue;
                 _knownUrls.Add(entry.Url);
@@ -189,22 +221,47 @@ namespace MozaPlugin.UI.DjsonImport
                 if (entry.DefaultProperty.StartsWith("@internal/", StringComparison.Ordinal)) continue;
                 if (string.IsNullOrWhiteSpace(entry.DefaultProperty)) continue;
 
-                // First occurrence wins: three properties (ErsPercent, DrsAvailable,
-                // Fuel) are claimed by two URLs each, and Telemetry.json lists the
-                // primary channel first in every case.
                 string key = Normalize(entry.DefaultProperty);
-                if (!_direct.ContainsKey(key)) _direct[key] = entry.Url;
-
-                const string gameData = "DataCorePlugin.GameData.";
-                if (key.StartsWith(gameData, StringComparison.OrdinalIgnoreCase))
+                if (!claims.TryGetValue(key, out var urls))
                 {
-                    string leaf = key.Substring(gameData.Length);
-                    if (leaf.Length > 0 && !_byLeaf.ContainsKey(leaf)) _byLeaf[leaf] = entry.Url;
+                    urls = new List<string>(1);
+                    claims[key] = urls;
                 }
+                if (!urls.Contains(entry.Url, StringComparer.OrdinalIgnoreCase)) urls.Add(entry.Url);
             }
 
             LoadPropertyMap();
-            BuildPool(catalog);
+
+            const string gameData = "DataCorePlugin.GameData.";
+            foreach (var claim in claims)
+            {
+                string url = PickPrimary(claim.Key, claim.Value);
+                _direct[claim.Key] = url;
+                if (claim.Key.StartsWith(gameData, StringComparison.OrdinalIgnoreCase))
+                {
+                    string leaf = claim.Key.Substring(gameData.Length);
+                    if (leaf.Length > 0) _byLeaf[leaf] = url;
+                }
+            }
+
+            BuildPool(rows);
+        }
+
+        /// <summary>The channel a property binds to when several claim it: the
+        /// <c>primary</c> table in DjsonPropertyMap.json, else the ordinal-first URL.</summary>
+        private string PickPrimary(string key, List<string> urls)
+        {
+            if (urls.Count == 1) return urls[0];
+            if (_primary.TryGetValue(key, out var primary))
+            {
+                foreach (var u in urls)
+                    if (string.Equals(u, primary, StringComparison.OrdinalIgnoreCase)) return u;
+            }
+            var sorted = new List<string>(urls);
+            sorted.Sort(StringComparer.Ordinal);
+            MozaLog.Warn($"[AZOM] DjsonPropertyMap: '{key}' is claimed by {string.Join(", ", sorted)} "
+                       + $"with no primary entry — using {sorted[0]}");
+            return sorted[0];
         }
 
         /// <summary>
@@ -248,7 +305,9 @@ namespace MozaPlugin.UI.DjsonImport
                 // channel it borrowed, so this is what decides whether a converted widget
                 // refreshes at 30 ms or 2 s. Everything the dashboard reads directly is
                 // already reserved by the caller, so taking a fast slot costs it nothing.
-                return a.PackageLevel.CompareTo(b.PackageLevel);
+                int byTier = a.PackageLevel.CompareTo(b.PackageLevel);
+                // Url last, so the lending order doesn't depend on catalog order.
+                return byTier != 0 ? byTier : string.CompareOrdinal(a.Url, b.Url);
             });
         }
 
@@ -282,6 +341,7 @@ namespace MozaPlugin.UI.DjsonImport
             if (root == null) return;
 
             CopySection(root["aliases"] as JObject, _aliases, validateUrl: true);
+            CopySection(root["primary"] as JObject, _primary, validateUrl: true);
             CopySection(root["synthetic"] as JObject, _synthetic, validateUrl: false);
             CopySection(root["unmappable"] as JObject, _unmappable, validateUrl: false);
             CopySection(root["string_valued"] as JObject, _stringValued, validateUrl: false);
@@ -406,6 +466,7 @@ namespace MozaPlugin.UI.DjsonImport
                 PackageLevel = row.PackageLevel,
             };
             _allocated[key] = allocation;
+            _allocationOrder.Add(key);
             return Borrowed(allocation);
         }
 

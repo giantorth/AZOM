@@ -50,14 +50,6 @@ namespace MozaPlugin.UI
             SetValueText(label, $"{shown:F0}%");
         }
 
-        /// <summary>Set slider value (clamped) and paint a label with optional suffix.</summary>
-        public static void SetSliderRaw(Slider slider, TextBox label, int value, int min, int max, string suffix)
-        {
-            int shown = (int)Clamp(value, min, max);
-            slider.Value = shown;
-            SetValueText(label, $"{shown}{suffix}");
-        }
-
         /// <summary>
         /// True when <paramref name="text"/> begins with the literal prefix of a
         /// composite-format string (everything before its first <c>{</c>

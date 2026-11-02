@@ -29,15 +29,78 @@ namespace MozaControls
         };
 
         private struct Sample { public double T, Freq, Amp; }
-        private readonly List<Sample>[] _buf = { new List<Sample>(), new List<Sample>(), new List<Sample>() };
+
+        /// <summary>One lane's sample window: a ring buffer that grows to fit
+        /// <see cref="WindowSec"/> at the display's frame rate, so trimming the
+        /// oldest samples is O(1) instead of a list shift.</summary>
+        private sealed class Lane
+        {
+            private Sample[] _ring = new Sample[1024];
+            private int _head, _count;
+            // Time of the newest sample whose value differs from the one before it.
+            private double _lastChangeT = double.NegativeInfinity;
+            // Set once samples have aged out, i.e. the window is fully covered.
+            private bool _full;
+
+            public int Count => _count;
+            public Sample this[int k] => _ring[(_head + k) % _ring.Length];
+            public Sample Newest => this[_count - 1];
+
+            /// <summary>Full window holding one unchanging value — it renders the same
+            /// image every frame.</summary>
+            public bool Static => _full && _count > 0 && _lastChangeT <= _ring[_head].T;
+
+            public void Clear()
+            {
+                _head = 0;
+                _count = 0;
+                _full = false;
+                _lastChangeT = double.NegativeInfinity;
+            }
+
+            public void Add(double t, double freq, double amp)
+            {
+                if (_count == 0 || Newest.Freq != freq || Newest.Amp != amp) _lastChangeT = t;
+                if (_count == _ring.Length) Grow();
+                _ring[(_head + _count) % _ring.Length] = new Sample { T = t, Freq = freq, Amp = amp };
+                _count++;
+            }
+
+            public void DropBefore(double cutoff)
+            {
+                while (_count > 0 && _ring[_head].T < cutoff)
+                {
+                    _head = (_head + 1) % _ring.Length;
+                    _count--;
+                    _full = true;
+                }
+            }
+
+            private void Grow()
+            {
+                var next = new Sample[_ring.Length * 2];
+                for (int k = 0; k < _count; k++) next[k] = this[k];
+                _ring = next;
+                _head = 0;
+            }
+        }
+
+        private readonly Lane[] _lanes = { new Lane(), new Lane(), new Lane() };
+        // Outline scratch, reused across lanes and frames.
+        private readonly List<Point> _top = new List<Point>();
+        private readonly List<Point> _bot = new List<Point>();
         private readonly Brush[] _fill = new Brush[3];
         private readonly Pen[] _stroke = new Pen[3];
+        private readonly Brush[] _label = new Brush[3];
         private readonly Typeface _face = new Typeface("Segoe UI");
         private readonly Brush _bg;
         private readonly Pen _grid;
         private readonly Pen _sep;
         private readonly Stopwatch _clock = Stopwatch.StartNew();
         private bool _hooked;
+        // The current static image has been drawn; further frames are skipped until
+        // something changes.
+        private bool _staticDrawn;
 
         public LfeScope()
         {
@@ -46,6 +109,7 @@ namespace MozaControls
                 var c = SlotColors[i];
                 _fill[i] = new SolidColorBrush(Color.FromArgb(0x9A, c.R, c.G, c.B)); _fill[i].Freeze();
                 _stroke[i] = new Pen(new SolidColorBrush(c), 1.0); _stroke[i].Freeze();
+                _label[i] = new SolidColorBrush(c); _label[i].Freeze();
             }
             _bg = new SolidColorBrush(Color.FromArgb(0x30, 0, 0, 0)); _bg.Freeze();
             _grid = new Pen(new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF)), 1); _grid.Freeze();
@@ -62,18 +126,26 @@ namespace MozaControls
             if (!IsVisible || Poll == null || ActualWidth <= 0) return;
             double t = _clock.Elapsed.TotalSeconds;
             var vals = Poll();
+            bool allStatic = true;
             for (int i = 0; i < 3; i++)
             {
-                var buf = _buf[i];
+                var lane = _lanes[i];
                 double amp = i < vals.Length ? vals[i].amp : 0;
                 double freq = i < vals.Length ? vals[i].freq : 0;
-                if (buf.Count > 0 && t - buf[buf.Count - 1].T > 0.3) buf.Clear();   // hidden/hitched → restart
-                buf.Add(new Sample { T = t, Freq = freq, Amp = amp });
-                double cutoff = t - WindowSec;
-                int drop = 0;
-                while (drop < buf.Count && buf[drop].T < cutoff) drop++;
-                if (drop > 0) buf.RemoveRange(0, drop);
+                if (lane.Count > 0 && t - lane.Newest.T > 0.3) lane.Clear();   // hidden/hitched → restart
+                lane.Add(t, freq, amp);
+                lane.DropBefore(t - WindowSec);
+                allStatic &= lane.Static;
             }
+            // A full, unchanging window only drifts its left edge by under a frame.
+            if (allStatic && _staticDrawn) return;
+            _staticDrawn = allStatic;
+            InvalidateVisual();
+        }
+
+        protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+        {
+            base.OnDpiChanged(oldDpi, newDpi);
             InvalidateVisual();
         }
 
@@ -85,6 +157,7 @@ namespace MozaControls
 
             double laneH = h / 3.0;
             double t1 = _clock.Elapsed.TotalSeconds, t0 = t1 - WindowSec;
+            double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             for (int i = 0; i < 3; i++)
             {
                 double laneTop = laneH * i, laneBot = laneTop + laneH;
@@ -95,39 +168,39 @@ namespace MozaControls
                 if (i > 0) dc.DrawLine(_sep, new Point(0, laneTop), new Point(w, laneTop));
                 dc.DrawLine(_grid, new Point(0, floor), new Point(w, floor));   // freq-0 baseline
 
-                var buf = _buf[i];
-                if (buf.Count >= 2)
+                var lane = _lanes[i];
+                if (lane.Count >= 2)
                 {
-                    var top = new List<Point>(buf.Count);
-                    var bot = new List<Point>(buf.Count);
-                    for (int k = 0; k < buf.Count; k++)
+                    _top.Clear();
+                    _bot.Clear();
+                    for (int k = 0; k < lane.Count; k++)
                     {
-                        var s = buf[k];
+                        var s = lane[k];
                         double x = (s.T - t0) / WindowSec * w;
                         double fN = Math.Max(0, Math.Min(1, s.Freq / MaxHz));
                         double cy = floor - fN * span;
                         double half = s.Amp * maxHalf;
-                        top.Add(new Point(x, Math.Max(laneTop + 1, cy - half)));
-                        bot.Add(new Point(x, Math.Min(laneBot - 1, cy + half)));
+                        _top.Add(new Point(x, Math.Max(laneTop + 1, cy - half)));
+                        _bot.Add(new Point(x, Math.Min(laneBot - 1, cy + half)));
                     }
                     var geo = new StreamGeometry();
                     using (var g = geo.Open())
                     {
-                        g.BeginFigure(top[0], true, true);
-                        g.PolyLineTo(top, true, false);
-                        for (int k = bot.Count - 1; k >= 0; k--) g.LineTo(bot[k], true, false);
+                        g.BeginFigure(_top[0], true, true);
+                        g.PolyLineTo(_top, true, false);
+                        for (int k = _bot.Count - 1; k >= 0; k--) g.LineTo(_bot[k], true, false);
                     }
                     geo.Freeze();
                     dc.DrawGeometry(_fill[i], _stroke[i], geo);
 
                     // current-frequency readout at the right of the lane
-                    var last = buf[buf.Count - 1];
+                    var last = lane.Newest;
                     if (last.Amp > 0.01)
                     {
                         var txt = new FormattedText(
                             ((int)Math.Round(last.Freq)).ToString(CultureInfo.InvariantCulture) + " Hz",
                             CultureInfo.InvariantCulture, FlowDirection.LeftToRight, _face, 10.5,
-                            new SolidColorBrush(SlotColors[i]), 1.0);
+                            _label[i], pixelsPerDip);
                         dc.DrawText(txt, new Point(w - txt.Width - 4, laneTop + 3));
                     }
                 }

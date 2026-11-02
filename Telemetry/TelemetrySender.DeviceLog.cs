@@ -120,12 +120,12 @@ namespace MozaPlugin.Telemetry
         /// reassembler and route any completed records. Serial read thread.
         /// This is a second reader of the same bytes the channel-catalog parser
         /// consumes — it never mutates that parser's state.</summary>
-        internal void FeedFfRecords(byte session, int seq, byte[] chunkPayload)
+        internal void FeedFfRecords(byte session, int seq, byte[] chunkPayload, bool crcValid)
         {
             if (chunkPayload == null || chunkPayload.Length <= 4) return;
             if (!DeviceLogPullEnabled) return;
             _ffScratch.Clear();
-            _ffStream.Append(session, seq, chunkPayload, _ffScratch);
+            _ffStream.Append(session, seq, chunkPayload, crcValid, _ffScratch);
             for (int i = 0; i < _ffScratch.Count; i++)
             {
                 var rec = _ffScratch[i];

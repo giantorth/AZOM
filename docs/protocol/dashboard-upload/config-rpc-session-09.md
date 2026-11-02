@@ -73,7 +73,10 @@ The host's `configJson()` `dashboards` list is not informational — the wheel
   wheel-reported `configJsonList` from the latest TitleId=1 push; the wheel
   does NOT answer mid-session prime/open-request nudges with a fresh full
   push (neither for the plugin nor for PitHouse — full pushes happen only at
-  connect).
+  connect). Such a nudge sent with synthetic seqs (outside the shared 0x09
+  outbound counter) also desyncs the sess=0x09 reassembler: forward-gap
+  storm, config channel dead until reconnect. Post-mutation confirmations
+  come from the wheel's unprompted TitleId=4 deltas.
 - **Two tables, two rebuild rules** (wire+wheel-log verified 2026-08-17,
   superseding the 2026-08-16 "rebuilds only on port reconnect" model):
   the **registry/`configJsonList`** rebuilds at connect (the TitleId=1 boot

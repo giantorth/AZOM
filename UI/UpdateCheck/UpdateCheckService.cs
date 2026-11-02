@@ -192,7 +192,7 @@ namespace MozaPlugin.UI.UpdateCheck
                     {
                         // Max by SemVer, not list order — the API sorts by
                         // creation time, which a re-published tag can skew.
-                        var entry = MakeEntry(rel, tag, StripLeadingV(tag));
+                        var entry = MakeEntry(rel, StripLeadingV(tag));
                         if (stable == null || CompareSemVer(entry.Version, stable.Version) > 0)
                             stable = entry;
                         continue;
@@ -203,7 +203,7 @@ namespace MozaPlugin.UI.UpdateCheck
                     string version = ExtractPrVersionFromName(name);
                     if (version.Length == 0) continue; // renamed by hand — skip, don't fail
                     int prNumber = int.Parse(m.Groups[1].Value);
-                    var prEntry = MakeEntry(rel, tag, version);
+                    var prEntry = MakeEntry(rel, version);
                     if (!prChannels.TryGetValue(prNumber, out var existing)
                         || prEntry.PublishedAtUtc > existing.Newest.PublishedAtUtc)
                     {
@@ -243,17 +243,16 @@ namespace MozaPlugin.UI.UpdateCheck
                 var rel = JObject.Parse(resp.Body);
                 string tag = (string?)rel["tag_name"] ?? "";
                 if (!s_stableTagRx.IsMatch(tag)) return null;
-                return MakeEntry(rel, tag, StripLeadingV(tag));
+                return MakeEntry(rel, StripLeadingV(tag));
             }
             catch { return null; }
         }
 
-        private static ReleaseEntry MakeEntry(JObject rel, string tag, string version)
+        private static ReleaseEntry MakeEntry(JObject rel, string version)
         {
             DateTime published =
                 ((DateTime?)rel["published_at"])?.ToUniversalTime() ?? DateTime.MinValue;
             return new ReleaseEntry(
-                tag,
                 version,
                 (string?)rel["html_url"] ?? "",
                 (string?)rel["body"] ?? "",

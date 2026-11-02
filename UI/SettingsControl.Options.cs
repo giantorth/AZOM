@@ -91,6 +91,7 @@ namespace MozaPlugin.UI
         // Called from RefreshDisplay inside the event suppressor.
         private void RefreshOptionsTab()
         {
+            if (!OptionsTab.IsSelected) return;
             if (ForzaCompatCheck != null)
                 ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
         }
@@ -160,6 +161,14 @@ namespace MozaPlugin.UI
                 ? Strings.Status_WheelbaseLfeSourceRestartRequired : "";
         }
 
+        private void PedalHapticsCombinedCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+
+            if (_plugin.SetPedalHapticsCombined(PedalHapticsCombinedCheck.IsChecked == true))
+                PedalHapticsCombinedStatusText.Text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+        }
+
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
@@ -171,13 +180,17 @@ namespace MozaPlugin.UI
             if (result != MessageBoxResult.Yes)
                 return;
 
+            bool wasCombined = _plugin.PedalHapticsCombined;
             _plugin.ClearSettings();
+            if (_plugin.PedalHapticsCombined != wasCombined && _plugin.ApplyPedalHapticsLayout())
+                PedalHapticsCombinedStatusText.Text = Strings.Status_WheelbaseLfeSourceRestartRequired;
 
             using (_suppressor.Begin())
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
+                PedalHapticsCombinedCheck.IsChecked = _plugin.Settings.PedalHapticsCombinedDevice;
                 SyncWheelbaseLfeSourceCombo();
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;

@@ -44,10 +44,10 @@ namespace MozaPlugin.UI.Import
                 int index = i;
                 var (oldI, oldS) = profile.MotionEffects?.Get(index) ?? (-1, -1);
                 plan.Diffs.Add(new FieldDiff($"{labels[i]} — {Strings.Motion_Panel_Intensity}",
-                    Display(oldI), Display(intensity),
+                    Display(oldI), Display(intensity), oldI != intensity,
                     () => SetIntensity(profile, index, intensity)));
                 plan.Diffs.Add(new FieldDiff($"{labels[i]} — {Strings.Motion_Panel_Smoothness}",
-                    Display(oldS), Display(smoothness),
+                    Display(oldS), Display(smoothness), oldS != smoothness,
                     () => SetSmoothness(profile, index, smoothness)));
 
                 foreach (var p in section.Properties())
@@ -70,7 +70,7 @@ namespace MozaPlugin.UI.Import
                 bool enabled = (bool?)engine["enabled"] ?? true;
                 int value = enabled ? Clamp(engineStrength) : 0;
                 int old = profile.MotionEffects?.EngineVibrationStrength ?? -1;
-                plan.Diffs.Add(new FieldDiff(Strings.Motion_Effect_EngineVibration, Display(old), Display(value),
+                plan.Diffs.Add(new FieldDiff(Strings.Motion_Effect_EngineVibration, Display(old), Display(value), old != value,
                     () => (profile.MotionEffects ??= new MotionEffectsSettings()).EngineVibrationStrength = value));
                 foreach (var p in engine.Properties())
                     if (p.Name != "Strength" && p.Name != "enabled")
@@ -85,7 +85,7 @@ namespace MozaPlugin.UI.Import
                     {
                         int value = Clamp(tactile);
                         int old = profile.MotionEffects?.TactileIntensity ?? -1;
-                        plan.Diffs.Add(new FieldDiff(Strings.Motion_Effect_TactileFeedback, Display(old), Display(value),
+                        plan.Diffs.Add(new FieldDiff(Strings.Motion_Effect_TactileFeedback, Display(old), Display(value), old != value,
                             () => (profile.MotionEffects ??= new MotionEffectsSettings()).TactileIntensity = value));
                     }
                     else

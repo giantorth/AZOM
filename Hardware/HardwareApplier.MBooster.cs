@@ -102,6 +102,7 @@ namespace MozaPlugin.Hardware
                 // Output registers the unit already reports are skipped, as
                 // Pit House's role-change burst left out a y5 already at 100.
                 bool Differs(string name, int value) => controller.OutputRegisterValue(dev, name) != value;
+                bool DiffersFloat(string name, float value) => !controller.UnitHoldsFloat(dev, name, value);
                 string dirName = $"mbooster-{prefix}-dir", minName = $"mbooster-{prefix}-min", maxName = $"mbooster-{prefix}-max";
                 if (cfg.Direction >= 0 && Differs(dirName, cfg.Direction)) controller.SendIntWrite(dirName, cfg.Direction, dev);
                 // Max before min, as Pit House writes them.
@@ -114,7 +115,7 @@ namespace MozaPlugin.Hardware
                     for (int i = 0; i < 5; i++)
                     {
                         string yName = $"mbooster-{prefix}-y{i + 1}";
-                        if (Differs(yName, (int)Math.Round(hwCurve[i])))
+                        if (DiffersFloat(yName, hwCurve[i]))
                             controller.SendFloatWrite(yName, hwCurve[i], dev);
                     }
                 // Travel / End Stop / Natural Friction / Segmented Damping are
@@ -218,7 +219,7 @@ namespace MozaPlugin.Hardware
                 if (ownsPedalFeelHardware && role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake)
                 {
                     if (cfg.SensorOutputRatioPct >= 0
-                        && Differs("mbooster-brake-angle-ratio", (int)Math.Round(cfg.SensorOutputRatioPct)))
+                        && DiffersFloat("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct))
                     {
                         controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
                     }

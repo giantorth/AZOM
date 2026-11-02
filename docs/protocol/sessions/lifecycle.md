@@ -57,11 +57,24 @@ persistent-wire pattern):
 `TryCloseSession(session, 500ms)` waits up to 500 ms for the wheel's
 fc:00 close-ack before moving on; an ack timeout is non-fatal and the
 host proceeds to the open phase regardless. The wheel reliably acks
-close frames for sessions it considers open and silently ignores closes
+close frames for sessions it considers open and does not ack closes
 for sessions it considers closed — which makes the close-ack a stale-state
 detector: at a point where this host process has opened nothing yet, an
 acked close proves the wheel still holds session state from a prior host
 instance.
+
+An unacked close is not silent on the display side: MOZADash logs each one as
+a rejected connect request, followed by the frame header and the 3 payload bytes it read:
+
+```
+connect error: request_syn_t: invalid data size.
+7c0001 000000
+```
+
+(`7c0002` / `7c0003` for the other sessions.) This is benign — in the bundles
+it is followed, after the host's opens, by `SERVERCONNECTED true` and
+`[TileMap] client created`. Across 35 bug bundles every such line maps to a
+host close frame within ~4 s; none appeared without one.
 
 ### Close-ack ≠ teardown: the ~11 s silence interlock
 

@@ -73,19 +73,40 @@ namespace MozaPlugin
         /// connect/handshake history out of every bug report. Callers that run on
         /// more than one pipe must fold the pipe label into the key.
         /// </summary>
-        public static void DebugIfChanged(string key, string message)
+        public static void DebugIfChanged(string key, string message) =>
+            DebugIfChanged(key, message, message);
+
+        /// <summary>
+        /// <see cref="DebugIfChanged(string, string)"/> that compares
+        /// <paramref name="state"/> instead of the logged line, for lines that
+        /// carry a per-call value (e.g. a duration) which must not defeat the
+        /// suppression.
+        /// </summary>
+        public static void DebugIfChanged(string key, string state, string message)
         {
-            if (string.IsNullOrEmpty(key)) { Debug(message); return; }
+            if (ShouldEmit(key, state)) Debug(message);
+        }
+
+        /// <summary>Error-level <see cref="DebugIfChanged(string, string)"/>, for
+        /// catch blocks on per-frame paths.</summary>
+        public static void ErrorIfChanged(string key, string message)
+        {
+            if (ShouldEmit(key, message)) Error(message);
+        }
+
+        private static bool ShouldEmit(string key, string state)
+        {
+            if (string.IsNullOrEmpty(key)) return true;
             var now = DateTime.UtcNow;
             lock (_repeatGate)
             {
                 if (_lastByKey.TryGetValue(key, out var prev)
-                    && prev.Key == message
+                    && prev.Key == state
                     && (now - prev.Value).TotalMinutes < RepeatRefreshMinutes)
-                    return;
-                _lastByKey[key] = new KeyValuePair<string, DateTime>(message, now);
+                    return false;
+                _lastByKey[key] = new KeyValuePair<string, DateTime>(state, now);
             }
-            Debug(message);
+            return true;
         }
 
         public static void Warn(string message)

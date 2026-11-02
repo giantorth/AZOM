@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using MozaPlugin.Hardware;
 using MozaPlugin.Sdk.Cbor;
 
@@ -28,7 +27,6 @@ namespace MozaPlugin.Sdk.Resources.Pedal
         private readonly string _commandPrefix;   // e.g. "pedals-brake-y" => suffixed 1..5
         private readonly string _diagnosticName;
         private readonly HardwareApplier _hardware;
-        private int _gapWarned;
 
         protected PedalNonLinearResource(
             MozaData data,
@@ -114,13 +112,6 @@ namespace MozaPlugin.Sdk.Resources.Pedal
                 _hardware.WriteFloatIfPedalsDetected($"{_commandPrefix}{i + 1}", values[i]);
             }
             return CoapResourceResponse.Valid();
-        }
-
-        /// <summary>One-time gap warning hook. Currently unused — kept for symmetry with <see cref="PedalScalarResource"/>; emit when wire-only or data-only paths surface.</summary>
-        protected void WarnGapOnce(string what)
-        {
-            if (Interlocked.CompareExchange(ref _gapWarned, 1, 0) == 0)
-                MozaLog.Warn($"[AZOM.Sdk] Pedal gap: {_diagnosticName} missing {what}");
         }
     }
 }

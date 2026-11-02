@@ -605,7 +605,15 @@ in [`MozaCommandDatabase`](../../../Protocol/MozaCommandDatabase.cs)
 (§ BASE AMBIENT LEDS); the live RPM bar is emitted by
 [`MozaBaseLedDeviceManager`](../../../Devices/Led/MozaBaseLedDeviceManager.cs)
 as a virtual SimHub LED device; config and per-LED palette writes go through
-`HardwareApplier.ApplyBaseAmbientToHardware`. Capability is gated on an `0xA2`
+`HardwareApplier.ApplyBaseAmbientToHardware`. That apply is change-gated against
+the static per-base config cache (`s_baseCfgCache`, which survives the
+game-switch reload): a value is written only when it differs from what was last
+sent to the base, and recorded only once actually dispatched, so a write dropped
+on a dead wire is retried by the next apply. UI writes always go out and are
+recorded too, keeping the gate in step. The ambient entries are dropped only on
+a real base loss (`ResetBaseDetection`, `OnBaseDisconnected`) — the apply runs
+before a swapped-in base's UID is known — so a reload or profile switch with
+unchanged values writes nothing, and a new base gets the full set. Capability is gated on an `0xA2`
 answer to `base-ambient-brightness` (`DeviceProber`), which R9/R12 silently
 drop.
 

@@ -79,6 +79,8 @@ namespace MozaPlugin.Devices.Extensions
         // construct a manager (registered in a static list) before finding out.
         private bool _injectionGaveUp;
 
+        private string DeviceName => LinkedDevice?.DeviceDescriptor?.Name ?? "?";
+
         /// <summary>
         /// Find the LedModuleDevice sub-device and replace its DeviceDriver
         /// with our MozaLedDeviceManager that always reports connected.
@@ -126,11 +128,14 @@ namespace MozaPlugin.Devices.Extensions
                         return;
                     }
                 }
-                MozaLog.Debug("[AZOM] No LedModuleDevice found on device instance");
+                // Retried every DataUpdate until injected, so repeat-suppressed.
+                MozaLog.DebugIfChanged("wheel-ext-nolmd:" + DeviceName,
+                    $"[AZOM] No LedModuleDevice found on device instance ({DeviceName})");
             }
             catch (Exception ex)
             {
-                MozaLog.Error($"[AZOM] Error injecting LED driver: {ex.Message}");
+                MozaLog.ErrorIfChanged("wheel-ext-inject:" + DeviceName,
+                    $"[AZOM] Error injecting LED driver ({DeviceName}): {ex.Message}");
             }
         }
 

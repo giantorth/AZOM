@@ -31,6 +31,8 @@ namespace MozaPlugin.Telemetry.Display
         // (~28/s), which is diluted by menu/idle gaps — not the live rate. Both active
         // records are still streamed per tick, so each refreshes at the full tick rate.
         private const double TickIntervalMs = 20.0;
+        // Viz snapshot cadence (~100 ms). Its only reader is the mapping panel's 500 ms poll.
+        private const int VizPublishEvery = 5;
         // FSR1 occupies the wheel lane: TierDash0..6 (records) + Enable (keepalive).
         private const int LaneSlotCount = 9;          // slots 0..8
         // _lastStreamedIndex sentinel meaning "currently in full-set fallback mode".
@@ -49,7 +51,6 @@ namespace MozaPlugin.Telemetry.Display
         private bool _lastConnected;
 
         private volatile StatusDataBase? _latestGameData;
-        private volatile bool _gameRunning;
         private int _tickCounter;
         private int _lastStreamedIndex = -1;
         // Table-7 EEPROM write gate (see Tick): selects (Param 6) and display brightness
@@ -73,7 +74,6 @@ namespace MozaPlugin.Telemetry.Display
 
         public bool IsRunning => _running;
         public void UpdateGameData(StatusDataBase? data) => _latestGameData = data;
-        public void SetGameRunning(bool running) => _gameRunning = running;
 
         public void Start()
         {
@@ -439,7 +439,7 @@ namespace MozaPlugin.Telemetry.Display
 
             // Live numeric viz: publish a snapshot of the active record set's real telemetry
             // values for the channel-mapping panel's byte strip (only while it asks for it).
-            if (plugin != null && plugin.Fsr1Probe.VizActive)
+            if (plugin != null && plugin.Fsr1Probe.VizActive && _tickCounter % VizPublishEvery == 0)
             {
                 // UI-only preview — must never take down the streaming tick if one record's
                 // partition is malformed. Isolate it so the wheel keeps updating regardless.

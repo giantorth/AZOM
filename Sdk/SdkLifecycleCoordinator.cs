@@ -253,10 +253,5 @@ namespace MozaPlugin.Sdk
         {
             lock (_gate) s_persistentStub?.TryStop(1500);
         }
-
-        /// <summary>True when a persistent stub child is still alive — Init's
-        /// cold-start re-entry check.</summary>
-        internal static bool PersistentStubIsRunning =>
-            s_persistentStub != null && s_persistentStub.IsRunning;
     }
 }

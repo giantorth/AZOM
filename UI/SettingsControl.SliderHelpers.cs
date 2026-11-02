@@ -29,8 +29,6 @@ namespace MozaPlugin.UI
 
         // ===== Helpers =====
 
-        // SetSliderPercent, SetSliderRaw, SetComboSafe, Clamp moved to UI/UiHelpers.
-
         private double ConvertTemp(int raw)
         {
             double celsius = raw / 100.0;
@@ -52,6 +50,18 @@ namespace MozaPlugin.UI
             commit(v);
             _plugin.SaveSettings();
         }
+
+        // Same, for the hidden data-store sliders behind the curve/EQ editors,
+        // which have no value box.
+        private void OnIntSliderChanged(double newValue, Action<int> commit)
+        {
+            if (_suppressEvents) return;
+            commit((int)Math.Round(newValue));
+            _plugin.SaveSettings();
+        }
+
+        private static void SetDataSlider(Slider slider, int value, int min, int max)
+            => slider.Value = (int)Clamp(value, min, max);
 
         // Min/max pair sliders additionally clamp against the sibling bound and
         // bounce the slider back without re-firing this handler.

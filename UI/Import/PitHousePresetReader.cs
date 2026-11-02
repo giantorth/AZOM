@@ -49,14 +49,14 @@ namespace MozaPlugin.UI.Import
             var deviceParams = root["deviceParams"] as JObject;
             if (deviceParams == null)
                 return (null, string.Format(Strings.Import_Error_InvalidJson, "missing 'deviceParams' object"));
+            if (root["id"] is JContainer)
+                return (null, string.Format(Strings.Import_Error_InvalidJson, "'id' is not a string"));
 
             var preset = new PitHousePreset
             {
-                Id = (string?)root["id"] ?? "",
                 Name = (string?)root["name"] ?? Path.GetFileNameWithoutExtension(path),
                 DeviceType = deviceType,
                 DeviceParams = deviceParams,
-                SourcePath = path,
             };
 
             var devicesArr = root["devices"] as JArray ?? tags?["devices"] as JArray;

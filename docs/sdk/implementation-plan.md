@@ -106,7 +106,7 @@ MozaPlugin/
 │           ├── SteerLockWriteHandler.cs          PacketId 3 — MotSetSteer_LimitAngle / MaximumAngle → base-{limit,max-angle}
 │           └── SteerLockReadHandler.cs           PacketId 4 — MotGetSteer_* read-back via Head.ReplyPort
 ├── UI/SettingsControl.xaml + .Sdk.cs             "Third-party SDK" tab
-├── Settings/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / SdkBindLoopbackOnly / ControlUdpPort
+├── Settings/MozaPluginSettings.cs                      SdkEmulationEnabled / SdkCoapPort / ControlUdpPort
 └── MozaPlugin.csproj                             Embed PitHouseStub.exe as resource
 
 PitHouseStub/                                     ← sibling project
@@ -136,7 +136,7 @@ Test setup:
 - Real MOZA R5 Base attached (host `lsusb` shows `346e:0004 Gudsen MOZA R5 Base`; Wine's `system.reg` has `HID\VID_346E&PID_0004` entry).
 - Plugin deployed and `SdkEmulationEnabled=true` in `MozaPluginSettings.json`.
 - Probe binary `CoapProbe.exe` built — net48 x86, P/Invokes through the vendor `MOZA_API_CSharp.dll` → `MOZA_API_C.dll` → `MOZA_SDK.dll`. Source at `/tmp/moza-sdk-probe/`. Calls `installMozaSDK()`, sleeps 3s (per the vendor `sdk_api_test.cc` pattern), then `EnumShifterDevices`, `setMotorFfbStrength(50)`, `setMotorPeakTorque(75)`, `CenterWheel()`, and the matching getters.
-- Diagnostic build of the stub (`PitHouseStub/Program.cs`) — logs args, every byte received on stdin, heartbeats, and shutdown signals to `%LOCALAPPDATA%\SimHub\MozaPlugin\PitHouseStub\stub-trace-<pid>-<stamp>.log`.
+- Diagnostic build of the stub (`PitHouseStub/Program.cs`) — logs args, every byte received on stdin, heartbeats, and shutdown signals to `%LOCALAPPDATA%\SimHub\MozaPlugin\PitHouseStub\stub-trace-<pid>-<stamp>.log`. The shipped stub (`CoapStub/Program.cs`) keeps this trace under `...\MozaPlugin\CoapStub\`: it polls parent liveness every 2 s but writes a heartbeat line only about every 5 min, caps each file at 4 MB (pruned after 7 days), and exempts lifecycle lines (parent exit, fatal, unhandled exception, ProcessExit, Ctrl-C) from that cap under their own 64 KB budget so the end of a trace survives.
 
 ### What we observed
 
@@ -215,6 +215,7 @@ These return-by-design URIs need either a `MozaData` field or a `MozaCommandData
 - **Motor:** `RoadSensitivity` (has command, no MozaData field), `LimitWheelSpeed` (neither), `NaturalInertiaRatio` (neither).
 - **Wheel:** `ClutchPaddleCombinePos`, `JoystickHatswitchMode`, `SpeedUnit`, `TemperatureUnit`, `ScreenBrightness` (wheel-screen), `ScreenCurrentUI`. Plus `ShiftIndicatorLightRpm` GET (POST works), `ScreenUIList` POST (GET returns empty map).
 - **Display:** `DisplayScreenSpeedUnit`, `DisplayScreenTemperatureUnit`, `DisplayScreenScreenCurrentUI`, `DisplayScreenScreenBrightness` POST (GET live), `DisplayScreenScreenUIList` POST.
+- **Lifecycle:** `CenterWheel` — GET is 4.05; POST returns 2.03 Valid but is a wire no-op, since its provisional `base-center-wheel` command isn't in `MozaCommandDatabase`. (`SoftReboot` POST is live: forwarded as `main-soft-reboot` when a base is detected.)
 - **Display URI prefix** — agent chose `DisplayScreen*` prefix to avoid registry collision with wheel URIs; needs Windows verification of what real PitHouse uses. Documented as a TODO in `DisplayBindings.cs`.
 
 ### Out of scope for Phase 1 — tracked for follow-up iterations

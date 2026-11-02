@@ -31,8 +31,9 @@ namespace MozaPlugin.Devices
         /// ambient strip at all (R3/R5/R9/R12 silently drop the 0xA2 read) — not
         /// "unknown", which falls through to <see cref="DefaultLedsPerStrip"/>.
         ///
-        /// <c>RatedNm</c> is the model's peak torque, scaling the Base-tab torque
-        /// graph and reported as <c>AZOM.TorqueLimit</c>. <c>0</c> means "not
+        /// <c>RatedNm</c> is the model's stock peak torque, scaling the Base-tab torque
+        /// graph and reported as <c>AZOM.TorqueLimit</c> via
+        /// <see cref="MozaData.BaseRatedNm"/>, which adds the torque boost. <c>0</c> means "not
         /// established" — an unrecognised model — and the graph falls back to
         /// auto-scaling. It is a double because the rating is not always the model
         /// number: the R5 is 5.5 Nm.
@@ -48,6 +49,30 @@ namespace MozaPlugin.Devices
             ("R25", "R25", 9, 25),
             ("R27", "R27", 9, 27),
         };
+
+        /// <summary>Extra peak torque a base gains once its torque-boost flag
+        /// (register 0x39) is unlocked.</summary>
+        public const double TorqueBoostNm = 2;
+
+        /// <summary>
+        /// True for the models that carry the torque-boost flag: the R16, R21 and
+        /// R25 Ultras. Firmware reports no "Ultra" marker, so the R16 Ultra is told
+        /// from the V1/V2 R16s by its hardware code (D12). The firmware floor is
+        /// checked separately — see <see cref="MozaData.BaseSupportsTorqueBoost"/>.
+        /// </summary>
+        public static bool HasTorqueBoost(string? baseModelName, string? hardwareCode)
+        {
+            switch (ExtractPrefix(baseModelName))
+            {
+                case "R16":
+                    return string.Equals(hardwareCode, "D12", StringComparison.OrdinalIgnoreCase);
+                case "R21":
+                case "R25":
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
         /// <summary>Model peak torque in Nm, or 0 when not established.</summary>
         public static double RatedNm(string? baseModelName)

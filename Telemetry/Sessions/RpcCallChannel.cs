@@ -57,9 +57,8 @@ namespace MozaPlugin.Telemetry.Sessions
         public int OutboundSeq { get; set; }
 
         // Guards the read-chunk-send-write of OutboundSeq inside Call() so
-        // two concurrent RPCs (UI-triggered + auto-test) can't reserve the
-        // same seq train and confuse the wheel's per-seq retransmit
-        // tracking. Distinct from _lock (which protects the id→waiter
+        // two concurrent RPCs can't reserve the same seq train and confuse
+        // the wheel's per-seq retransmit tracking. Distinct from _lock (which protects the id→waiter
         // dict): RPC replies must be routable while a different RPC is
         // sending, so we use a separate object.
         private readonly object _seqLock = new object();
@@ -164,6 +163,12 @@ namespace MozaPlugin.Telemetry.Sessions
             }
             try { waiter.Dispose(); } catch { }
             return acked ? reply : null;
+        }
+
+        /// <summary>True while any <see cref="Call"/> is waiting for a reply.</summary>
+        public bool HasWaiters
+        {
+            get { lock (_lock) return _waiters.Count > 0; }
         }
 
         /// <summary>

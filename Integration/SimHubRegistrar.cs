@@ -47,12 +47,12 @@ namespace MozaPlugin.Integration
             // Peak |torque| this game session — cleared on each game start by
             // MozaPlugin.DataUpdate, and by the plugin reload a game switch causes.
             _plugin.AttachDelegate("AZOM.MaxTorque", () => _plugin.Data?.LiveTorquePeakNm ?? 0.0);
-            // The base model's rated peak, the figure the Base-tab graph scales to.
-            // -1 = not established (an unrecognised model). Distinct from
-            // AZOM.Torque, which is the user's own output limit as a percentage.
+            // The base's rated peak (torque boost included), the figure the Base-tab
+            // graph scales to. -1 = not established (an unrecognised model). Distinct
+            // from AZOM.Torque, which is the user's own output limit as a percentage.
             _plugin.AttachDelegate("AZOM.TorqueLimit", () =>
             {
-                double rated = BaseModelInfo.RatedNm(_plugin.Data?.BaseModelName);
+                double rated = _plugin.Data?.BaseRatedNm ?? 0;
                 return rated > 0 ? rated : -1.0;
             });
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
@@ -101,6 +101,12 @@ namespace MozaPlugin.Integration
             // a wheel silently ignores the binding; documented limitation.
             _plugin.AttachDelegate("AZOM.TelemetryState", () => (_plugin.TelemetrySender?.Phase ?? PipelinePhase.Idle).ToString());
             _plugin.AttachDelegate("AZOM.DashboardBound", () => (_plugin.TelemetrySender?.Phase ?? PipelinePhase.Idle) == PipelinePhase.Active);
+
+            // Active plugin profile, and the dashboard on the active display — the
+            // wheel's screen, else a CM1/CM2 dash (same target as DashboardNext/Prev
+            // for CM1). "" when nothing is known.
+            _plugin.AttachDelegate("AZOM.ProfileName", () => _plugin.Settings?.ProfileStore?.CurrentProfile?.Name ?? "");
+            _plugin.AttachDelegate("AZOM.DashboardName", () => CurrentDashboardName());
 
             // Live physical-input positions read directly from the device HID
             // surface (independent of any game telemetry — these update even with
@@ -274,9 +280,13 @@ namespace MozaPlugin.Integration
             // later toggle-on restores it instead of a fixed default.
             _plugin.AddAction("AZOM.DisplayToggle", (a, b) => ToggleDisplay());
 
-            // Toggle telemetry test mode (synthetic signal sweep) for the active
-            // wheel page, mirroring the Test Start/Stop buttons in the UI.
-            _plugin.AddAction("AZOM.TestModeToggle", (a, b) => ToggleTestMode());
+            // Toggle the dashboard test pattern on every display pipeline — same
+            // path as the dashboard UI's Send Test Pattern / Stop Test button.
+            _plugin.AddAction("AZOM.TestModeToggle", (a, b) =>
+            {
+                bool on = _plugin.ToggleDashboardTestPattern();
+                MozaLog.Debug($"[AZOM] Test pattern → {(on ? "on" : "off")} via action");
+            });
 
             // FSR V1 single-byte probe diagnostic: step the probed payload offset with
             // wheel buttons so the boundaries can be walked hands-on while watching the
@@ -325,37 +335,6 @@ namespace MozaPlugin.Integration
             }
         }
 
-        // Flip telemetry test mode for the active wheel page. Mirrors
-        // DashboardManagementControl's Test Start/Stop: when the active overlay
-        // doesn't already have live telemetry enabled, test mode owns the sender
-        // lifecycle (start on a worker thread when turning on, stop when turning
-        // off) so the synthetic sweep runs without flipping the persisted
-        // per-page telemetry-enabled flag.
-        private void ToggleTestMode()
-        {
-            var active = _plugin.TelemetrySender;
-            if (active == null)
-            {
-                MozaLog.Debug("[AZOM] Test mode toggle ignored: no telemetry sender");
-                return;
-            }
-            bool turningOn = !active.TestMode;
-            active.TestMode = turningOn;
-            if (!_plugin.ActiveTelemetryEnabled)
-            {
-                if (turningOn)
-                {
-                    _plugin.ApplyTelemetrySettings();
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ => active.Start());
-                }
-                else
-                {
-                    active.Stop();
-                }
-            }
-            MozaLog.Debug($"[AZOM] Test mode → {(turningOn ? "on" : "off")} via action");
-        }
-
         // ===== Display brightness step/set helpers =====
 
         // Current wheel display brightness using the same fallback chain as the
@@ -395,7 +374,9 @@ namespace MozaPlugin.Integration
 
         private void StepDisplayBrightness(int delta)
         {
-            int val = ClampStep(CurrentDisplayBrightness(), delta, 0, 100);
+            int current = CurrentDisplayBrightness();
+            int val = ClampStep(current, delta, 0, 100);
+            if (val == current) return; // saturated — skip the redundant push
             SetDisplayBrightness(val);
             MozaLog.Debug($"[AZOM] Display brightness → {val}% via action");
         }
@@ -554,7 +535,9 @@ namespace MozaPlugin.Integration
         {
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
-            ab9.EngineVibrationIntensity = (byte)ClampStep(ab9.EngineVibrationIntensity, delta, 0, 100);
+            int v = ClampStep(ab9.EngineVibrationIntensity, delta, 0, 100);
+            if (v == ab9.EngineVibrationIntensity) return; // saturated — skip the redundant save
+            ab9.EngineVibrationIntensity = (byte)v;
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] AB9 engine vibration intensity → {ab9.EngineVibrationIntensity} via action");
         }
@@ -563,7 +546,9 @@ namespace MozaPlugin.Integration
         {
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
-            ab9.EngineVibrationFrequency = (ushort)ClampStep(ab9.EngineVibrationFrequency, delta, 0, 200);
+            int v = ClampStep(ab9.EngineVibrationFrequency, delta, 0, 200);
+            if (v == ab9.EngineVibrationFrequency) return; // saturated — skip the redundant save
+            ab9.EngineVibrationFrequency = (ushort)v;
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] AB9 engine vibration frequency → {ab9.EngineVibrationFrequency} Hz via action");
         }
@@ -575,6 +560,7 @@ namespace MozaPlugin.Integration
             var ab9 = GetOrCreateActiveAb9();
             if (ab9 == null) return;
             int v = ClampStep(ab9.GearShiftVibrationIntensity, delta, 0, 100);
+            if (v == ab9.GearShiftVibrationIntensity) return; // saturated — skip the redundant config write
             ab9.GearShiftVibrationIntensity = (byte)v;
             _plugin.Ab9Manager?.SendGearShiftVibrationIntensity(v);
             _plugin.SaveSettings();
@@ -752,6 +738,40 @@ namespace MozaPlugin.Integration
             _plugin.SaveSettings();
             _plugin.OnDashboardSwitched((uint)target);
             MozaLog.Debug($"[AZOM] Dashboard cycle {(delta > 0 ? "next" : "prev")} → slot {target} \"{selected}\" via action");
+        }
+
+        // Page labels match DashboardManagementControl's combo for FSR1/CM1.
+        private string CurrentDashboardName()
+        {
+            if (_plugin.IsFsr1DisplayWheel)
+                return $"Dashboard {_plugin.GetActiveFsr1Index() + 1}";
+            if (_plugin.WheelUsesTierDefDisplaySender)
+                return TierDefDashboardName(_plugin.TelemetrySender, _plugin.ActiveTelemetryProfileName);
+            if (_plugin.DashIsCm1)
+                return $"Dashboard {_plugin.GetActiveCm1Index()}";
+            var cm2 = _plugin.ActiveCm2Sender;
+            if (cm2 != null)
+                return TierDefDashboardName(cm2, _plugin.ActiveCm2DashboardName);
+            return "";
+        }
+
+        // Same preference as the dashboard combo: the device-reported slot once it
+        // matches our latest switch, else the saved name, else the stale reported slot.
+        private static string TierDefDashboardName(TelemetrySender? sender, string? savedName)
+        {
+            var list = sender?.WheelState?.ConfigJsonList;
+            int slot = sender?.WheelReportedSlot ?? -1;
+            string? reported = (list != null && slot >= 0 && slot < list.Count) ? list[slot] : null;
+            if (!string.IsNullOrEmpty(reported) && slot == sender!.LastEmittedKind4Slot)
+                return reported!;
+            if (!string.IsNullOrEmpty(savedName))
+            {
+                if (list == null || list.Count == 0) return savedName!;
+                foreach (var name in list)
+                    if (string.Equals(name, savedName, StringComparison.OrdinalIgnoreCase))
+                        return name;
+            }
+            return reported ?? savedName ?? "";
         }
     }
 }

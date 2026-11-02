@@ -62,7 +62,7 @@ namespace MozaPlugin.Integration
         public string DefaultSettingsKey
             => "MozaPedalHaptics" + MozaPedalHapticsProtocol.PedalLabel(_pedal);
 
-        public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsReady == true;
+        public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsActive(combined: false) == true;
 
         /// <summary>
         /// The channel list SimHub sees — and deliberately not the same list in
@@ -90,7 +90,7 @@ namespace MozaPlugin.Integration
 
         private static readonly List<ChannelInformation> HiddenFromUi = new List<ChannelInformation>();
 
-        private static bool IsUiThread
+        internal static bool IsUiThread
         {
             get
             {
@@ -120,7 +120,7 @@ namespace MozaPlugin.Integration
         public void UpdateOutput(Dictionary<int, ChannelValue> values)
         {
             var plugin = MozaPlugin.Instance;
-            if (plugin == null) return;
+            if (plugin == null || plugin.PedalHapticsCombined) return;
 
             for (int i = 0; i < _channels.Count; i++)
             {
@@ -134,12 +134,131 @@ namespace MozaPlugin.Integration
             }
         }
 
-        public void Stop() => MozaPlugin.Instance?.ClearShakeItPedalHaptics(_pedalIndex);
+        // Inactive layout must not clear what the active one is driving.
+        public void Stop()
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin != null && !plugin.PedalHapticsCombined)
+                plugin.ClearShakeItPedalHaptics(_pedalIndex);
+        }
 
         /// <summary>
         /// Band advertised to the ShakeIt tone mixer. The unit accepts 10-100 Hz
         /// and clamps outside it, so there is no point offering the user more.
         /// </summary>
+        public FrequencyRange HardwareFrequencyRange()
+            => new FrequencyRange(MozaPedalHapticsProtocol.MinFrequencyHz, MozaPedalHapticsProtocol.MaxFrequencyHz);
+
+        public void SetSettings(ShakeItSettings shakeItSettings) { }
+
+        public IEnumerable<DeviceSettingControl> GetSettingsControls() { yield break; }
+    }
+
+    /// <summary>
+    /// ShakeIt Motors channels provider for the <b>combined</b> S12 device: one
+    /// channel per pedal, which the user ticks per effect, over the same hidden
+    /// oscillator assignment the per-pedal devices use.
+    ///
+    /// Channel ids carry two things in one activation dictionary:
+    /// <list type="bullet">
+    /// <item>0..2 — the pedal ticks, the only channels the UI is shown.</item>
+    /// <item>3.. — every pedal's oscillators, pedal-major
+    /// (<see cref="OscillatorChannel"/>), shown only to the mixer and
+    /// assigned by <c>MozaPedalHapticsBridge.SyncCombinedOscillatorAssignments</c>.</item>
+    /// </list>
+    /// The mixer walks the pedal ids too and emits a tone for each; those are
+    /// dropped in <see cref="UpdateOutput"/>, the oscillator ones are what play.
+    ///
+    /// Same construction rules as <see cref="MozaPedalHapticsChannelsProvider"/>:
+    /// public, parameterless, no plugin state at construction.
+    /// </summary>
+    public sealed class MozaPedalHapticsCombinedChannelsProvider : IShakeItChannelsInfoProvider
+    {
+        internal const int PedalChannels = MozaPedalHapticsProtocol.PedalCount;
+
+        /// <summary>
+        /// Never-enabled key the oscillator sweep writes once it has seeded a
+        /// placement's pedal ticks, so a user unticking every pedal stays unticked.
+        /// Negative: no mixer or UI walk ever reaches it.
+        /// </summary>
+        internal const int PedalsSeededMarker = -1;
+
+        internal static int OscillatorChannel(int pedalIndex, int oscillator)
+            => PedalChannels + pedalIndex * MozaPedalHapticsProtocol.ChannelsPerPedal + oscillator;
+
+        private readonly List<ChannelInformation> _pedalChannels;
+        private readonly List<ChannelInformation> _mixerChannels;
+
+        public MozaPedalHapticsCombinedChannelsProvider()
+        {
+            _pedalChannels = new List<ChannelInformation>(PedalChannels);
+            for (int p = 0; p < PedalChannels; p++)
+                _pedalChannels.Add(new ChannelInformation
+                {
+                    Name = MozaPedalHapticsProtocol.PedalLabel(MozaPedalHapticsProtocol.PedalForIndex(p))
+                });
+
+            _mixerChannels = new List<ChannelInformation>(_pedalChannels);
+            for (int p = 0; p < PedalChannels; p++)
+                for (int o = 0; o < MozaPedalHapticsProtocol.ChannelsPerPedal; o++)
+                    _mixerChannels.Add(new ChannelInformation
+                    {
+                        Name = MozaPedalHapticsProtocol.PedalLabel(MozaPedalHapticsProtocol.PedalForIndex(p))
+                             + " " + MozaPedalHapticsProtocol.ChannelName(o)
+                    });
+        }
+
+        public string DefaultSettingsKey => "MozaPedalHapticsCombined";
+
+        public bool IsConnected => MozaPlugin.Instance?.IsPedalHapticsActive(combined: true) == true;
+
+        /// <summary>
+        /// UI thread gets the pedal ticks, the data-thread mixer gets ticks plus
+        /// oscillators. See <see cref="MozaPedalHapticsChannelsProvider.GetChannels"/>
+        /// for why the thread split is safe.
+        /// </summary>
+        public List<ChannelInformation> GetChannels(MotorsWithFrequencyOutputManagerBase manager)
+            => MozaPedalHapticsChannelsProvider.IsUiThread ? _pedalChannels : _mixerChannels;
+
+        // Pedal ticks are seeded by the sweep (all on, as SimHub's stock providers
+        // default); oscillators are only ever handed out by it.
+        public ChannelActivation CreateDefaultActivationFor(FFBPlacement placement, MotorsWithFrequencyOutputManagerBase manager)
+            => new ChannelActivation { IsEnabled = false };
+
+        public void LoadDefaultPlatformSettings(EffectsContainerBase effectsContainerBase, ShakeItProfile shakeItProfile)
+        {
+            if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
+                effectsContainerBase.AggregationMode = "Mono";
+        }
+
+        public void UpdateOutput(Dictionary<int, ChannelValue> values)
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.PedalHapticsCombined) return;
+
+            for (int p = 0; p < PedalChannels; p++)
+            {
+                for (int o = 0; o < MozaPedalHapticsProtocol.ChannelsPerPedal; o++)
+                {
+                    double gain = 0, freq = 0;
+                    if (values != null && values.TryGetValue(OscillatorChannel(p, o), out var c) && c != null)
+                    {
+                        gain = c.Gain;
+                        freq = c.Frequency;
+                    }
+                    plugin.PostShakeItPedalHapticsChannel(p, o, gain, freq);
+                }
+            }
+        }
+
+        public void Stop()
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null || !plugin.PedalHapticsCombined) return;
+            for (int p = 0; p < PedalChannels; p++)
+                plugin.ClearShakeItPedalHaptics(p);
+        }
+
         public FrequencyRange HardwareFrequencyRange()
             => new FrequencyRange(MozaPedalHapticsProtocol.MinFrequencyHz, MozaPedalHapticsProtocol.MaxFrequencyHz);
 

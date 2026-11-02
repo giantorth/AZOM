@@ -77,9 +77,14 @@ Request:
 - RSF clamps to 90–2000° per model; the plugin re-clamps in
   `SteerLockWriteHandler` so out-of-range values don't reach the
   wheelbase.
-- Either field can be absent; only the present ones are forwarded.
+- Either field can be absent; only the present ones are forwarded,
+  `base-limit` before `base-max-angle`.
+- The base gate is `HardwareApplier.WriteIfBaseConnected`'s own
+  (`DeviceDetectionState.BaseDetected`, which survives the game-switch
+  reload) — the handler reports a skip only when those writes actually
+  went nowhere, rather than pre-checking a separate flag.
 - No reply — even errors are silent. Diagnostics surface via the
-  plugin's debug log.
+  plugin's log (a skip is logged as a warning with the requested values).
 
 ## Steer-lock read (PacketId 4)
 

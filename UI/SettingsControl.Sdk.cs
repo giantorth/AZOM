@@ -86,6 +86,7 @@ namespace MozaPlugin.UI
         /// </summary>
         private void RefreshSdkStatusTick()
         {
+            if (!OptionsTab.IsSelected) return;
             RefreshSdkStatus();
         }
 

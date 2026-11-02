@@ -119,12 +119,6 @@ namespace MozaPlugin.Devices.PedalHaptics
             }
         }
 
-        /// <summary>Force every pedal silent.</summary>
-        public void ClearAll()
-        {
-            for (int p = 0; p < Pedals; p++) ClearPedal(p);
-        }
-
         public bool MayHaveWork
         {
             get

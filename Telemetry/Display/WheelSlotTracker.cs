@@ -1,6 +1,5 @@
 using System;
 using MozaPlugin.Telemetry.Dashboard;
-using MozaPlugin.Telemetry.Frames;
 using MozaPlugin.Telemetry.Sessions;
 
 namespace MozaPlugin.Telemetry.Display
@@ -234,10 +233,11 @@ namespace MozaPlugin.Telemetry.Display
         /// a switch, bundle Z45VF4BC). Any other slot = the device switched itself
         /// (W17 3H6ZQRG2, CM2 Z45VF4BC — neither sends a type-04 for it) and is
         /// followed. Leaves the type-04 field auto-detect alone.
+        /// <paramref name="crcValid"/>: the chunk's CRC32 trailer, as checked by the caller.
         /// </summary>
-        public void TryAbsorbKind4Echo(byte[] chunkPayload)
+        public void TryAbsorbKind4Echo(byte[] chunkPayload, bool crcValid)
         {
-            if (!TryDecodeKind4Echo(chunkPayload, out int slot)) return;
+            if (!crcValid || !TryDecodeKind4Echo(chunkPayload, out int slot)) return;
             if (slot != _lastEmittedKind4Slot)
             {
                 int prev = _wheelReportedSlot;
@@ -254,15 +254,13 @@ namespace MozaPlugin.Telemetry.Display
         }
 
         /// <summary>Find a CRC-valid kind=4 FF record in a session-data chunk (4-byte
-        /// chunk CRC trailer included, as fed to <see cref="TryAbsorbType04Slot"/>).</summary>
+        /// chunk CRC trailer included, as fed to <see cref="TryAbsorbType04Slot"/>)
+        /// whose chunk CRC the caller has already verified.</summary>
         internal static bool TryDecodeKind4Echo(byte[] payload, out int slot)
         {
             slot = -1;
             if (payload == null || payload.Length <= 4) return false;
             int len = payload.Length - 4;
-            uint wireCrc = (uint)(payload[len] | (payload[len + 1] << 8)
-                               | (payload[len + 2] << 16) | (payload[len + 3] << 24));
-            if (TierDefinitionBuilder.Crc32(payload, 0, len) != wireCrc) return false;
 
             for (int at = 0; at < len; at++)
             {

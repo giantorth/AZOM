@@ -35,6 +35,8 @@ namespace MozaPlugin.Devices
         private string? _lastAb9GearString;
         private DateTime _lastAb9GearShiftSendUtc = DateTime.MinValue;
 
+        private bool _lastGameRunning;
+
         internal GearshiftDetector(
             MozaPlugin plugin,
             MozaData data,
@@ -56,8 +58,26 @@ namespace MozaPlugin.Devices
         /// <summary>Run both device paths for this tick.</summary>
         internal void Tick(GameData data)
         {
+            // A new session's first gear is a warm-up, not a shift from the last session's.
+            bool running = data.GameRunning;
+            if (running && !_lastGameRunning)
+            {
+                _lastGearString = null;
+                _lastAb9GearString = null;
+            }
+            _lastGameRunning = running;
+
             CheckWheelbase(data);
             CheckAb9(data);
+        }
+
+        // Advances the latch every tick, gated or not, so opening a gate never
+        // compares against a stale gear. Null latch = warm-up, never a change.
+        private static bool GearChanged(ref string? latch, string gear)
+        {
+            string? previous = latch;
+            latch = gear;
+            return previous != null && previous != gear;
         }
 
         // Fire a one-shot base-gearshift-event on gear change. Gated by
@@ -67,9 +87,10 @@ namespace MozaPlugin.Devices
         // GearshiftVibrateOnNeutral opts in.
         private void CheckWheelbase(GameData data)
         {
-            if (!_data.IsConnected) return;
             string? gear = data?.NewData?.Gear;
             if (string.IsNullOrEmpty(gear)) return;
+            if (!GearChanged(ref _lastGearString, gear!)) return;
+            if (!_data.IsConnected) return;
 
             // LFE-capable firmware: the complex gearshift (cmd 0x77, LFE channel
             // id 0) handles gear-shift feedback ONLY while that channel is enabled
@@ -88,15 +109,6 @@ namespace MozaPlugin.Devices
             }
 
             if (_data.GearshiftVibration <= 0) return;
-            if (_lastGearString == null)
-            {
-                _lastGearString = gear;
-                return; // warm-up: record the first observed value, don't fire
-            }
-            if (gear == _lastGearString) return;
-            // Update the latch on every change so we don't compare against a
-            // stale value on the next tick. Whether we *fire* is decided after.
-            _lastGearString = gear;
             // Skip dis-engagement transitions (anything → neutral) unless the
             // user has opted in. Some games report neutral as "0" instead of
             // "N" — treat both as neutral.
@@ -127,20 +139,14 @@ namespace MozaPlugin.Devices
         // on the AB9 so every gate engagement registers).
         private void CheckAb9(GameData data)
         {
+            string? gear = data?.NewData?.Gear;
+            if (string.IsNullOrEmpty(gear)) return;
+            if (!GearChanged(ref _lastAb9GearString, gear!)) return;
+
             if (_ab9Manager == null || !_ab9Manager.IsConnected) return;
             if (!_detectionState.Ab9Detected) return;
             var ab9Settings = CurrentProfile?.Ab9;
             if (ab9Settings == null || ab9Settings.GearShiftVibrationIntensity <= 0) return;
-
-            string? gear = data?.NewData?.Gear;
-            if (string.IsNullOrEmpty(gear)) return;
-            if (_lastAb9GearString == null)
-            {
-                _lastAb9GearString = gear;
-                return; // warm-up: record first value, don't fire
-            }
-            if (gear == _lastAb9GearString) return;
-            _lastAb9GearString = gear;
 
             bool isNeutral = (gear == "N" || gear == "0");
             bool vibrateOnNeutral = ab9Settings.GearShiftVibrateOnNeutral;

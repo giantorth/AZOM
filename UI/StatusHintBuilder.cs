@@ -72,16 +72,17 @@ namespace MozaPlugin.UI
             var data = plugin.Data;
 
             // Rule 1: PortLockedByOtherApp
-            // Hardware visible in the OS registry AND open keeps failing with
-            // access-denied AND we're not connected. The double-failure debounce
-            // (>= 2) prevents a single transient open failure from flashing the
-            // banner.
+            // Hardware visible in the OS registry (or the failing port is the
+            // saved MOZA port the probe fallback retried) AND open keeps failing
+            // with access-denied AND we're not connected. The double-failure
+            // debounce (>= 2) prevents a single transient open failure from
+            // flashing the banner.
             if (elapsed >= PortLockedSettling
                 && connection != null
                 && !(data?.IsConnected ?? false)
                 && connection.ConsecutiveOpenFailures >= 2
                 && connection.LastFailure.Kind == ConnectionFailureKind.AccessDenied
-                && MozaPortDiscovery.Instance.Enumerate().Count >= 1)
+                && (connection.LastFailure.FromProbe || MozaPortDiscovery.Instance.Enumerate().Count >= 1))
             {
                 var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
                 list.Add(new StatusHint(
@@ -92,18 +93,35 @@ namespace MozaPlugin.UI
 
             // Rule 1b: PortVanished — registry saw the port but Open can't find it
             // (hot-unplug / Wine pty teardown). Distinct remediation from
-            // access-denied: replug, not close-another-app.
+            // access-denied: replug, not close-another-app. Not for probe-path
+            // failures: a missing saved port is just a powered-off device.
             if (elapsed >= PortLockedSettling
                 && connection != null
                 && !(data?.IsConnected ?? false)
                 && connection.ConsecutiveOpenFailures >= 2
-                && connection.LastFailure.Kind == ConnectionFailureKind.PortVanished)
+                && connection.LastFailure.Kind == ConnectionFailureKind.PortVanished
+                && !connection.LastFailure.FromProbe)
             {
                 var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
                 list.Add(new StatusHint(
                     StatusHintKind.PortVanished,
                     Strings.Banner_PortVanished_Title,
                     string.Format(Strings.Banner_PortVanished_Body, port)));
+            }
+
+            // Rule 1b2: DeviceUnresponsive — a write/close/open on the port hung.
+            // No open-failure debounce: the stuck call isn't retried, so the
+            // counter stays at 0–1, and the hang thresholds are already seconds.
+            if (elapsed >= PortLockedSettling
+                && connection != null
+                && !(data?.IsConnected ?? false)
+                && connection.LastFailure.Kind == ConnectionFailureKind.DeviceUnresponsive)
+            {
+                var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;
+                list.Add(new StatusHint(
+                    StatusHintKind.DeviceUnresponsive,
+                    Strings.Banner_DeviceUnresponsive_Title,
+                    string.Format(Strings.Banner_DeviceUnresponsive_Body, port)));
             }
 
             // Rule 1c: TelemetryParked — the recovery ladder exhausted its restart
@@ -246,9 +264,11 @@ namespace MozaPlugin.UI
                     StatusHintKind.ProfileNotAddedPedalHaptics,
                     Strings.Banner_ProfileNotAddedPedalHaptics_Title,
                     string.Format(Strings.Banner_ProfileNotAddedPedalHaptics_Body,
-                        "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
-                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
-                        + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
+                        plugin.PedalHapticsCombined
+                            ? Devices.Extensions.DeviceDefinitionDeployer.PedalHapticsCombinedDeviceName
+                            : "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
+                              + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
+                              + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
             }
 
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —

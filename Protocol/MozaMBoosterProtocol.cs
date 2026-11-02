@@ -50,6 +50,10 @@ namespace MozaPlugin.Protocol
         /// <summary>Motor-write payload length (excludes group + device per dirt-client framing rule).</summary>
         public const byte MotorPayloadLen = 0x09;
 
+        /// <summary>Every effect wire id, ascending — the set a full disable burst covers.</summary>
+        internal static readonly MBoosterEffectId[] AllEffectIds =
+            (MBoosterEffectId[])Enum.GetValues(typeof(MBoosterEffectId));
+
         // Firmware error reports -------------------------------------------
         // A unit reports an error on group 0x0E as `03 <code:2 BE> 00 01`; Pit
         // House acks with `04 <code:2 BE> 01` to that unit's id and the unit
@@ -477,10 +481,9 @@ namespace MozaPlugin.Protocol
         /// <summary>
         /// Same 0-100% encoding as <see cref="EncodeFrictionPct"/>
         /// (<c>raw = round(pct * 65535 / 100)</c>) — kept as its own named
-        /// pair since it serves a structurally different command
+        /// encoder since it serves a structurally different command
         /// (Segmented Damping's fixed 10-field frame vs Natural Friction's
-        /// prefix+selector commands), matching this file's convention of a
-        /// dedicated Encode/Decode pair per reverse-engineered feature.
+        /// prefix+selector commands).
         /// </summary>
         public static int EncodeSegmentedDampingPct(double pct)
         {
@@ -489,13 +492,6 @@ namespace MozaPlugin.Protocol
             if (raw <= 0) return 0;
             if (raw >= 0xFFFF) return 0xFFFF;
             return (int)raw;
-        }
-
-        /// <summary>Inverse of <see cref="EncodeSegmentedDampingPct"/>.</summary>
-        public static double DecodeSegmentedDampingPct(int raw)
-        {
-            if (raw <= 0) return 0;
-            return raw * 100.0 / 65535.0;
         }
 
         /// <summary>

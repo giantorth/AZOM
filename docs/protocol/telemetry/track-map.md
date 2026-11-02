@@ -103,7 +103,12 @@ logged `not exist …/iracing/nurburgring combinedShortB.mztrack` while
 
 ### Transform source by game
 
-- **AC** — `TrackMapTransform.ResolveMapIni` (track's map.ini).
+- **AC** — `TrackMapTransform.ResolveMapIni` (track's map.ini). The result is
+  cached per track folder for the process lifetime, a "no map.ini" null
+  included, so builders re-resolving on track change don't re-read the file on
+  the tick thread. AC's `content/` directory (running AC process, else Steam
+  libraries) is cached only once found; a miss is retried on the next uncached
+  track lookup.
 - **Outline with world bounds** (ACC, LMU, F1, AC without map.ini) —
   `FromBounds` on the outline's bounds, centred.
 - **iRacing with an outline line** — `FromBounds` on the line's extent (below).

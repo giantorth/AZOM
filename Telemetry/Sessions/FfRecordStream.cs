@@ -71,27 +71,24 @@ namespace MozaPlugin.Telemetry.Sessions
         /// is the raw bytes after the 8-byte session header, INCLUDING the
         /// 4-byte per-chunk CRC32 trailer — the trailer is stripped here so
         /// callers can pass the same array they hand the catalog parser.
+        /// <paramref name="crcValid"/> is that trailer's check, done once by
+        /// the caller for every consumer of the chunk.
         /// Completed records are appended to <paramref name="into"/>.
         /// Retransmits are dropped by seq, mirroring
         /// <c>ChannelCatalogParser.AppendChunkIfNew</c>.
         /// </summary>
-        public void Append(byte session, int seq, byte[] payload, List<FfRecord> into)
+        public void Append(byte session, int seq, byte[] payload, bool crcValid, List<FfRecord> into)
         {
             if (payload == null || payload.Length <= 4) return;
             int length = payload.Length - 4;
 
-            // Verify the per-chunk CRC32 trailer BEFORE accepting the chunk, and
-            // leave HighestSeq alone when it fails. This mirrors the catalog
-            // feed in TelemetryInboundDispatcher: a corrupt chunk must not
-            // consume its seq, or the wheel's retransmit of that same seq is
-            // then discarded as a duplicate and the corruption becomes
-            // permanent — losing the whole multi-chunk record rather than the
-            // one bad chunk.
-            uint wireCrc = (uint)(payload[length]
-                                | (payload[length + 1] << 8)
-                                | (payload[length + 2] << 16)
-                                | (payload[length + 3] << 24));
-            if (Frames.TierDefinitionBuilder.Crc32(payload, 0, length) != wireCrc) return;
+            // Reject a CRC-failed chunk BEFORE accepting it, and leave
+            // HighestSeq alone. This mirrors the catalog feed in
+            // TelemetryInboundDispatcher: a corrupt chunk must not consume its
+            // seq, or the wheel's retransmit of that same seq is then discarded
+            // as a duplicate and the corruption becomes permanent — losing the
+            // whole multi-chunk record rather than the one bad chunk.
+            if (!crcValid) return;
 
             lock (_gate)
             {

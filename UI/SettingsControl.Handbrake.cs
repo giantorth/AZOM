@@ -38,7 +38,7 @@ namespace MozaPlugin.UI
             bool detected = _plugin.IsHandbrakeDetected;
             HandbrakeTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
 
-            if (!detected) return;
+            if (!detected || !HandbrakeTab.IsSelected) return;
 
             SetComboSafe(HandbrakeModeCombo, _data.HandbrakeMode);
 
@@ -57,11 +57,11 @@ namespace MozaPlugin.UI
             HandbrakeMaxSlider.Value = Clamp(_data.HandbrakeMax, 0, 100);
             SetValueText(HandbrakeMaxValue, $"{_data.HandbrakeMax}%");
 
-            SetSliderRaw(HbY1Slider, HbY1Value, _data.HandbrakeCurve[0], 0, 100, "");
-            SetSliderRaw(HbY2Slider, HbY2Value, _data.HandbrakeCurve[1], 0, 100, "");
-            SetSliderRaw(HbY3Slider, HbY3Value, _data.HandbrakeCurve[2], 0, 100, "");
-            SetSliderRaw(HbY4Slider, HbY4Value, _data.HandbrakeCurve[3], 0, 100, "");
-            SetSliderRaw(HbY5Slider, HbY5Value, _data.HandbrakeCurve[4], 0, 100, "");
+            SetDataSlider(HbY1Slider, _data.HandbrakeCurve[0], 0, 100);
+            SetDataSlider(HbY2Slider, _data.HandbrakeCurve[1], 0, 100);
+            SetDataSlider(HbY3Slider, _data.HandbrakeCurve[2], 0, 100);
+            SetDataSlider(HbY4Slider, _data.HandbrakeCurve[3], 0, 100);
+            SetDataSlider(HbY5Slider, _data.HandbrakeCurve[4], 0, 100);
         }
 
         private void HandbrakeModeCombo_Changed(object sender, SelectionChangedEventArgs e)
@@ -106,11 +106,11 @@ namespace MozaPlugin.UI
         {
             using (_suppressor.Begin())
             {
-                HbY1Slider.Value = p[0]; HbY1Value.Text = $"{p[0]}"; _data.HandbrakeCurve[0] = p[0];
-                HbY2Slider.Value = p[1]; HbY2Value.Text = $"{p[1]}"; _data.HandbrakeCurve[1] = p[1];
-                HbY3Slider.Value = p[2]; HbY3Value.Text = $"{p[2]}"; _data.HandbrakeCurve[2] = p[2];
-                HbY4Slider.Value = p[3]; HbY4Value.Text = $"{p[3]}"; _data.HandbrakeCurve[3] = p[3];
-                HbY5Slider.Value = p[4]; HbY5Value.Text = $"{p[4]}"; _data.HandbrakeCurve[4] = p[4];
+                HbY1Slider.Value = p[0]; _data.HandbrakeCurve[0] = p[0];
+                HbY2Slider.Value = p[1]; _data.HandbrakeCurve[1] = p[1];
+                HbY3Slider.Value = p[2]; _data.HandbrakeCurve[2] = p[2];
+                HbY4Slider.Value = p[3]; _data.HandbrakeCurve[3] = p[3];
+                HbY5Slider.Value = p[4]; _data.HandbrakeCurve[4] = p[4];
             }
             for (int i = 0; i < 5; i++)
                 _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected($"handbrake-y{i + 1}", p[i]);
@@ -124,28 +124,30 @@ namespace MozaPlugin.UI
 
         private void HandbrakeMinSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMinSlider, _data.HandbrakeMax, isMin: true, HandbrakeMinValue, v => { _data.HandbrakeMin = v; _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-min", v); });
         private void HandbrakeMaxSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnMinMaxSliderChanged(e.NewValue, HandbrakeMaxSlider, _data.HandbrakeMin, isMin: false, HandbrakeMaxValue, v => { _data.HandbrakeMax = v; _plugin.HardwareApplier.WriteIfHandbrakeDetected("handbrake-max", v); });
-        private void HbY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY1Value, "", v => { _data.HandbrakeCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y1", v); });
-        private void HbY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY2Value, "", v => { _data.HandbrakeCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y2", v); });
-        private void HbY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY3Value, "", v => { _data.HandbrakeCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y3", v); });
-        private void HbY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY4Value, "", v => { _data.HandbrakeCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y4", v); });
-        private void HbY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, HbY5Value, "", v => { _data.HandbrakeCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y5", v); });
+        private void HbY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => { _data.HandbrakeCurve[0] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y1", v); });
+        private void HbY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => { _data.HandbrakeCurve[1] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y2", v); });
+        private void HbY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => { _data.HandbrakeCurve[2] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y3", v); });
+        private void HbY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => { _data.HandbrakeCurve[3] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y4", v); });
+        private void HbY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => { _data.HandbrakeCurve[4] = v; _plugin.HardwareApplier.WriteFloatIfHandbrakeDetected("handbrake-y5", v); });
 
         private const int CalibrationSeconds = 5;
 
         // Shared single-button calibration flow: send start, show a live
         // countdown instruction, then auto-send stop after CalibrationSeconds.
+        // Each target (keyed by its start button) owns its own timer, and an
+        // Unload does not stop it: every cal-start must be paired with its
+        // cal-stop, and the timer self-terminates within CalibrationSeconds.
         private void RunCalibrationCountdown(Button startButton, TextBlock status,
             string instructionFormat, Action sendStart, Action sendStop)
         {
+            if (_calCountdowns.ContainsKey(startButton)) return;
+
             sendStart();
             startButton.IsEnabled = false;
             int remaining = CalibrationSeconds;
             status.Text = string.Format(instructionFormat, remaining);
             status.Visibility = Visibility.Visible;
 
-            // Held in a field so OnUnloadedStopTimers can stop it: a running
-            // DispatcherTimer roots this control (and _plugin) until it fires.
-            _calCountdownTimer?.Stop();
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += (s, _) =>
             {
@@ -156,16 +158,16 @@ namespace MozaPlugin.UI
                     return;
                 }
                 ((DispatcherTimer)s!).Stop();
-                if (ReferenceEquals(_calCountdownTimer, s)) _calCountdownTimer = null;
+                _calCountdowns.Remove(startButton);
                 sendStop();
                 status.Text = Strings.Status_Done;
                 startButton.IsEnabled = true;
             };
-            _calCountdownTimer = timer;
+            _calCountdowns[startButton] = timer;
             timer.Start();
         }
 
-        private DispatcherTimer? _calCountdownTimer;
+        private readonly Dictionary<Button, DispatcherTimer> _calCountdowns = new Dictionary<Button, DispatcherTimer>();
 
         private void HbCalStartButton_Click(object sender, RoutedEventArgs e) =>
             RunCalibrationCountdown(HbCalStartButton, HbCalStatus, Strings.Hint_CalibrateHandbrake,

@@ -16,6 +16,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
     {
         private readonly TelemetrySender _sender;
 
+        // Reassembler log tags, shared so the per-chunk path doesn't format them.
+        private const string Sess09Tag = "sess=0x09";
+        private const string Sess0aTag = "sess=0x0a";
+
         public TelemetryInboundDispatcher(TelemetrySender sender)
         {
             _sender = sender;
@@ -97,20 +101,14 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
         private void HandleFc00Ack(byte[] data)
         {
-            _sender.SessionLife._lastAckedSession = data[4];
-            if (data.Length >= 7)
+            // 5-byte fc:00 carries no seq: -1 = "ack present, seq unknown".
+            int ackSeq = data.Length >= 7 ? data[5] | (data[6] << 8) : -1;
+            _sender.SessionLife.NoteAck(data[4], ackSeq);
+            if (ackSeq >= 0)
             {
-                int ackSeq = data[5] | (data[6] << 8);
-                _sender.SessionLife._lastAckedSeq = ackSeq;
                 _sender.Retransmitter.Ack(data[4], ackSeq);
                 // Route ack to session owner (downloader, uploader, etc.).
                 _sender.Dispatcher.DispatchAck(data[4], ackSeq);
-            }
-            else
-            {
-                // 5-byte fc:00 (no seq). Signal "ack present but seq unknown" so
-                // TryOpenSession's seq verification falls through to session-match-only.
-                _sender.SessionLife._lastAckedSeq = -1;
             }
             // Mgmt session engagement signal: a wheel fc:00 ack on sess=MgmtPort
             // proves the session is open even if the wheel never pushes data on
@@ -133,9 +131,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private void HandleDeviceInit(byte[] data, byte session)
         {
             int openSeq = data.Length >= 8 ? data[6] | (data[7] << 8) : 0;
-            var info = _sender.Sessions.GetOrCreate(session);
-            info.DeviceInitiated = true;
-            info.Port = (byte)(openSeq & 0xFF);
             _sender.SendSessionAckInternal(session, (ushort)openSeq);
             // Route device-init through dispatcher first so we check ownership
             // before redirecting the uploader's ActiveSession (don't let
@@ -180,53 +175,61 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 return;
             }
 
+            // Chunk CRC32 trailer: checked at most once, shared by every consumer below.
+            int crcState = 0;   // 0 = unchecked, 1 = valid, -1 = invalid / too short
+            uint wireCrc = 0, calcCrc = 0;
+            bool ChunkCrcOk()
+            {
+                if (crcState == 0)
+                {
+                    if (chunkPayload.Length < 4)
+                    {
+                        crcState = -1;
+                    }
+                    else
+                    {
+                        int netLen = chunkPayload.Length - 4;
+                        wireCrc = (uint)(chunkPayload[netLen]
+                                       | (chunkPayload[netLen + 1] << 8)
+                                       | (chunkPayload[netLen + 2] << 16)
+                                       | (chunkPayload[netLen + 3] << 24));
+                        calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
+                        crcState = calcCrc == wireCrc ? 1 : -1;
+                    }
+                }
+                return crcState > 0;
+            }
+
+            bool isFlag = session == _sender.FlagByte;
+            byte mgmt = _sender.EffectiveMgmtPort;
+            bool isMgmt = session == mgmt;
+
             // Ack on telemetry session — send the SPECIFIC seq (running max would
             // silently drop retransmits of older seqs).
-            if (session == _sender.FlagByte)
+            if (isFlag)
             {
-                if (seq > _sender._sessionAckSeq)
-                    _sender._sessionAckSeq = seq;
                 _sender.SendSessionAckInternal(
                     _sender.FlagByte, _sender.GapAwareCatalogAckSeq(_sender.FlagByte, seq));
 
-                // First inbound on sess=FlagByte = engagement gate.
-                _sender.Watchdog.NoteSession02FirstInbound();
-                // Wheel-reported dashboard slot tracker.
-                _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
-                _sender.SlotTracker.TryAbsorbKind4Echo(chunkPayload);
-                // FF-record reassembly (device display log, kind=14).
-                _sender.FeedFfRecords(session, seq, chunkPayload);
+                _sender.Watchdog.NoteSession02Inbound();
+                AbsorbCatalogLaneChunk(session, seq, chunkPayload, ChunkCrcOk());
             }
 
             // Ack on mgmt session. Specific-seq ack (NOT running max) — otherwise
             // retransmits of older seqs never get cleared. Effective port: the
             // wheel can keep 0x01 live without fc:00-acking our open.
-            byte mgmt = _sender.EffectiveMgmtPort;
-            if (session == mgmt)
+            if (isMgmt)
             {
-                if (seq > _sender._mgmtAckSeq)
-                    _sender._mgmtAckSeq = seq;
                 _sender.SendSessionAckInternal(
                     mgmt, _sender.GapAwareCatalogAckSeq(mgmt, seq));
                 _sender.MgmtResponseEvent.Set();
                 // Mgmt session engagement signal — data flow on sess=MgmtPort
                 // is the strongest possible proof the session is alive.
                 _sender.Watchdog.NoteSession01Engaged();
-                // Wheel-reported dashboard slot tracker. CS-family wheels echo
-                // the type-04 slot record on sess=FlagByte (0x02); W13/FSR2
-                // reports it on the mgmt session (0x01) instead. Listen on both
-                // so WheelReportedSlot converges and the slot round-trip can
-                // succeed — without this the W13's report is never absorbed,
-                // WheelReportedSlot stays -1, and the DisplayWatchdog
-                // force-restarts a healthy display after every kind=4. The
-                // strict padding/bound validation rejects the mgmt session's
-                // 0x06 acks and 0x04 catalog-URL records.
-                _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
-                _sender.SlotTracker.TryAbsorbKind4Echo(chunkPayload);
-                // FF-record reassembly. Scanned on both catalog sessions
-                // because which one carries the FF records is Form-dependent;
-                // a duplicate feed (FlagByte == MgmtPort) is dropped by seq.
-                _sender.FeedFfRecords(session, seq, chunkPayload);
+                // FlagByte == MgmtPort (Form-A / telem-open fallback): the
+                // block above already absorbed this chunk.
+                if (!isFlag)
+                    AbsorbCatalogLaneChunk(session, seq, chunkPayload, ChunkCrcOk());
             }
 
             // Capture the wheel's post-subscription response (5 s window) on
@@ -267,28 +270,24 @@ namespace MozaPlugin.Telemetry.Lifecycle
             if (session == 0x09 || session == 0x0a)
             {
                 if (session == 0x09) _sender._session09InboundSeq = seq;
-                try
+                if (MozaLog.WireDebugEnabled)
                 {
-                    MozaLog.Debug(
-                        $"[AZOM] session 0x{session:X2} inbound chunk: seq={seq} payload={chunkPayload.Length}B " +
-                        $"first8={BitConverter.ToString(chunkPayload, 0, Math.Min(8, chunkPayload.Length))}");
+                    try
+                    {
+                        MozaLog.Debug(
+                            $"[AZOM] session 0x{session:X2} inbound chunk: seq={seq} payload={chunkPayload.Length}B " +
+                            $"first8={BitConverter.ToString(chunkPayload, 0, Math.Min(8, chunkPayload.Length))}");
+                    }
+                    catch { }
                 }
-                catch { }
 
                 // Cumulative-ACK + buffer-preserving gap handling. Process chunk
-                // first, then ack the reassembler's HighWaterSeq (highest contiguous-
-                // received seq). On forward gap HighWaterSeq stays at pre-gap value,
-                // so wheel sees the missing-chunk ack window and auto-retransmits.
+                // first, then ack the highest contiguous-received seq. On forward
+                // gap that stays at the pre-gap value, so the wheel sees the
+                // missing-chunk ack window and auto-retransmits.
                 _sender.Watchdog.NoteConfigJsonChunkArrived();
-                var result = _sender.ConfigJson.OnChunk(seq, chunkPayload, $"sess=0x{session:X2}");
-
-                // Pick ACK value:
-                //  - StateReady: chunk completed the burst; HighWaterSeq is now -1
-                //    but we DID receive seq contiguously — ack `seq`.
-                //  - Buffered/GapDetected: ack HighWaterSeq (stays at pre-gap on gap).
-                int ackSeq = (result == ConfigJsonClient.ChunkResult.StateReady)
-                    ? seq
-                    : _sender.ConfigJson.HighWaterSeq;
+                var result = _sender.ConfigJson.OnChunk(
+                    seq, chunkPayload, out int ackSeq, session == 0x09 ? Sess09Tag : Sess0aTag);
                 if (ackSeq >= 0)
                     _sender.SendSessionAckInternal(session, (ushort)ackSeq);
 
@@ -335,17 +334,17 @@ namespace MozaPlugin.Telemetry.Lifecycle
             }
 
             // Session 0x0a: RPC reply channel. Ack already sent above (shared
-            // handler with configJson); don't double-ack.
-            if (session == 0x0a)
+            // handler with configJson); don't double-ack. Own reassembler: the
+            // configJson one is shared with 0x09. TryDecompress consumes each
+            // complete message and keeps the next one's head if it rode along.
+            if (session == 0x0a
+                && _sender.Session0aInbox.AddChunk(seq, chunkPayload, Sess0aTag))
             {
-                if (_sender.Session0aInbox.AddChunk(seq, chunkPayload, "sess=0x0a"))
+                byte[]? replyBlob;
+                while ((replyBlob = _sender.Session0aInbox.TryDecompress()) != null)
                 {
-                    byte[]? replyBlob = _sender.Session0aInbox.TryDecompress();
-                    if (replyBlob != null)
-                    {
-                        _sender.Session0aInbox.Clear();
+                    if (_sender.Rpc.HasWaiters)
                         _sender.Rpc.HandleReply(replyBlob);
-                    }
                 }
             }
 
@@ -358,12 +357,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 if (chunkPayload.Length >= 4)
                 {
                     int netLen = chunkPayload.Length - 4;
-                    uint wireCrc = (uint)(chunkPayload[netLen]
-                                        | (chunkPayload[netLen + 1] << 8)
-                                        | (chunkPayload[netLen + 2] << 16)
-                                        | (chunkPayload[netLen + 3] << 24));
-                    uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
-                    if (calcCrc != wireCrc)
+                    if (!ChunkCrcOk())
                     {
                         int n = _sender.IncrementTileServerCrcRejects();
                         if (n <= 5 || n % 50 == 0)
@@ -406,17 +400,15 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // Channel catalog buffering. V0 URL-subscription firmware (CSP post-
             // 2026-04) sends URL entries on 0x01; V2-compact uses 0x02. Listen
             // on both during preamble. CRC validation prevents corrupted chunks
-            // from mangling diagnostic catalog URLs.
+            // from mangling diagnostic catalog URLs. Empty keepalive chunks
+            // (CRC only) must reach the parser: they consume a seq, and skipping
+            // them parks the next catalog burst behind a hole until the 5 s
+            // stall escape (bundle DJQ23F6D).
             bool isCatalogSession = session == _sender.FlagByte || session == 0x01;
-            if (isCatalogSession && data.Length > 12 && chunkPayload.Length >= 4)
+            if (isCatalogSession && chunkPayload.Length >= 4)
             {
                 int netLen = chunkPayload.Length - 4;
-                uint wireCrc = (uint)(chunkPayload[netLen]
-                                    | (chunkPayload[netLen + 1] << 8)
-                                    | (chunkPayload[netLen + 2] << 16)
-                                    | (chunkPayload[netLen + 3] << 24));
-                uint calcCrc = TierDefinitionBuilder.Crc32(chunkPayload, 0, netLen);
-                if (calcCrc == wireCrc)
+                if (ChunkCrcOk())
                 {
                     // Seq-aware append: dedup retransmits per session.
                     _sender.CatalogParser.AppendChunkIfNew(session, seq, chunkPayload, 0, netLen);
@@ -433,6 +425,24 @@ namespace MozaPlugin.Telemetry.Lifecycle
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Slot tracking and FF-record reassembly for a chunk on a catalog lane
+        /// (FlagByte or mgmt). Both lanes are scanned: CS-family wheels echo the
+        /// type-04 slot record on sess=FlagByte (0x02), W13/FSR2 report it on the
+        /// mgmt session (0x01) — without the mgmt scan the W13's report is never
+        /// absorbed, WheelReportedSlot stays -1, and the DisplayWatchdog
+        /// force-restarts a healthy display after every kind=4. The strict
+        /// padding/bound validation rejects the mgmt session's 0x06 acks and
+        /// 0x04 catalog-URL records. Which lane carries the FF records
+        /// (device display log, kind=14) is Form-dependent.
+        /// </summary>
+        private void AbsorbCatalogLaneChunk(byte session, int seq, byte[] chunkPayload, bool crcValid)
+        {
+            _sender.SlotTracker.TryAbsorbType04Slot(chunkPayload);
+            _sender.SlotTracker.TryAbsorbKind4Echo(chunkPayload, crcValid);
+            _sender.FeedFfRecords(session, seq, chunkPayload, crcValid);
         }
 
         private void HandleSessionEnd(byte[] data, byte session)

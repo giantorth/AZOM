@@ -27,18 +27,8 @@ namespace MozaPlugin.UI
 {
     public partial class SettingsControl : UserControl
     {
-
-        // Build a filesystem-safe slug from the active wheel's firmware model name
-        // for use as a filename prefix on diagnostics bundles. Prefers the curated
-        // friendly name (e.g. "CS Pro" for firmware "W17"); falls back to the raw
-        // prefix for unknown wheels. Returns "" when no model is known yet so the
-        // caller can omit the prefix entirely rather than emit a leading dash.
-        
         // ===== AB9 Active Shifter Tab =====
 
-        // Tracks whether the slider/combo values have been seeded from the profile
-        // — without this, the first refresh tick would race the user's drag and
-        // immediately overwrite an in-flight slider value with the saved one.
         private void RefreshAb9Tab()
         {
             if (_plugin?.Ab9Manager == null) { Ab9Tab.Visibility = Visibility.Collapsed; return; }
@@ -59,24 +49,34 @@ namespace MozaPlugin.UI
                       _plugin.Ab9Manager.Connection.DiscoveredPid)
                 : (object)Strings.TabHeader_Ab9Shifter;
 
-            // Re-seed the controls from the active profile every refresh tick so
-            // the tab follows per-game profile switches (matching the other
-            // tabs). Events are suppressed (RefreshDisplay holds the suppressor;
-            // the nested Begin below is depth-counted). A missing Ab9 block
-            // shows defaults. The slider handlers write profile.Ab9 synchronously
-            // so re-seeding can't fight a live drag.
+            // Re-seed the controls from the active profile every refresh tick
+            // while the tab is shown (MainTabs_SelectionChanged repaints it on
+            // selection) so it follows per-game profile switches (matching the
+            // other tabs). Events are suppressed (RefreshDisplay holds the
+            // suppressor; the nested Begin below is depth-counted). A missing
+            // Ab9 block shows defaults. The slider handlers write profile.Ab9
+            // synchronously so re-seeding can't fight a live drag. The opt-in
+            // status probe keeps polling while the tab is hidden.
             var ab9 = _plugin.Settings?.ProfileStore?.CurrentProfile?.Ab9 ?? new Ab9Settings();
+            bool shown = Ab9Tab.IsSelected;
 
             // ShowAllTabs can surface the tab with no AB9; the layout picker and
             // its gate still work against the profile.
             if (!connected && !detected)
             {
+                if (!shown) return;
                 using (_suppressor.Begin())
                 {
                     SetAb9InputModeCombo(ab9.InputMode);
                     SetAb9ModeCombo(ab9.Mode);
                 }
                 RefreshAb9GateView(ab9);
+                return;
+            }
+
+            if (!shown)
+            {
+                RefreshAb9StatusProbe();
                 return;
             }
 
@@ -101,7 +101,7 @@ namespace MozaPlugin.UI
                 // manual edit / older build before the slider enforced ticks.
                 ab9DbMs = ((ab9DbMs + 25) / 50) * 50;
                 Ab9GearShiftDebounceSlider.Value = ab9DbMs;
-                Ab9GearShiftDebounceValue.Text = $"{ab9DbMs} ms";
+                SetValueText(Ab9GearShiftDebounceValue, $"{ab9DbMs} ms");
             }
 
             RefreshAb9GateView(ab9);
@@ -194,7 +194,7 @@ namespace MozaPlugin.UI
         private void SetAb9Slider(Slider slider, TextBox value, byte v)
         {
             slider.Value = v;
-            value.Text = v.ToString();
+            SetValueText(value, v.ToString());
         }
 
         private void SetAb9ModeCombo(Ab9Mode mode)

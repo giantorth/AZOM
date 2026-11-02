@@ -176,7 +176,7 @@ PitHouse-initiated switch (UI dropdown):
 
 1. `MozaPlugin.OnDashboardSwitched(slot)` → `ApplyTelemetrySettings` (stages new profile in sender) → `TelemetrySender.SwitchToProfile(slot, null)`.
 2. `SwitchToProfile` emits kind=4 via `SendDashboardSwitch`, then arms the hot-reneg burst: `_pendingHotTierDefReemit = HotSwitchEmissionCount = 4`.
-3. `TickGrowSubscriptionIfCatalogStable` runs in the tick loop; once the wheel's post-switch catalog activity has been seen and quieted (or fallback timer at 1500 ms), it calls `ApplySubscription(force:true)` which builds a fresh tier-def reading `_catalogParser.LastWheelEndMarker` and emits on sess=0x01. Decrements the counter; subsequent emissions pace `HotSwitchEmissionSpacingMs = 1000` ms apart.
+3. `TickGrowSubscriptionIfCatalogStable` runs in the tick loop; once the wheel's post-switch catalog activity has been seen and quieted (or fallback timer at 1500 ms) — except that if an END that advanced since arm has not yet been re-asserted (`ChannelCatalogParser.HasUnsettledEndSince`, see [`session-02-channel-catalog.md`](session-02-channel-catalog.md) § END settle), the first emission waits for the re-assertion instead, capped at `FirstEmissionUnsettledCapMs` (4000 ms): an END that lands mid-announcement would be echoed for a partial generation (bundle DJQ23F6D). It then calls `ApplySubscription(force:true)` which builds a fresh tier-def reading `_catalogParser.LastWheelEndMarker` and emits on sess=0x01. Decrements the counter; subsequent emissions pace `HotSwitchEmissionSpacingMs = 1000` ms apart.
 4. After 4 emissions the counter clears.
 
 Wheel-initiated switch (user pressed wheel hardware control):

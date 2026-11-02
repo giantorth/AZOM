@@ -4,7 +4,7 @@ using System.Linq;
 namespace MozaPlugin.Telemetry.Display
 {
     /// <summary>Byte encoding of a group-0x42 field. Width fixes the field's
-    /// full-scale capability (<see cref="Fsr1FieldDef.CapabilityMax"/>).</summary>
+    /// full-scale capability (<see cref="Fsr1DashboardCatalog.OutputMaxFor"/>).</summary>
     internal enum Fsr1Encoding { U8, U16_BE, U16_LE, U24_BE }
 
     /// <summary>How a resolved SimHub value becomes the field's wire integer.</summary>
@@ -51,19 +51,6 @@ namespace MozaPlugin.Telemetry.Display
         /// lap times use Scale 1000 (seconds → ms). A user Scale/Bias override wins over these.</summary>
         public double DefaultScale = 1.0;
         public double DefaultBias = 0.0;
-
-        /// <summary>Largest value the field's byte width can represent.</summary>
-        public long CapabilityMax => Encoding switch
-        {
-            Fsr1Encoding.U8 => 0xFF,
-            Fsr1Encoding.U16_BE => 0xFFFF,
-            Fsr1Encoding.U16_LE => 0xFFFF,
-            Fsr1Encoding.U24_BE => 0xFFFFFF,
-            _ => 0xFF,
-        };
-
-        /// <summary>Effective output ceiling (FullScale override or capability).</summary>
-        public long OutputMax => FullScale > 0 ? FullScale : CapabilityMax;
 
         /// <summary>Anchor fields are filled by the protocol, not user-mappable.</summary>
         public bool IsUserMappable => Kind != Fsr1FieldKind.EngineFlag;
@@ -704,9 +691,8 @@ namespace MozaPlugin.Telemetry.Display
         // only the channel and Scale/Bias gain are user-assignable. The driver,
         // emitter, viz, and UI all read the same per-record slot partition.
 
-        /// <summary>Output ceiling for a resolved encoding (mirrors
-        /// <see cref="Fsr1FieldDef.OutputMax"/> but for the overridden width): the
-        /// field's <paramref name="fullScale"/> cap if set, else the encoding capability.</summary>
+        /// <summary>Output ceiling for a resolved encoding: the field's
+        /// <paramref name="fullScale"/> cap if set, else the encoding capability.</summary>
         internal static long OutputMaxFor(Fsr1Encoding enc, long fullScale)
         {
             if (fullScale > 0) return fullScale;

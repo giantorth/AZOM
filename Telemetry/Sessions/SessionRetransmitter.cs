@@ -49,6 +49,12 @@ namespace MozaPlugin.Telemetry.Sessions
 
         private readonly Dictionary<(byte session, int seq), Pending> _queue
             = new Dictionary<(byte, int), Pending>();
+        // Per-session index of _queue's seqs, kept sorted ascending, so an ack
+        // drains a prefix instead of scanning the whole queue (seqs are tracked
+        // in rising order, so inserts are appends). Mirrors _queue exactly;
+        // mutated only alongside it, under _lock.
+        private readonly Dictionary<byte, List<int>> _seqsBySession
+            = new Dictionary<byte, List<int>>();
         private readonly object _lock = new object();
         // Lock-free mirror of _queue.Count so the per-tick DueRetransmits and
         // per-ack Ack calls skip the lock + allocations entirely while idle
@@ -177,6 +183,7 @@ namespace MozaPlugin.Telemetry.Sessions
             lock (_lock)
             {
                 _queue[(session, seq)] = entry;
+                IndexSeqLocked(session, seq);
                 if (seq >= SeqWrapWarnThreshold
                     && entry.LastSentTicks - _lastWrapWarnTickCount >= WrapWarnIntervalMs)
                 {
@@ -209,7 +216,7 @@ namespace MozaPlugin.Telemetry.Sessions
                     }
                     if (haveVictim)
                     {
-                        _queue.Remove(victimKey);
+                        RemoveLocked(victimKey.Item1, victimKey.Item2);
                         evictedSession = victimKey.Item1;
                         evictedSeq = victimKey.Item2;
                         evictedQueueSize = _queue.Count;
@@ -251,19 +258,46 @@ namespace MozaPlugin.Telemetry.Sessions
             if (_count == 0) return;   // idle fast path — read-thread caller
             lock (_lock)
             {
-                List<(byte, int)>? doomed = null;
-                foreach (var kv in _queue)
-                {
-                    if (kv.Key.session == session && kv.Key.seq <= ackSeq)
-                        (doomed ??= new List<(byte, int)>()).Add(kv.Key);
-                }
-                if (doomed != null)
-                {
-                    foreach (var k in doomed) _queue.Remove(k);
-                    _count = _queue.Count;
-                    if (countAsAcked) _ackedChunks += doomed.Count;
-                }
+                if (!_seqsBySession.TryGetValue(session, out var seqs) || seqs.Count == 0) return;
+                int at = seqs.BinarySearch(ackSeq);
+                int removed = at >= 0 ? at + 1 : ~at;   // count of seqs <= ackSeq
+                if (removed == 0) return;
+                for (int i = 0; i < removed; i++) _queue.Remove((session, seqs[i]));
+                seqs.RemoveRange(0, removed);
+                _count = _queue.Count;
+                if (countAsAcked) _ackedChunks += removed;
             }
+        }
+
+        /// <summary>Add <paramref name="seq"/> to its session's sorted index
+        /// (no-op when already present — a re-Track replaces the entry in
+        /// place). Caller holds _lock.</summary>
+        private void IndexSeqLocked(byte session, int seq)
+        {
+            if (!_seqsBySession.TryGetValue(session, out var seqs))
+            {
+                seqs = new List<int>();
+                _seqsBySession[session] = seqs;
+            }
+            if (seqs.Count == 0 || seq > seqs[seqs.Count - 1])
+            {
+                seqs.Add(seq);
+                return;
+            }
+            int at = seqs.BinarySearch(seq);
+            if (at < 0) seqs.Insert(~at, seq);
+        }
+
+        /// <summary>Remove one entry from both indexes. Caller holds _lock.</summary>
+        private bool RemoveLocked(byte session, int seq)
+        {
+            if (!_queue.Remove((session, seq))) return false;
+            if (_seqsBySession.TryGetValue(session, out var seqs))
+            {
+                int at = seqs.BinarySearch(seq);
+                if (at >= 0) seqs.RemoveAt(at);
+            }
+            return true;
         }
 
         /// <summary>
@@ -277,7 +311,7 @@ namespace MozaPlugin.Telemetry.Sessions
         {
             lock (_lock)
             {
-                if (_queue.Remove((session, seq)))
+                if (RemoveLocked(session, seq))
                     _count = _queue.Count;
             }
         }
@@ -311,12 +345,8 @@ namespace MozaPlugin.Telemetry.Sessions
                 // unacked seq — the chunk the peer is actually waiting for.
                 byte held = _heldSession;
                 int heldFloor = int.MaxValue;
-                if (held != 0)
-                {
-                    foreach (var kv in _queue)
-                        if (kv.Key.session == held && kv.Key.seq < heldFloor)
-                            heldFloor = kv.Key.seq;
-                }
+                if (held != 0 && _seqsBySession.TryGetValue(held, out var heldSeqs) && heldSeqs.Count > 0)
+                    heldFloor = heldSeqs[0];
 
                 List<(byte, int)>? doomed = null;
                 foreach (var kv in _queue)
@@ -351,7 +381,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 }
                 if (doomed != null)
                 {
-                    foreach (var k in doomed) _queue.Remove(k);
+                    foreach (var k in doomed) RemoveLocked(k.Item1, k.Item2);
                     _count = _queue.Count;
                 }
             }
@@ -369,6 +399,7 @@ namespace MozaPlugin.Telemetry.Sessions
             lock (_lock)
             {
                 _queue.Clear();
+                _seqsBySession.Clear();
                 _count = 0;
             }
         }

@@ -8,13 +8,48 @@ namespace MozaPlugin.Protocol
     /// <summary>Which MOZA device a serial probe targets.</summary>
     public enum ProbeKind { Base, Hub, Ab9 }
 
+    /// <summary>How a single port probe ended.</summary>
+    public enum ProbeOutcome
+    {
+        Responded,
+        // Opened, nothing came back.
+        NoReply,
+        // Opened, bytes came back but not the expected response group.
+        OtherReply,
+        // Open() threw; ProbeResult.Error carries the exception.
+        OpenFailed,
+        // Opened, then a write/read threw.
+        IoFailed,
+        // Opened, then the caller abandoned the probe mid-poll.
+        Abandoned,
+        // Open() did not return before the caller's deadline.
+        Blocked,
+        // Not attempted (backoff window, prior probe still blocked, thread start failed).
+        Skipped,
+    }
+
+    public readonly struct ProbeResult
+    {
+        public readonly ProbeOutcome Outcome;
+        public readonly Exception? Error;
+        public readonly string? Detail;
+
+        public ProbeResult(ProbeOutcome outcome, Exception? error = null, string? detail = null)
+        {
+            Outcome = outcome;
+            Error = error;
+            Detail = detail;
+        }
+
+        public bool Responded => Outcome == ProbeOutcome.Responded;
+
+        /// <summary>The port opened and was usable; false means it could not be probed at all.</summary>
+        public bool Reachable => Outcome == ProbeOutcome.Responded || Outcome == ProbeOutcome.NoReply
+                              || Outcome == ProbeOutcome.OtherReply || Outcome == ProbeOutcome.Abandoned;
+    }
+
     /// <summary>
-    /// Self-contained serial open+probe core used by <see cref="MozaSerialConnection"/>.
-    ///
-    /// <para>It keeps the wire constants below as local copies of the
-    /// corresponding <c>MozaProtocol.*</c> values so the file stays free of
-    /// other MozaPlugin dependencies. They are stable wire constants; keep them
-    /// in sync (they have not changed since the protocol was first decoded).</para>
+    /// Serial open+probe core used by <see cref="MozaSerialConnection"/>.
     ///
     /// <para>The one operation that can SEGFAULT Wine — <c>SerialPort.Open</c> on
     /// a not-yet-ready CDC-ACM port (the freshly-powered-base crash) — lives in
@@ -24,14 +59,6 @@ namespace MozaPlugin.Protocol
     /// </summary>
     public static class SerialProbeCore
     {
-        // ── Wire constants — MUST mirror MozaProtocol.* (stable) ──────────────
-        public const byte MessageStart  = 0x7E;    // MozaProtocol.MessageStart
-        public const int  BaudRate       = 115200; // MozaProtocol.BaudRate
-        public const byte MagicValue     = 0x0D;   // MozaProtocol.MagicValue
-        public const byte BaseRespGroup  = 0xAB;   // MozaProtocol.BaseRespGroup (0x2B|0x80)
-        public const byte HubRespGroup   = 0xE4;   // MozaProtocol.HubRespGroup  (0x64|0x80)
-        public const byte Ab9RespGroup   = 0x89;   // MozaProtocol.Ab9RespGroup  (0x09|0x80)
-
         // ── Probe timing ─────────────────────────────────────────────────────
         // How long ProbeOnePort polls a port that opened but hasn't answered
         // before giving up. A non-answering port ALWAYS burns this in full, and
@@ -52,63 +79,15 @@ namespace MozaPlugin.Protocol
 
         private static byte[] BuildProbe(byte[] frame)
         {
-            frame[frame.Length - 1] = WireChecksum(frame, frame.Length - 1);
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
             return frame;
-        }
-
-        // Wire-level checksum: each 0x7E in body positions 2.. counts twice
-        // (byte-stuffing doubles it on the wire). Mirror of
-        // MozaProtocol.CalculateWireChecksum.
-        private static byte WireChecksum(byte[] data, int length)
-        {
-            int sum = MagicValue;
-            for (int i = 0; i < length; i++) sum += data[i];
-            for (int i = 2; i < length; i++) if (data[i] == MessageStart) sum += MessageStart;
-            return (byte)(sum & 0xFF);
-        }
-
-        /// <summary>The raw (un-stuffed) wire probe frame for a kind. Exposed so the
-        /// in-assembly <c>MozaPortProbe</c> can run the same probe over an already-open
-        /// <c>IMozaPort</c> (Wine by-id path) without duplicating the frame bytes.</summary>
-        public static byte[] GetProbeFrame(ProbeKind kind)
-        {
-            switch (kind)
-            {
-                case ProbeKind.Hub: return HubProbeFrame;
-                case ProbeKind.Ab9: return Ab9ProbeFrame;
-                default: return BaseProbeFrame;
-            }
-        }
-
-        /// <summary>The response group byte that confirms a kind (0xAB base / 0xE4 hub / 0x89 ab9).</summary>
-        public static byte GetExpectedRespGroup(ProbeKind kind)
-        {
-            switch (kind)
-            {
-                case ProbeKind.Hub: return HubRespGroup;
-                case ProbeKind.Ab9: return Ab9RespGroup;
-                default: return BaseRespGroup;
-            }
-        }
-
-        /// <summary>Parse a probe-kind name (case-insensitive) — used by the
-        /// helper to decode its argv.</summary>
-        public static bool TryParseKind(string s, out ProbeKind kind)
-        {
-            switch ((s ?? string.Empty).Trim().ToLowerInvariant())
-            {
-                case "base": kind = ProbeKind.Base; return true;
-                case "hub":  kind = ProbeKind.Hub;  return true;
-                case "ab9":  kind = ProbeKind.Ab9;  return true;
-                default:     kind = ProbeKind.Base; return false;
-            }
         }
 
         /// <summary>
         /// Open <paramref name="portName"/>, send the probe for
         /// <paramref name="kind"/>, and poll for the expected response group.
-        /// Returns (responded, reachable); reachable=false means the open itself
-        /// failed. <b>This is the call that can crash Wine on a not-ready port</b>
+        /// Returns how the probe ended; an Open() failure carries its exception
+        /// so the caller can classify it. <b>This is the call that can crash Wine on a not-ready port</b>
         /// — never call it on a thread/process whose death would matter.
         /// <paramref name="log"/> is an optional diagnostic sink.
         ///
@@ -120,7 +99,7 @@ namespace MozaPlugin.Protocol
         /// Open is the Wine segfault, which is why the caller cannot just do it
         /// itself.</para>
         /// </summary>
-        public static (bool responded, bool reachable) ProbeOnePort(
+        public static ProbeResult ProbeOnePort(
             string portName, ProbeKind kind, Action<string>? log = null,
             Func<bool>? shouldAbort = null)
         {
@@ -128,22 +107,22 @@ namespace MozaPlugin.Protocol
             byte expectedRespGroup;
             switch (kind)
             {
-                case ProbeKind.Base: msg = BaseProbeFrame; expectedRespGroup = BaseRespGroup; break;
-                case ProbeKind.Hub:  msg = HubProbeFrame;  expectedRespGroup = HubRespGroup;  break;
-                case ProbeKind.Ab9:  msg = Ab9ProbeFrame;  expectedRespGroup = Ab9RespGroup;  break;
-                default: return (false, false);
+                case ProbeKind.Base: msg = BaseProbeFrame; expectedRespGroup = MozaProtocol.BaseRespGroup; break;
+                case ProbeKind.Hub:  msg = HubProbeFrame;  expectedRespGroup = MozaProtocol.HubRespGroup;  break;
+                case ProbeKind.Ab9:  msg = Ab9ProbeFrame;  expectedRespGroup = MozaProtocol.Ab9RespGroup;  break;
+                default: return new ProbeResult(ProbeOutcome.Skipped, detail: $"unknown probe kind {kind}");
             }
 
             SerialPort? probe = null;
             try
             {
-                probe = new SerialPort(portName, BaudRate) { ReadTimeout = 300, WriteTimeout = 300 };
+                probe = new SerialPort(portName, MozaProtocol.BaudRate) { ReadTimeout = 300, WriteTimeout = 300 };
                 probe.Open();
             }
-            catch
+            catch (Exception ex)
             {
                 try { probe?.Dispose(); } catch { }
-                return (false, false); // open failed → not reachable
+                return new ProbeResult(ProbeOutcome.OpenFailed, ex);
             }
 
             try
@@ -165,7 +144,8 @@ namespace MozaPlugin.Protocol
                 {
                     if (waited >= nextProbeAt)
                     {
-                        try { probe.Write(msg, 0, msg.Length); } catch { return (false, false); }
+                        try { probe.Write(msg, 0, msg.Length); }
+                        catch (Exception ex) { return new ProbeResult(ProbeOutcome.IoFailed, ex, "write"); }
                         nextProbeAt = waited + ProbeRepeatMs;
                     }
 
@@ -177,7 +157,7 @@ namespace MozaPlugin.Protocol
                     if (shouldAbort?.Invoke() == true)
                     {
                         log?.Invoke($"Probe {portName}: abandoned by caller after {waited}ms — releasing port");
-                        return (false, true);
+                        return new ProbeResult(ProbeOutcome.Abandoned);
                     }
 
                     int avail = probe.BytesToRead;
@@ -192,7 +172,7 @@ namespace MozaPlugin.Protocol
                         }
                         for (int i = 0; i + 2 < accum.Count; i++)
                         {
-                            if (accum[i] != MessageStart) continue;
+                            if (accum[i] != MozaProtocol.MessageStart) continue;
                             byte respGroup = accum[i + 2];
                             if (firstSeenGroup == 0xFF) firstSeenGroup = respGroup;
                             if (respGroup == expectedRespGroup) { responded = true; break; }
@@ -201,18 +181,17 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                if (!responded && firstSeenGroup != 0xFF)
-                {
-                    log?.Invoke(
-                        $"Probe {portName} {kind}: {accum.Count}B in {waited}ms, " +
-                        $"no 0x{expectedRespGroup:X2} (first seen 0x{firstSeenGroup:X2})");
-                }
-                return (responded, true);
+                if (responded) return new ProbeResult(ProbeOutcome.Responded);
+                if (firstSeenGroup == 0xFF) return new ProbeResult(ProbeOutcome.NoReply);
+                log?.Invoke(
+                    $"Probe {portName} {kind}: {accum.Count}B in {waited}ms, " +
+                    $"no 0x{expectedRespGroup:X2} (first seen 0x{firstSeenGroup:X2})");
+                return new ProbeResult(ProbeOutcome.OtherReply, detail: $"group 0x{firstSeenGroup:X2}");
             }
             catch (Exception ex)
             {
                 log?.Invoke($"Probe {portName}: {ex.GetType().Name}");
-                return (false, false);
+                return new ProbeResult(ProbeOutcome.IoFailed, ex);
             }
             finally
             {

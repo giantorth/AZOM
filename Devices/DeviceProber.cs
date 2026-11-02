@@ -189,11 +189,6 @@ namespace MozaPlugin.Devices
                 cmds.Add($"wheel-rpm-color{i}");
             for (int i = 1; i <= info.ButtonLedCount; i++)
                 cmds.Add($"wheel-button-color{i}");
-            if (info.HasFlagLeds)
-            {
-                for (int i = 1; i <= 6; i++)
-                    cmds.Add($"wheel-flag-color{i}");
-            }
 
             // Extended LED group probes (Single/Rotary/Ambient). Sent ONLY for
             // models we've positively identified as having the group — never for
@@ -323,6 +318,10 @@ namespace MozaPlugin.Devices
         // only enumerates peripherals and must not touch the primary sender's
         // heartbeat mask.
         private readonly bool _drivesTelemetry;
+        // Set once this instance has issued the wheel's detect-time read cascade.
+        // Per instance like MozaData, so a persistent-wire reload starts it false
+        // while LastKnownWheelModel rides the bag — see RereadWheelAfterReload.
+        private bool _wheelReadsIssued;
 
         public DeviceProber(
             MozaPlugin plugin,
@@ -381,6 +380,7 @@ namespace MozaPlugin.Devices
         {
             if (_detectionState.DashDetected) return;
             _detectionState.DashDetected = true;
+            _plugin.HardwareApplier.ForgetDashFlagsBrightness();
 
             // A dash reached through the primary pipe (base or hub) is the meter at
             // 0x14 (0x12 is the base main). PitHouse cm2.pcapng drives this CM2's
@@ -565,16 +565,34 @@ namespace MozaPlugin.Devices
         // to elimination. Rounds are driven by the PollStatus presence probe (~5 s apart),
         // so this is a handful of seconds, not a race with the first reply.
         private const int RelayShifterIdentityGraceRounds = 3;
-        private int _relayShifterProbeRounds;
+        // Volatile: advanced on this pipe's dispatch thread, reset by
+        // ReleasePeripheralOwnership from timer / disconnect / UI threads.
+        private volatile int _relayShifterProbeRounds;
         // Set by any group-0x51 settings answer from this pipe's shifter. Evidence that a
         // shifter is there and talking — NOT evidence of which model, which is exactly the
         // conflation that made a relayed HGP report as an SGP.
-        private bool _relayShifterAnsweredSettingsRead;
+        private volatile bool _relayShifterAnsweredSettingsRead;
         // Edge guard so the elimination fallback logs + latches at most once per pipe.
         // NOT a "stop probing" latch: the owner gate at the top of ProbeRelayedShifter is
         // the only thing that ends the probe, so a pipe whose shifter is replaced still
         // re-resolves once the flags clear.
-        private bool _relayShifterFallbackTried;
+        private volatile bool _relayShifterFallbackTried;
+
+        /// <summary>
+        /// This pipe no longer reaches the peripherals it detected (unplugged,
+        /// disabled, or rebound to a different device): drop their detection and
+        /// ownership so they re-detect wherever they answer next, and restart the
+        /// relayed-shifter identification — stale rounds + settings-read evidence
+        /// would otherwise fire the SGP elimination fallback on the next shifter's
+        /// first probe round, before its model name can answer.
+        /// </summary>
+        internal void ReleasePeripheralOwnership()
+        {
+            _relayShifterProbeRounds = 0;
+            _relayShifterAnsweredSettingsRead = false;
+            _relayShifterFallbackTried = false;
+            _detectionState.ClearPeripheralsOwnedBy(_deviceManager);
+        }
 
         /// <summary>Resolve a base/hub-relayed shifter's model from its self-describing
         /// model name — the only measured discriminator on a lane with no PID. Logs the
@@ -643,6 +661,48 @@ namespace MozaPlugin.Devices
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Wheel counterpart of the base reload repair in DetectDevices. A reload
+        /// restores LastKnownWheelModel, so the first-sight cascade never runs on the
+        /// fresh MozaData and wheel identity, input modes and LED/knob state stay
+        /// blank — e.g. per-knob selectors fall back to legacy All Rotaries (142QVFB4).
+        /// Deferred during a param storm; the model-name recheck that triggers it is
+        /// suspended then too.
+        /// </summary>
+        private void RereadWheelAfterReload(byte deviceId, bool oldProtocol)
+        {
+            if (!_drivesTelemetry || _wheelReadsIssued) return;
+            if (_plugin.FirmwareDebugLogForDiagnostics.ParamStormActive) return;
+            _wheelReadsIssued = true;
+
+            _deviceManager.ReadSetting("wheel-sw-version");
+            _deviceManager.ReadSetting("wheel-hw-version");
+            if (oldProtocol)
+            {
+                _deviceManager.ReadSetting("wheel-serial-a");
+                _deviceManager.ReadSetting("wheel-serial-b");
+                _deviceManager.ReadSetting("es-wheel-hw-version");
+                _deviceManager.ReadSetting("es-wheel-sw-version");
+                _deviceManager.ReadSetting("es-wheel-mcu-uid");
+                _deviceManager.SendPithouseIdentityProbe(deviceId);
+                _deviceManager.ReadSettingsPaced(OldWheelSettingsReadCommands);
+            }
+            else
+            {
+                bool fsr1 = _plugin.IsFsr1DisplayWheel;
+                if (!fsr1)
+                {
+                    _deviceManager.ReadSetting("wheel-serial-a");
+                    _deviceManager.ReadSetting("wheel-serial-b");
+                    _deviceManager.SendPithouseIdentityProbe(deviceId);
+                }
+                _deviceManager.ReadSettingsPaced(NewWheelCoreReadCommands);
+                _deviceManager.ReadSettingsPaced(
+                    BuildNewWheelLedReadCommands(_plugin.WheelModelInfo, fsr1));
+            }
+            MozaLog.Debug("[AZOM] Wheel rode a persistent-wire reload — re-reading identity, settings and LED state");
         }
 
         /// <summary>
@@ -1031,6 +1091,7 @@ namespace MozaPlugin.Devices
                         // First-sight: resolve LED layout and deploy device defs.
                         if (string.IsNullOrEmpty(_detectionState.LastKnownWheelModel))
                         {
+                            _wheelReadsIssued = true;
                             _detectionState.LastKnownWheelModel = currentModel;
                             _plugin.WheelModelInfo = WheelModelInfo.FromModelName(currentModel);
                             var info = _plugin.WheelModelInfo;
@@ -1115,6 +1176,10 @@ namespace MozaPlugin.Devices
                             // ShouldDriveDashboard now has real input — make the keep/skip decision.
                             _plugin.StartTelemetryIfReady();
                         }
+                        else
+                        {
+                            RereadWheelAfterReload(deviceId, oldProtocol: false);
+                        }
                     }
                     else
                     {
@@ -1154,6 +1219,7 @@ namespace MozaPlugin.Devices
                             break;
                         if (string.IsNullOrEmpty(_detectionState.LastKnownWheelModel))
                         {
+                            _wheelReadsIssued = true;
                             _detectionState.LastKnownWheelModel = esModel;
                             _plugin.WheelModelInfo = WheelModelInfo.FromModelName(esModel);
                             var info = _plugin.WheelModelInfo;
@@ -1168,6 +1234,10 @@ namespace MozaPlugin.Devices
                             var prof = _plugin.Settings?.ProfileStore?.CurrentProfile;
                             if (prof != null)
                                 _plugin.ApplyProfileOnConnect(prof);
+                        }
+                        else
+                        {
+                            RereadWheelAfterReload(_deviceManager.WheelDeviceId, oldProtocol: true);
                         }
                     }
                     break;

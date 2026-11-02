@@ -269,12 +269,16 @@ namespace MozaPlugin.Integration.Motion
             {
                 var v = lane.GetLighting(kv.Key, ColorParamFirst);
                 if (v != null && v.Length >= 3)
-                    kv.Value.Background = new SolidColorBrush(Color.FromRgb(v[0], v[1], v[2]));
+                    kv.Value.Background = Devices.Ui.WheelUiHelpers.GetCachedBrush(v[0], v[1], v[2]);
             }
             if (!BrightnessBox.IsKeyboardFocusWithin)
             {
                 var b = lane.GetLighting(BrightnessZone, BrightnessParam);
-                if (b != null && b.Length >= 1) BrightnessBox.Text = b[0].ToString(CultureInfo.CurrentCulture);
+                if (b != null && b.Length >= 1)
+                {
+                    string text = b[0].ToString(CultureInfo.CurrentCulture);
+                    if (BrightnessBox.Text != text) BrightnessBox.Text = text;
+                }
             }
         }
 

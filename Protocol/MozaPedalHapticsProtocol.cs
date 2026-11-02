@@ -19,8 +19,11 @@ namespace MozaPlugin.Protocol
     /// "one independent oscillator on that pedal's motor".
     ///
     /// <see cref="EngineVibration"/> and <see cref="RoadTexture"/> are the two
-    /// that behave differently — see
-    /// <see cref="MozaPedalHapticsProtocol.SlotSelfExpires"/> and
+    /// that behave differently. The other slots stop themselves once their
+    /// duration elapses; these two do not treat duration as a timeout and
+    /// instead run until roughly a second passes with no update, or until
+    /// explicitly disabled. Either way the host has to keep streaming to
+    /// sustain an effect. See also
     /// <see cref="MozaPedalHapticsProtocol.BuildRoadTextureFrame"/>.
     /// </summary>
     public enum PedalHapticsEffectSlot : byte
@@ -178,19 +181,6 @@ namespace MozaPlugin.Protocol
         /// <summary>Suspension-position range carried in the frequency field for <see cref="PedalHapticsEffectSlot.RoadTexture"/>.</summary>
         public const int MinRoadPosition = 0;
         public const int MaxRoadPosition = 100;
-
-        /// <summary>
-        /// Slots that stop themselves once their duration elapses. The other two
-        /// — <see cref="PedalHapticsEffectSlot.EngineVibration"/> and
-        /// <see cref="PedalHapticsEffectSlot.RoadTexture"/> — do not treat
-        /// duration as a timeout and instead run until roughly a second passes
-        /// with no update, or until explicitly disabled. Either way the host has
-        /// to keep streaming to sustain an effect; the difference is only what
-        /// happens once it stops.
-        /// </summary>
-        public static bool SlotSelfExpires(byte slot) =>
-            slot != (byte)PedalHapticsEffectSlot.EngineVibration
-            && slot != (byte)PedalHapticsEffectSlot.RoadTexture;
 
         /// <summary>
         /// Duration written into a streamed frame. An effect is held on by

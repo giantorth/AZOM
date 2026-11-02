@@ -100,16 +100,12 @@ namespace MozaPlugin.Telemetry.Lifecycle
         private const int PostSwitchWindowMs = 90_000;
         private const int PostSwitchTierDefDeadMs = 30_000;
 
-        // ── liveness / rejection feeder state (Interlocked on 64-bit) ─────
-        private long _session01EngagedUtcTicks;
+        // ── liveness feeder state (Interlocked on 64-bit) ─────────────────
         private long _session01LastInboundUtcTicks;
-        private long _session01LastCloseUtcTicks;
-        private long _session02FirstInboundUtcTicks;
         private long _session02LastInboundUtcTicks;
-        // Last fc:00 ack the wheel sent on the FlagByte lane. Kept SEPARATE
-        // from _session02LastInboundUtcTicks so the engagement latch stays
-        // data-only ("positive proof, never filler"); only Context C's
-        // liveness test fuses the two.
+        // Last fc:00 ack the wheel sent on the FlagByte lane. Kept separate
+        // from _session02LastInboundUtcTicks; only Context C's liveness test
+        // fuses the two.
         private long _session02LastAckUtcTicks;
         private int _activeStateEnteredTickCount;
 
@@ -205,34 +201,21 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// data chunk. Liveness only — proves the mgmt session is alive on the
         /// wheel side, NOT that the display bound (acks + the identity blob +
         /// END keepalives flow while the dashboard is dead).</summary>
-        public void NoteSession01Engaged()
-        {
-            long now = DateTime.UtcNow.Ticks;
-            if (Interlocked.Read(ref _session01EngagedUtcTicks) == 0)
-                Interlocked.Exchange(ref _session01EngagedUtcTicks, now);
-            Interlocked.Exchange(ref _session01LastInboundUtcTicks, now);
-        }
+        public void NoteSession01Engaged() =>
+            Interlocked.Exchange(ref _session01LastInboundUtcTicks, DateTime.UtcNow.Ticks);
 
         /// <summary>Called for every sess=FlagByte (0x02) inbound chunk.
         /// Liveness only — empty keep-alives satisfy this even when the display
-        /// is unbound, which is exactly why the verdict gates on slot
-        /// round-trip and not on this flag.</summary>
-        public void NoteSession02FirstInbound()
-        {
-            long now = DateTime.UtcNow.Ticks;
-            if (Interlocked.Read(ref _session02FirstInboundUtcTicks) == 0)
-                Interlocked.Exchange(ref _session02FirstInboundUtcTicks, now);
-            Interlocked.Exchange(ref _session02LastInboundUtcTicks, now);
-        }
+        /// is unbound.</summary>
+        public void NoteSession02Inbound() =>
+            Interlocked.Exchange(ref _session02LastInboundUtcTicks, DateTime.UtcNow.Ticks);
 
         /// <summary>Called for every wheel fc:00 ack on sess=FlagByte (0x02).
         /// Lane liveness ONLY — the mirror of the mgmt lane's ack feed in
         /// <see cref="NoteSession01Engaged"/>: an ack proves the wheel still
         /// holds the session open and is servicing our sends even when it has
-        /// nothing of its own to push. Deliberately does NOT touch
-        /// _session02FirstInboundUtcTicks — that latch is the engagement gate
-        /// and stays data-only, so filler can never satisfy it. Consumed only
-        /// by Context C's liveness test.</summary>
+        /// nothing of its own to push. Consumed only by Context C's liveness
+        /// test.</summary>
         public void NoteSession02Ack() =>
             Interlocked.Exchange(ref _session02LastAckUtcTicks, DateTime.UtcNow.Ticks);
 
@@ -264,26 +247,13 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
         public void NoteActiveStateEntered() => _activeStateEnteredTickCount = Environment.TickCount;
 
-        /// <summary>Wheel-initiated type=0x00 CLOSE. Revokes the affected
-        /// session's liveness flag (the wheel rejecting a session we believe is
-        /// engaged is a contradiction), stamps the mgmt close time so the
-        /// verdict refuses to trust inbound-bytes liveness while a close is
-        /// recent, and fast-escalates a sustained storm to a full restart.</summary>
+        /// <summary>Wheel-initiated type=0x00 CLOSE. Feeds the tier-def reject
+        /// detector and fast-escalates a sustained storm to a full
+        /// restart.</summary>
         public void NoteWheelInitiatedClose(byte session)
         {
             if (session >= CloseStormSessionMax) return;
             int now = Environment.TickCount;
-
-            // Revoke liveness on the affected session.
-            if (session == _sender.EffectiveMgmtPort)
-                Interlocked.Exchange(ref _session01EngagedUtcTicks, 0);
-            if (session == _sender.FlagByte && Interlocked.Read(ref _session02FirstInboundUtcTicks) != 0)
-                Interlocked.Exchange(ref _session02FirstInboundUtcTicks, 0);
-            // Stamp the mgmt close time unconditionally. No consumer today —
-            // the post-close settle window it fed was removed with the rest of
-            // the unread threshold constants; kept as a cheap observation point.
-            if (session == _sender.EffectiveMgmtPort)
-                Interlocked.Exchange(ref _session01LastCloseUtcTicks, DateTime.UtcNow.Ticks);
 
             // Tier-def reject wedge — see the field block for the full story.
             var emitter = _sender.TierDefEmitter;
@@ -358,10 +328,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// <summary>Reset all watchdog state at sender Start/Stop boundary.</summary>
         public void Reset()
         {
-            Interlocked.Exchange(ref _session01EngagedUtcTicks, 0);
             Interlocked.Exchange(ref _session01LastInboundUtcTicks, 0);
-            Interlocked.Exchange(ref _session01LastCloseUtcTicks, 0);
-            Interlocked.Exchange(ref _session02FirstInboundUtcTicks, 0);
             Interlocked.Exchange(ref _session02LastInboundUtcTicks, 0);
             Interlocked.Exchange(ref _session02LastAckUtcTicks, 0);
             _activeStateEnteredTickCount = 0;
@@ -658,10 +625,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // list this session — NOT merely opened 0x09. On a slow-bring-up wheel
             // (radar/track-map dash on a CS-Pro base) the wheel device-inits 0x09
             // within ~1 s of our open request but only pushes the list once its
-            // dashboard has finished loading (~35-40 s later). The old gate stopped
-            // at DeviceInitiated (the open itself), so the request landed ~35 s too
-            // early, the wheel opened 0x09 with nothing to enumerate, and the list
-            // never arrived — dropdown "(none)", UI stuck on "wheel state not yet
+            // dashboard has finished loading (~35-40 s later). Stopping at the 0x09
+            // open itself lands the request ~35 s too early: the wheel opens 0x09
+            // with nothing to enumerate and the list never arrives — dropdown
+            // "(none)", UI stuck on "wheel state not yet
             // ready" (wire trace: 6c80 request at t=5.7s, wheel 0x09 open type=0x81
             // at t=6.0s, dashboard load at t=41s, no list ever pushed). Re-emit
             // prime+open across the full backoff window (~56 s) until the LIVE

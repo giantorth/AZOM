@@ -12,6 +12,14 @@
     "Extending coverage is a data edit — add a row here, no code change."
   ],
 
+  "primary": {
+    "_comment": "SimHub property claimed by more than one Telemetry.json channel -> the channel a dashboard binds. Without an entry the resolver takes the ordinal-first URL and logs a warning.",
+
+    "DataCorePlugin.GameData.ErsPercent": "v1/gameData/ErsState",
+    "DataCorePlugin.GameData.DRSAvailable": "v1/gameData/DRSAllowed",
+    "DataCorePlugin.GameData.Fuel": "v1/gameData/Fuel"
+  },
+
   "aliases": {
     "_comment": "SimHub property path -> canonical v1/gameData channel URL. Every target verified present in Data/Telemetry.json.",
 

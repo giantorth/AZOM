@@ -50,6 +50,10 @@ namespace MozaPlugin
             mgr.SetTimerResolution(wanted);
         }
 
+        /// <summary>Hold the 1 ms timer outside gameplay (e.g. dashboard-upload
+        /// frame pacing). Null when the manager isn't up; dispose to release.</summary>
+        internal IDisposable? AcquireTimerResolutionHold() => _responsiveness?.AcquireTimerResolution();
+
         // ES/ESX firmware RPM brightness register (0x14 0x00) is a small field, not a
         // 0..100 percentage: sweeping SimHub's 0..100 master made the bar ramp+wrap
         // ~3.3 times (issue #113 follow-up), so its period is ~30 counts. Scale the
@@ -283,6 +287,33 @@ namespace MozaPlugin
                     "10-band EQ stay disabled (needs >= 1.2.10.10)");
         }
 
+        private int _lastLoggedTorqueBoost = MozaData.TorqueBoostUnread;
+
+        /// <summary>
+        /// Re-read the torque-boost flag every tick on a base that carries it, so an
+        /// unlock done in PitHouse mid-session reaches the rated torque without a
+        /// restart. PitHouse polls the same register every 4–30 s.
+        /// </summary>
+        private void TickTorqueBoostPoll()
+        {
+            if (!DetectionState.BaseDetected) return;
+            var data = _data;
+            if (data == null || !data.BaseSupportsTorqueBoost) return;
+            var owner = DetectionState.BaseOwner ?? _deviceManager;
+            if (owner == null || !owner.IsConnected) return;
+
+            int boost = data.BaseTorqueBoost;
+            if (boost != _lastLoggedTorqueBoost && boost != MozaData.TorqueBoostUnread)
+            {
+                _lastLoggedTorqueBoost = boost;
+                MozaLog.Info($"[AZOM] Base torque boost: {(boost == 1 ? "unlocked" : "stock")} " +
+                    $"(rated {data.BaseRatedNm:0.#} Nm)");
+            }
+
+            // Untracked: the next tick re-asks.
+            owner.ReadSettingUntracked("base-torque-boost");
+        }
+
         // Same budget as the base: ~25 s past wheel detect, one frame per round.
         private const int WheelFwVersionProbeRetryLimit = 5;
 
@@ -371,6 +402,7 @@ namespace MozaPlugin
 
             TickBaseFwVersionRetry();
             TickWheelFwVersionRetry();
+            TickTorqueBoostPoll();
 
             // CM2 / dashboard-pipeline reconcile runs REGARDLESS of the wheelbase
             // connection. DECOUPLED: a standalone-USB CM2 is driven by the dedicated
@@ -538,17 +570,12 @@ namespace MozaPlugin
 
             // Device detection probes — only sent until each device is found.
             //
-            // For dash / handbrake / pedals we now use PitHouse-style empty
-            // presence probes (`0x00 dev=<id>` → `0x80 dev=<swap>`). The prior
-            // approach re-issued the first settings read (`dash-rpm-indicator-mode`
-            // etc.) every PollStatus tick; with no device attached the read
-            // never got a response and PendingResponseTracker amplified each
-            // probe by its 3-retry budget (200/400/800 ms backoff). Net result:
-            // 9 frames/tick of pure noise per absent sub-device. Empty probes
-            // are NOT tracked, so absent devices cost exactly one 5-byte frame
-            // per tick. ACK handling lives in OnPresenceProbeAck (called from
-            // OnMessageReceived) which flips DetectionState and kicks off the
-            // existing per-device settings read batch.
+            // Dash / handbrake / pedals use PitHouse-style empty presence
+            // probes (`0x00 dev=<id>` → `0x80 dev=<swap>`). They are not
+            // tracked by PendingResponseTracker, so an absent device costs one
+            // 5-byte frame per tick instead of a retransmitted settings read.
+            // OnPresenceProbeAck (from OnMessageReceived) flips DetectionState
+            // and starts the per-device settings read batch.
             //
             // Hub stays on the cmd-specific read path because hub shares
             // device id 0x12 with the wheelbase main controller — an empty

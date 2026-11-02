@@ -184,9 +184,22 @@ last-message repeat, not a per-effect trace.
 
 ## How the plugin uses this
 
-**One SimHub device per motor port** — `MOZA S12 Throttle`, `MOZA S12 Brake`,
-`MOZA S12 Clutch`, each with its own ShakeIt profile and effect defaults. A user
-assigns an effect to the pedal they want it on, and that is the whole setup.
+Two SimHub device layouts, picked by **Options > Combined pedal haptics device**
+(`PedalHapticsCombinedDevice`; on for new installs, off for upgraders):
+
+- **Per-pedal** — `MOZA S12 Throttle`, `MOZA S12 Brake`, `MOZA S12 Clutch`, each
+  with its own ShakeIt profile and effect defaults. A user assigns an effect to
+  the pedal they want it on, and that is the whole setup.
+- **Combined** — one `MOZA S12 Pedal Haptics` device with a channel per pedal.
+  Each effect ticks the pedals it plays on (all three until the user changes
+  it, as SimHub's stock providers default).
+
+Only the selected layout's definition is deployed, and the other is never
+deleted, so a user switching over keeps the old devices to copy effects from.
+The unselected layout's devices read as disconnected and post nothing — their
+`Stop`/`Clear` are gated too, or an idle device's teardown would silence the
+active one's pedals. Switching clears every pedal's latest state, since the
+scheduler would otherwise keep re-sending what the old layout left playing.
 
 ### Effects are assigned to oscillators automatically
 
@@ -226,6 +239,25 @@ channel list to arrange it. Two notes:
   runtime; past eight switched-on effects, some share an oscillator.
 - **Sharing is harmless.** ShakeIt sums the effects on a channel before the
   value arrives, and the slots are interchangeable.
+
+#### Combined device
+
+The same assignment, run once per pedal (`SyncCombinedOscillatorAssignments`).
+One activation dictionary per effect carries both the user's ticks and the
+hidden assignment, by channel id:
+
+| Id | Meaning | Seen by |
+|----|---------|---------|
+| 0..2 | Pedal ticks (throttle, brake, clutch) | UI and mixer |
+| 3 + pedal×8 + oscillator | Oscillator assignment | Mixer only |
+| -1 | "Ticks seeded" marker, never enabled | Neither |
+
+Both callers walk ids from 0, so the ticks must come first; the mixer's tones
+for ids 0..2 are dropped in `UpdateOutput`. A placement gets an oscillator in a
+pedal's block only while that pedal is ticked on it. Ticks are seeded all-on by
+the sweep, not by `CreateDefaultActivationFor` — that has no channel index and
+must return off for the oscillators, and the mixer creates the tick entries
+first. The marker keeps a user who unticks every pedal from being re-seeded.
 
 Road Texture (slot 8) is not one of the eight. It takes a suspension position
 rather than a tone, so it cannot serve as a general output;

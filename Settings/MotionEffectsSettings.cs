@@ -8,7 +8,6 @@ namespace MozaPlugin.Settings
     public sealed class MotionEffectsSettings
     {
         public const int Count = 6;
-        public const int RoadDetailIndex = 5;
 
         public int PitchIntensity { get; set; } = -1;
         public int PitchSmoothness { get; set; } = -1;

@@ -22,7 +22,7 @@ Master reference for all compression types.
 | `int16_t` | 16 | 0x05 inferred | `raw = value` | raw | signed 16 | — |
 | `uint16_t` | 16 | 0x04 ✓ | `raw = value` | raw | 0–65535 | 2 |
 | `float_6000_1` | 16 | 0x0F ✓ | `clamp(game × 10, 0, 65535)` | `game = raw / 10` | 0–6553.5 | 4 |
-| `float_600_2` | 16 | 0x15 inferred | `clamp(game × 100, 0, 65535)` | `game = raw / 100` | 0–655.35 | 12 |
+| `float_600_2` | 16 | **0x10** (was 0x15) | `clamp(game × 100, 0, 65535)` | `game = raw / 100` | 0–655.35 | 12 |
 | `brake_temp_1` | **32** | **0x07** (was 0x12/16) | IEEE 754 single bits | IEEE 754 reinterpret | full float | 14 |
 | `uint24_t` | 24 | — | `raw = value` | raw | 0–16777215 | — |
 | `float` | 32 | 0x07 ✓ | IEEE 754 single bits | IEEE 754 reinterpret | full float | 73 |

@@ -296,19 +296,9 @@ namespace MozaPlugin.Devices.Ui
                     DashFlagsBrightnessSlider.Value = Clamp(_data.DashFlagsBrightness, 0, 100);
                     DashFlagsBrightnessValue.Text = $"{_data.DashFlagsBrightness}";
 
-                    UpdateSwatches(_dashRpmColorSwatches, _data.DashRpmColors, 10);
-                    UpdateSwatches(_dashFlagColorSwatches, _data.DashFlagColors, 6);
+                    WheelUiHelpers.UpdateSwatches(_dashRpmColorSwatches, _data.DashRpmColors, 10);
+                    WheelUiHelpers.UpdateSwatches(_dashFlagColorSwatches, _data.DashFlagColors, 6);
                 }
-            }
-        }
-
-        private static void UpdateSwatches(Border[] swatches, byte[][] colors, int count)
-        {
-            for (int i = 0; i < count && i < swatches.Length; i++)
-            {
-                if (swatches[i] == null) continue;
-                var c = colors[i];
-                swatches[i].Background = new SolidColorBrush(Color.FromRgb(c[0], c[1], c[2]));
             }
         }
 

@@ -237,7 +237,6 @@ namespace MozaPlugin
 
         // Protection
         public volatile int Protection = -1;
-        public volatile int ProtectionMode;
         public volatile int NaturalInertia = -1;
 
         // High speed damping
@@ -251,7 +250,6 @@ namespace MozaPlugin
 
         // FFB misc
         public volatile int FfbReverse = -1;
-        public volatile int FfbDisable;
         public volatile int TempStrategy = -1;   // cmd 0x1E base — also exposed in
                                                   // PitHouse as "Performance output"
                                                   // (0 = Reserved, 1 = Full).
@@ -583,6 +581,34 @@ namespace MozaPlugin
         public const int BaseFwLfeMin = (1 << 24) | (2 << 16) | (10 << 8) | 10; // 1.2.10.10
         public bool BaseSupportsLfe => BaseFwVersion != 0 && BaseFwVersion >= BaseFwLfeMin;
 
+        // Minimum base firmware carrying the torque-boost flag (register 0x39).
+        public const int BaseFwTorqueBoostMin = (1 << 24) | (2 << 16) | (12 << 8) | 4; // 1.2.12.4
+
+        /// <summary>True when this base has the torque-boost flag: an R16/R21/R25
+        /// Ultra on firmware >= 1.2.12.4. Gates the 0x39 poll.</summary>
+        public bool BaseSupportsTorqueBoost =>
+            BaseFwVersion >= BaseFwTorqueBoostMin
+            && Devices.BaseModelInfo.HasTorqueBoost(BaseModelName,
+                Devices.BaseModelInfo.ExtractHardwareCode(BaseSwVersion, BaseHwVersion));
+
+        // Torque-boost flag read back from the base: -1 = not read yet,
+        // 0 = stock, 1 = unlocked.
+        public const int TorqueBoostUnread = -1;
+        public volatile int BaseTorqueBoost = TorqueBoostUnread;
+
+        public bool BaseTorqueBoosted => BaseTorqueBoost == 1 && BaseSupportsTorqueBoost;
+
+        /// <summary>The base's peak torque in Nm, including the torque boost once
+        /// the base reports it unlocked; 0 when the model isn't established.</summary>
+        public double BaseRatedNm
+        {
+            get
+            {
+                double rated = Devices.BaseModelInfo.RatedNm(BaseModelName);
+                return rated > 0 && BaseTorqueBoosted ? rated + Devices.BaseModelInfo.TorqueBoostNm : rated;
+            }
+        }
+
         /// <summary>Packed <see cref="BaseFwVersion"/> as PitHouse displays it
         /// (major.minor.patch.build), or "unknown" when no probe has answered.</summary>
         public string BaseFwVersionText
@@ -901,6 +927,7 @@ namespace MozaPlugin
                 // State
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
+                case "base-torque-boost":   BaseTorqueBoost = value; break;
 
                 // Core settings
                 case "base-limit":          Limit = value; BaseSettingsRead = true; break;
@@ -917,7 +944,6 @@ namespace MozaPlugin
 
                 // Protection
                 case "base-protection":         Protection = value; break;
-                case "base-protection-mode":    ProtectionMode = value; break;
                 case "base-natural-inertia":    NaturalInertia = value; break;
 
                 // High speed damping
@@ -931,7 +957,6 @@ namespace MozaPlugin
 
                 // FFB misc
                 case "base-ffb-reverse":    FfbReverse = value; break;
-                case "base-ffb-disable":    FfbDisable = value; break;
                 case "base-temp-strategy":  TempStrategy = value; break;
                 case "base-gearshift-vibration": GearshiftVibration = value; break;
 
@@ -1118,28 +1143,21 @@ namespace MozaPlugin
 
             // Color commands need at least 3 bytes (R, G, B)
             // Wheel RPM colors
-            if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
+            if (commandName.StartsWith("wheel-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-rpm-color");
                 if (idx >= 0 && idx < WheelRpmColors.Length && data.Length >= 3)
                     SetColor(WheelRpmColors[idx], data);
             }
             // Wheel button colors
-            else if (commandName.StartsWith("wheel-button-color"))
+            else if (commandName.StartsWith("wheel-button-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-button-color");
                 if (idx >= 0 && idx < WheelButtonMax && data.Length >= 3)
                     SetColor(WheelButtonColors[idx], data);
             }
-            // Wheel flag colors
-            else if (commandName.StartsWith("wheel-flag-color"))
-            {
-                int idx = ParseTrailingIndex(commandName, "wheel-flag-color");
-                if (idx >= 0 && idx < 6 && data.Length >= 3)
-                    SetColor(WheelFlagColors[idx], data);
-            }
             // Old wheel RPM colors
-            else if (commandName.StartsWith("wheel-old-rpm-color"))
+            else if (commandName.StartsWith("wheel-old-rpm-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-old-rpm-color");
                 if (idx >= 0 && idx < 10 && data.Length >= 3)
@@ -1176,7 +1194,7 @@ namespace MozaPlugin
             // Per-LED idle palette: base-ambient-led-color-strip{s}-mode{m}-led{l}.
             // Mode is the standby-mode number; only 1 (constant) and 2 (breathing)
             // carry a palette.
-            else if (commandName.StartsWith("base-ambient-led-color-strip"))
+            else if (commandName.StartsWith("base-ambient-led-color-strip", StringComparison.Ordinal))
             {
                 if (data.Length >= 3
                     && TryParseBaseAmbientLedName(commandName, out int strip, out int mode, out int led))
@@ -1190,7 +1208,7 @@ namespace MozaPlugin
                 }
             }
             // Per-LED sleep palette: base-ambient-sleep-led-color-strip{s}-led{l}.
-            else if (commandName.StartsWith("base-ambient-sleep-led-color-strip"))
+            else if (commandName.StartsWith("base-ambient-sleep-led-color-strip", StringComparison.Ordinal))
             {
                 if (data.Length >= 3
                     && TryParseBaseAmbientLedName(commandName, out int strip, out _, out int led))
@@ -1203,21 +1221,21 @@ namespace MozaPlugin
             // Shifter (SGP) LEDs + relayed device-type are model-aware — routed via
             // UpdateShifterArray/TryUpdateShifter, not this shared method.
             // Dash RPM colors
-            else if (commandName.StartsWith("dash-rpm-color") && !commandName.Contains("blink"))
+            else if (commandName.StartsWith("dash-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
             {
                 int idx = ParseTrailingIndex(commandName, "dash-rpm-color");
                 if (idx >= 0 && idx < 10 && data.Length >= 3)
                     SetColor(DashRpmColors[idx], data);
             }
             // Dash flag colors
-            else if (commandName.StartsWith("dash-flag-color") && commandName != "dash-flag-colors")
+            else if (commandName.StartsWith("dash-flag-color", StringComparison.Ordinal) && commandName != "dash-flag-colors")
             {
                 int idx = ParseTrailingIndex(commandName, "dash-flag-color");
                 if (idx >= 0 && idx < 6 && data.Length >= 3)
                     SetColor(DashFlagColors[idx], data);
             }
             // Per-LED knob ring background colors (cmd 0x1F 0x03 0x01).
-            else if (commandName.StartsWith("wheel-knob-bg-color"))
+            else if (commandName.StartsWith("wheel-knob-bg-color", StringComparison.Ordinal))
             {
                 int idx = ParseTrailingIndex(commandName, "wheel-knob-bg-color");
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
@@ -1226,14 +1244,14 @@ namespace MozaPlugin
             // Per-knob Active LED color (cmd 0x27, role=0). Command name shape
             // is "wheel-knob{N}-active-color" with N in 1..5. Cheap StartsWith
             // gate keeps the parse off the hot path for unrelated frames.
-            else if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+            else if (commandName.StartsWith("wheel-knob", StringComparison.Ordinal) && commandName.EndsWith("-active-color", StringComparison.Ordinal))
             {
                 // Extract the knob index between "wheel-knob" (10 chars) and
                 // "-active-color" (13 chars).
                 int start = "wheel-knob".Length;
                 int end = commandName.Length - "-active-color".Length;
-                if (end > start && data.Length >= 3
-                    && int.TryParse(commandName.Substring(start, end - start), out int knob1)
+                int knob1 = ParseDigits(commandName, start, end);
+                if (data.Length >= 3
                     && knob1 >= 1 && knob1 <= WheelKnobPrimaryColors.Length)
                 {
                     SetColor(WheelKnobPrimaryColors[knob1 - 1], data);
@@ -1496,6 +1514,7 @@ namespace MozaPlugin
             BaseHwSubVersion = "";
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
+            BaseTorqueBoost = TorqueBoostUnread;
             // BaseFwVersion is intentionally NOT cleared — see its field comment.
             // It is static-backed and survives resets so the LFE card doesn't blink
             // out; the prober overwrites it on the next base detect.
@@ -1509,10 +1528,23 @@ namespace MozaPlugin
 
         private static int ParseTrailingIndex(string commandName, string prefix)
         {
-            var numStr = commandName.Substring(prefix.Length);
-            if (int.TryParse(numStr, out int num))
-                return num - 1; // Convert 1-based to 0-based
-            return -1;
+            int num = ParseDigits(commandName, prefix.Length, commandName.Length);
+            return num >= 0 ? num - 1 : -1; // Convert 1-based to 0-based
+        }
+
+        // Decimal value of s[start, end); -1 when the span is empty, too long for
+        // an int, or holds anything but digits.
+        private static int ParseDigits(string s, int start, int end)
+        {
+            if (start >= end || end - start > 9) return -1;
+            int value = 0;
+            for (int i = start; i < end; i++)
+            {
+                char c = s[i];
+                if (c < '0' || c > '9') return -1;
+                value = value * 10 + (c - '0');
+            }
+            return value;
         }
 
         // Lock around the 3-byte copy so Display() / PackColors callers never
@@ -1537,13 +1569,12 @@ namespace MozaPlugin
         private static bool IsWheelLedColorCommand(string commandName)
         {
             // wheel-rpm-color{N} (but not wheel-rpm-blink-color)
-            if (commandName.StartsWith("wheel-rpm-color") && !commandName.Contains("blink"))
+            if (commandName.StartsWith("wheel-rpm-color", StringComparison.Ordinal) && !commandName.Contains("blink"))
                 return true;
-            if (commandName.StartsWith("wheel-button-color")) return true;
-            if (commandName.StartsWith("wheel-flag-color")) return true;
-            if (commandName.StartsWith("wheel-knob-bg-color")) return true;
+            if (commandName.StartsWith("wheel-button-color", StringComparison.Ordinal)) return true;
+            if (commandName.StartsWith("wheel-knob-bg-color", StringComparison.Ordinal)) return true;
             // wheel-knob{N}-active-color
-            if (commandName.StartsWith("wheel-knob") && commandName.EndsWith("-active-color"))
+            if (commandName.StartsWith("wheel-knob", StringComparison.Ordinal) && commandName.EndsWith("-active-color", StringComparison.Ordinal))
                 return true;
             return false;
         }

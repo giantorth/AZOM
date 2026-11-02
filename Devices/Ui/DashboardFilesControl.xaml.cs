@@ -707,17 +707,33 @@ namespace MozaPlugin.Devices.Ui
             string dirName = row.DirName;
             string id = row.Id;
             var plugin = _plugin;
-            MozaLog.Info($"[AZOM] Delete requested: \"{dirName}\" id={id}");
+            // Target is fixed at click time: slot lookup, switch-away and the
+            // RPC must all hit the same device.
+            bool cm2 = IsCm2Target;
+            string lane = cm2 ? "cm2" : "wheel";
+            MozaLog.Info($"[AZOM] Delete requested ({lane}): \"{dirName}\" id={id}");
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
                 {
+                    if (plugin == null) return;
+                    // The lane switch helpers resolve the sender live; a sender
+                    // replaced since the click would split the delete across devices.
+                    var laneSender = cm2 ? plugin.ActiveCm2Sender : plugin.TelemetrySender;
+                    if (!ReferenceEquals(laneSender, ts))
+                    {
+                        MozaLog.Warn(
+                            $"[AZOM] completelyRemove(\"{dirName}\") aborted: {lane} sender " +
+                            "was replaced before the delete ran");
+                        return;
+                    }
+
                     // Don't delete the CURRENTLY-RENDERED dash out from under
-                    // the wheel — switch away first. WheelReportedSlot is -1
-                    // until the wheel reports a switch this session (cold
+                    // the device — switch away first. WheelReportedSlot is -1
+                    // until the device reports a switch this session (cold
                     // start / post-reconnect), so an UNKNOWN rendered slot is
                     // treated as possibly-active and switched away too.
-                    var state = plugin?.WheelStateForDiagnostics;
+                    var state = ts.WheelState;
                     var list = state?.ConfigJsonList;
                     int targetSlot = -1, fallbackSlot = -1;
                     if (list != null)
@@ -730,17 +746,30 @@ namespace MozaPlugin.Devices.Ui
                                 fallbackSlot = i;
                         }
                     }
+                    string savedName = cm2 ? plugin.ActiveCm2DashboardName : plugin.ActiveTelemetryProfileName;
                     bool deletingActive = targetSlot >= 0
                         && (ts.WheelReportedSlot == targetSlot
                             || ts.WheelReportedSlot < 0
-                            || string.Equals(plugin?.ActiveTelemetryProfileName, dirName,
-                                StringComparison.OrdinalIgnoreCase));
+                            || string.Equals(savedName, dirName, StringComparison.OrdinalIgnoreCase));
                     if (deletingActive && fallbackSlot >= 0)
                     {
+                        string fallbackName = list![fallbackSlot];
                         MozaLog.Info(
-                            $"[AZOM] Deleting the active/possibly-active dashboard — switching to " +
-                            $"slot {fallbackSlot} (\"{list![fallbackSlot]}\") first");
-                        plugin!.OnDashboardSwitched((uint)fallbackSlot);
+                            $"[AZOM] Deleting the active/possibly-active {lane} dashboard — switching to " +
+                            $"slot {fallbackSlot} (\"{fallbackName}\") first");
+                        if (cm2)
+                        {
+                            // The CM2's saved name is what its pipeline-start
+                            // re-assert targets; keep it on the dash we moved to.
+                            plugin.ActiveCm2DashboardName = fallbackName;
+                            plugin.PersistSettings();
+                            plugin.OnCm2DashboardSwitched((uint)fallbackSlot);
+                            plugin.RaiseDashboardSelectionChangedInternal();
+                        }
+                        else
+                        {
+                            plugin.OnDashboardSwitched((uint)fallbackSlot);
+                        }
                         System.Threading.Thread.Sleep(1500);
                     }
 
@@ -977,8 +1006,8 @@ namespace MozaPlugin.Devices.Ui
         private void RefreshWheelFilesGrid()
         {
             if (WheelFilesGrid == null || _plugin == null) return;
-            var state = _plugin.WheelStateForDiagnostics;
             var senderForRows = ActiveSender;
+            var state = senderForRows?.WheelState;
             var rows = new List<WheelFileRow>();
             if (state != null)
             {

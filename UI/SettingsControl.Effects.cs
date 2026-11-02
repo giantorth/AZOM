@@ -69,10 +69,8 @@ namespace MozaPlugin.UI
 
         /// <summary>
         /// Turn off every custom effect's sustained Test toggle for the
-        /// currently-selected device — mirrors the explicit stop calls for
-        /// the eight built-in effects' Test toggles in
-        /// <see cref="OnMBoosterDeviceRowSelected"/> and
-        /// <see cref="OnUnloadedStopTimers"/>, so a forgotten toggle doesn't
+        /// currently-selected device. Called from
+        /// <see cref="StopMBoosterPedalTests"/>, so a forgotten toggle doesn't
         /// leave the pedal buzzing with no UI left to turn it off.
         /// </summary>
         private void StopAllCustomEffectTests()
@@ -462,7 +460,7 @@ namespace MozaPlugin.UI
         // outside a real ABS event), vibrating continuously at the live
         // Frequency/Intensity/Smoothness slider values for as long as it's
         // on. See MBoosterDeviceController.SetAbsTestActive and
-        // MBoosterEffectWorker's _absTestSustained.
+        // MBoosterTestEffect.Abs.
         private void MBoosterAbsTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -504,7 +502,7 @@ namespace MozaPlugin.UI
         // outside a real TC event), vibrating continuously at the live
         // Frequency/Intensity slider values for as long as it's on. See
         // MBoosterDeviceController.SetTcTestActive and
-        // MBoosterEffectWorker's _tcTestSustained.
+        // MBoosterTestEffect.TractionControl.
         private void MBoosterTcTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -547,7 +545,7 @@ namespace MozaPlugin.UI
         // press against outside a real spin event), vibrating continuously
         // at the live Frequency/Intensity slider values for as long as it's
         // on. See MBoosterDeviceController.SetWheelSpinTestActive and
-        // MBoosterEffectWorker's _wheelSpinTestSustained.
+        // MBoosterTestEffect.WheelSpin.
         private void MBoosterWheelSpinTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -622,7 +620,7 @@ namespace MozaPlugin.UI
         // Intensity slider values for as long as it's on (there's no live
         // "gear just changed" signal to press against outside a real
         // shift). See MBoosterDeviceController.SetGearShiftTestActive and
-        // MBoosterEffectWorker's _gearShiftTestSustained.
+        // MBoosterTestEffect.GearShift.
         private void MBoosterGearShiftTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -666,7 +664,7 @@ namespace MozaPlugin.UI
         // preview against outside a real drive), vibrating continuously at
         // the live Frequency/Intensity slider values for as long as it's
         // on. See MBoosterDeviceController.SetLockupTestActive and
-        // MBoosterEffectWorker's _lockupTestSustained.
+        // MBoosterTestEffect.Lockup.
         private void MBoosterLockupTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -736,7 +734,7 @@ namespace MozaPlugin.UI
         // substituting live brake position for it, vibrating continuously
         // at the live Frequency/Intensity/Decay slider values for as long
         // as it's on. See MBoosterDeviceController.SetThresholdTestActive
-        // and MBoosterEffectWorker's _thresholdTestSustained.
+        // and MBoosterTestEffect.Threshold.
         private void MBoosterThresholdTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -812,7 +810,7 @@ namespace MozaPlugin.UI
         // live Frequency/Intensity/Smoothness slider values once the pedal
         // crosses the Trigger Input Level. See
         // MBoosterDeviceController.SetBitePointTestActive and
-        // MBoosterEffectWorker's _bitePointTestSustained.
+        // MBoosterTestEffect.BitePoint.
         private void MBoosterBitePointTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -842,7 +840,7 @@ namespace MozaPlugin.UI
         // Intensity slider values (both tracked in real time, not a
         // snapshot) for as long as it's on. See
         // MBoosterDeviceController.SetEngineTestActive and
-        // MBoosterEffectWorker's _engineTestSustained.
+        // MBoosterTestEffect.Engine.
         private void MBoosterEngineTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -898,7 +896,7 @@ namespace MozaPlugin.UI
         // signal to preview against outside a real drive), running
         // continuously at the live Intensity/Smoothness slider values. See
         // MBoosterDeviceController.SetRoadTextureTestActive and
-        // MBoosterEffectWorker's _roadTextureTestSustained.
+        // MBoosterTestEffect.RoadTexture.
         private void MBoosterRoadTextureTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -937,7 +935,7 @@ namespace MozaPlugin.UI
         // independently requires its own configured base value — otherwise
         // that one is a no-op (the other can still preview on its own). See
         // MBoosterDeviceController.SetBrakeFadeTestActive and
-        // MBoosterEffectWorker's _brakeFadeTestActive.
+        // MBoosterTestEffect.BrakeFade.
         private void MBoosterBrakeFadeTestToggle_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;

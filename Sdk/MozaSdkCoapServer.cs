@@ -22,10 +22,8 @@ namespace MozaPlugin.Sdk
     /// Lifecycle:
     /// <list type="number">
     ///   <item><see cref="Start"/> binds a <see cref="UdpClient"/> to
-    ///   <c>127.0.0.1:</c><see cref="CoapPort"/> (loopback only — the
-    ///   <see cref="MozaPluginSettings.SdkBindLoopbackOnly"/> flag is plumbed
-    ///   for future use but ignored in v1, by design) and spawns a single
-    ///   receive thread.</item>
+    ///   <c>127.0.0.1:</c><see cref="CoapPort"/> (loopback only) and spawns a
+    ///   single receive thread.</item>
     ///   <item>Receive loop parses each datagram, resolves the URI via the
     ///   registry, dispatches to a handler, encodes the response, and ships
     ///   it back to the source endpoint. CoAP CON pings (Code=0, Type=CON)
@@ -62,9 +60,8 @@ namespace MozaPlugin.Sdk
         private int _boundPort;
 
 
-        // Per-URI sampling counters for noisy resources (Feedforward etc.).
-        // Sampled at the same N=60 ratio as the Motor agent's emitter so
-        // server-side trace cadence matches handler-side trace cadence.
+        // Per-URI sampling counters for noisy resources (Feedforward etc.);
+        // the only log of these requests (handlers don't log them).
         private const int NoisySampleEvery = 60;
         private static readonly HashSet<string> NoisyUriTrailingSegments = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -93,9 +90,8 @@ namespace MozaPlugin.Sdk
         ///   onto the wheelbase / dash / pedals / etc.</param>
         /// <remarks>
         /// Constructor is internal because <see cref="HardwareApplier"/> is an
-        /// internal type; the public read-only surface (Status, IsRunning,
-        /// etc.) remains accessible to external callers via
-        /// <see cref="MozaPlugin.SdkServer"/>.
+        /// internal type; the public read-only <see cref="Status"/> remains
+        /// accessible to external callers via <see cref="MozaPlugin.SdkServer"/>.
         /// </remarks>
         internal MozaSdkCoapServer(MozaData data, HardwareApplier hw)
         {
@@ -107,26 +103,11 @@ namespace MozaPlugin.Sdk
             ResourceBindings.RegisterAll(_registry, _catalog, data, hw);
         }
 
-        /// <summary>True while the receive thread is alive.</summary>
-        public bool IsRunning
-        {
-            get { return _running; }
-        }
-
         /// <summary>Human-readable status string surfaced to the UI tab.</summary>
         public string Status
         {
             get { lock (_stateGate) return _status; }
         }
-
-        /// <summary>The port the listener actually bound to. 0 when not running.</summary>
-        public int BoundPort
-        {
-            get { lock (_stateGate) return _boundPort; }
-        }
-
-        /// <summary>Diagnostic: the URI suffixes the resource registry currently knows about.</summary>
-        public IEnumerable<string> KnownUriSuffixes => _registry.KnownUriSuffixes;
 
         /// <summary>
         /// Bind the UDP socket and spawn the receive thread. Idempotent —
@@ -153,6 +134,7 @@ namespace MozaPlugin.Sdk
                     // setting is honoured implicitly (true is the only path).
                     var endpoint = new IPEndPoint(IPAddress.Loopback, desiredPort);
                     var udp = new UdpClient(endpoint);
+                    LoopbackUdpSocket.DisableConnectionReset(udp, "[Sdk]");
 
                     // No ReceiveTimeout: ReceiveLoop uses Socket.Poll for
                     // its 200 ms wake-up budget. ReceiveTimeout-based
@@ -351,20 +333,33 @@ namespace MozaPlugin.Sdk
                 return;
             }
 
-            // CoAP CON ping: Code=0 and Type=CON. Reply with empty RST echoing
-            // the MID (no token, no payload). RFC 7252 §4.2.
-            if (request.Code == CoapCode.Empty && request.Type == CoapCode.TypeCon)
+            // Anything that is not a CON/NON request (empty message, response
+            // code, ACK/RST type) is never answered with a response (RFC 7252
+            // §4.2/§4.3); replying NON 4.04 could ping-pong with a client that
+            // RSTs unexpected NONs. A CON is rejected with an empty RST echoing
+            // the MID — this is also the CoAP ping (Code=0, Type=CON) reply.
+            if (!IsRequest(request))
             {
-                var rst = new CoapMessage
+                if (request.Type == CoapCode.TypeCon)
                 {
-                    Type = CoapCode.TypeRst,
-                    Code = CoapCode.Empty,
-                    MessageId = request.MessageId,
-                    Token = Array.Empty<byte>(),
-                    Payload = Array.Empty<byte>(),
-                };
-                SendSafe(udp, rst, remote);
-                LogRequest("Ping", "/(ping)", null, CoapCode.Empty, null, (int)sw.ElapsedMilliseconds);
+                    var rst = new CoapMessage
+                    {
+                        Type = CoapCode.TypeRst,
+                        Code = CoapCode.Empty,
+                        MessageId = request.MessageId,
+                        Token = Array.Empty<byte>(),
+                        Payload = Array.Empty<byte>(),
+                    };
+                    SendSafe(udp, rst, remote);
+                }
+                if (request.Code == CoapCode.Empty && request.Type == CoapCode.TypeCon)
+                    LogRequest("Ping", "/(ping)", null, CoapCode.Empty, null, (int)sw.ElapsedMilliseconds);
+                else
+                    MozaLog.DebugIfChanged("sdk:coap-non-request", string.Format(
+                        CultureInfo.InvariantCulture,
+                        "[Sdk] CoAP non-request ignored{0}: type={1} code={2}",
+                        request.Type == CoapCode.TypeCon ? " (RST sent)" : string.Empty,
+                        request.Type, CoapCode.Format(request.Code)));
                 return;
             }
 
@@ -373,24 +368,14 @@ namespace MozaPlugin.Sdk
 
             // Resolve and dispatch.
             CoapResourceResponse resourceResponse;
-            CoapResourceHandler? handler = _registry.Resolve(uriPath, out string? deviceId, out string? propertyName);
+            CoapResourceHandler? handler = _registry.Resolve(uriPath, out string? deviceId);
             if (handler == null)
             {
                 resourceResponse = CoapResourceResponse.NotFound("no handler bound");
             }
             else
             {
-                int contentFormat = -1;
-                var cfOpt = request.GetOption(CoapOptionNumber.ContentFormat);
-                if (cfOpt != null) contentFormat = (int)cfOpt.Value.ValueAsUInt();
-
-                var resourceReq = new CoapResourceRequest(
-                    uriPath: uriPath,
-                    deviceId: deviceId,
-                    propertyName: propertyName,
-                    payload: request.Payload,
-                    contentFormat: contentFormat,
-                    token: request.Token);
+                var resourceReq = new CoapResourceRequest(deviceId, request.Payload);
 
                 try
                 {
@@ -473,6 +458,7 @@ namespace MozaPlugin.Sdk
                 CoapMessage req;
                 try { req = CoapMessage.Decode(datagram); }
                 catch { return; }
+                if (!IsRequest(req)) return;
 
                 var resp = new CoapMessage
                 {
@@ -486,6 +472,12 @@ namespace MozaPlugin.Sdk
             }
             catch { /* swallow — last-ditch error path */ }
         }
+
+        /// <summary>A CON or NON message carrying a request-class code (0.01-0.31).</summary>
+        private static bool IsRequest(CoapMessage m) =>
+            m.Code != CoapCode.Empty
+            && CoapCode.Class(m.Code) == 0
+            && (m.Type == CoapCode.TypeCon || m.Type == CoapCode.TypeNon);
 
         private static void SendSafe(UdpClient udp, CoapMessage msg, IPEndPoint remote)
         {
@@ -545,21 +537,27 @@ namespace MozaPlugin.Sdk
                 return;
             }
 
-            // Everything else: always log. POST writes/actions carry their value
-            // and surface at Info; rejected/failed requests (4.xx/5.xx) at Warn so
-            // a bad CoAP-driven command stands out; reads (GET) stay at Debug.
+            // Everything else. POST writes/actions carry their value and surface
+            // at Info; rejected/failed requests (4.xx/5.xx) at Warn so a bad
+            // CoAP-driven command stands out; reads (GET) and pings go to Debug,
+            // repeat-suppressed per verb+URI so a polling client can't evict the
+            // ring. The suppression state excludes the duration.
+            string payloadText = DescribePayload(payload);
+            string reasonText = string.IsNullOrEmpty(reason) ? string.Empty : $" [{reason}]";
             string line = string.Format(
                 CultureInfo.InvariantCulture,
                 "[Sdk] {0} {1}{2} -> {3} ({4}ms){5}",
-                verb, uriPath, DescribePayload(payload), CoapCode.Format(responseCode), durationMs,
-                string.IsNullOrEmpty(reason) ? string.Empty : $" [{reason}]");
+                verb, uriPath, payloadText, CoapCode.Format(responseCode), durationMs, reasonText);
 
             if (CoapCode.Class(responseCode) >= 4)
                 MozaLog.Warn(line);
             else if (string.Equals(verb, "POST", StringComparison.Ordinal))
                 MozaLog.Info(line);
             else
-                MozaLog.Debug(line);
+                MozaLog.DebugIfChanged(
+                    "sdk:" + verb + " " + uriPath,
+                    payloadText + " " + CoapCode.Format(responseCode) + reasonText,
+                    line);
         }
 
         /// <summary>Increment and return the per-key request counter (liveness/noisy sampling).</summary>

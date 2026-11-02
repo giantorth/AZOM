@@ -476,7 +476,8 @@ namespace MozaPlugin.Devices.Motion
                 }
                 while (_requests.TryDequeue(out _)) { }
                 TryConnect(now);
-                Thread.Sleep(50);
+                // Nothing holds the lane (the usual case with no controller): poll slowly.
+                Thread.Sleep(Wanted ? 50 : PacedWorkerLoop.IdleSleepMs);
                 return;
             }
             if (!_wasConnected)
@@ -1064,6 +1065,10 @@ namespace MozaPlugin.Devices.Motion
         public void Dispose()
         {
             if (!_running) return;
+            // Stop the worker first: it would otherwise re-send game mode or refill the
+            // stream slots after the standby below. A timed-out join still gets standby.
+            _running = false;
+            try { _worker.Join(500); } catch { }
             var phase = _phase;
             if (_connection.IsConnected
                 && (phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
@@ -1079,8 +1084,6 @@ namespace MozaPlugin.Devices.Motion
                 }
                 catch { /* shutting down */ }
             }
-            _running = false;
-            try { _worker.Join(500); } catch { }
             _connection.MessageReceived -= OnMessage;
             try { _connection.Disconnect(); } catch { }
             try { _connection.Dispose(); } catch { }

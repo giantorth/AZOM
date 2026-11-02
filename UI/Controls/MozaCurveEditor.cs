@@ -131,17 +131,6 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(10.0));
         public double MinEndpointGap { get => (double)GetValue(MinEndpointGapProperty); set => SetValue(MinEndpointGapProperty, value); }
 
-        // When true, every spline control point is clamped to YMin..YMax, so
-        // (convex hull) the drawn curve never leaves the plot vertically — a
-        // flat run of nodes at 0 stays flat instead of dipping below the axis.
-        // Off by default — hardware-evaluated curves keep their unclamped
-        // drawing.
-        public static readonly DependencyProperty ClampSplineToPlotProperty =
-            DependencyProperty.Register(nameof(ClampSplineToPlot), typeof(bool), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
-                    (d, e) => ((MozaCurveEditor)d).Recompute()));
-        public bool ClampSplineToPlot { get => (bool)GetValue(ClampSplineToPlotProperty); set => SetValue(ClampSplineToPlotProperty, value); }
-
         // True while a node or the end anchor is being dragged. Owners that
         // rescale the axis from a value the drag itself writes (Pedal Feel:
         // YMax from Max Force) wait for DragCompleted, else the axis moves
@@ -1092,16 +1081,8 @@ namespace MozaControls
                 Point p1 = allPts[i + 1];
                 Point p2 = allPts[i + 2];
                 Point p3 = allPts[i + 3];
-                double c1y = p1.Y + (p2.Y - p0.Y) / 6.0;
-                double c2y = p2.Y - (p3.Y - p1.Y) / 6.0;
-                if (ClampSplineToPlot)
-                {
-                    double top = PadTop, bottom = PadTop + plotH;
-                    c1y = Math.Max(top, Math.Min(bottom, c1y));
-                    c2y = Math.Max(top, Math.Min(bottom, c2y));
-                }
-                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, c1y);
-                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, c2y);
+                Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
+                Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
                 fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
                 segments[i] = (p1, c1, c2, p2);
             }

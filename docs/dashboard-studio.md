@@ -152,11 +152,18 @@ per-wheel synced tree) and `Local_DashboardFileManager::startProcess` (for the l
 project tree); both build the same `dashId` → `--update-preview-image` → `.\MOZA Dashboard
 Studio.exe` invocation and log `Failed to start process with ID` when the spawn fails.
 
-**The plugin deliberately never passes this flag.** It is a maintenance mode with no window,
-so a user pressing a button would see nothing happen; and the previews it writes are
-PitHouse's concern, not the telemetry pipeline's. It is documented here because the flag is
-the reason stray headless `MOZA Dashboard Studio.exe` processes appear at PitHouse startup —
-which is exactly what a naïve "is Studio already running?" check would trip over.
+**The plugin uses this flag for the preview atop the dashboard page's telemetry card**
+([`UI/DashboardPreviewRenderer.cs`](../UI/DashboardPreviewRenderer.cs)). It never renders in
+place: the selected dashboard's mzdash bytes (wheel cache, library folder, builtin or custom
+file) are copied to `%LOCALAPPDATA%\MozaSimHubPlugin\DashboardPreviews\<sha1>\<Name>\<Name>.mzdash`,
+along with any `Resource\` subtree beside the source, and Studio renders that copy. The cache
+is keyed by content hash, so an unchanged dashboard renders once; renders are serialized,
+time out after 60 s, and the cache is pruned to the newest 64 entries. With no Studio
+install, no mzdash for the selection, or a failed render, a same-sized "Preview not
+available" placeholder is shown; FSR1/CM1 (built-in pages, no mzdash) hide the preview.
+
+The flag is also why stray headless `MOZA Dashboard Studio.exe` processes appear at PitHouse
+startup — exactly what a naïve "is Studio already running?" check would trip over.
 
 ## Other observed internals
 

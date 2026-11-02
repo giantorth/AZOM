@@ -25,8 +25,6 @@ namespace MozaPlugin.UI.UpdateCheck
 
         private UpdateInstallCoordinator() { }
 
-        private CancellationTokenSource? _installCts;
-
         /// <summary>
         /// True while a download+install is running. Surfaces gate their repaint
         /// paths on this so a 500 ms refresh tick doesn't clobber live progress.
@@ -115,10 +113,6 @@ namespace MozaPlugin.UI.UpdateCheck
                 return;
             }
 
-            try { _installCts?.Cancel(); } catch { }
-            _installCts = new CancellationTokenSource();
-            var ct = _installCts.Token;
-
             InstallInProgress = true;
 
             // Progress<T> captures the originating (UI) SynchronizationContext so
@@ -133,8 +127,7 @@ namespace MozaPlugin.UI.UpdateCheck
                         s.LastSeenAssetUrl,
                         UpdateCheckService.Http,
                         progress,
-                        ct),
-                    ct).ConfigureAwait(true);
+                        CancellationToken.None)).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -157,12 +150,6 @@ namespace MozaPlugin.UI.UpdateCheck
             // can't be issued, the pending-restart banner's Restart button remains.
             if (result.Success)
                 MozaPlugin.Instance?.RestartSimHub();
-        }
-
-        /// <summary>Cancels an in-flight install (e.g. when the last UI host unloads).</summary>
-        public void CancelInstall()
-        {
-            try { _installCts?.Cancel(); } catch { }
         }
     }
 }

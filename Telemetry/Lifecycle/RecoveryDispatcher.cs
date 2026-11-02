@@ -278,7 +278,6 @@ namespace MozaPlugin.Telemetry.Lifecycle
         /// </summary>
         public void Park(string reason, bool degraded = false)
         {
-            bool fire;
             lock (_lock)
             {
                 if (_parked)
@@ -291,9 +290,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 _parkIsDegraded = degraded;
                 _lastEscalationUtcTicks = DateTime.UtcNow.Ticks;
                 ArmParkAutoRetryLocked();
-                fire = true;
             }
-            if (!fire) return;
             MozaLog.Warn($"[AZOM] Recovery park initiated: {reason}");
             ThreadPool.QueueUserWorkItem(_ =>
             {

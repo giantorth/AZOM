@@ -24,14 +24,10 @@ namespace MozaPlugin.Sdk
     /// </summary>
     public static class PayloadCodec
     {
-        /// <summary>
-        /// Content-Format value for <c>application/octet-stream</c>. Mirrors
-        /// <see cref="Coap.CoapContentFormat.OctetStream"/>; re-exported here
-        /// so resource handlers don't need a using for the Coap namespace.
-        /// </summary>
+        /// <summary>CoAP Content-Format value for <c>application/octet-stream</c>.</summary>
         public const int CFOctetStream = 42;
 
-        /// <summary>Content-Format value for <c>application/cbor</c>. Mirrors <see cref="Coap.CoapContentFormat.Cbor"/>.</summary>
+        /// <summary>CoAP Content-Format value for <c>application/cbor</c>.</summary>
         public const int CFCbor = 60;
 
         /// <summary>
@@ -69,23 +65,6 @@ namespace MozaPlugin.Sdk
                   | (body[2] << 16)
                   | (body[3] << 24);
             return true;
-        }
-
-        /// <summary>
-        /// Encode <paramref name="value"/> as a 4-byte little-endian int32.
-        /// Not used by the GET scalar path (which is ASCII text) but kept for
-        /// the rare echo-back / observe-notification cases where the server
-        /// emits in the same shape the client sent.
-        /// </summary>
-        public static byte[] EncodeScalarAsLittleEndian(int value)
-        {
-            return new byte[]
-            {
-                (byte)(value         & 0xFF),
-                (byte)((value >>  8) & 0xFF),
-                (byte)((value >> 16) & 0xFF),
-                (byte)((value >> 24) & 0xFF),
-            };
         }
     }
 }

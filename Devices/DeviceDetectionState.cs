@@ -155,19 +155,13 @@ namespace MozaPlugin.Devices
             // Also picks up BaseFwVersionLogged / BaseFwVersionProbeRetries, which
             // this method used to leave latched across a reload.
             ResetBase();
-            DashDetected = false;
-            ResetDashPollMisses();
-            NewWheelDetected = false;
-            OldWheelDetected = false;
-            LastKnownWheelDeviceId = 0;
+            ResetWheel();
             HandbrakeDetected = false;
             PedalsDetected = false;
             HubDetected = false;
             Ab9Detected = false;
             HgpDetected = false;
             SgpDetected = false;
-            NewWheelActingOldProtocol = false;
-            NewWheelActingOldModel = "";
             ClearOwners();
         }
 
@@ -184,6 +178,39 @@ namespace MozaPlugin.Devices
             HgpOwner = null;
             SgpOwner = null;
             BaseOwner = null;
+        }
+
+        /// <summary>
+        /// Drop detection AND ownership of every routable peripheral (pedals,
+        /// handbrake, HGP, SGP) owned by <paramref name="dm"/>. Call when that pipe
+        /// goes away or now reaches a different device, so the peripheral
+        /// re-detects on whichever pipe answers next — Mark*Detected only claims
+        /// ownership while the flag is clear or the owner null. A null
+        /// <paramref name="dm"/> drops the flags no pipe has claimed yet (e.g. ones
+        /// carried across a persistent-wire reload).
+        /// </summary>
+        public void ClearPeripheralsOwnedBy(MozaDeviceManager? dm)
+        {
+            if (ReferenceEquals(PedalsOwner, dm))
+            {
+                PedalsDetected = false;
+                PedalsOwner = null;
+            }
+            if (ReferenceEquals(HandbrakeOwner, dm))
+            {
+                HandbrakeDetected = false;
+                HandbrakeOwner = null;
+            }
+            if (ReferenceEquals(HgpOwner, dm))
+            {
+                HgpDetected = false;
+                HgpOwner = null;
+            }
+            if (ReferenceEquals(SgpOwner, dm))
+            {
+                SgpDetected = false;
+                SgpOwner = null;
+            }
         }
 
         /// <summary>

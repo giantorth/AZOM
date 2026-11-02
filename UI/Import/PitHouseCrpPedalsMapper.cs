@@ -94,6 +94,7 @@ namespace MozaPlugin.UI.Import
                 $"{label} · Direction",
                 ov < 0 ? "(unset)" : Dir(ov),
                 Dir(nv),
+                ov < 0 || (ov != 0) != (nv != 0),
                 () => SetDir(profile, prefix, nv)));
         }
 
@@ -139,6 +140,7 @@ namespace MozaPlugin.UI.Import
                 $"{label} · Range (min–max)",
                 oldMin < 0 || oldMax < 0 ? "(unset)" : $"{oldMin}–{oldMax}%",
                 $"{min}–{max}%",
+                oldMin != min || oldMax != max,
                 () => { SetMin(profile, prefix, min); SetMax(profile, prefix, max); }));
         }
 
@@ -166,13 +168,17 @@ namespace MozaPlugin.UI.Import
             }
 
             var old = GetCurve(profile, prefix);
-            string oldDisplay = old == null || old.Length < 5
+            bool oldUnset = old == null || old.Length < 5;
+            string oldDisplay = oldUnset
                 ? "(unset)"
-                : $"{old[0]}/{old[1]}/{old[2]}/{old[3]}/{old[4]}";
+                : $"{old![0]}/{old[1]}/{old[2]}/{old[3]}/{old[4]}";
+            bool changed = oldUnset;
+            for (int i = 0; !changed && i < 5; i++) changed = old![i] != y[i];
             plan.Diffs.Add(new FieldDiff(
                 $"{label} · Output curve (Y at 20/40/60/80/100%)",
                 oldDisplay,
                 $"{y[0]}/{y[1]}/{y[2]}/{y[3]}/{y[4]}",
+                changed,
                 () => SetCurve(profile, prefix, (int[])y.Clone())));
         }
 
@@ -192,6 +198,7 @@ namespace MozaPlugin.UI.Import
                 $"{label} · Sensor output ratio",
                 ov < 0 ? "(unset)" : ov.ToString(CultureInfo.InvariantCulture) + "%",
                 nv.ToString(CultureInfo.InvariantCulture) + "%",
+                ov != nv,
                 () => profile.PedalsBrakeAngleRatio = nv));
         }
 

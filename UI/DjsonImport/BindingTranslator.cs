@@ -207,7 +207,8 @@ namespace MozaPlugin.UI.DjsonImport
                     continue;
                 }
 
-                string expression = DjsonReader.Str(DjsonReader.Obj(spec, "Formula"), "Expression");
+                var formula = DjsonReader.Obj(spec, "Formula");
+                string expression = DjsonReader.Str(formula, "Expression");
                 if (expression.Length == 0) continue;
 
                 // Colour and image targets need text — a "#RRGGBB" or an image path.
@@ -215,7 +216,7 @@ namespace MozaPlugin.UI.DjsonImport
                 // has nowhere to put such a value; offloading would land a number in the
                 // slot and render black or blank. Keep the design-time value and report it.
                 bool textResult = IsColorTarget(target) || target == "image.src";
-                var t = _js.Translate(expression, allowOffload: !textResult);
+                var t = _js.Translate(expression, allowOffload: !textResult, DeclaredJavaScript(formula));
                 if (!t.Ok)
                 {
                     NoteFailure(expression, t);
@@ -259,10 +260,11 @@ namespace MozaPlugin.UI.DjsonImport
         /// </summary>
         public string? TranslateExpression(JObject spec)
         {
-            string expression = DjsonReader.Str(DjsonReader.Obj(spec, "Formula"), "Expression");
+            var formula = DjsonReader.Obj(spec, "Formula");
+            string expression = DjsonReader.Str(formula, "Expression");
             if (expression.Length == 0) return null;
 
-            var t = _js.Translate(expression, allowOffload: true);
+            var t = _js.Translate(expression, allowOffload: true, DeclaredJavaScript(formula));
             if (!t.Ok)
             {
                 NoteFailure(expression, t);
@@ -272,6 +274,14 @@ namespace MozaPlugin.UI.DjsonImport
             foreach (var note in t.Notes) _report.Notes.Add(note);
             return t.Js;
         }
+
+        /// <summary>SimHub writes <c>Formula.Interpreter: 1</c> on a JavaScript formula and
+        /// omits the field for NCalc. Null when absent or not a number, leaving the shape
+        /// check to decide.</summary>
+        private static bool? DeclaredJavaScript(JObject? formula)
+            => formula?["Interpreter"] is JValue { Type: JTokenType.Integer } v
+                ? (long)v == 1
+                : (bool?)null;
 
         /// <summary>Pick the chain step that renders the value. A <c>FormatString</c> on the
         /// binding decides it; otherwise a text target stringifies and anything else (a

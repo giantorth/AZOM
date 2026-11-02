@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using GameReaderCommon;
 using MozaPlugin.Diagnostics;
 using MozaPlugin.Protocol;
 using MozaPlugin.Telemetry.Dashboard;
@@ -23,11 +22,16 @@ namespace MozaPlugin.Telemetry.Frames
         private const int ChecksumLen = 1;
 
         private readonly DashboardProfile _profile;
+        // Channel set captured at construction. The emitter swaps tier.Channels on
+        // the live profile, so per-frame loops must never re-read _profile.Channels:
+        // every per-channel array here is sized and indexed against this snapshot.
+        private readonly ChannelDefinition[] _channels;
+        private readonly int[] _bitWidth;
         private readonly Func<GameDataSnapshot, double>[] _resolvers;
 
         // Per-channel encode path resolved once at construction (a channel's
-        // compression code never changes), so the per-frame loop skips the three
-        // CompressionTable string-dictionary lookups TelemetryEncoder would do.
+        // compression code never changes), so the per-frame loop skips the
+        // CompressionTable string-dictionary lookups.
         private enum EncKind : byte { Float, Double, Bits, LocationPair, RadarPair }
         private readonly EncKind[] _encKind;
         private readonly Func<double, ulong>?[] _encFn;
@@ -44,6 +48,8 @@ namespace MozaPlugin.Telemetry.Frames
         /// per-opponent allocation entirely when no channel consumes them
         /// (the shipped default, with radar/track-map channels disabled).</summary>
         public bool NeedsCarPositions { get; private set; }
+        // Any RadarPair channel — the only consumer of the heading state below.
+        private readonly bool _hasRadar;
         // Track-map location_t packing. The 64-bit slot is, little-endian,
         //   [u16 Y(elev) | u24 Z | u24 X]
         // where each field = clamp(center + round(scale * worldMetres)).
@@ -94,14 +100,6 @@ namespace MozaPlugin.Telemetry.Frames
         // motion — never derive a heading from it (see UpdateRadarHeadings).
         private const float RadarTeleportEps = 40f;
 
-        public TelemetryFrameBuilder(DashboardProfile profile)
-            : this(profile, propertyResolver: null, type02NConvention: false,
-                deviceId: MozaProtocol.DeviceWheel) { }
-
-        public TelemetryFrameBuilder(DashboardProfile profile, Func<string, double>? propertyResolver)
-            : this(profile, propertyResolver, type02NConvention: false,
-                deviceId: MozaProtocol.DeviceWheel) { }
-
         /// <summary>
         /// Build a frame builder. If <paramref name="propertyResolver"/> is supplied,
         /// channels with a non-empty <see cref="ChannelDefinition.SimHubProperty"/>
@@ -109,7 +107,7 @@ namespace MozaPlugin.Telemetry.Frames
         /// back to <see cref="GameDataSnapshot.GetField"/>.
         ///
         /// <paramref name="type02NConvention"/> selects the N-field formula:
-        /// false (default) = legacy 8+dataLen (VGS/F1), true = 10+dataLen
+        /// false = legacy 8+dataLen (VGS/F1), true = 10+dataLen
         /// including grp+dev (CSP/Type02 wheel firmware). Verified against
         /// PitHouse capture wireshark/csp/start-game-change-dash.pcapng — CSP
         /// frame `7e 0b 43 17 7d 23 32 00 23 32 1d 20 1f 00` has N=11 with
@@ -140,13 +138,17 @@ namespace MozaPlugin.Telemetry.Frames
             // we're just rewiring the host-side value source. Per-frame cost
             // is two property reads + one branch on top of the existing
             // resolver dispatch — sub-µs even on long tier lists.
-            _resolvers = new Func<GameDataSnapshot, double>[profile.Channels.Count];
-            _encKind = new EncKind[profile.Channels.Count];
-            _encFn = new Func<double, ulong>?[profile.Channels.Count];
-            _locIndex = new int[profile.Channels.Count];
-            for (int i = 0; i < profile.Channels.Count; i++)
+            _channels = profile.Channels.ToArray();
+            int count = _channels.Length;
+            _bitWidth = new int[count];
+            _resolvers = new Func<GameDataSnapshot, double>[count];
+            _encKind = new EncKind[count];
+            _encFn = new Func<double, ulong>?[count];
+            _locIndex = new int[count];
+            for (int i = 0; i < count; i++)
             {
-                var ch = profile.Channels[i];
+                var ch = _channels[i];
+                _bitWidth[i] = ch.BitWidth;
                 if (propertyResolver != null)
                 {
                     var resolver = propertyResolver;
@@ -170,8 +172,9 @@ namespace MozaPlugin.Telemetry.Frames
                     _resolvers[i] = s => s.GetField(channel.SimHubField);
                 }
 
-                // Resolve the encode path once. Mirrors TelemetryEncoder's
-                // IsFloat → IsDouble → Encode precedence exactly.
+                // Resolve the encode path once: float, then 64-bit, then the
+                // bit path (cached CompressionTable encoder, same semantics as
+                // TelemetryEncoder.Encode).
                 if (ch.Compression == "float")
                     _encKind[i] = EncKind.Float;
                 else if (CompressionTable.TryGetByName(ch.Compression, out var de) && de.BitWidth == 64)
@@ -204,6 +207,7 @@ namespace MozaPlugin.Telemetry.Frames
                     _encKind[i] = EncKind.RadarPair;
                     _locIndex[i] = riIdx;
                     NeedsCarPositions = true;
+                    _hasRadar = true;
                 }
                 else
                 {
@@ -241,9 +245,9 @@ namespace MozaPlugin.Telemetry.Frames
         public DashboardProfile Profile => _profile;
 
         // Pack one channel's value using the pre-resolved encode path. _bitWriter
-        // is non-null here (callers guard). Matches TelemetryEncoder semantics:
-        // float → WriteFloat, 64-bit → WriteDouble, else encode-and-pack with the
-        // cached entry delegate (or the (uint)(int) fallback when uncatalogued).
+        // is non-null here (callers guard). float → WriteFloat, 64-bit →
+        // WriteDouble, else encode-and-pack with the cached entry delegate (or
+        // TelemetryEncoder.Encode's (uint)(int) fallback when uncatalogued).
         private void WriteChannel(int i, double value, int bitWidth)
         {
             switch (_encKind[i])
@@ -427,15 +431,6 @@ namespace MozaPlugin.Telemetry.Frames
         private const int RadarPosFieldCenter = 0x200;       // 512: 10-bit axis centre (rel = 0)
         private const double RadarPosFieldScale = 512.0 / 24.0; // 21.333 units/m per axis (+/-24 m)
         private const int RadarHeadCenter = 0x167;     // high 12 bits at relHeading = 0 (aligned)
-        // Only emit a car whose |relZ| is inside the low-20 wrap window; beyond it
-        // the position wraps and the dot teleports. 2^19 / 21630 = 24.24 m; gate
-        // just inside so we never sit on the wrap seam.
-        private const float RadarRelZRange = 24.0f;
-        // ...AND within ~30 m in 2-D. relZ carries no lateral, so a car far across
-        // the track on a parallel section can share the player's world-Z and would
-        // otherwise plot as a phantom (wrong spot, ~180° heading). PitHouse's shown
-        // cars are 100% within 30 m 2-D (0% beyond) — this gate matches that.
-        private const float RadarRange2DSq = 30f * 30f;
         private const double RadToDeg = 180.0 / Math.PI;
 
         private void WriteRadarPair(int slot, in GameDataSnapshot snap)
@@ -599,10 +594,6 @@ namespace MozaPlugin.Telemetry.Frames
             return (short)v;
         }
 
-        /// <summary>Build frame from live game data.</summary>
-        public byte[] BuildFrame(StatusDataBase? gameData, byte flagByte) =>
-            BuildFrameFromSnapshot(GameDataSnapshot.FromStatusData(gameData, NeedsCarPositions), flagByte);
-
         /// <summary>Build frame from a pre-populated snapshot (test patterns, etc.).</summary>
         public byte[] BuildFrameFromSnapshot(GameDataSnapshot snapshot, byte flagByte)
         {
@@ -614,12 +605,13 @@ namespace MozaPlugin.Telemetry.Frames
 
                 // Refresh per-car headings from motion before writing radar slots
                 // (feeds the ri high-12-bit relative-orientation field).
-                UpdateRadarHeadings(in snapshot);
+                if (_hasRadar)
+                    UpdateRadarHeadings(in snapshot);
 
                 if (NeedsCarPositions)
                     UpdateMapTransform(in snapshot);
 
-                for (int i = 0; i < _profile.Channels.Count; i++)
+                for (int i = 0; i < _channels.Length; i++)
                 {
                     if (_encKind[i] == EncKind.LocationPair)
                     {
@@ -633,7 +625,7 @@ namespace MozaPlugin.Telemetry.Frames
                     }
                     double value = _resolvers[i](snapshot);
                     if (double.IsNaN(value) || double.IsInfinity(value)) value = 0.0;
-                    WriteChannel(i, value, _profile.Channels[i].BitWidth);
+                    WriteChannel(i, value, _bitWidth[i]);
                 }
             }
 
@@ -669,11 +661,10 @@ namespace MozaPlugin.Telemetry.Frames
             {
                 _bitWriter.Reset();
 
-                for (int i = 0; i < _profile.Channels.Count; i++)
+                for (int i = 0; i < _channels.Length; i++)
                 {
-                    var ch = _profile.Channels[i];
-                    double value = TestSignalGenerator.Compute(ch.TestSignal, nowMs);
-                    WriteChannel(i, value, ch.BitWidth);
+                    double value = TestSignalGenerator.Compute(_channels[i].TestSignal, nowMs);
+                    WriteChannel(i, value, _bitWidth[i]);
                 }
             }
 
@@ -789,29 +780,6 @@ namespace MozaPlugin.Telemetry.Frames
         {
             Array.Reverse(b);
             return b;
-        }
-
-        /// <summary>
-        /// Build a stub frame for a tier with no active channels.
-        /// Frame contains the full fixed header but no data bytes.
-        /// </summary>
-        public static byte[] BuildStubFrame(byte flagByte, byte deviceId = MozaProtocol.DeviceWheel)
-        {
-            var frame = new byte[HeaderLen + ChecksumLen];
-            frame[0] = MozaProtocol.MessageStart;
-            frame[1] = (byte)(2 + 6);  // N legacy: cmd+prefix, no data
-            frame[2] = MozaProtocol.TelemetrySendGroup;
-            frame[3] = deviceId;
-            frame[4] = 0x7D;
-            frame[5] = 0x23;
-            frame[6] = 0x32;
-            frame[7] = 0x00;
-            frame[8] = 0x23;
-            frame[9] = 0x32;
-            frame[10] = flagByte;
-            frame[11] = 0x20;
-            frame[12] = MozaProtocol.CalculateWireChecksum(frame, 12);
-            return frame;
         }
     }
 }

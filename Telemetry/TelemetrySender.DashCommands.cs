@@ -290,12 +290,10 @@ namespace MozaPlugin.Telemetry
         // Live connection reference for collaborators — never capture this:
         // Rebind() replaces _connection (CM2 standalone repoint).
         internal MozaSerialConnection ConnectionRef => _connection;
-        internal Sessions.SessionInfo SessionsGetOrCreate(byte session) => _sessions.GetOrCreate(session);
         internal bool ConfigJsonHasLastState => _configJson.LastState != null;
         internal long ConfigJsonLastForwardGapUtcTicks => _configJson.LastForwardGapUtcTicks;
         internal int Session09InboundSeq => _session09InboundSeq;
         internal int CatalogCount => _catalogParser?.Count ?? 0;
-        internal bool HasActiveSubscription => _activeSubscription != null;
         internal void SendRawFrame(byte[] frame)
         {
             NoteOutboundChunk(frame);

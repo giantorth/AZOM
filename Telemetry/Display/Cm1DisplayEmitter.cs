@@ -83,25 +83,11 @@ namespace MozaPlugin.Telemetry.Display
                 var rec = records[i];
                 frame[o++] = rec.Key[0];
                 frame[o++] = rec.Key[1];
-                WriteFloatBE(frame, o, rec.Value);
+                FloatBits.WriteF32BE(frame, o, rec.Value);
                 o += 4;
             }
             frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
             return frame;
-        }
-
-        /// <summary>Write a big-endian IEEE-754 float32 at <paramref name="off"/>.</summary>
-        private static void WriteFloatBE(byte[] frame, int off, float value)
-        {
-            var b = BitConverter.GetBytes(value); // host order
-            if (BitConverter.IsLittleEndian)
-            {
-                frame[off] = b[3]; frame[off + 1] = b[2]; frame[off + 2] = b[1]; frame[off + 3] = b[0];
-            }
-            else
-            {
-                frame[off] = b[0]; frame[off + 1] = b[1]; frame[off + 2] = b[2]; frame[off + 3] = b[3];
-            }
         }
 
         /// <summary>Append the wire checksum to a literal 7E…payload prefix.</summary>

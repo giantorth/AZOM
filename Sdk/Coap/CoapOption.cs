@@ -15,15 +15,6 @@ namespace MozaPlugin.Sdk.Coap
     }
 
     /// <summary>
-    /// Well-known Content-Format identifiers used in the capture.
-    /// </summary>
-    public static class CoapContentFormat
-    {
-        public const int OctetStream = 42;  // application/octet-stream
-        public const int Cbor        = 60;  // application/cbor
-    }
-
-    /// <summary>
     /// A single CoAP option as a (number, raw-value-bytes) pair. The decoder
     /// produces these in numerical/wire order; the encoder requires the same.
     /// </summary>

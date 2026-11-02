@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Telemetry.Frames
 {
-    // Single source of truth for every compression code observed in PitHouse traffic.
-    // Old code spread bit-width / encoder / test-range maps across three files
-    // (Telemetry/TierDefinitionBuilder.cs:180, TelemetryEncoder.cs:15, :154); this
-    // collapses them into one row per code.
+    // Single source of truth for every compression code observed in PitHouse traffic:
+    // one row per code with its bit width, encoder and test range.
     //
     // Codes covered (per docs/protocol/findings/2026-05-04-tierdef-reference.md):
     //   captured in tier-def channel records: 0x00 0x02 0x04 0x07 0x0D 0x0E 0x0F 0x11 0x13 0x16
@@ -42,21 +41,13 @@ namespace MozaPlugin.Telemetry.Frames
 
         private static readonly Dictionary<string, Entry> _byName =
             new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Dictionary<uint, Entry> _byCode = new Dictionary<uint, Entry>();
-        private static readonly List<Entry> _all = new List<Entry>();
 
         // Sanitise NaN / ±Infinity (SimHub surfaces these during init / pre-warmup).
         private static double Sanitize(double v) => double.IsNaN(v) || double.IsInfinity(v) ? 0.0 : v;
         private static double Clamp(double v, double lo, double hi) =>
             v < lo ? lo : v > hi ? hi : v;
 
-        private static void Add(Entry e)
-        {
-            _byName[e.Name] = e;
-            if (!_byCode.ContainsKey(e.Code))
-                _byCode[e.Code] = e;
-            _all.Add(e);
-        }
+        private static void Add(Entry e) => _byName[e.Name] = e;
 
         static CompressionTable()
         {
@@ -99,19 +90,12 @@ namespace MozaPlugin.Telemetry.Frames
             // 16-bit speed (×10, 0..65535)
             Add(new Entry("float_6000_1", 0x0F, 16,
                 v => (ulong)Clamp(Sanitize(v) * 10.0, 0, 65535), (0, 400)));
-            Add(new Entry("float_600_2", 0x15, 16,
+            // PitHouse emits 0x10/16 for NavigationSpeedLimit (stock compression
+            // float_600_2) in truck-sim tier-defs (bridge-20260514-170002 idx=18);
+            // ×100 confirmed on hardware. The inferred 0x15 made Type02 reject the
+            // whole tier (bundles DJQ23F6D, F6WV5S95: InstantConsumption_L100KM).
+            Add(new Entry("float_600_2", 0x10, 16,
                 v => (ulong)Clamp(Sanitize(v) * 100.0, 0, 65535), (0, 400)));
-
-            // 16-bit navigation speed limit. PitHouse emits comp=0x10 width=16
-            // for NavigationSpeedLimit in truck-sim (ETS2/ATS) tier-defs
-            // (bridge-20260514-170002 idx=18) — the only place 0x10 appears
-            // (the earlier "0x10 never used" note was from circuit captures,
-            // which lack this channel). The firmware's 0x10 codec is ×100
-            // (confirmed on hardware: a 0–130 test sweep displayed 0–1 at ×1,
-            // i.e. raw/100). Same scale as float_600_2 — the original bug was
-            // the wrong CODE (0x15), not the scale.
-            Add(new Entry("nav_speed_limit", 0x10, 16,
-                v => (ulong)Clamp(Sanitize(v) * 100.0, 0, 65535), (0, 130)));
 
             // 12-bit tyre pressure (×10, 0..4095). Code confirmed by decoding
             // PitHouse value frames in bridge-20260503-112940.jsonl flag=0x04/0x0a/0x10:
@@ -189,11 +173,11 @@ namespace MozaPlugin.Telemetry.Frames
 
             // 64-bit (caller uses BitConverter on raw double; encode returns the bits)
             Add(new Entry("double", 0x0A, 64,
-                v => BitConverter.ToUInt64(BitConverter.GetBytes(Sanitize(v)), 0),
+                v => (ulong)BitConverter.DoubleToInt64Bits(Sanitize(v)),
                 (0, 200)));
             // PitHouse emits code 0x09 width 64 for patch/Location_* (was 0x0B).
             Add(new Entry("location_t", 0x09, 64,
-                v => BitConverter.ToUInt64(BitConverter.GetBytes(Sanitize(v)), 0),
+                v => (ulong)BitConverter.DoubleToInt64Bits(Sanitize(v)),
                 (0, 1)));
             Add(new Entry("int64_t", 0x0C, 64,
                 v => (ulong)(long)Sanitize(v), (-1000, 1000)));
@@ -216,15 +200,8 @@ namespace MozaPlugin.Telemetry.Frames
         // IEEE-754 single-precision bits, packed into the low 32 bits. Shared by
         // every channel emitted as code 0x07 width 32.
         private static ulong EncodeFloatBits(double v)
-            => BitConverter.ToUInt32(BitConverter.GetBytes((float)Sanitize(v)), 0);
+            => FloatBits.ToUInt32((float)Sanitize(v));
 
-        // Public lookups. Both throw if name/code is unknown — callers should
-        // pre-validate via TryGet against the Telemetry.json catalog at load time.
-        public static Entry GetByName(string name) => _byName[name];
-        public static Entry GetByCode(uint code) => _byCode[code];
         public static bool TryGetByName(string name, out Entry entry) => _byName.TryGetValue(name, out entry!);
-        public static bool TryGetByCode(uint code, out Entry entry) => _byCode.TryGetValue(code, out entry!);
-
-        public static IReadOnlyList<Entry> All => _all;
     }
 }

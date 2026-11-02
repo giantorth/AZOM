@@ -67,16 +67,13 @@ namespace MozaPlugin.Telemetry.Sessions
         // assertion, a reassembler-state edge case) would otherwise unwind the
         // read loop and the wheel goes silent for the rest of the session.
         // Wrap per-callback so one buggy consumer can't take down inbound
-        // dispatch for every other session.
-        private static void SafeInvoke(string kind, byte session, Action callback)
+        // dispatch for every other session. The try/catch is inlined per method
+        // so a dispatch allocates no closure.
+        private static void LogConsumerThrew(string kind, byte session, Exception ex)
         {
-            try { callback(); }
-            catch (Exception ex)
-            {
-                MozaLog.Warn(
-                    $"[AZOM] SessionDispatcher: session 0x{session:X2} {kind} consumer threw: " +
-                    $"{ex.GetType().Name}: {ex.Message}");
-            }
+            MozaLog.Warn(
+                $"[AZOM] SessionDispatcher: session 0x{session:X2} {kind} consumer threw: " +
+                $"{ex.GetType().Name}: {ex.Message}");
         }
 
         /// <summary>Dispatch a data chunk (type 0x01) to the session owner.</summary>
@@ -84,7 +81,9 @@ namespace MozaPlugin.Telemetry.Sessions
         {
             ISessionConsumer? owner;
             lock (_lock) _owners.TryGetValue(session, out owner);
-            if (owner != null) SafeInvoke("OnData", session, () => owner.OnData(session, seq, payload));
+            if (owner == null) return;
+            try { owner.OnData(session, seq, payload); }
+            catch (Exception ex) { LogConsumerThrew("OnData", session, ex); }
         }
 
         /// <summary>Dispatch an FC:00 ack to the session owner.</summary>
@@ -92,7 +91,9 @@ namespace MozaPlugin.Telemetry.Sessions
         {
             ISessionConsumer? owner;
             lock (_lock) _owners.TryGetValue(session, out owner);
-            if (owner != null) SafeInvoke("OnAck", session, () => owner.OnAck(session, ackSeq));
+            if (owner == null) return;
+            try { owner.OnAck(session, ackSeq); }
+            catch (Exception ex) { LogConsumerThrew("OnAck", session, ex); }
         }
 
         /// <summary>Dispatch a device-init (type 0x81) to the session owner.</summary>
@@ -100,7 +101,9 @@ namespace MozaPlugin.Telemetry.Sessions
         {
             ISessionConsumer? owner;
             lock (_lock) _owners.TryGetValue(session, out owner);
-            if (owner != null) SafeInvoke("OnOpen", session, () => owner.OnOpen(session, openSeq));
+            if (owner == null) return;
+            try { owner.OnOpen(session, openSeq); }
+            catch (Exception ex) { LogConsumerThrew("OnOpen", session, ex); }
         }
 
         /// <summary>Dispatch an end marker (type 0x00) to the session owner.</summary>
@@ -108,7 +111,9 @@ namespace MozaPlugin.Telemetry.Sessions
         {
             ISessionConsumer? owner;
             lock (_lock) _owners.TryGetValue(session, out owner);
-            if (owner != null) SafeInvoke("OnClose", session, () => owner.OnClose(session, ackSeq));
+            if (owner == null) return;
+            try { owner.OnClose(session, ackSeq); }
+            catch (Exception ex) { LogConsumerThrew("OnClose", session, ex); }
         }
 
         /// <summary>Clear all ownership (used on disconnect/reset).</summary>

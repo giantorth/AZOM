@@ -34,6 +34,9 @@ namespace MozaPlugin.Devices
         public const string PedalHapticsThrottleGuid = "554167b0-3c2f-41d8-8e8e-6c3716b9459f";
         public const string PedalHapticsBrakeGuid    = "5a050757-d2bb-498d-8077-22604ce8fff2";
         public const string PedalHapticsClutchGuid   = "779ea51c-b3b3-4977-a4c0-fd8df610cd41";
+        // S12 pedal vibration as one device, one channel per pedal. Coexists with
+        // the per-pedal devices; the PedalHapticsCombinedDevice setting picks which drives.
+        public const string PedalHapticsCombinedGuid = "ceec288f-d739-4891-b0a3-aadc0dbd4ef1";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -318,9 +321,13 @@ namespace MozaPlugin.Devices
             return 0;
         }
 
-        /// <summary>Returns true if the DeviceTypeID is one of the pedal-haptics devices.</summary>
+        /// <summary>Returns true if the DeviceTypeID is the all-pedals pedal-haptics device.</summary>
+        public static bool IsPedalHapticsCombinedDevice(string deviceTypeId) =>
+            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, PedalHapticsCombinedGuid);
+
+        /// <summary>Returns true if the DeviceTypeID is one of the pedal-haptics devices, per-pedal or combined.</summary>
         public static bool IsPedalHapticsDevice(string deviceTypeId) =>
-            PedalHapticsPedalFor(deviceTypeId) != 0;
+            PedalHapticsPedalFor(deviceTypeId) != 0 || IsPedalHapticsCombinedDevice(deviceTypeId);
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>
@@ -415,15 +422,7 @@ namespace MozaPlugin.Devices
                     Directory.CreateDirectory(dir);
 
                 var json = JsonConvert.SerializeObject(snapshot, Formatting.Indented);
-
-                // Atomic write: stage to a sibling .tmp first, then move into place.
-                // A crash mid-WriteAllText would otherwise truncate the existing
-                // registry to garbage and lose the GUID-to-prefix map on next load.
-                var tmpPath = _registryPath + ".tmp";
-                File.WriteAllText(tmpPath, json);
-                if (File.Exists(_registryPath))
-                    File.Delete(_registryPath);
-                File.Move(tmpPath, _registryPath);
+                AtomicFile.WriteAllText(_registryPath, json);
             }
             catch (Exception ex)
             {

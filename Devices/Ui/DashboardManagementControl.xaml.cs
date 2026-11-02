@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -68,7 +69,11 @@ namespace MozaPlugin.Devices.Ui
 
         private void OnRefreshTick(object? sender, EventArgs e)
         {
-            try { RefreshDashboardManagement(); }
+            try
+            {
+                RefreshDashboardManagement();
+                UpdateDashboardPreview();
+            }
             catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-dashmgmt", $"[AZOM] Dashboard tab tick failed: {ex}"); }
         }
 
@@ -88,6 +93,7 @@ namespace MozaPlugin.Devices.Ui
             // unload. Clear the guard so the next load re-runs InitTelemetryUI and re-arms
             // them — otherwise after one tab-switch the byte preview + value column stay dead.
             _telemetryUIInitialized = false;
+            _lastPopulatedCm1Index = int.MinValue;
 
             if (_dashEventSubscribedPlugin != null)
             {
@@ -221,7 +227,11 @@ namespace MozaPlugin.Devices.Ui
                 // slot / ConfigJsonList to track.
                 if (IsCm1)
                 {
-                    PopulateDashboardCombo();
+                    // Repopulate only on a page change: every rebuild re-selects, and
+                    // the selection handler's ScrollIntoView snaps the list back.
+                    if ((_plugin?.GetActiveCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
+                        || TelemetryProfileList.Items.Count == 0)
+                        PopulateDashboardCombo();
                     long sigc = ComputeMappingDataSignature();
                     if (sigc != _lastMappingDataSignature) PopulateChannelMappingList();
                     return;
@@ -297,7 +307,48 @@ namespace MozaPlugin.Devices.Ui
                     }
                     SelectWheelDisplayRotationByMode(r);
                 }
+
+                var s = _plugin.Settings;
+                if (s != null)
+                {
+                    SyncStatusLedPanel.Visibility = Visibility.Visible;
+                    SyncStatusLedToggle.IsChecked = s.NegotiationLedEnabled;
+                    int c = s.NegotiationLedColor;
+                    if (c != _shownSyncLedColor)
+                    {
+                        _shownSyncLedColor = c;
+                        SyncStatusLedSwatch.Background = SyncStatusLedBrush(c);
+                    }
+                }
             }
+        }
+
+        private int _shownSyncLedColor = -1;
+
+        private static SolidColorBrush SyncStatusLedBrush(int packed)
+        {
+            var rgb = MozaProfile.UnpackColor(packed);
+            return new SolidColorBrush(Color.FromRgb(rgb[0], rgb[1], rgb[2]));
+        }
+
+        private void SyncStatusLedToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _plugin?.Settings == null) return;
+            _plugin.Settings.NegotiationLedEnabled = SyncStatusLedToggle.IsChecked == true;
+            _plugin.SaveSettings();
+        }
+
+        private void SyncStatusLedSwatch_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (_suppressEvents || _plugin?.Settings == null) return;
+            var rgb = MozaProfile.UnpackColor(_plugin.Settings.NegotiationLedColor);
+            var dialog = new ColorPickerDialog(rgb[0], rgb[1], rgb[2]) { Owner = Window.GetWindow(this) };
+            if (dialog.ShowDialog() != true) return;
+            int packed = (dialog.SelectedR << 16) | (dialog.SelectedG << 8) | dialog.SelectedB;
+            _plugin.Settings.NegotiationLedColor = packed;
+            _shownSyncLedColor = packed;
+            SyncStatusLedSwatch.Background = SyncStatusLedBrush(packed);
+            _plugin.SaveSettings();
         }
 
         // ===== Dashboard Telemetry =====
@@ -338,6 +389,8 @@ namespace MozaPlugin.Devices.Ui
         private void PopulateDashboardCombo()
         {
             if (_plugin == null) return;
+            // Any non-CM1 list invalidates the CM1 page snapshot.
+            _lastPopulatedCm1Index = int.MinValue;
 
             // CM1 base-bridged dash: built-in pages selected via the 0x32/0x81 switch
             // (1-based 1..N); no tier-def ConfigJsonList. Mirrors the FSR1 branch.
@@ -345,15 +398,16 @@ namespace MozaPlugin.Devices.Ui
             {
                 using (_suppressor.Begin())
                 {
-                    TelemetryProfileCombo.Items.Clear();
+                    TelemetryProfileList.Items.Clear();
                     int min = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MinDashboardIndex;
                     int max = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex;
                     for (int i = min; i <= max; i++)
-                        TelemetryProfileCombo.Items.Add($"Dashboard {i}");
+                        TelemetryProfileList.Items.Add($"Dashboard {i}");
                     int active = _plugin.GetActiveCm1Index();
                     int idx = active - min;
-                    TelemetryProfileCombo.SelectedIndex = (idx >= 0 && idx < TelemetryProfileCombo.Items.Count) ? idx : 0;
+                    TelemetryProfileList.SelectedIndex = (idx >= 0 && idx < TelemetryProfileList.Items.Count) ? idx : 0;
                     _lastPopulatedWheelSlot = -1;
+                    _lastPopulatedCm1Index = active;
                 }
                 return;
             }
@@ -369,12 +423,12 @@ namespace MozaPlugin.Devices.Ui
                 // (auto-followed via OnFsr1ActiveIndexChanged).
                 using (_suppressor.Begin())
                 {
-                    TelemetryProfileCombo.Items.Clear();
+                    TelemetryProfileList.Items.Clear();
                     int max = global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
                     for (int i = 0; i <= max; i++)
-                        TelemetryProfileCombo.Items.Add($"Dashboard {i + 1}");
+                        TelemetryProfileList.Items.Add($"Dashboard {i + 1}");
                     int active = _plugin.GetActiveFsr1Index();
-                    TelemetryProfileCombo.SelectedIndex = (active >= 0 && active <= max) ? active : 0;
+                    TelemetryProfileList.SelectedIndex = (active >= 0 && active <= max) ? active : 0;
                     _lastPopulatedWheelSlot = -1;
                 }
                 return;
@@ -382,7 +436,7 @@ namespace MozaPlugin.Devices.Ui
 
             using (_suppressor.Begin())
             {
-                TelemetryProfileCombo.Items.Clear();
+                TelemetryProfileList.Items.Clear();
 
                 // Source dashboards from the target's OWN sender state (wheel sender
                 // for the wheel page, CM2 sender for the CM2 page).
@@ -393,19 +447,19 @@ namespace MozaPlugin.Devices.Ui
                     // Device-reported dashboards in configJsonList order.
                     // Dropdown index = configJsonList slot used by the switch command.
                     foreach (var name in state.ConfigJsonList)
-                        TelemetryProfileCombo.Items.Add(name);
+                        TelemetryProfileList.Items.Add(name);
                 }
                 else if (!IsCm2Target)
                 {
                     // Wheel-only fallback: cached dashboard names (state not up yet).
-                    TelemetryProfileCombo.Items.Add("(none)");
+                    TelemetryProfileList.Items.Add("(none)");
                     if (_plugin.DashCache != null)
                     {
                         foreach (var name in _plugin.DashCache.CachedNames)
-                            TelemetryProfileCombo.Items.Add(name);
+                            TelemetryProfileList.Items.Add(name);
                     }
                     if (!string.IsNullOrEmpty(_plugin.ActiveTelemetryMzdashPath))
-                        TelemetryProfileCombo.Items.Add(
+                        TelemetryProfileList.Items.Add(
                             "[Custom: " + System.IO.Path.GetFileName(
                                 _plugin.ActiveTelemetryMzdashPath) + "]");
                 }
@@ -419,7 +473,7 @@ namespace MozaPlugin.Devices.Ui
                 bool savedInList = false;
                 if (!string.IsNullOrEmpty(savedName))
                 {
-                    foreach (var item in TelemetryProfileCombo.Items)
+                    foreach (var item in TelemetryProfileList.Items)
                     {
                         if (string.Equals(item?.ToString(), savedName, StringComparison.OrdinalIgnoreCase))
                         {
@@ -442,22 +496,22 @@ namespace MozaPlugin.Devices.Ui
                     selectedName = savedName;
                 if (!string.IsNullOrEmpty(selectedName))
                 {
-                    for (int i = 0; i < TelemetryProfileCombo.Items.Count; i++)
+                    for (int i = 0; i < TelemetryProfileList.Items.Count; i++)
                     {
                         // OrdinalIgnoreCase to match the rest of the dashboard
                         // binding chain (DashboardBindingCoordinator key/name
                         // lookups); a case mismatch between the saved profile
                         // name and the wheel's ConfigJsonList entry used to
                         // leave the combo stuck on the prior selection.
-                        if (string.Equals(TelemetryProfileCombo.Items[i]?.ToString(), selectedName, StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(TelemetryProfileList.Items[i]?.ToString(), selectedName, StringComparison.OrdinalIgnoreCase))
                         {
-                            TelemetryProfileCombo.SelectedIndex = i;
+                            TelemetryProfileList.SelectedIndex = i;
                             break;
                         }
                     }
                 }
-                if (TelemetryProfileCombo.SelectedIndex < 0 && TelemetryProfileCombo.Items.Count > 0)
-                    TelemetryProfileCombo.SelectedIndex = 0;
+                if (TelemetryProfileList.SelectedIndex < 0 && TelemetryProfileList.Items.Count > 0)
+                    TelemetryProfileList.SelectedIndex = 0;
 
                 // Snapshot the wheel-reported slot we just populated against,
                 // so RefreshTelemetryStatus only triggers a repopulate when
@@ -484,6 +538,10 @@ namespace MozaPlugin.Devices.Ui
         /// of any slot (including -1) is treated as a change.
         /// </summary>
         private int _lastPopulatedWheelSlot = int.MinValue;
+
+        /// <summary>CM1 page the dropdown was last populated against; int.MinValue when
+        /// the list doesn't hold the CM1 pages.</summary>
+        private int _lastPopulatedCm1Index = int.MinValue;
 
         /// <summary>Content signature of the ConfigJsonList the dropdown was
         /// last populated from. The list changes mid-session on upload/delete
@@ -643,10 +701,15 @@ namespace MozaPlugin.Devices.Ui
             // The standalone FSR1/CM1 drivers render the pattern without a tier-def
             // sender, so the button is live whenever any display pipeline is running.
             TelemetryTestBtn.IsEnabled = senderReady || (_plugin?.IsAnyDashboardDisplayRunning ?? false);
-            TelemetryTestBtn.Content = testMode
-                ? global::MozaPlugin.Resources.Strings.Button_StopTest
-                : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
-            TelemetryProfileCombo.IsEnabled = selectorReady;
+            if (testMode != _testIconShowsStop)
+            {
+                _testIconShowsStop = testMode;
+                TelemetryTestIcon.Data = (Geometry)FindResource(testMode ? "IconStop" : "IconPlay");
+                TelemetryTestText.Text = testMode
+                    ? global::MozaPlugin.Resources.Strings.Button_StopTest
+                    : global::MozaPlugin.Resources.Strings.Button_SendTestPattern;
+            }
+            TelemetryProfileList.IsEnabled = selectorReady;
 
             // Single-byte probe diagnostic: FSR1-only, live whenever its driver runs.
             bool probeOn = _plugin?.Fsr1Probe.Active ?? false;
@@ -781,13 +844,18 @@ namespace MozaPlugin.Devices.Ui
             WheelDisplayRotationCombo.SelectedIndex = -1;
         }
 
-        private void TelemetryProfileCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private bool _testIconShowsStop;
+
+        private void TelemetryProfileList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (TelemetryProfileList.SelectedItem != null)
+                TelemetryProfileList.ScrollIntoView(TelemetryProfileList.SelectedItem);
             if (_suppressEvents || _plugin == null) return;
-            var selected = TelemetryProfileCombo.SelectedItem?.ToString();
+            UpdateDashboardPreview();
+            var selected = TelemetryProfileList.SelectedItem?.ToString();
             if (selected == null) return;
 
-            int idx = TelemetryProfileCombo.SelectedIndex;
+            int idx = TelemetryProfileList.SelectedIndex;
 
             // CM1 base-bridged dash: selecting a page sends the group-0x32/0x81 select to
             // dev 0x14 (1-based page = combo index + min). Checked before the FSR1 branch
@@ -886,70 +954,12 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
-        private void TelemetryClearMzdash_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-            _plugin.ActiveTelemetryProfileName = "";
-            _plugin.ActiveTelemetryMzdashPath = "";
-            _plugin.SaveSettings();
-            _plugin.OnDashboardSwitched();
-
-            using (_suppressor.Begin())
-            {
-                // Drop any stale [Custom: ...] entry so the dropdown doesn't keep
-                // showing a previously-loaded mzdash filename.
-                for (int i = TelemetryProfileCombo.Items.Count - 1; i >= 0; i--)
-                    if (TelemetryProfileCombo.Items[i]?.ToString()?.StartsWith("[Custom:") == true)
-                        TelemetryProfileCombo.Items.RemoveAt(i);
-                // Select "(none)".
-                for (int i = 0; i < TelemetryProfileCombo.Items.Count; i++)
-                {
-                    if (TelemetryProfileCombo.Items[i]?.ToString() == "(none)")
-                    {
-                        TelemetryProfileCombo.SelectedIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            PopulateChannelMappingList();
-        }
-
         // Single toggle: Send Test Pattern ⇄ Stop Test. Button content + enabled
         // state are kept in sync each tick by RefreshTelemetryStatus.
         private void TelemetryTestToggle_Click(object sender, RoutedEventArgs e)
         {
             if (_plugin == null) return;
-
-            bool turningOn = !_plugin.DashboardTestPatternActive;
-            // Drives every display pipeline: tier-def senders via TestMode, the
-            // standalone FSR1/CM1 drivers via the shared flag (they pick it up on
-            // their next tick — no start needed while they're already running).
-            _plugin.SetDashboardTestPattern(turningOn);
-
-            // A tier-def DISPLAY wheel (W17/W18) renders only while its sender is
-            // Active; bring it up on demand. Never start it for an FSR1 (its screen
-            // is the 0x42 driver — starting the idle wheel sender kicks a phantom
-            // cold-start) or for a wheel whose screen isn't the tier-def sender.
-            var active = _plugin.TelemetrySender;
-            if (active != null && _plugin.WheelUsesTierDefDisplaySender && !_plugin.ActiveTelemetryEnabled)
-            {
-                if (turningOn && !active.IsActive)
-                {
-                    _plugin.ApplyTelemetrySettings();
-                    // An exception escaping a pool work item terminates the process.
-                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    {
-                        try { active.Start(); }
-                        catch (Exception ex) { MozaLog.Warn($"[AZOM] Test-pattern sender start failed: {ex.Message}"); }
-                    });
-                }
-                else if (!turningOn && active.IsActive)
-                {
-                    active.Stop();
-                }
-            }
-
+            _plugin.ToggleDashboardTestPattern();
             RefreshTelemetryStatus();
         }
 
@@ -975,6 +985,156 @@ namespace MozaPlugin.Devices.Ui
             if (_plugin == null) return;
             _plugin.Fsr1Probe.Step(+1);
             RefreshTelemetryStatus();
+        }
+
+        // ===== Preview =====
+
+        private string? _previewName;
+        // DashCache hands back the same array until the dashboard changes, so a
+        // reference compare spots a re-download/re-scan without re-hashing.
+        private byte[]? _previewCacheRef;
+        private int _previewRequest;
+        private bool _previewKeyValid;
+
+        private void UpdateDashboardPreview()
+        {
+            if (_plugin == null || DashboardPreviewPanel == null) return;
+            // FSR1/CM1 show built-in pages with no mzdash behind them.
+            bool mzdashSurface = !IsCm1 && !(!IsCm2Target && _plugin.IsFsr1DisplayWheel);
+            if (!mzdashSurface)
+            {
+                if (_previewKeyValid)
+                {
+                    _previewKeyValid = false;
+                    _previewRequest++;
+                    DashboardPreviewPanel.Visibility = Visibility.Collapsed;
+                }
+                return;
+            }
+
+            string? name = TelemetryProfileList.SelectedItem?.ToString();
+            if (name == "(none)") name = null;
+
+            bool custom = name != null && name.StartsWith("[Custom:");
+            byte[]? cached = name != null && !custom ? _plugin.DashCache?.TryGetRawContent(name) : null;
+            if (_previewKeyValid && name == _previewName && ReferenceEquals(cached, _previewCacheRef)) return;
+            if (name != _previewName) _previewPage = 0;
+            _previewKeyValid = true;
+            _previewName = name;
+            _previewCacheRef = cached;
+            int request = ++_previewRequest;
+
+            byte[]? bytes = cached;
+            string sourceDir = "";
+            try
+            {
+                if (custom)
+                {
+                    string path = _plugin.ActiveTelemetryMzdashPath;
+                    if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                    {
+                        bytes = System.IO.File.ReadAllBytes(path);
+                        sourceDir = System.IO.Path.GetDirectoryName(path) ?? "";
+                    }
+                }
+                else if (name != null)
+                {
+                    bytes ??= DashboardLibraryResolver.ResolveBytes(_plugin.DashCache, _plugin.DashProfileStore, name);
+                    sourceDir = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Dashboard preview: cannot read '{name}': {ex.Message}");
+                bytes = null;
+            }
+
+            if (name == null || bytes == null || !DashboardPreviewRenderer.IsAvailable)
+            {
+                ShowPreview(null);
+                return;
+            }
+
+            var render = DashboardPreviewRenderer.GetOrRenderAsync(name, bytes, sourceDir);
+            if (!render.IsCompleted)
+            {
+                _previewPages = Array.Empty<ImageSource>();
+                ShowPreviewPage();
+                SetPreviewPlaceholder(Strings.Status_RenderingPreview);
+                DashboardPreviewPanel.Visibility = Visibility.Visible;
+            }
+            render.ContinueWith(t => LoadPreviewImages(t.Result), TaskScheduler.Default).ContinueWith(t =>
+            {
+                if (request != _previewRequest) return;
+                ShowPreview(t.IsFaulted ? null : t.Result);
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        private IReadOnlyList<ImageSource> _previewPages = Array.Empty<ImageSource>();
+        private int _previewPage;
+
+        private void ShowPreview(IReadOnlyList<ImageSource>? images)
+        {
+            _previewPages = images ?? Array.Empty<ImageSource>();
+            // Stay on the same page across a re-render of the same dashboard.
+            if (_previewPage >= _previewPages.Count) _previewPage = 0;
+            SetPreviewPlaceholder(_previewPages.Count > 0 ? null : Strings.Status_PreviewUnavailable);
+            DashboardPreviewPanel.Visibility = Visibility.Visible;
+            ShowPreviewPage();
+        }
+
+        private void SetPreviewPlaceholder(string? text)
+        {
+            DashboardPreviewStatus.Text = text ?? "";
+            DashboardPreviewPlaceholder.Visibility = text == null ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void ShowPreviewPage()
+        {
+            int count = _previewPages.Count;
+            DashboardPreviewImage.Source = count > 0 ? _previewPages[_previewPage] : null;
+            DashboardPreviewPageLabel.Text = count > 0 ? $"{_previewPage + 1} / {count}" : "";
+            DashboardPreviewPrevBtn.IsEnabled = count > 1;
+            DashboardPreviewNextBtn.IsEnabled = count > 1;
+        }
+
+        private void DashboardPreviewPrev_Click(object sender, RoutedEventArgs e) => StepPreviewPage(-1);
+
+        private void DashboardPreviewNext_Click(object sender, RoutedEventArgs e) => StepPreviewPage(+1);
+
+        private void StepPreviewPage(int delta)
+        {
+            int count = _previewPages.Count;
+            if (count < 2) return;
+            _previewPage = ((_previewPage + delta) % count + count) % count;
+            ShowPreviewPage();
+        }
+
+        // Decoded from memory and frozen so the PNGs stay unlocked for re-render/prune.
+        private static IReadOnlyList<ImageSource> LoadPreviewImages(IReadOnlyList<string> paths)
+        {
+            var list = new List<ImageSource>(paths.Count);
+            foreach (var p in paths)
+            {
+                try
+                {
+                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                    using (var ms = new System.IO.MemoryStream(System.IO.File.ReadAllBytes(p)))
+                    {
+                        bmp.BeginInit();
+                        bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bmp.StreamSource = ms;
+                        bmp.EndInit();
+                    }
+                    bmp.Freeze();
+                    list.Add(bmp);
+                }
+                catch (Exception ex)
+                {
+                    MozaLog.Warn($"[AZOM] Dashboard preview: cannot load {p}: {ex.Message}");
+                }
+            }
+            return list;
         }
 
         // ===== Channel mappings =====

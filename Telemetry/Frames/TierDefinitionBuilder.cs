@@ -70,7 +70,7 @@ namespace MozaPlugin.Telemetry.Frames
         private static byte[] BuildTierDefinitionMessageType02(MultiStreamProfile profile, byte flagBase,
              System.Collections.Generic.IReadOnlyList<string> wheelCatalog,
             uint endMarkerCounter,
-            byte? prevFlagBase = null, int prevTierCount = 0, int prevSubPerBroadcast = 0)
+            byte? prevFlagBase = null, int prevTierCount = 0)
         {
             using var ms = new MemoryStream();
             using var w = new BinaryWriter(ms);
@@ -141,75 +141,26 @@ namespace MozaPlugin.Telemetry.Frames
             int tierCount = profile.Tiers.Count;
             byte FlagFor(int i) => (byte)(flagBase + i);
 
-            // PitHouse-exact format (R5 + W17, Rally V4 + Nebula in-game captures
-            // 2026-04-29). Broadcast = consecutive sub-tiers covering ALL
-            // pkg_levels. Each broadcast emits sub-tiers back-to-back, then a
-            // SINGLE end-marker, then enables for that broadcast's flags.
-            //
-            // Nebula (1 sub-tier × 3 broadcasts): each broadcast = 1 sub-tier.
-            //   tier_0  end-marker=0  enable_0
-            //   tier_1  end-marker=4  enable_1
-            //   tier_2  end-marker=4
-            //
-            // Rally V4 (3 sub-tiers × 4 broadcasts): each broadcast = 3 sub-tiers.
-            //   tier_0 tier_1 tier_2  end-marker=0
-            //   enable_0 enable_1 enable_2
-            //   tier_3 tier_4 tier_5  end-marker=9   (channel count 5+2+1=8 → wait
-            //   enable_3 enable_4 enable_5            should be 8 not 9; PitHouse
-            //   ...                                   used 9 because added TCActive
-            //                                         in subsequent broadcasts.)
-            //
-            // To detect broadcast boundaries we look for the SAME flag-offset
-            // pattern repeating: profile is built as `subPerBroadcast × N`
-            // broadcasts (TelemetrySender.Profile setter assembles it). Detect
-            // by finding the pkg_level repeat: when current tier's pkg_level
-            // matches profile.Tiers[0]'s pkg_level after the first tier, that's
-            // a broadcast boundary.
-            int subPerBroadcast = DetectSubTiersPerBroadcast(profile);
-            int broadcastCount = tierCount / subPerBroadcast;
-
-            // Total channel count across one broadcast (used as end-marker for
-            // subsequent broadcasts; first uses 0). Use the post-filter count
-            // (channels actually written by WriteTier — i.e. those whose URLs
-            // appear in the wheel catalog with a non-zero idx) so the marker
-            // matches the bytes we emit.
-            int channelsPerBroadcast = 0;
-            for (int j = 0; j < subPerBroadcast; j++)
-                foreach (var ch in profile.Tiers[j].Channels)
-                    if (idxByUrl.TryGetValue(ch.Url ?? "", out var idx) && idx > 0)
-                        channelsPerBroadcast++;
-
             // On dashboard switch, emit ENABLE records for the previous
-            // subscription's last-broadcast flags BEFORE the first new TIER.
-            // PitHouse does this to signal the wheel that the old tier's
-            // flags are still valid while it processes the new definition.
-            if (prevFlagBase.HasValue && prevTierCount > 0 && prevSubPerBroadcast > 0)
+            // subscription's flags BEFORE the first new TIER (single broadcast,
+            // so that is every prior tier). PitHouse does this to signal the
+            // wheel that the old tier's flags are still valid while it
+            // processes the new definition.
+            if (prevFlagBase.HasValue && prevTierCount > 0)
             {
-                int prevBroadcasts = prevTierCount / prevSubPerBroadcast;
-                int prevLastBase = prevFlagBase.Value + (prevBroadcasts - 1) * prevSubPerBroadcast;
-                for (int s = 0; s < prevSubPerBroadcast; s++)
-                    WriteEnable((byte)(prevLastBase + s));
+                for (int s = 0; s < prevTierCount; s++)
+                    WriteEnable((byte)(prevFlagBase.Value + s));
             }
 
-            for (int b = 0; b < broadcastCount; b++)
-            {
-                int baseTier = b * subPerBroadcast;
-                for (int s = 0; s < subPerBroadcast; s++)
-                    WriteTier(FlagFor(baseTier + s), profile.Tiers[baseTier + s].Channels);
-                // END u32 = the caller-supplied session counter, identical
-                // across every broadcast inside one emission. PitHouse
-                // emits the SAME END value for all broadcasts of a single
-                // tier-def emission (verified switch #1 broadcasts 2+3
-                // both END=42; switch #2 broadcasts 2-13 all END=68 in
-                // bridge-20260517-070054.jsonl). The counter advances on
-                // the NEXT emission, not within this one.
-                WriteEndMarker();
-                if (b < broadcastCount - 1)
-                {
-                    for (int s = 0; s < subPerBroadcast; s++)
-                        WriteEnable(FlagFor(baseTier + s));
-                }
-            }
+            // Single broadcast (see DetectSubTiersPerBroadcast): every tier
+            // back-to-back, then ONE END marker. END u32 = the caller-supplied
+            // session counter; PitHouse emits the SAME END for every broadcast
+            // of one emission (switch #1 broadcasts 2+3 both END=42; switch #2
+            // broadcasts 2-13 all END=68 in bridge-20260517-070054.jsonl), and
+            // the counter advances on the NEXT emission.
+            for (int t = 0; t < tierCount; t++)
+                WriteTier(FlagFor(t), profile.Tiers[t].Channels);
+            WriteEndMarker();
 
             return ms.ToArray();
         }
@@ -315,17 +266,6 @@ namespace MozaPlugin.Telemetry.Frames
         }
 
         /// <summary>
-        /// Build the complete tier definition message bytes from a MultiStreamProfile.
-        /// 2-arg overload kept for tests and any caller without per-emission
-        /// state (no end-marker echo, no prev-subscription transition).
-        /// </summary>
-        public static byte[] BuildTierDefinitionMessage(MultiStreamProfile profile, byte flagBase)
-            => BuildTierDefinitionMessage(profile, flagBase,
-                includeEnableEntries: true,
-                useWheelCatalogIndices: false,
-                wheelCatalog: null);
-
-        /// <summary>
         /// Build a V2 compact tier-def message. Layout differs by wheel firmware:
         /// Type02-era (W17/W18/KS Pro/R5+) uses the broadcast-structured shape
         /// with wheel-catalog channel indices; VGS-class (VGS / GS V2P / F1 /
@@ -346,11 +286,10 @@ namespace MozaPlugin.Telemetry.Frames
         /// inferred from the same doc). Pass 0 for cold-start before the
         /// wheel has pushed any END marker.</param>
         public static byte[] BuildTierDefinitionMessage(MultiStreamProfile profile, byte flagBase,
-            bool includeEnableEntries,
             bool useWheelCatalogIndices,
             System.Collections.Generic.IReadOnlyList<string>? wheelCatalog,
             uint endMarkerCounter = 0,
-            byte? prevFlagBase = null, int prevTierCount = 0, int prevSubPerBroadcast = 0)
+            byte? prevFlagBase = null, int prevTierCount = 0)
         {
             if (profile.Tiers.Count == 0)
                 return Array.Empty<byte>();
@@ -360,12 +299,12 @@ namespace MozaPlugin.Telemetry.Frames
                 return BuildTierDefinitionMessageType02(profile, flagBase,
                     wheelCatalog,
                     endMarkerCounter,
-                    prevFlagBase, prevTierCount, prevSubPerBroadcast);
+                    prevFlagBase, prevTierCount);
             }
 
             // VGS path: flat prior-flag-enable layout with wheelEND echo.
-            // includeEnableEntries / prevFlagBase / prevTierCount /
-            // prevSubPerBroadcast are Type02-only concepts and are ignored
+            // prevFlagBase / prevTierCount are
+            // Type02-only concepts and are ignored
             // here — VGS's prior-flag enables are computed from flagBase
             // directly.
             return BuildTierDefinitionV2Compact(profile, flagBase, endMarkerCounter);

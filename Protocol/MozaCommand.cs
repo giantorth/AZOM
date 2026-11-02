@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 
 namespace MozaPlugin.Protocol
 {
@@ -25,43 +24,54 @@ namespace MozaPlugin.Protocol
             PayloadType = payloadType;
         }
 
+        /// <summary>Offset of the value payload in a built frame (after <c>7E len group dev cmd…</c>).</summary>
+        internal int PayloadOffset => 4 + CommandId.Length;
+
+        // Exact-size frame with header + command id filled and a zeroed payload;
+        // the trailing checksum slot is set by SealFrame.
+        private byte[] NewFrame(byte group, byte deviceId, int payloadLength)
+        {
+            var frame = new byte[4 + CommandId.Length + payloadLength + 1];
+            frame[0] = MozaProtocol.MessageStart;
+            frame[1] = (byte)(CommandId.Length + payloadLength);
+            frame[2] = group;
+            frame[3] = deviceId;
+            Buffer.BlockCopy(CommandId, 0, frame, 4, CommandId.Length);
+            return frame;
+        }
+
+        /// <summary>
+        /// Write frame with a zeroed <paramref name="payloadLength"/>-byte payload at
+        /// <see cref="PayloadOffset"/>, for callers that fill it in place; finish with
+        /// <see cref="SealFrame"/>. Null when the command is not writable.
+        /// </summary>
+        internal byte[]? NewWriteFrame(byte deviceId, int payloadLength)
+            => WriteGroup == 0xFF ? null : NewFrame(WriteGroup, deviceId, payloadLength);
+
+        /// <summary>Set the trailing wire checksum of a frame from <see cref="NewWriteFrame"/>.</summary>
+        internal static byte[] SealFrame(byte[] frame)
+        {
+            frame[frame.Length - 1] = MozaProtocol.CalculateWireChecksum(frame, frame.Length - 1);
+            return frame;
+        }
+
         public byte[]? BuildReadMessage(byte deviceId)
         {
             if (ReadGroup == 0xFF) // 0xFF sentinel = not readable
                 return null;
 
-            int payloadLength = CommandId.Length + PayloadBytes;
-            var msg = new List<byte>
-            {
-                MozaProtocol.MessageStart,
-                (byte)payloadLength,
-                ReadGroup,
-                deviceId
-            };
-            msg.AddRange(CommandId);
-            msg.AddRange(new byte[PayloadBytes]);
-
-            msg.Add(MozaProtocol.CalculateWireChecksum(msg.ToArray()));
-            return msg.ToArray();
+            // The PayloadBytes zeros are the array's default.
+            return SealFrame(NewFrame(ReadGroup, deviceId, PayloadBytes));
         }
 
         public byte[]? BuildWriteMessage(byte deviceId, byte[] payload)
         {
-            if (WriteGroup == 0xFF)
+            var frame = NewWriteFrame(deviceId, payload.Length);
+            if (frame == null)
                 return null;
 
-            int payloadLength = CommandId.Length + payload.Length;
-            var msg = new List<byte>
-            {
-                MozaProtocol.MessageStart,
-                (byte)payloadLength,
-                WriteGroup,
-                deviceId
-            };
-            msg.AddRange(CommandId);
-            msg.AddRange(payload);
-            msg.Add(MozaProtocol.CalculateWireChecksum(msg.ToArray()));
-            return msg.ToArray();
+            Buffer.BlockCopy(payload, 0, frame, PayloadOffset, payload.Length);
+            return SealFrame(frame);
         }
 
         /// <summary>
@@ -69,13 +79,17 @@ namespace MozaPlugin.Protocol
         /// </summary>
         public byte[]? BuildWriteInt(byte deviceId, int value)
         {
-            var payload = new byte[PayloadBytes];
+            var frame = NewWriteFrame(deviceId, PayloadBytes);
+            if (frame == null)
+                return null;
+
+            int o = PayloadOffset;
             for (int i = PayloadBytes - 1; i >= 0; i--)
             {
-                payload[i] = (byte)(value & 0xFF);
+                frame[o + i] = (byte)(value & 0xFF);
                 value >>= 8;
             }
-            return BuildWriteMessage(deviceId, payload);
+            return SealFrame(frame);
         }
 
         public static int ParseIntValue(byte[] data, int byteCount)
@@ -104,9 +118,7 @@ namespace MozaPlugin.Protocol
             if (data == null || offset < 0 || data.Length - offset < 4)
                 return 0f;
 
-            // Big-endian on the wire; assemble the bits directly (no scratch array).
-            int bits = (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
-            return BitConverter.ToSingle(BitConverter.GetBytes(bits), 0);
+            return FloatBits.ReadF32BE(data, offset);
         }
 
         /// <summary>
@@ -114,9 +126,12 @@ namespace MozaPlugin.Protocol
         /// </summary>
         public byte[]? BuildWriteFloat(byte deviceId, float value)
         {
-            var le = BitConverter.GetBytes(value);
-            var payload = new byte[] { le[3], le[2], le[1], le[0] };
-            return BuildWriteMessage(deviceId, payload);
+            var frame = NewWriteFrame(deviceId, 4);
+            if (frame == null)
+                return null;
+
+            FloatBits.WriteF32BE(frame, PayloadOffset, value);
+            return SealFrame(frame);
         }
     }
 }

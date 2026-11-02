@@ -10,8 +10,8 @@ namespace MozaPlugin.Sdk
     /// it against <see cref="CoapResourceRegistry"/>, then dispatches to a
     /// handler subclass via <see cref="HandleGet"/> or <see cref="HandlePost"/>.
     /// Subclasses do not see CoAP framing — they receive a
-    /// <see cref="CoapResourceRequest"/> with the parsed Uri-Path, payload,
-    /// and content-format option, and return a <see cref="CoapResourceResponse"/>
+    /// <see cref="CoapResourceRequest"/> with the resolved device ID and
+    /// payload, and return a <see cref="CoapResourceResponse"/>
     /// describing the response code + body the listener should put on the wire.
     /// </summary>
     /// <remarks>
@@ -49,54 +49,22 @@ namespace MozaPlugin.Sdk
 
     /// <summary>
     /// Immutable request descriptor handed to <see cref="CoapResourceHandler"/>.
-    /// Carries the URI segments already resolved by the registry plus the raw
-    /// request body bytes. Handlers must not retain the buffers past the call
-    /// — the listener owns the lifetime of <see cref="Payload"/> and
-    /// <see cref="Token"/>.
+    /// Carries the device ID already resolved by the registry plus the raw
+    /// request body bytes. Handlers must not retain <see cref="Payload"/> past
+    /// the call — the listener owns its lifetime.
     /// </summary>
     public readonly struct CoapResourceRequest
     {
-        /// <summary>
-        /// Full canonical URI path of the request, e.g.
-        /// <c>/MOZARacing/ProductDevice/&lt;id&gt;/FfbStrength</c>. Always begins
-        /// with a leading slash. Useful for logging; handlers should normally
-        /// use <see cref="DeviceId"/> and <see cref="PropertyName"/> instead.
-        /// </summary>
-        public string UriPath { get; }
-
         /// <summary>The device-ID segment extracted by the registry, or null when the URI has no <c>{id}</c> placeholder.</summary>
         public string? DeviceId { get; }
-
-        /// <summary>The trailing property-name segment, or null when the URI has no property placeholder.</summary>
-        public string? PropertyName { get; }
 
         /// <summary>Request body bytes. Empty for GET. Caller-owned; handler must not retain past the call.</summary>
         public byte[] Payload { get; }
 
-        /// <summary>
-        /// Content-Format option value, or -1 when the option is absent.
-        /// 42 = application/octet-stream, 60 = application/cbor (see
-        /// <see cref="CoapContentFormat"/>).
-        /// </summary>
-        public int ContentFormat { get; }
-
-        /// <summary>The exchange token. Echoed verbatim by the listener on the response.</summary>
-        public byte[] Token { get; }
-
-        public CoapResourceRequest(
-            string uriPath,
-            string? deviceId,
-            string? propertyName,
-            byte[]? payload,
-            int contentFormat,
-            byte[]? token)
+        public CoapResourceRequest(string? deviceId, byte[]? payload)
         {
-            UriPath = uriPath ?? string.Empty;
             DeviceId = deviceId;
-            PropertyName = propertyName;
             Payload = payload ?? Array.Empty<byte>();
-            ContentFormat = contentFormat;
-            Token = token ?? Array.Empty<byte>();
         }
 
         /// <summary>True when the request carries a non-empty body.</summary>

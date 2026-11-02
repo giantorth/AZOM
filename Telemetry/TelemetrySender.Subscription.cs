@@ -16,68 +16,6 @@ namespace MozaPlugin.Telemetry
 {
     public partial class TelemetrySender
     {
-
-        // ── Port probing ────────────────────────────────────────────────────
-
-
-        /// <summary>
-        /// Wait for the wheel's pre-tier-def channel registration burst to stop
-        /// arriving. Polls <see cref="ChannelCatalogParser.LastActivityMs"/> — once the
-        /// last activity is older than <paramref name="quietMs"/>, we assume the
-        /// wheel is done pushing its channel URLs.
-        /// </summary>
-        
-        /// <summary>
-        /// Build a new <see cref="MultiStreamProfile"/> with only the channels
-        /// whose <c>Url</c> appears in <paramref name="catalog"/>. Tiers that
-        /// end up empty are dropped. URL match is case-insensitive and also
-        /// accepts catalog entries matching the last path segment (the wheel
-        /// sometimes advertises bare names where the profile uses a full URL).
-        /// </summary>
-        
-        /// <summary>
-        /// Build a V0 subscription profile from the wheel's full channel catalog.
-        /// Each catalog URL becomes a channel; metadata (compression, SimHub
-        /// property/field, scale) is borrowed from the host's profile when a
-        /// URL match exists, otherwise sane defaults (uint32_t, Zero field) are
-        /// applied so the channel is still subscribed and value frames go out.
-        /// Single tier at the host profile's base PackageLevel — V0 firmware
-        /// resolves per-channel update cadence internally so per-tier scheduling
-        /// is irrelevant.
-        /// </summary>
-        
-        /// <summary>
-        /// PitHouse byte-faithful tier-channel transform: for each unique
-        /// Channels list in the profile, REMOVE channels whose URLs aren't
-        /// in the wheel's catalog (chIdx would be 0 → tier-def can't
-        /// reference them) and SORT the remaining channels by catalog idx
-        /// ascending. Recomputes <c>tier.TotalBits</c>/<c>tier.TotalBytes</c>
-        /// so downstream FrameBuilders size their bit-pack buffers
-        /// correctly.
-        ///
-        /// MultiStreamProfile's tier-broadcast expansion shares Channels
-        /// lists by reference across tier replicas, so mutating each unique
-        /// list once propagates to every replica.
-        ///
-        /// IMPORTANT: this method does NOT touch <see cref="_tiers"/> or
-        /// rebuild FrameBuilders — callers do that explicitly. Two call
-        /// sites:
-        ///   * Profile setter (pre-FrameBuilder-construction): mutate the
-        ///     incoming profile in-place so the immediately-following
-        ///     `new TelemetryFrameBuilder(tier, …)` loop builds sized-
-        ///     correctly buffers against the filtered Channels list.
-        ///   * ApplySubscription (post-catalog-grow): mutate the live
-        ///     profile and then rebuild <see cref="_tiers"/> Builders via
-        ///     <see cref="RebuildFrameBuildersFromProfile"/>.
-        /// </summary>
-        
-        /// <summary>
-        /// Rebuild per-tier FrameBuilders from <see cref="_profile"/>.
-        /// Called after <see cref="SortTierChannelsByCatalogIdx"/> mutates
-        /// the live profile post-Profile-setter (e.g. ApplySubscription
-        /// after catalog growth). Safe to call when _tiers is null/empty.
-        /// </summary>
-        
         /// <summary>
         /// Single point of entry for (re-)subscribing to the wheel's channel
         /// catalog. Swaps the active profile to match the catalog, sends
@@ -102,6 +40,13 @@ namespace MozaPlugin.Telemetry
             // its identity probe. After this returns, _policy is the final
             // policy used for tier-def emission and value-frame routing.
             ResolveAutoPolicy();
+
+            // New tier-def generation — including every Start's preamble→Active
+            // apply: forget what strings were sent so the first poll re-pushes
+            // them (the wheel's prior copy belongs to a closed session or a
+            // superseded binding). Tick thread, like every other user of the dict.
+            if (!reuseFlagBase)
+                _stringChannelState.Clear();
 
             MaybeSwapProfileForCatalog(force: force);
             if (_profile == null || _profile.Tiers.Count == 0)
@@ -232,33 +177,14 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Send the tier definition message on the telemetry session.
-        /// This is the critical config data that tells the wheel firmware how to
-        /// decode each flag byte's bit-packed telemetry data: which channels are
-        /// in each tier, their compression codes, and bit widths.
-        ///
-        /// Pithouse sends this as 7c:00 data chunks (type=0x01) on session 0x02
-        /// during the first ~1s after session open. Without it, the wheel silently
-        /// ignores all 7d:23 telemetry frames.
-        /// </summary>
-        
-        /// <summary>
         /// Swap the active <see cref="Profile"/> for one synthesized from the
-        /// wheel's advertised channel catalog when the Type02 wire format is in
-        /// use. Removes the mzdash dependency on the subscription axis — plugin
-        /// subscribes to whatever the wheel declared and feeds those channels
-        /// from SimHub via the URL→property mapping in
-        /// <see cref="DashboardProfileStore"/>. No-op when catalog isn't parsed
-        /// yet, when era isn't Type02, or when the synthesized profile would be
-        /// empty (e.g. wheel advertised zero channels).
+        /// wheel's advertised channel catalog. Removes the mzdash dependency on
+        /// the subscription axis — plugin subscribes to whatever the wheel
+        /// declared and feeds those channels from SimHub via the URL→property
+        /// mapping in <see cref="DashboardProfileStore"/>. No-op when catalog
+        /// isn't parsed yet or when the synthesized profile would be empty
+        /// (e.g. wheel advertised zero channels).
         /// </summary>
-        /// <remarks>
-        /// Public entry point for <see cref="MozaPlugin.ApplyTelemetrySettings"/>
-        /// to swap immediately after setting Profile, so the UI reads the
-        /// catalog-based channel list instead of the builtin's fixed set.
-        /// </remarks>
-        public void SwapProfileForCatalogIfType02() => MaybeSwapProfileForCatalog(force: true);
-
         private void MaybeSwapProfileForCatalog(bool force = false)
         {
             // Fallback path: synthesise a profile from the wheel-advertised
@@ -309,7 +235,7 @@ namespace MozaPlugin.Telemetry
             // end (0x00→0x3F over 64 emissions) and let partial re-advertisements
             // collapse the bound channel set. A real dashboard switch always
             // changes count or signature, so content-keying still catches it.
-            ulong catalogHash = ComputeCatalogHash(catalog);
+            ulong catalogHash = CatalogHashFor(catalog);
             if (currentIsSynthesised
                 && _catalogCountAtSynthesis == catalog.Count
                 && _catalogHashAtSynthesis == catalogHash
@@ -394,7 +320,6 @@ namespace MozaPlugin.Telemetry
                 _catalogCountAtSynthesis != catalog.Count
                 || _catalogHashAtSynthesis != catalogHash;
 
-            _catalogEndMarkerAtSynthesis = _catalogParser.LastWheelEndMarker;
             _catalogCountAtSynthesis = catalog.Count;
             _catalogHashAtSynthesis = catalogHash;
 

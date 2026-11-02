@@ -43,6 +43,12 @@ namespace MozaPlugin.Telemetry.Dashboard
         // other lane). Array element refs are atomic, so readers need no lock.
         private static readonly WheelDashboardState?[] s_cachedByDevice = new WheelDashboardState?[256];
 
+        // Serialises every read-modify-write of _lastState / the cache slot: the
+        // read thread merges wheel deltas while upload-completion and library-sync
+        // workers apply host deltas. Static because the slot is shared across
+        // instances. Readers just take the published reference.
+        private static readonly object s_stateLock = new();
+
         /// <summary>Target device id (0x17 wheel, 0x14/0x12 CM2) that selects this
         /// client's cross-instance cache slot. Set by the owning sender.</summary>
         public byte CacheKey { get; set; } = MozaProtocol.DeviceWheel;
@@ -69,20 +75,13 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// list lands rather than stopping on a stale cache.</summary>
         internal WheelDashboardState? LiveState => _lastState;
 
-        /// <summary>Highest contiguous-received chunk seq, suitable for use
-        /// as a cumulative session-ack value. -1 before the first chunk.
-        /// Proxy to the internal <see cref="SessionDataReassembler.HighWaterSeq"/>
-        /// so the TelemetrySender ack path can stay decoupled from this
-        /// client's reassembly state.</summary>
-        public int HighWaterSeq => _deviceInbox.HighWaterSeq;
-
         /// <summary>UTC ticks of the most recent forward gap on the device
         /// inbox, or 0 if none observed. Used by the gap-recovery watchdog
         /// to decide when to escalate from passive (wait for wheel auto-
         /// retransmit) to active (prime+open-request).</summary>
         public long LastForwardGapUtcTicks => _deviceInbox.LastForwardGapUtcTicks;
 
-        /// <summary>Result of a seq-aware <see cref="OnChunk(int, byte[])"/> call.</summary>
+        /// <summary>Result of an <see cref="OnChunk(int, byte[], out int, string)"/> call.</summary>
         public enum ChunkResult
         {
             /// <summary>Chunk accepted; no complete state yet (more chunks expected).</summary>
@@ -90,61 +89,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             /// <summary>State decoded — caller can read <see cref="LastState"/>.</summary>
             StateReady,
             /// <summary>Seq gap detected: a prior chunk was dropped on the wire.
-            /// Buffer has been cleared. Caller must re-issue the configJson open
-            /// request so the wheel re-emits its state burst — otherwise the
-            /// handshake is permanently broken for this session lifetime.</summary>
+            /// The buffer is kept and the out ackSeq is the pre-gap seq, so
+            /// acking it makes the wheel retransmit from the gap.</summary>
             GapDetected,
-        }
-
-        /// <summary>Feed one session 0x09 device→host chunk payload.</summary>
-        public WheelDashboardState? OnChunk(byte[] chunkPayload)
-        {
-            _deviceInbox.AddChunk(chunkPayload);
-            byte[]? decomp = _deviceInbox.TryDecompress();
-            if (decomp == null) return null;
-            var state = WheelStateParser.Parse(decomp, out var missing);
-            if (state != null)
-            {
-                // TitleId=4 pushes are deltas — merge into the prior state so
-                // the cached inventory doesn't collapse to the last delta.
-                state = WheelDashboardState.Merge(_lastState ?? CachedLastState, state);
-                _lastState = state;
-                CachedLastState = state;
-                // Consume the decoded blob so successive updates (e.g. after
-                // a dashboard change) can reassemble a fresh one.
-                _deviceInbox.Clear();
-                try
-                {
-                    MozaLog.Debug(
-                        $"[AZOM] configJson state received: TitleId={state.TitleId} " +
-                        $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
-                        $"configJsonList={state.ConfigJsonList.Count} " +
-                        $"enabled={state.EnabledDashboards.Count} disabled={state.DisabledDashboards.Count} " +
-                        $"imageRefMap={state.ImageRefMap.Count} imagePath={state.ImagePath.Count} " +
-                        $"rootDirPath='{state.RootDirPath}'");
-                }
-                catch { /* logging optional in unit tests */ }
-                // Diagnostic: flag firmware-schema drift. 2025-11 firmware
-                // emits all 11 top-level fields; older or newer firmware may
-                // drop/rename fields and PitHouse's UI flatly rejects the
-                // state when any are missing. Log once per distinct shape.
-                if (missing.Count > 0)
-                {
-                    string shape = string.Join(",", missing);
-                    if (shape != _lastMissingShape)
-                    {
-                        _lastMissingShape = shape;
-                        try
-                        {
-                            MozaLog.Debug(
-                                $"[AZOM] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
-                                "Firmware may be older than 2025-11 or schema has drifted.");
-                        }
-                        catch { /* logging optional in unit tests */ }
-                    }
-                }
-            }
-            return state;
         }
 
         private string _lastMissingShape = "";
@@ -161,16 +108,22 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void CompactConfirmedDeletes()
         {
-            var basis = _lastState ?? CachedLastState;
-            if (basis == null || basis.ConfirmedRemovedNames.Count == 0) return;
-            var doomed = new HashSet<string>(basis.ConfirmedRemovedNames, StringComparer.Ordinal);
-            var table = new List<string>(basis.ConfigJsonList);
-            int before = table.Count;
-            table.RemoveAll(n => doomed.Contains(n));
-            var s = CloneWithList(basis, table);
-            s.ConfirmedRemovedNames = Array.Empty<string>();
-            _lastState = s;
-            CachedLastState = s;
+            HashSet<string> doomed;
+            int before;
+            List<string> table;
+            lock (s_stateLock)
+            {
+                var basis = _lastState ?? CachedLastState;
+                if (basis == null || basis.ConfirmedRemovedNames.Count == 0) return;
+                doomed = new HashSet<string>(basis.ConfirmedRemovedNames, StringComparer.Ordinal);
+                table = new List<string>(basis.ConfigJsonList);
+                before = table.Count;
+                table.RemoveAll(n => doomed.Contains(n));
+                var s = CloneWithList(basis, table);
+                s.ConfirmedRemovedNames = Array.Empty<string>();
+                _lastState = s;
+                CachedLastState = s;
+            }
             try
             {
                 MozaLog.Info(
@@ -195,22 +148,26 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void ApplyLibraryDelta(string? addName, string? removeName)
         {
-            var basis = _lastState ?? CachedLastState;
-            if (basis == null) return;
-            var list = new List<string>(basis.ConfigJsonList);
-            bool changed = false;
-            if (!string.IsNullOrEmpty(removeName))
-                changed |= list.RemoveAll(n => string.Equals(n, removeName, StringComparison.Ordinal)) > 0;
-            if (!string.IsNullOrEmpty(addName)
-                && list.FindIndex(n => string.Equals(n, addName, StringComparison.Ordinal)) < 0)
+            List<string> list;
+            lock (s_stateLock)
             {
-                int at = 0;
-                while (at < list.Count && string.CompareOrdinal(list[at], addName) < 0) at++;
-                list.Insert(at, addName!);
-                changed = true;
+                var basis = _lastState ?? CachedLastState;
+                if (basis == null) return;
+                list = new List<string>(basis.ConfigJsonList);
+                bool changed = false;
+                if (!string.IsNullOrEmpty(removeName))
+                    changed |= list.RemoveAll(n => string.Equals(n, removeName, StringComparison.Ordinal)) > 0;
+                if (!string.IsNullOrEmpty(addName)
+                    && list.FindIndex(n => string.Equals(n, addName, StringComparison.Ordinal)) < 0)
+                {
+                    int at = 0;
+                    while (at < list.Count && string.CompareOrdinal(list[at], addName) < 0) at++;
+                    list.Insert(at, addName!);
+                    changed = true;
+                }
+                if (!changed) return;
+                AdoptList(basis, list);
             }
-            if (!changed) return;
-            AdoptList(basis, list);
             try
             {
                 MozaLog.Debug(
@@ -220,27 +177,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             catch { }
         }
 
-        /// <summary>
-        /// UNUSED (kept for reference): early 2026-08-16 theory that the wheel
-        /// adopts the host's configJson() list as its slot table. Disproven
-        /// same day — the wheel maintains its own ordinal-sorted
-        /// configJsonList, which can include entries the host's enabled-only
-        /// declaration omits; adopting the declared list shifted name→slot
-        /// mappings and routed switches to the wrong dash. The wheel-reported
-        /// list is the only slot authority; host-caused deltas are applied via
-        /// <see cref="ApplyLibraryDelta"/>.
-        /// </summary>
-        public void AdoptDeclaredLibraryList(IReadOnlyList<string> names)
-        {
-            if (names == null || names.Count == 0) return;
-            var basis = _lastState ?? CachedLastState;
-            if (basis == null) return;
-            AdoptList(basis, new List<string>(names));
-        }
-
         /// <summary>Clone <paramref name="basis"/> with a replacement
         /// <see cref="WheelDashboardState.ConfigJsonList"/> and publish it as
-        /// the cached state.</summary>
+        /// the cached state. Caller holds <see cref="s_stateLock"/>.</summary>
         private void AdoptList(WheelDashboardState basis, List<string> names)
         {
             var s = CloneWithList(basis, names);
@@ -274,56 +213,71 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Seq-aware variant. Detects when a chunk seq is missing and signals the
+        /// Feed one device→host config-session chunk payload. Detects when a
+        /// chunk seq is missing and signals the
         /// caller to re-handshake — without this, a single dropped chunk under
         /// Wine SerialPort R/W contention silently corrupts the zlib stream and
         /// the configJson handshake fails for the lifetime of the session.
-        /// Returns <see cref="ChunkResult.GapDetected"/> on missing seq, in which
-        /// case the buffer has already been cleared and the caller should re-
-        /// issue the configJson open request to make the wheel re-emit its burst.
+        /// Returns <see cref="ChunkResult.GapDetected"/> on missing seq; the buffer
+        /// is kept and <paramref name="ackSeq"/> is the pre-gap seq to ack so the
+        /// wheel retransmits from the gap.
         /// </summary>
-        public ChunkResult OnChunk(int seq, byte[] chunkPayload, string tag = "sess=0x09")
+        public ChunkResult OnChunk(int seq, byte[] chunkPayload, out int ackSeq, string tag = "sess=0x09")
         {
-            if (!_deviceInbox.AddChunk(seq, chunkPayload, tag))
+            bool accepted = _deviceInbox.AddChunk(seq, chunkPayload, tag);
+            // Cumulative ack value (pre-gap on a forward gap, -1 = none). Read
+            // before decoding: draining the buffer resets the high-water mark,
+            // but the chunk that completed the message still needs its ack.
+            ackSeq = _deviceInbox.HighWaterSeq;
+            if (!accepted)
                 return ChunkResult.GapDetected;
-            byte[]? decomp = _deviceInbox.TryDecompress();
-            if (decomp == null) return ChunkResult.Buffered;
-            var state = WheelStateParser.Parse(decomp, out var missing);
-            if (state == null) return ChunkResult.Buffered;
-            // TitleId=4 pushes are deltas — merge into the prior state so the
-            // cached inventory doesn't collapse to the last delta.
-            state = WheelDashboardState.Merge(_lastState ?? CachedLastState, state);
-            _lastState = state;
-            CachedLastState = state;
-            _deviceInbox.Clear();
-            try
+            // One chunk can complete more than one message: the wheel packs the
+            // next message's head behind the previous one. Non-state messages
+            // (RPC replies) are consumed by TryDecompress and skipped here.
+            var result = ChunkResult.Buffered;
+            byte[]? decomp;
+            while ((decomp = _deviceInbox.TryDecompress()) != null)
             {
-                // Info: the delete/enable acceptance-test monitor line.
-                MozaLog.Info(
-                    $"[AZOM] configJson state received: TitleId={state.TitleId} " +
-                    $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
-                    $"configJsonList={state.ConfigJsonList.Count} " +
-                    $"enabled={state.EnabledDashboards.Count} disabled={state.DisabledDashboards.Count} " +
-                    $"imageRefMap={state.ImageRefMap.Count} imagePath={state.ImagePath.Count} " +
-                    $"rootDirPath='{state.RootDirPath}'");
-            }
-            catch { /* logging optional in unit tests */ }
-            if (missing.Count > 0)
-            {
-                string shape = string.Join(",", missing);
-                if (shape != _lastMissingShape)
+                var state = WheelStateParser.Parse(decomp, out var missing);
+                if (state == null) continue;
+                // TitleId=4 pushes are deltas — merge into the prior state so the
+                // cached inventory doesn't collapse to the last delta.
+                lock (s_stateLock)
                 {
-                    _lastMissingShape = shape;
-                    try
+                    state = WheelDashboardState.Merge(_lastState ?? CachedLastState, state);
+                    _lastState = state;
+                    CachedLastState = state;
+                }
+                result = ChunkResult.StateReady;
+                try
+                {
+                    // Info: the delete/enable acceptance-test monitor line.
+                    MozaLog.Info(
+                        $"[AZOM] configJson state received: TitleId={state.TitleId} " +
+                        $"displayVersion={state.DisplayVersion} resetVersion={state.ResetVersion} " +
+                        $"configJsonList={state.ConfigJsonList.Count} " +
+                        $"enabled={state.EnabledDashboards.Count} disabled={state.DisabledDashboards.Count} " +
+                        $"imageRefMap={state.ImageRefMap.Count} imagePath={state.ImagePath.Count} " +
+                        $"rootDirPath='{state.RootDirPath}'");
+                }
+                catch { /* logging optional in unit tests */ }
+                if (missing.Count > 0)
+                {
+                    string shape = string.Join(",", missing);
+                    if (shape != _lastMissingShape)
                     {
-                        MozaLog.Debug(
-                            $"[AZOM] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
-                            "Firmware may be older than 2025-11 or schema has drifted.");
+                        _lastMissingShape = shape;
+                        try
+                        {
+                            MozaLog.Debug(
+                                $"[AZOM] configJson state missing {missing.Count} expected top-level field(s): {shape}. " +
+                                "Firmware may be older than 2025-11 or schema has drifted.");
+                        }
+                        catch { /* logging optional in unit tests */ }
                     }
-                    catch { /* logging optional in unit tests */ }
                 }
             }
-            return ChunkResult.StateReady;
+            return result;
         }
 
         /// <summary>
@@ -356,16 +310,13 @@ namespace MozaPlugin.Telemetry.Dashboard
         public void HardReset()
         {
             _deviceInbox.Clear();
-            _lastState = null;
-            CachedLastState = null;
+            lock (s_stateLock)
+            {
+                _lastState = null;
+                CachedLastState = null;
+            }
             _lastMissingShape = "";
         }
-
-        /// <summary>Backwards-compatible alias for <see cref="ClearBuffer"/>.
-        /// Old call sites assumed Reset() also cleared LastState; the buffer-
-        /// only behaviour is now the safer default. Callers wanting the full
-        /// clear should switch to <see cref="HardReset"/>.</summary>
-        public void Reset() => ClearBuffer();
 
         /// <summary>
         /// Build the host's `configJson()` reply. Pass the library names the

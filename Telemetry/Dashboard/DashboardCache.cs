@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using MozaPlugin.Diagnostics;
 
 namespace MozaPlugin.Telemetry.Dashboard
@@ -52,23 +51,21 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         // --- User folder library (fallback after wheel cache) ---
-        private readonly Dictionary<string, MultiStreamProfile> _folderProfiles =
+        // Replaced wholesale under _lock by LoadFromFolders, never mutated after.
+        private Dictionary<string, MultiStreamProfile> _folderProfiles =
             new Dictionary<string, MultiStreamProfile>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, byte[]> _folderRawContent =
+        private Dictionary<string, byte[]> _folderRawContent =
             new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _folderFilePaths =
+        private Dictionary<string, string> _folderFilePaths =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _folderHashes =
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // Bumped per LoadFromFolders call; only the latest-started scan publishes.
+        private int _folderGeneration;
 
         public DashboardCache(string cacheDir, DashboardProfileStore store)
         {
             _cacheDir = cacheDir;
             _store = store;
         }
-
-        /// <summary>Number of cached profiles.</summary>
-        public int Count { get { lock (_lock) return _byHash.Count; } }
 
         /// <summary>
         /// Scan the cache directory for previously-saved .mzdash files and parse them.
@@ -290,13 +287,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Scan a user-configured folder for .mzdash files and parse them.
-        /// These act as a fallback library when wheel cache misses.
-        /// </summary>
-        public void LoadFromFolder(string folderPath) => LoadFromFolders(new[] { folderPath });
-
-        /// <summary>
-        /// Scan several folders into the one folder-library, in order.
+        /// Scan several folders into the one folder-library, in order. These
+        /// act as a fallback library when wheel cache misses.
         /// Entries are keyed by profile name and LATER FOLDERS WIN, so callers
         /// pass least-authoritative first.
         ///
@@ -308,30 +300,44 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public void LoadFromFolders(IReadOnlyList<string?> folderPaths)
         {
-            lock (_lock)
+            // Scan into private maps and publish them in one swap, so lookups
+            // during the scan keep seeing the previous library rather than an
+            // empty or half-filled one, and overlapping reloads can't interleave.
+            int generation = Interlocked.Increment(ref _folderGeneration);
+            var profiles = new Dictionary<string, MultiStreamProfile>(StringComparer.OrdinalIgnoreCase);
+            var rawContent = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            var filePaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (folderPaths != null)
             {
-                _folderProfiles.Clear();
-                _folderRawContent.Clear();
-                _folderFilePaths.Clear();
-                _folderHashes.Clear();
+                var scanned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var folderPath in folderPaths)
+                {
+                    if (string.IsNullOrEmpty(folderPath)) continue;
+                    string full;
+                    try { full = Path.GetFullPath(folderPath!); }
+                    catch { full = folderPath!; }
+                    // The configured folder and Studio's root are often the same
+                    // directory — scanning twice is just wasted parsing.
+                    if (!scanned.Add(full)) continue;
+                    ScanFolder(full, profiles, rawContent, filePaths);
+                }
             }
 
-            if (folderPaths == null) return;
-            var scanned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var folderPath in folderPaths)
+            lock (_lock)
             {
-                if (string.IsNullOrEmpty(folderPath)) continue;
-                string full;
-                try { full = Path.GetFullPath(folderPath!); }
-                catch { full = folderPath!; }
-                // The configured folder and Studio's root are often the same
-                // directory — scanning twice is just wasted parsing.
-                if (!scanned.Add(full)) continue;
-                ScanFolder(full);
+                // A reload started after this one owns the library.
+                if (generation != _folderGeneration) return;
+                _folderProfiles = profiles;
+                _folderRawContent = rawContent;
+                _folderFilePaths = filePaths;
             }
         }
 
-        private void ScanFolder(string folderPath)
+        private void ScanFolder(string folderPath,
+            Dictionary<string, MultiStreamProfile> profiles,
+            Dictionary<string, byte[]> rawContent,
+            Dictionary<string, string> filePaths)
         {
             if (!Directory.Exists(folderPath)) return;
 
@@ -339,26 +345,18 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
                 try
                 {
-                    var profile = _store.ParseMzdash(file);
+                    byte[] rawBytes = File.ReadAllBytes(file);
+                    // Same decode as File.ReadAllText: BOM-detected, UTF-8 default.
+                    string content;
+                    using (var reader = new StreamReader(new MemoryStream(rawBytes), Encoding.UTF8,
+                               detectEncodingFromByteOrderMarks: true))
+                        content = reader.ReadToEnd();
+                    var profile = _store.ParseMzdashContent(Path.GetFileNameWithoutExtension(file), content);
                     if (profile == null) continue;
 
-                    byte[] rawBytes = File.ReadAllBytes(file);
-                    string hash;
-                    using (var sha = SHA1.Create())
-                    {
-                        byte[] digest = sha.ComputeHash(rawBytes);
-                        var sb = new StringBuilder(8);
-                        for (int i = 0; i < 4; i++) sb.Append(digest[i].ToString("x2"));
-                        hash = sb.ToString();
-                    }
-
-                    lock (_lock)
-                    {
-                        _folderProfiles[profile.Name] = profile;
-                        _folderRawContent[profile.Name] = rawBytes;
-                        _folderFilePaths[profile.Name] = file;
-                        _folderHashes[profile.Name] = hash;
-                    }
+                    profiles[profile.Name] = profile;
+                    rawContent[profile.Name] = rawBytes;
+                    filePaths[profile.Name] = file;
                 }
                 catch (Exception ex)
                 {
@@ -367,7 +365,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
 
             // Count is cumulative across every folder scanned this pass.
-            MozaLog.Debug($"[AZOM] DashboardCache: {FolderProfileCount} folder profiles after scanning '{folderPath}'");
+            MozaLog.Debug($"[AZOM] DashboardCache: {profiles.Count} folder profiles after scanning '{folderPath}'");
         }
 
         /// <summary>
@@ -396,25 +394,6 @@ namespace MozaPlugin.Telemetry.Dashboard
                 TryGetNormalized(_folderFilePaths, name, out var path);
                 return path;
             }
-        }
-
-        /// <summary>
-        /// Get the precomputed SHA1 hash (first 8 hex chars) for a folder-loaded profile.
-        /// </summary>
-        public string? TryGetFolderHash(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return null;
-            lock (_lock)
-            {
-                _folderHashes.TryGetValue(name, out var hash);
-                return hash;
-            }
-        }
-
-        /// <summary>All folder-loaded dashboard names.</summary>
-        public IReadOnlyList<string> FolderNames
-        {
-            get { lock (_lock) return _folderProfiles.Keys.ToList(); }
         }
     }
 }

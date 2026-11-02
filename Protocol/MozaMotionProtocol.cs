@@ -150,20 +150,9 @@ namespace MozaPlugin.Protocol
             return frame;
         }
 
-        private static void PutF32(byte[] dst, int offset, float value)
-        {
-            uint bits = (uint)BitConverter.ToInt32(BitConverter.GetBytes(value), 0);
-            dst[offset] = (byte)(bits >> 24);
-            dst[offset + 1] = (byte)(bits >> 16);
-            dst[offset + 2] = (byte)(bits >> 8);
-            dst[offset + 3] = (byte)bits;
-        }
+        private static void PutF32(byte[] dst, int offset, float value) => FloatBits.WriteF32BE(dst, offset, value);
 
-        public static float GetF32(byte[] src, int offset)
-        {
-            int bits = (src[offset] << 24) | (src[offset + 1] << 16) | (src[offset + 2] << 8) | src[offset + 3];
-            return BitConverter.ToSingle(BitConverter.GetBytes(bits), 0);
-        }
+        public static float GetF32(byte[] src, int offset) => FloatBits.ReadF32BE(src, offset);
 
         // ------------------------------------------------------------ mode / status
 
@@ -373,25 +362,24 @@ namespace MozaPlugin.Protocol
             p[0] = StreamEngineVibration;
             p[1] = 0x00;
             p[2] = 0xFF;
-            var records = new (byte Id, float Gain, float Hz)[]
-            {
-                (0x00, g0, 265f),
-                (0x59, g1, f0Hz),
-                (0x0F, g23, 2 * f0Hz),
-                (0x00, g23, 3 * f0Hz),
-                (0x0F, g4, 4 * f0Hz),
-            };
-            for (int k = 0; k < records.Length; k++)
-            {
-                int off = 3 + 9 * k;
-                p[off] = records[k].Id;
-                PutF32(p, off + 1, records[k].Gain);
-                PutF32(p, off + 5, records[k].Hz);
-            }
+            PutVibrationRecord(p, 0, 0x00, g0, 265f);
+            PutVibrationRecord(p, 1, 0x59, g1, f0Hz);
+            PutVibrationRecord(p, 2, 0x0F, g23, 2 * f0Hz);
+            PutVibrationRecord(p, 3, 0x00, g23, 3 * f0Hz);
+            PutVibrationRecord(p, 4, 0x0F, g4, 4 * f0Hz);
             p[48] = 0x00;
             p[49] = 0x00;
             p[50] = 0x64;
             return Build(GroupStream, DeviceController, p);
+        }
+
+        /// <summary>Record <paramref name="k"/> of the <c>0x22/09</c> payload: <c>[id][gain f32][freq f32]</c>.</summary>
+        private static void PutVibrationRecord(byte[] p, int k, byte id, float gain, float hz)
+        {
+            int off = 3 + 9 * k;
+            p[off] = id;
+            PutF32(p, off + 1, gain);
+            PutF32(p, off + 5, hz);
         }
 
         // ------------------------------------------------------------ parsers

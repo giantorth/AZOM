@@ -94,12 +94,6 @@ namespace MozaPlugin.Protocol
             return false;
         }
 
-        /// <summary>Force the next lookup to re-stat.</summary>
-        public static void Invalidate()
-        {
-            lock (s_gate) s_timestamp = 0;
-        }
-
         // Serialises Build(): SimHub's COM scanner calls in from parallel workers,
         // and each Build() walks sysfs and forks a shell per MOZA tty. Taken only
         // around the build; s_gate stays the short leaf lock for the map itself.
@@ -159,18 +153,17 @@ namespace MozaPlugin.Protocol
         private static string? ResolveComForTty(string prefix, string tty)
         {
             if (!WineNativeExec.Available) return null;
-            if (string.IsNullOrEmpty(tty) || tty.IndexOfAny(ShellUnsafe) >= 0) return null;
+            if (string.IsNullOrEmpty(tty)) return null;
 
-            // for f in <prefix>/dosdevices/com*; do
-            //   [ "$f" -ef "/dev/<tty>" ] && { n=${f##*/com}; exit "$n"; }
-            // done; exit 0
-            string script =
-                "for f in \"" + prefix + "\"/dosdevices/com*; do "
-                + "[ \"$f\" -ef \"/dev/" + tty + "\" ] && "
+            // Prefix and tty go in as positional parameters ($1, $2), so the shell
+            // never parses either value.
+            const string script =
+                "for f in \"$1\"/dosdevices/com*; do "
+                + "[ \"$f\" -ef \"/dev/$2\" ] && "
                 + "{ n=${f##*/com}; exit \"$n\"; }; "
                 + "done; exit 0";
 
-            var r = WineNativeExec.Run(new[] { "sh", "-c", script }, timeoutMs: 3000);
+            var r = WineNativeExec.Run(new[] { "sh", "-c", script, "sh", prefix, tty }, timeoutMs: 3000);
             if (r.Outcome != NativeSpawnOutcome.Completed)
             {
                 MozaLog.DebugIfChanged("wine-com-spawn",
@@ -189,12 +182,6 @@ namespace MozaPlugin.Protocol
             }
             return "COM" + n.ToString(CultureInfo.InvariantCulture);
         }
-
-        // Refuse to interpolate anything that could break out of the double-quoted
-        // shell word. tty names are kernel-generated (ttyACM0, ttyUSB1) so this
-        // never rejects a real device.
-        private static readonly char[] ShellUnsafe =
-            { '"', '\'', '\\', '$', '`', ';', '&', '|', '\n', '\r', '<', '>', '*', '?', ' ' };
 
         private static Dictionary<string, string> Build()
         {

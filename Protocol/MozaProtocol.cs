@@ -35,39 +35,19 @@ namespace MozaPlugin.Protocol
         public const byte DeviceHPattern = 26;
         public const byte DeviceSequential = 26;
         public const byte DeviceHandbrake = 27;
-        public const byte DeviceEStop = 28;
         public const byte DeviceHub = 18;
         // AB9 active shifter exposes a single internal device at id 0x12 on its own
         // VID_346E PID_1000 composite USB device — same numeric value as DeviceMain
         // but reached via the AB9's dedicated CDC pipe, not the wheelbase's.
         public const byte DeviceAb9 = 18;
 
-        // Read request groups
-        public const byte BaseReadSettings = 40;   // FFB, angle, etc.
-        public const byte BaseReadTelemetry = 43;   // Temps, state
-        public const byte PedalsReadSettings = 35;
-        public const byte PedalsReadOutput = 37;    // Throttle/brake/clutch output
-        public const byte WheelRead = 64;
-        public const byte DashRead = 51;
-        public const byte HubRead = 100;
-        public const byte HandbrakeRead = 91;
-
-        // Write request groups
-        public const byte BaseWriteSettings = 41;
-        public const byte BaseWriteCalibration = 42;
-        public const byte BaseSendTelemetry = 65;
-        public const byte PedalsWriteSettings = 36;
-        public const byte WheelWrite = 63;
-        public const byte DashWrite = 50;
-        public const byte HandbrakeWrite = 92;
-
         // Dashboard telemetry (pithouse-re.md § 4)
         public const byte TelemetrySendGroup = 0x43;  // Group for telemetry data frames
         public const byte TelemetryModeGroup = 0x40;  // Group for telemetry mode config (28:02)
 
         // Response groups — request group with bit 7 toggled per MozaResponseParser.
-        public const byte BaseRespGroup = 0xAB;             // BaseReadSettings (0x2B) bit7-toggled
-        public const byte HubRespGroup  = 0xE4;             // HubRead (0x64) bit7-toggled
+        public const byte BaseRespGroup = 0xAB;             // base read group (0x2B) bit7-toggled
+        public const byte HubRespGroup  = 0xE4;             // hub read group (0x64) bit7-toggled
         public const byte Ab9RespGroup  = 0x89;             // AB9 probe group (0x09) bit7-toggled
         public const byte SerialStreamRespGroup    = 0xC3;  // TelemetrySendGroup (0x43) bit7-toggled
         public const byte WheelChannelCfgRespGroup = 0xC0;  // TelemetryModeGroup (0x40) bit7-toggled

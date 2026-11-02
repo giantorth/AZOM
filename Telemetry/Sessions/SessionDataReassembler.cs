@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using MozaPlugin.Telemetry.Frames;
@@ -14,17 +13,13 @@ namespace MozaPlugin.Telemetry.Sessions
     /// pithouse-style tier def chunks); we try both strip layouts and pick
     /// whichever makes the CRC match.
     ///
-    /// Once enough bytes are buffered the caller can decode the 9-byte
-    /// compressed envelope used on sessions 0x04 and 0x09:
+    /// Callers run <see cref="TryDecompress"/> after each accepted chunk; it
+    /// returns (and consumes) a zlib message only once the whole stream is
+    /// buffered and verifies. Sessions 0x09/0x0a wrap it in the 9-byte envelope
     ///
-    ///   [flag:1B=0x00] [comp_size:u32 LE] [uncomp_size:u32 LE] [zlib stream]
+    ///   [flag:1B=0x00] [comp_size+4:u32 LE] [uncomp_size:u32 LE] [zlib stream]
     ///
-    /// The zlib stream uses deflate with a zlib header (78 9c / 78 da). The
-    /// reassembler doesn't know how many compressed bytes to expect up front
-    /// — the envelope size field is only present on the FIRST chunk of a
-    /// message — so callers should invoke <see cref="TryDecompress"/> when a
-    /// logical message boundary is signalled elsewhere (e.g. session 0x04 END
-    /// marker, session 0x09 seq increment stall).
+    /// other sessions (0x04 dir listing) use their own prefix.
     /// </summary>
     public sealed class SessionDataReassembler
     {
@@ -35,8 +30,21 @@ namespace MozaPlugin.Telemetry.Sessions
         // marker was lost.
         private const int MaxBufferBytes = 1 << 20;
 
-        private readonly List<byte> _buffer = new();
+        private const int InitialCapacity = 256;
+        // A cleared buffer that grew past this is replaced so one large
+        // message doesn't pin its peak allocation for the session lifetime.
+        private const int ShrinkAboveBytes = 64 * 1024;
+
+        // Guards every field below. TryDecompress inflates under it: the
+        // writers are the serial read thread itself, Clear() runs on stop.
+        private readonly object _lock = new object();
+        private byte[] _buf = new byte[InitialCapacity];
+        private int _count;
         private bool _overflowLogged;
+        // Buffer length an enveloped message needs before it is complete; 0 = none.
+        private int _pendingEnd;
+        // Buffer length at the last decode miss; the same bytes can't decode now.
+        private int _missLength = -1;
         // Highest contiguous-received seq (-1 before the first chunk). Any
         // seq > HighWaterSeq is unacked; the wheel auto-retransmits from
         // the first unacked seq on its outstanding-ack timer (~1.3 s).
@@ -46,14 +54,15 @@ namespace MozaPlugin.Telemetry.Sessions
         // escalation from passive-wait to prime+open-request.
         private long _lastForwardGapUtcTicks;
 
-        public int Length { get { lock (_buffer) return _buffer.Count; } }
+        public int Length { get { lock (_lock) return _count; } }
 
         /// <summary>Highest contiguously-received seq, suitable for sending as
         /// a cumulative ACK. -1 before the first chunk after a
-        /// <see cref="Clear"/>. Out-of-order chunks are dropped (caller acks
+        /// <see cref="Clear"/> or after <see cref="TryDecompress"/> drains the
+        /// buffer, so read it before decoding. Out-of-order chunks are dropped (caller acks
         /// this value so the wheel retransmits the missing seq), so the
         /// high-water mark is also the most-recently-accepted seq.</summary>
-        public int HighWaterSeq { get { lock (_buffer) return _lastSeq; } }
+        public int HighWaterSeq { get { lock (_lock) return _lastSeq; } }
 
         /// <summary>UTC ticks of the most recent forward-gap observation
         /// (seq &gt; _lastSeq + 1), or 0 if no gap has been observed.
@@ -61,7 +70,7 @@ namespace MozaPlugin.Telemetry.Sessions
         /// vs. escalate to prime+open-request" decision.</summary>
         public long LastForwardGapUtcTicks
         {
-            get { lock (_buffer) return _lastForwardGapUtcTicks; }
+            get { lock (_lock) return _lastForwardGapUtcTicks; }
         }
 
         /// <summary>
@@ -90,30 +99,6 @@ namespace MozaPlugin.Telemetry.Sessions
             /// <summary>Buffer overflowed the 1 MiB cap. Buffer was cleared;
             /// caller should treat this as a hard reset.</summary>
             BufferOverflow,
-        }
-
-        /// <summary>Feed one raw chunk payload (the bytes after session/type/seq).
-        /// No seq tracking — caller doesn't have the seq context. Use the
-        /// <see cref="AddChunk(int, byte[])"/> overload when seq is available so
-        /// gaps are detected instead of corrupting the buffer silently.</summary>
-        public void AddChunk(byte[] chunk)
-        {
-            if (chunk == null || chunk.Length < 4) return;
-            byte[] net = StripCrcTrailer(chunk);
-            lock (_buffer)
-            {
-                if (_buffer.Count + net.Length > MaxBufferBytes)
-                {
-                    if (!_overflowLogged)
-                    {
-                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
-                        _overflowLogged = true;
-                    }
-                    _buffer.Clear();
-                    return;
-                }
-                _buffer.AddRange(net);
-            }
         }
 
         /// <summary>
@@ -172,8 +157,8 @@ namespace MozaPlugin.Telemetry.Sessions
             // We classify as Duplicate so callers don't react (no buffer
             // mutation, no _lastSeq advance, ack-from-HighWaterSeq is correct).
             if (chunk == null || chunk.Length < 4) return ChunkInsertResult.Duplicate;
-            byte[] net = StripCrcTrailer(chunk);
-            lock (_buffer)
+            int netLen = chunk.Length - 4;
+            lock (_lock)
             {
                 bool wasRestart = false;
                 if (_lastSeq != -1 && seq != _lastSeq + 1)
@@ -193,8 +178,8 @@ namespace MozaPlugin.Telemetry.Sessions
                     {
                         MozaLog.Debug(
                             $"[AZOM] Reassembler seq restart{tagSuffix}: " +
-                            $"got seq={seq}, last was {_lastSeq}; clearing {_buffer.Count}B buffer (assuming new burst)");
-                        _buffer.Clear();
+                            $"got seq={seq}, last was {_lastSeq}; clearing {_count}B buffer (assuming new burst)");
+                        ResetBufferLocked();
                         _overflowLogged = false;
                         _lastSeq = -1;
                         wasRestart = true;
@@ -215,23 +200,23 @@ namespace MozaPlugin.Telemetry.Sessions
                         MozaLog.Warn(
                             $"[AZOM] Reassembler forward gap{tagSuffix}: " +
                             $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
-                            $"preserving {_buffer.Count}B buffer, dropping out-of-order chunk — " +
+                            $"preserving {_count}B buffer, dropping out-of-order chunk — " +
                             $"caller must ack HighWaterSeq={_lastSeq} so wheel retransmits");
                         return ChunkInsertResult.GapDetected;
                     }
                 }
-                if (_buffer.Count + net.Length > MaxBufferBytes)
+                if (_count + netLen > MaxBufferBytes)
                 {
                     if (!_overflowLogged)
                     {
-                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_buffer.Count}+{net.Length}); dropping buffer");
+                        MozaLog.Warn($"[AZOM] SessionDataReassembler exceeded {MaxBufferBytes} bytes ({_count}+{netLen}); dropping buffer");
                         _overflowLogged = true;
                     }
-                    _buffer.Clear();
+                    ResetBufferLocked();
                     _lastSeq = -1;
                     return ChunkInsertResult.BufferOverflow;
                 }
-                _buffer.AddRange(net);
+                AppendLocked(chunk, netLen);
                 _lastSeq = seq;
                 if (!string.IsNullOrEmpty(tag)) _gapTag = tag;
                 // Forward progress resumed — clear the gap timestamp so the
@@ -244,20 +229,55 @@ namespace MozaPlugin.Telemetry.Sessions
 
         public void Clear()
         {
-            lock (_buffer)
+            lock (_lock)
             {
-                _buffer.Clear();
+                ResetBufferLocked();
                 _overflowLogged = false;
                 _lastSeq = -1;
                 _lastForwardGapUtcTicks = 0;
             }
         }
 
+        private void ResetBufferLocked()
+        {
+            _count = 0;
+            _pendingEnd = 0;
+            _missLength = -1;
+            if (_buf.Length > ShrinkAboveBytes) _buf = new byte[InitialCapacity];
+        }
+
+        private void AppendLocked(byte[] src, int count)
+        {
+            if (count <= 0) return;
+            int needed = _count + count;
+            if (needed > _buf.Length)
+            {
+                int size = _buf.Length;
+                while (size < needed) size *= 2;
+                var grown = new byte[size];
+                Buffer.BlockCopy(_buf, 0, grown, 0, _count);
+                _buf = grown;
+            }
+            Buffer.BlockCopy(src, 0, _buf, _count, count);
+            _count = needed;
+        }
+
+        private void RemoveHeadLocked(int count)
+        {
+            int remain = _count - count;
+            if (remain > 0) Buffer.BlockCopy(_buf, count, _buf, 0, remain);
+            _count = remain;
+        }
+
         /// <summary>Snapshot the current reassembled buffer.</summary>
         public byte[] Snapshot()
         {
-            lock (_buffer)
-                return _buffer.ToArray();
+            lock (_lock)
+            {
+                var copy = new byte[_count];
+                Buffer.BlockCopy(_buf, 0, copy, 0, _count);
+                return copy;
+            }
         }
 
         /// <summary>
@@ -284,53 +304,208 @@ namespace MozaPlugin.Telemetry.Sessions
         }
 
         /// <summary>
-        /// Decode the 9-byte compressed envelope + zlib payload. Returns
-        /// decompressed bytes or null if the buffer doesn't look like an
-        /// envelope yet (header too short, zlib decompression failed, etc).
-        /// Caller is responsible for deciding when to call this — typically
-        /// after seeing a session END marker or a complete RPC round-trip.
+        /// Return the first COMPLETE zlib message in the buffer and remove its
+        /// bytes (plus anything before it); null while no message is complete.
+        /// A message counts as complete only when its stream inflates and its
+        /// Adler-32 trailer verifies — DeflateStream returns partial output on
+        /// truncated input, so a bare inflate can't tell a fragment from a
+        /// message. Bytes after the message (the wheel packs the next
+        /// message's head into the same chunk) stay buffered; once the buffer
+        /// empties, seq tracking restarts as after <see cref="Clear"/>.
         ///
-        /// NOTE: on sess=0x09 / 0x0a the inbound dispatcher copies starting
-        /// at byte 8 of the wire frame, which is the session-header ack field
-        /// (LE u16) — so the first 2 bytes of every buffer are the wheel's
-        /// ack value, NOT an envelope sentinel. The <c>buf[0] == 0x00</c>
-        /// branch below frequently misreads those bytes as an envelope and
-        /// computes a bogus compSize; the magic-scan fallback below is what
-        /// actually decompresses the real zlib stream a few bytes deeper.
-        /// A previous attempt to "early-return when envelope says not enough"
-        /// was reverted (commit history) because the bogus compSize threshold
-        /// can never be reached, leaving configJson permanently un-parsed.
-        /// The real fix would be to strip the 2 ack bytes before accumulating
-        /// — left as a follow-up.
+        /// The stream is located by its 78 9c / 78 da magic. When the 9-byte
+        /// envelope directly precedes it, the envelope's sizes gate the decode
+        /// (no inflate until all comp_size−4 zlib bytes are buffered) and the
+        /// inflated length must match uncomp_size. Other prefixes (0x04 dir
+        /// listing) fall back to locating the Adler-32 trailer after the stream.
         /// </summary>
         public byte[]? TryDecompress()
         {
-            byte[] buf = Snapshot();
-            if (buf.Length < 9) return null;
-            if (buf[0] == 0x00)
+            int dropped;
+            string tag;
+            lock (_lock)
             {
-                uint compSize = (uint)(buf[1] | (buf[2] << 8) | (buf[3] << 16) | (buf[4] << 24));
-                if (buf.Length >= 9 + compSize)
+                int n = _count;
+                if (n < MinZlibBytes || n == _missLength || n < _pendingEnd) return null;
+
+                byte[]? msg = FindCompleteMessage(_buf, n, out int end, out int pendingEnd, out int dropTo);
+                if (msg != null)
                 {
-                    byte[]? r = DecompressZlib(buf, 9);
-                    if (r != null) return r;
+                    RemoveHeadLocked(end);
+                    _pendingEnd = 0;
+                    _missLength = -1;
+                    if (_count == 0)
+                    {
+                        _overflowLogged = false;
+                        _lastSeq = -1;
+                        _lastForwardGapUtcTicks = 0;
+                    }
+                    return msg;
+                }
+                if (dropTo > 0) RemoveHeadLocked(dropTo);
+                _pendingEnd = pendingEnd > 0 ? pendingEnd - dropTo : 0;
+                _missLength = _count;
+                if (dropTo == 0) return null;
+                dropped = dropTo;
+                tag = _gapTag;
+            }
+            MozaLog.Debug(
+                $"[AZOM] Reassembler{(tag.Length > 0 ? " (" + tag + ")" : "")}: " +
+                $"discarded {dropped}B up to an enveloped zlib message that failed verification");
+            return null;
+        }
+
+        // Smallest zlib stream: 2-byte header + 2-byte empty deflate + Adler-32.
+        private const int MinZlibBytes = 8;
+
+        /// <summary>
+        /// Scan <c>buf[0, len)</c> for the first complete, verified zlib
+        /// message. <paramref name="end"/> is the offset just past it. When an
+        /// enveloped message is still incomplete, returns null with
+        /// <paramref name="pendingEnd"/> = the buffer length it needs.
+        /// <paramref name="dropTo"/> is the offset past the last enveloped
+        /// candidate that was complete but failed verification.
+        /// </summary>
+        private static byte[]? FindCompleteMessage(byte[] buf, int len,
+            out int end, out int pendingEnd, out int dropTo)
+        {
+            end = 0;
+            pendingEnd = 0;
+            dropTo = 0;
+            int tried = 0;
+            for (int i = 0; i + 2 <= len; i++)
+            {
+                if (buf[i] != 0x78) continue;
+                if (buf[i + 1] != 0x9c && buf[i + 1] != 0xda) continue;
+
+                if (TryReadEnvelope(buf, i, out int zlibLen, out int uncompLen))
+                {
+                    int msgEnd = i + zlibLen;
+                    if (msgEnd > len)
+                    {
+                        pendingEnd = msgEnd;
+                        return null;
+                    }
+                    if (++tried > MaxMagicCandidates) return null;
+                    byte[]? r = InflateZlibExact(buf, i, zlibLen, uncompLen);
+                    if (r != null)
+                    {
+                        end = msgEnd;
+                        return r;
+                    }
+                    // Sizes may belong to bytes that only look like an envelope.
+                    r = InflateZlibToTrailer(buf, i, len, out int streamEnd);
+                    if (r != null)
+                    {
+                        end = streamEnd;
+                        return r;
+                    }
+                    // All its bytes are here and it still doesn't verify: never retry it.
+                    dropTo = i + 2;
+                    continue;
+                }
+
+                if (++tried > MaxMagicCandidates) return null;
+                byte[]? s = InflateZlibToTrailer(buf, i, len, out int sEnd);
+                if (s != null)
+                {
+                    end = sEnd;
+                    return s;
                 }
             }
-            // Fallback: mzdash bodies embed raw 0x7E bytes that interact with
-            // the wire-level escape rules (see docs/protocol/wire/checksum.md).
-            // If envelope-offset decode failed, scan for zlib magic (78 9c / 78 da)
-            // and try each candidate — mirrors sim/wheel_sim.py:1742-1770.
-            return TryDecompressByMagic(buf);
+            return null;
+        }
+
+        /// <summary>Read the 9-byte 0x09/0x0a envelope ending right before the
+        /// zlib magic at <paramref name="magicAt"/>. False when the bytes there
+        /// can't be one (wrong flag, sizes out of range or inconsistent with
+        /// deflate's ratio limits — the 0x04 dir-listing prefix has a zero byte
+        /// and big-endian sizes in that position).</summary>
+        private static bool TryReadEnvelope(byte[] buf, int magicAt, out int zlibLen, out int uncompLen)
+        {
+            zlibLen = 0;
+            uncompLen = 0;
+            if (magicAt < 9 || buf[magicAt - 9] != 0x00) return false;
+            uint compPlus4 = (uint)(buf[magicAt - 8] | (buf[magicAt - 7] << 8)
+                                  | (buf[magicAt - 6] << 16) | (buf[magicAt - 5] << 24));
+            uint uncomp = (uint)(buf[magicAt - 4] | (buf[magicAt - 3] << 8)
+                               | (buf[magicAt - 2] << 16) | (buf[magicAt - 1] << 24));
+            if (compPlus4 < MinZlibBytes + 4 || compPlus4 - 4 > MaxBufferBytes) return false;
+            if (uncomp == 0 || uncomp > MaxInflatedBytes) return false;
+            long zl = compPlus4 - 4;
+            // Deflate tops out near 1032:1; a zlib encoder never exceeds the
+            // stored-block size (input + 5 B per 64 KiB block + 6 B framing).
+            if (uncomp > zl * 1032 || zl > uncomp + uncomp / 8 + 64) return false;
+            zlibLen = (int)zl;
+            uncompLen = (int)uncomp;
+            return true;
         }
 
         /// <summary>
-        /// Scan <paramref name="buf"/> for zlib magic bytes (78 9c / 78 da) and
-        /// trial-decompress each hit. Returns the first stream that inflates
-        /// without error. Used as a fallback when envelope-offset decoding
-        /// fails because embedded 0x7E in mzdash JSON corrupted the header.
+        /// Inflate the zlib stream occupying exactly
+        /// <c>data[offset, offset + zlibLength)</c> (header + deflate + Adler-32)
+        /// and verify it: the Adler-32 trailer must match and, when
+        /// <paramref name="expectedLength"/> ≥ 0, so must the inflated length.
+        /// Null on any mismatch, corruption, or oversize output.
         /// </summary>
-        // The real stream sits within the first few bytes (ack field + envelope);
-        // a buffer that keeps failing past this many candidates is garbage, and
+        internal static byte[]? InflateZlibExact(byte[] data, int offset, int zlibLength, int expectedLength)
+        {
+            if (zlibLength < MinZlibBytes || offset < 0 || offset + zlibLength > data.Length) return null;
+            byte[]? r = Inflate(data, offset + 2, zlibLength - 6);
+            if (r == null) return null;
+            if (expectedLength >= 0 && r.Length != expectedLength) return null;
+            return Adler32(r, 0, r.Length) == ReadU32BE(data, offset + zlibLength - 4) ? r : null;
+        }
+
+        /// <summary>
+        /// Inflate the zlib stream at <paramref name="offset"/> without knowing
+        /// its length, and accept it only when the Adler-32 of the output sits
+        /// in <c>buf[offset, len)</c> after the stream start — absent for a
+        /// truncated stream. <paramref name="end"/> is the offset just past
+        /// that trailer.
+        /// </summary>
+        private static byte[]? InflateZlibToTrailer(byte[] buf, int offset, int len, out int end)
+        {
+            end = 0;
+            byte[]? r = Inflate(buf, offset + 2, len - offset - 2);
+            if (r == null || r.Length == 0) return null;
+            uint adler = Adler32(r, 0, r.Length);
+            for (int p = offset + 4; p + 4 <= len; p++)
+            {
+                if (ReadU32BE(buf, p) != adler) continue;
+                end = p + 4;
+                return r;
+            }
+            return null;
+        }
+
+        private static uint ReadU32BE(byte[] b, int at)
+            => (uint)((b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]);
+
+        /// <summary>zlib Adler-32 (RFC 1950).</summary>
+        internal static uint Adler32(byte[] data, int offset, int count)
+        {
+            const uint Mod = 65521;
+            // Largest n such that 255n(n+1)/2 + (n+1)(Mod-1) fits in a uint.
+            const int Nmax = 5552;
+            uint a = 1, b = 0;
+            int stop = offset + count;
+            while (offset < stop)
+            {
+                int n = Math.Min(Nmax, stop - offset);
+                for (int k = 0; k < n; k++)
+                {
+                    a += data[offset++];
+                    b += a;
+                }
+                a %= Mod;
+                b %= Mod;
+            }
+            return (b << 16) | a;
+        }
+
+        // The real stream sits right after its envelope/prefix; a buffer that
+        // keeps failing past this many candidates is garbage, and
         // each failed candidate walks the inflater over the whole tail on the
         // serial read thread.
         private const int MaxMagicCandidates = 16;
@@ -339,6 +514,13 @@ namespace MozaPlugin.Telemetry.Sessions
         // the x86 process.
         private const int MaxInflatedBytes = 4 << 20;
 
+        /// <summary>
+        /// Scan <paramref name="buf"/> for zlib magic bytes (78 9c / 78 da) and
+        /// trial-decompress each hit. Returns the first stream that inflates
+        /// without error — no completeness or Adler-32 check, so callers must
+        /// pass a whole blob. Serves external callers (DashboardDownloader,
+        /// DeviceLogParser); <see cref="TryDecompress"/> does not use it.
+        /// </summary>
         public static byte[]? TryDecompressByMagic(byte[] buf)
         {
             int tried = 0;
@@ -361,13 +543,18 @@ namespace MozaPlugin.Telemetry.Sessions
         public static byte[]? DecompressZlib(byte[] data, int offset)
         {
             if (offset + 2 > data.Length) return null;
-            // Skip 2-byte zlib header (CMF + FLG). DeflateStream expects raw deflate.
-            int start = offset + 2;
-            int length = data.Length - start;
-            // Last 4 bytes of a full zlib stream are the Adler-32 checksum —
-            // we can't know where the stream ends exactly without trial
-            // decompression. Strip 4 bytes if we can't decode with them.
-            using var ms = new MemoryStream(data, start, length);
+            // Skip 2-byte zlib header (CMF + FLG). DeflateStream expects raw deflate
+            // and stops at the final block, so a trailing Adler-32 is ignored.
+            return Inflate(data, offset + 2, data.Length - offset - 2);
+        }
+
+        /// <summary>Inflate raw deflate data <c>data[start, start + count)</c>,
+        /// bounded by <see cref="MaxInflatedBytes"/>. Null on corruption or
+        /// oversize output; truncated input yields partial output.</summary>
+        private static byte[]? Inflate(byte[] data, int start, int count)
+        {
+            if (count < 0) return null;
+            using var ms = new MemoryStream(data, start, count);
             using var def = new DeflateStream(ms, CompressionMode.Decompress);
             using var outMs = new MemoryStream();
             var chunk = new byte[16 * 1024];

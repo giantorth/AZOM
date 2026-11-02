@@ -246,6 +246,18 @@ which is hard-limit wiped (with a warning, losing in-flight catalog data) at
 64 KB. Watch `Parser: buf=<N>B` in the Diagnostics tab's wheel-catalog section
 if the pull cadence is ever raised.
 
+### Aligning display-log times with host time
+
+The display's wall clock is not synced to the host — bundles show whole-hour
+offsets (+1 h, +6 h), i.e. a timezone mismatch, and the plugin's bundle file
+stamps each line with the host **receive** time, not when it was logged. While a pull returns a full 100 lines
+the plugin is still draining backlog, and receive time can trail the logged
+time by minutes (bundle `5RWB04RE`: ~6 min), so a naive "receive minus logged"
+offset is wrong. `tools/displaylog_clock.py` gives the lower-bound offset and
+batch slack; trust it only when the median slack is a few seconds (single-line
+steady state). `tools/syn_error_vs_wire.py` uses it to line display events up
+with the serial captures.
+
 ### Session
 
 Both host records ride the **FF session** — the same one as the `kind=2`/`kind=7`

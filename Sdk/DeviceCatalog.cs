@@ -58,9 +58,6 @@ namespace MozaPlugin.Sdk
         /// <summary>Placeholder parentId for top-of-tree devices (Motor).</summary>
         public const string RootParentId = "000000000000";
 
-        /// <summary>Width of a manifest device ID in hex characters.</summary>
-        private const int IdHexLength = 16;
-
         /// <summary>Width of the manifest <c>mcuUid</c> and <c>parentId</c> fields in hex characters (6 bytes of the STM32 UID).</summary>
         public const int McuUidHexLength = 12;
 

@@ -80,7 +80,7 @@ namespace MozaPlugin.Telemetry
 
                 // Steady-state (Active).
                 TickAbsorbCatalogIfChanged();
-                _autoTest?.Tick(_baseTickMs);
+                _autoTest?.Tick();
 
                 // Catalog-only mode upkeep: when the user has no mzdash folder
                 // configured, ApplyTelemetrySettings may have just wiped the
@@ -93,6 +93,7 @@ namespace MozaPlugin.Telemetry
                 // last synthesis; the steady-state cost is an allocation-free
                 // catalog content hash.
                 MaybeSwapProfileForCatalog();
+                SyncTickTimerToBaseTick();
 
                 // Re-read _tiers: MaybeSwapProfileForCatalog may have rebuilt
                 // them above (synthesised from wheel-advertised catalog when
@@ -197,6 +198,11 @@ namespace MozaPlugin.Telemetry
             TickEmitRetransmits();
             _tierDefEmitter.TickEmitTierDefBlindRetransmits();
 
+            // A queued wedge re-provoke owns this cycle: RestartForSwitch drains
+            // for PreStopDrainMs before its Stop, and going Active meanwhile would
+            // emit the very tier-def the re-provoke exists to avoid.
+            if (_reprovokePending) return;
+
             if (_tickCounter >= _preambleTickTarget)
             {
                 // Try a fresh parse before checking catalog readiness — a
@@ -275,7 +281,7 @@ namespace MozaPlugin.Telemetry
                                 $"[AZOM] Cold-start preamble hold: waiting for a real catalog " +
                                 $"(valid URL + END u32) on tier-def sess 0x{gateMgmt:X2} " +
                                 $"before first tier-def. Cap {catalogCap} ticks " +
-                                $"({PreambleSess01CatalogWaitMaxMs} ms).");
+                                $"({catalogWaitMs} ms).");
                         }
                         return;
                     }
@@ -307,11 +313,12 @@ namespace MozaPlugin.Telemetry
                             $"re-advertises on 0x{gateMgmt:X2} (attempt {_coldStartReprovokeAttempts}/{MaxColdStartReprovokes}).");
                         System.Threading.Interlocked.Exchange(ref _forceColdReprovoke, 1);
                         _coldStartWheelGatePending = false;   // re-armed by the re-provoked Start
+                        _reprovokePending = true;
                         RestartForSwitch();
                         return;   // do NOT proceed to Active / do NOT emit the doomed tier-def
                     }
                     MozaLog.Warn(
-                        $"[AZOM] Cold-start catalog wait exceeded {PreambleSess01CatalogWaitMaxMs} ms " +
+                        $"[AZOM] Cold-start catalog wait exceeded {catalogWaitMs} ms " +
                         $"without a real catalog on tier-def session 0x{gateMgmt:X2} " +
                         $"({(catalogOnFlagSession ? $"re-provoke budget exhausted after {_coldStartReprovokeAttempts} attempts" : "screenless or slow wheel")}) " +
                         $"— proceeding to Active anyway (watchdog will recover if binding fails). " +
@@ -347,6 +354,7 @@ namespace MozaPlugin.Telemetry
 
                 _tickCounter = 0;
                 _slowCounter = 0;
+                ResetCadences();
             }
         }
 
@@ -376,10 +384,10 @@ namespace MozaPlugin.Telemetry
         private void TickAbsorbCatalogIfChanged()
         {
             int curLen = _catalogParser.BufferLength;
-            // Also parse when chunks are parked behind a hole: in that state the
-            // buffer does NOT grow, so the growth test alone would never fire and
-            // the reassembler's stall escape could never run.
-            if (curLen > _catalogParser.LastParsedBufferLen || _catalogParser.HasPendingChunks)
+            // Chunks parked behind a hole don't grow the buffer, so the growth
+            // test alone would never reach the reassembler's stall escape. Run
+            // the escape directly and parse only when it actually skipped a hole.
+            if (curLen > _catalogParser.LastParsedBufferLen || _catalogParser.TryEscapePendingStall())
             {
                 // TryParse internally trims bytes up to the last committed
                 // END marker, so in normal operation buffers stay bounded
@@ -617,11 +625,12 @@ namespace MozaPlugin.Telemetry
                 // Latest-wins per tier: if the last frame for this tier is still
                 // queued (e.g. write thread stalled under Wine syscall overhead),
                 // overwrite it so the wheel gets the freshest snapshot instead
-                // of a growing backlog.
+                // of a growing backlog. Tiers past the 8 fixed slots ride the
+                // connection's per-lane overflow slots.
                 if (i < 8)
                     SendStreamSlot((int)StreamKind.TierDash0 + i, frame);
                 else
-                    _connection.Send(frame);
+                    _connection.SendTierOverflow(StreamSlotBase, i - 8, frame);
 
                 // Count toward the per-second governor budget (essential tiers count
                 // too, so they reserve their share and the sheddable tiers shed once
@@ -658,19 +667,17 @@ namespace MozaPlugin.Telemetry
             // resolving every channel's property + ToString per 30 ms tick was
             // pure churn. Poll at ~4 Hz — a change is picked up within ≤250 ms,
             // far inside the 15 s keepalive floor.
-            if (_tickCounter % StringPollTickInterval != 0) return;
-            EmitStringChannels(force: false);
+            if (!CadenceDue(Cadence.StringPoll, StringPollIntervalMs, 0)) return;
+            EmitStringChannels();
         }
 
-        private const int StringPollTickInterval = 8; // ~4 Hz at the 30 ms base tick
+        private const int StringPollIntervalMs = 250;
         private const int StringKeepaliveFloorMs = 15000; // PitHouse mean cadence
 
         /// <summary>Iterate the active profile's string channels and emit each
-        /// one via sess=0x01 type=0x05. When <paramref name="force"/> is false,
-        /// emits only on value change or 15 s keepalive expiry and skips
-        /// fully-unmapped channels with no prior state. When true, emits every
-        /// catalog-bound channel regardless — used by the auto-test burst.</summary>
-        private void EmitStringChannels(bool force)
+        /// one via sess=0x01 type=0x05, only on value change or 15 s keepalive
+        /// expiry. Skips fully-unmapped channels with no prior state.</summary>
+        private void EmitStringChannels()
         {
             var profile = _profile;
             if (profile == null || profile.StringChannels.Count == 0) return;
@@ -683,31 +690,52 @@ namespace MozaPlugin.Telemetry
 
             foreach (var ch in profile.StringChannels)
             {
-                int idx = _catalogParser.FindIdxByUrl(ch.Url);
+                int idx = ResolveStringChannelIdx(ch.Url);
                 if (idx < 1 || idx > 255) continue;
 
                 string value = ResolveStringChannelValue(ch, signalNowMs);
 
-                if (!force)
-                {
-                    // Unmapped channels with no prior state would otherwise
-                    // blast "" at the wheel every 15 s. Wait for a UI mapping.
-                    if (value.Length == 0 && !_stringChannelState.ContainsKey(ch.Url))
-                        continue;
+                // Unmapped channels with no prior state would otherwise
+                // blast "" at the wheel every 15 s. Wait for a UI mapping.
+                if (value.Length == 0 && !_stringChannelState.ContainsKey(ch.Url))
+                    continue;
 
-                    bool send;
-                    if (!_stringChannelState.TryGetValue(ch.Url, out var st))
-                        send = true;
-                    else if (!string.Equals(st.lastValue, value, System.StringComparison.Ordinal))
-                        send = true;
-                    else
-                        send = nowMs - st.lastTickMs >= StringKeepaliveFloorMs;
-                    if (!send) continue;
-                }
+                bool send;
+                if (!_stringChannelState.TryGetValue(ch.Url, out var st))
+                    send = true;
+                else if (!string.Equals(st.lastValue, value, System.StringComparison.Ordinal))
+                    send = true;
+                else
+                    send = nowMs - st.lastTickMs >= StringKeepaliveFloorMs;
+                if (!send) continue;
 
                 EmitOneStringValue((byte)idx, value);
                 _stringChannelState[ch.Url] = (value, nowMs);
             }
+        }
+
+        // URL → idx over the current LiveCatalog generation, rebuilt when the
+        // parser publishes a new list. Tick thread only.
+        private System.Collections.Generic.IReadOnlyList<string>? _stringIdxLiveRef;
+        private System.Collections.Generic.Dictionary<string, int>? _stringIdxLiveMap;
+
+        /// <summary>Wheel idx for a string channel: the live generation first (the
+        /// union catalog keeps a prior dash's URL at stale indices after a switch,
+        /// first-wins), then the union when the live generation lacks the URL.</summary>
+        private int ResolveStringChannelIdx(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return -1;
+            var live = _catalogParser.LiveCatalog;
+            if (live != null)
+            {
+                if (!ReferenceEquals(live, _stringIdxLiveRef))
+                {
+                    _stringIdxLiveMap = ChannelCatalogParser.BuildIdxByUrl(live);
+                    _stringIdxLiveRef = live;
+                }
+                if (_stringIdxLiveMap!.TryGetValue(url, out int liveIdx)) return liveIdx;
+            }
+            return _catalogParser.FindIdxByUrl(url);
         }
 
         /// <summary>Resolve a string channel's current value. Test mode pulls
@@ -778,14 +806,6 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>Diagnostic: emit every string channel in the current
-        /// profile right now, bypassing the change-detect + keepalive gate.
-        /// Used by the auto-test harness (PhaseStringBurst) to produce a
-        /// clearly-labelled wire-trace window even when no game is running
-        /// and steady-state cadence is silent. Updates dedup state so the
-        /// subsequent tick doesn't immediately re-emit.</summary>
-        public void ForceStringEmitAll() => EmitStringChannels(force: true);
-
         /// <summary>Sequence-counter, gated on gameRunning because PitHouse only
         /// emits it while a game is actively driving telemetry — bursting it at
         /// idle is the largest plugin-vs-PitHouse drift source observed in
@@ -801,16 +821,84 @@ namespace MozaPlugin.Telemetry
                 SendStreamSlot((int)StreamKind.Sequence, _frames.BuildSequenceCounterFrame());
         }
 
+        // ── Wall-clock cadences ─────────────────────────────────────────────
+        // The parity polls, widget poll, string poll and slow path run on elapsed
+        // time, not tick counts: the tick period follows the fastest tier's
+        // package_level (500 ms+ for a dashboard with no pkg-30 channel), where a
+        // tick-count cadence would stretch to seconds. Each cadence fires once
+        // per period at its own offset, keeping them staggered across the cycle.
+        private enum Cadence
+        {
+            HandbrakePresence, HandbrakeOutput, PedalOutputs,
+            LedGroup1, LedGroup2, WidgetPoll, SlowPath, StringPoll,
+            Count,
+        }
+
+        private const int PollCycleMs = 1000;
+        private const int LedGroup2CycleMs = 5 * PollCycleMs;
+
+        // Tick thread only. Restarted on the Active transition.
+        private readonly System.Diagnostics.Stopwatch _cadenceClock =
+            System.Diagnostics.Stopwatch.StartNew();
+        private readonly long[] _cadenceLastCycle = NewCadenceCycles();
+
+        private static long[] NewCadenceCycles()
+        {
+            var cycles = new long[(int)Cadence.Count];
+            for (int k = 0; k < cycles.Length; k++) cycles[k] = -1;
+            return cycles;
+        }
+
+        private void ResetCadences()
+        {
+            for (int k = 0; k < _cadenceLastCycle.Length; k++) _cadenceLastCycle[k] = -1;
+            _cadenceClock.Restart();
+        }
+
+        /// <summary>Tier TickIntervals are computed against <c>_baseTickMs</c>,
+        /// which a Profile assignment can move after StartTickTimer armed the
+        /// timer; keep the timer period in step so tier rates hold.</summary>
+        private void SyncTickTimerToBaseTick()
+        {
+            var timer = Volatile.Read(ref _sendTimer);
+            if (timer == null) return;
+            int baseMs = _baseTickMs;
+            double prevMs = timer.Interval;
+            if (prevMs == baseMs) return;
+            try
+            {
+                timer.Interval = baseMs;
+            }
+            catch (Exception) when (!ReferenceEquals(Volatile.Read(ref _sendTimer), timer))
+            {
+                return;   // torn down by a concurrent Stop()
+            }
+            MozaLog.Debug($"[AZOM] Tick timer re-timed {prevMs} ms → {baseMs} ms (base tick moved by profile change)");
+        }
+
+        /// <summary>True once per <paramref name="periodMs"/> window, at
+        /// <paramref name="offsetMs"/> into it. A stall spanning several windows
+        /// fires once, not once per missed window.</summary>
+        private bool CadenceDue(Cadence cadence, int periodMs, int offsetMs)
+        {
+            long t = _cadenceClock.ElapsedMilliseconds - offsetMs;
+            if (t < 0) return false;
+            long cycle = t / periodMs;
+            if (cycle == _cadenceLastCycle[(int)cadence]) return false;
+            _cadenceLastCycle[(int)cadence] = cycle;
+            return true;
+        }
+
         /// <summary>Peripheral output polls (handbrake + pedals) at ~1 Hz,
-        /// staggered across ticks so the writes don't pile into a single
+        /// staggered across the cycle so the writes don't pile into a single
         /// 4ms-paced burst.</summary>
         private void TickEmitPeripheralPolls()
         {
-            int slow = Math.Max(8, 1000 / _baseTickMs); // ~1Hz cycle (33 ticks @ 30ms base)
-            int phase = _tickCounter % slow;
-            if (phase == 0)             _connection.Send(Frames.TelemetryFrameCache.HandbrakePresenceFrame);
-            else if (phase == slow / 5) _connection.Send(Frames.TelemetryFrameCache.HandbrakeOutputFrame);
-            else if (phase == 2 * slow / 5)
+            if (CadenceDue(Cadence.HandbrakePresence, PollCycleMs, 0))
+                _connection.Send(Frames.TelemetryFrameCache.HandbrakePresenceFrame);
+            if (CadenceDue(Cadence.HandbrakeOutput, PollCycleMs, PollCycleMs / 5))
+                _connection.Send(Frames.TelemetryFrameCache.HandbrakeOutputFrame);
+            if (CadenceDue(Cadence.PedalOutputs, PollCycleMs, 2 * PollCycleMs / 5))
             {
                 _connection.Send(Frames.TelemetryFrameCache.PedalThrottleOutFrame);
                 _connection.Send(Frames.TelemetryFrameCache.PedalBrakeOutFrame);
@@ -823,10 +911,9 @@ namespace MozaPlugin.Telemetry
         /// block comment near <c>TelemetryFrameCache.LedStatePollGroup1</c>.</summary>
         private void TickEmitLedStatePolls()
         {
-            int slow = Math.Max(8, 1000 / _baseTickMs);
-            if (_tickCounter % slow == 3 * slow / 5)
+            if (CadenceDue(Cadence.LedGroup1, PollCycleMs, 3 * PollCycleMs / 5))
                 _connection.Send(Frames.TelemetryFrameCache.LedStatePollGroup1);
-            if (_tickCounter % (slow * 5) == 4 * slow / 5)
+            if (CadenceDue(Cadence.LedGroup2, LedGroup2CycleMs, 4 * PollCycleMs / 5))
                 _connection.Send(Frames.TelemetryFrameCache.LedStatePollGroup2);
         }
 
@@ -848,25 +935,24 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>Widget-state poll cycle: one frame per ~1 Hz slow tick,
+        /// <summary>Widget-state poll cycle: one frame per ~1 Hz cycle,
         /// rotating through the 63 live probes in SendOneWidgetPoll, so each
         /// individual probe recurs every ~63 s. PitHouse's own capture cadence
         /// is ~0.2/s per probe — we stay well under it.</summary>
         private void TickEmitWidgetPoll()
         {
-            int slow = Math.Max(8, 1000 / _baseTickMs);
-            if (_tickCounter % slow == slow / 2)
+            if (CadenceDue(Cadence.WidgetPoll, PollCycleMs, PollCycleMs / 2))
                 SendWidgetStatePoll();
         }
 
         /// <summary>~1 Hz slow path: dash keepalive, mode frame, display
         /// config, 28x poll, status push, session 0x09 keepalive. Display
         /// config is throttled to every other slow tick (~0.5 Hz) to match
-        /// PitHouse cadence.</summary>
+        /// PitHouse cadence. <c>_slowCounter</c> counts slow ticks fired.</summary>
         private void TickEmitSlowPath()
         {
-            int slow = Math.Max(1, 1000 / _baseTickMs);
-            if (_slowCounter++ % slow != 0) return;
+            if (!CadenceDue(Cadence.SlowPath, PollCycleMs, 0)) return;
+            _slowCounter++;
 
             // SendHeartbeat() emits group-0 length-0 presence pings; PitHouse
             // capture (2026-04-29) shows none of these on the wire — PitHouse

@@ -12,9 +12,7 @@ namespace MozaPlugin.Sdk
     ///     the live <see cref="DeviceCatalog"/> at lookup time; unknown IDs fail to resolve so observable garbage URIs from a
     ///     bad client surface as 4.04 rather than reaching a handler.</description></item>
     /// </list>
-    /// Per-property suffixes after <c>{id}</c> are extracted as the
-    /// <c>propertyName</c> out parameter — concrete handlers do not need to
-    /// re-parse the URI. Thread-safe: all mutators and lookups serialize on a
+    /// Thread-safe: all mutators and lookups serialize on a
     /// single lock so resource bindings can be added after the server is
     /// running (e.g. when a wheel reconnects and a new device-scoped handler
     /// must come online).
@@ -84,17 +82,15 @@ namespace MozaPlugin.Sdk
         /// <summary>
         /// Resolve <paramref name="fullUri"/> against the registered schemas.
         /// Returns the matching handler with the extracted device-ID slot
-        /// (when the schema contained one) and the property-name suffix (the
-        /// segment immediately following <c>{id}</c>, if any).
+        /// (when the schema contained one).
         /// </summary>
         /// <returns>
         /// The handler if a schema matched AND any required device-ID is in
         /// the catalog; <c>null</c> otherwise.
         /// </returns>
-        public CoapResourceHandler? Resolve(string fullUri, out string? deviceId, out string? propertyName)
+        public CoapResourceHandler? Resolve(string fullUri, out string? deviceId)
         {
             deviceId = null;
-            propertyName = null;
             if (string.IsNullOrEmpty(fullUri)) return null;
             if (!fullUri.StartsWith("/", StringComparison.Ordinal)) return null;
 
@@ -138,31 +134,9 @@ namespace MozaPlugin.Sdk
                     continue;
 
                 deviceId = candidateId;
-                propertyName = ExtractPropertyName(entry.Segments, requestSegments);
                 return entry.Handler;
             }
             return null;
-        }
-
-        /// <summary>Enumerate currently-bound URI schemas for diagnostics.</summary>
-        public IEnumerable<string> KnownUriSuffixes
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    var copy = new string[_bindings.Count];
-                    for (int i = 0; i < _bindings.Count; i++)
-                        copy[i] = _bindings[i].Schema;
-                    return copy;
-                }
-            }
-        }
-
-        /// <summary>Number of bindings currently registered. Diagnostic only.</summary>
-        public int Count
-        {
-            get { lock (_gate) return _bindings.Count; }
         }
 
         // ----- helpers -----
@@ -188,28 +162,6 @@ namespace MozaPlugin.Sdk
                 if (parts[i].Length > 0) list.Add(parts[i]);
             }
             return list.ToArray();
-        }
-
-        /// <summary>
-        /// Extract the property-name slot — the segment that follows the
-        /// <c>{id}</c> placeholder. For schemas without a placeholder, returns
-        /// the LAST segment (so <c>/MOZARacing/SdkState</c> reports
-        /// propertyName="SdkState"). For schemas where the placeholder is the
-        /// trailing segment (the manifest URI), returns null.
-        /// </summary>
-        private static string? ExtractPropertyName(string[] schemaSegments, string[] requestSegments)
-        {
-            for (int i = 0; i < schemaSegments.Length; i++)
-            {
-                if (string.Equals(schemaSegments[i], IdPlaceholder, StringComparison.Ordinal))
-                {
-                    int next = i + 1;
-                    if (next >= requestSegments.Length) return null;
-                    return requestSegments[next];
-                }
-            }
-            if (requestSegments.Length == 0) return null;
-            return requestSegments[requestSegments.Length - 1];
         }
 
         private bool CatalogContainsId(string id)

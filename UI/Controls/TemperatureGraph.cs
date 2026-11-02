@@ -199,9 +199,16 @@ namespace MozaControls
         // pass per dispatcher frame rebuilds them once (see BandwidthSparkline).
         private bool _recomputePending;
 
+        public TemperatureGraph()
+        {
+            // The host keeps assigning samples while the graph is off-screen;
+            // Recompute skips then, so catch up when shown.
+            IsVisibleChanged += (_, e) => { if ((bool)e.NewValue) ScheduleRecompute(); };
+        }
+
         private void ScheduleRecompute()
         {
-            if (_recomputePending) return;
+            if (_recomputePending || !IsVisible) return;
             _recomputePending = true;
             Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
             {
@@ -210,20 +217,32 @@ namespace MozaControls
             }));
         }
 
-        private static List<double> Collect(IEnumerable? src)
+        // Reused sample buffers, one per series.
+        private double[] _mcuBuf = new double[0];
+        private double[] _mosBuf = new double[0];
+        private double[] _motBuf = new double[0];
+
+        // Gridlines depend only on size; rebuilt when it changes.
+        private Geometry? _gridCache;
+        private double _gridCacheW, _gridCacheH;
+
+        // Min/max over the non-zero samples (zero is the no-data sentinel).
+        private static void LiveRange(double[] vals, int n, ref bool any, ref double min, ref double max)
         {
-            var list = new List<double>();
-            if (src == null) return list;
-            foreach (var v in src)
+            for (int i = 0; i < n; i++)
             {
-                if (v is IConvertible c)
-                    list.Add(c.ToDouble(System.Globalization.CultureInfo.InvariantCulture));
+                double v = vals[i];
+                if (!(v > 0)) continue;
+                if (!any) { min = v; max = v; any = true; continue; }
+                if (v < min) min = v;
+                if (v > max) max = v;
             }
-            return list;
         }
 
         private void Recompute()
         {
+            if (!IsVisible) return;
+
             double w = ActualWidth;
             double h = ActualHeight;
             if (w <= 0 || h <= 0)
@@ -236,25 +255,23 @@ namespace MozaControls
             double plotW = w - pad * 2;
             double plotH = h - pad * 2;
 
-            var mcu = Collect(McuSamples);
-            var mos = Collect(MosfetSamples);
-            var mot = Collect(MotorSamples);
+            int mcuN = SparklineSeries.Read(McuSamples, ref _mcuBuf);
+            int mosN = SparklineSeries.Read(MosfetSamples, ref _mosBuf);
+            int motN = SparklineSeries.Read(MotorSamples, ref _motBuf);
 
             // ---- Auto-scale Y range ----
             // Aggregate all non-zero samples; zero is the "no data" sentinel
             // pushed into the buffer at startup / when disconnected, and would
             // otherwise drag the scale floor down and squash the live readings
             // up into a sliver at the top.
-            var live = mcu.Concat(mos).Concat(mot).Where(v => v > 0).ToList();
-            double dataMin, dataMax;
-            if (live.Count == 0)
+            bool anyLive = false;
+            double dataMin = 0, dataMax = 0;
+            LiveRange(_mcuBuf, mcuN, ref anyLive, ref dataMin, ref dataMax);
+            LiveRange(_mosBuf, mosN, ref anyLive, ref dataMin, ref dataMax);
+            LiveRange(_motBuf, motN, ref anyLive, ref dataMin, ref dataMax);
+            if (!anyLive)
             {
                 dataMin = 0; dataMax = MinRange;
-            }
-            else
-            {
-                dataMin = live.Min();
-                dataMax = live.Max();
             }
 
             // Pad 10 % above/below so the lines don't kiss the edges, then
@@ -265,37 +282,24 @@ namespace MozaControls
             double yMax = cx + range / 2.0 * 1.20;
             double yRange = Math.Max(1, yMax - yMin);
 
-            double Y(double v) => h - pad - (Math.Min(Math.Max(v, yMin), yMax) - yMin) / yRange * plotH;
-
-            (Geometry? line, Geometry? fill, double tipX, double tipY, double last)
-                BuildSeries(List<double> vals)
-            {
-                if (vals.Count == 0) return (null, null, 0, 0, 0);
-                int n = vals.Count;
-                double X(int i) => pad + (n == 1 ? 0 : plotW * i / (n - 1));
-
-                var lineFig = new PathFigure { StartPoint = new Point(X(0), Y(vals[0])), IsClosed = false, IsFilled = false };
-                for (int i = 1; i < n; i++)
-                    lineFig.Segments.Add(new LineSegment(new Point(X(i), Y(vals[i])), true));
-                var lineGeom = new PathGeometry(); lineGeom.Figures.Add(lineFig); lineGeom.Freeze();
-
-                // Fill mirrors the bandwidth sparkline: traces along the same
-                // points, then closes down to the bottom-right and bottom-left
-                // corners so the area between the line and the X axis fills in.
-                var fillFig = new PathFigure { StartPoint = new Point(pad, h - pad), IsClosed = true, IsFilled = true };
-                for (int i = 0; i < n; i++)
-                    fillFig.Segments.Add(new LineSegment(new Point(X(i), Y(vals[i])), false));
-                fillFig.Segments.Add(new LineSegment(new Point(pad + plotW, h - pad), false));
-                var fillGeom = new PathGeometry(); fillGeom.Figures.Add(fillFig); fillGeom.Freeze();
-
-                double tipX = pad + plotW;
-                double tipY = Y(vals[n - 1]);
-                return (lineGeom, fillGeom, tipX - 3, tipY - 3, vals[n - 1]);
-            }
-
-            var (mcuLine, mcuFill, mcuTipX, mcuTipY, mcuLast) = BuildSeries(mcu);
-            var (mosLine, mosFill, mosTipX, mosTipY, mosLast) = BuildSeries(mos);
-            var (motLine, motFill, motTipX, motTipY, motLast) = BuildSeries(mot);
+            // Fill mirrors the bandwidth sparkline: traces along the same
+            // points, then closes down to the bottom-right and bottom-left
+            // corners so the area between the line and the X axis fills in.
+            double baseY = h - pad;
+            double scale = plotH / yRange;
+            double tipX = pad + plotW - 3;
+            SparklineSeries.Build(_mcuBuf, mcuN, pad, plotW, baseY, yMin, yMax, yMin, scale,
+                out var mcuLine, out var mcuFill, out double mcuLastY);
+            SparklineSeries.Build(_mosBuf, mosN, pad, plotW, baseY, yMin, yMax, yMin, scale,
+                out var mosLine, out var mosFill, out double mosLastY);
+            SparklineSeries.Build(_motBuf, motN, pad, plotW, baseY, yMin, yMax, yMin, scale,
+                out var motLine, out var motFill, out double motLastY);
+            double mcuTipX = mcuN > 0 ? tipX : 0, mcuTipY = mcuN > 0 ? mcuLastY - 3 : 0;
+            double mosTipX = mosN > 0 ? tipX : 0, mosTipY = mosN > 0 ? mosLastY - 3 : 0;
+            double motTipX = motN > 0 ? tipX : 0, motTipY = motN > 0 ? motLastY - 3 : 0;
+            double mcuLast = mcuN > 0 ? _mcuBuf[mcuN - 1] : 0;
+            double mosLast = mosN > 0 ? _mosBuf[mosN - 1] : 0;
+            double motLast = motN > 0 ? _motBuf[motN - 1] : 0;
 
             SetValue(McuLineGeometryKey,    mcuLine);
             SetValue(MosfetLineGeometryKey, mosLine);
@@ -311,23 +315,39 @@ namespace MozaControls
             // Sort the three latest readings descending. The series with the
             // highest current temp gets the highest ZIndex, so its fill (and
             // tip dot) overlap any cooler series sitting underneath.
-            var ranked = new[] { ("mcu", mcuLast), ("mos", mosLast), ("mot", motLast) }
-                .OrderBy(t => t.Item2)
-                .Select((t, idx) => (t.Item1, idx))
-                .ToDictionary(t => t.Item1, t => t.idx);
-            SetValue(McuZIndexKey,    ranked["mcu"]);
-            SetValue(MosfetZIndexKey, ranked["mos"]);
-            SetValue(MotorZIndexKey,  ranked["mot"]);
+            // Ties keep declaration order (mcu, mos, mot), as a stable sort would.
+            SetValue(McuZIndexKey,    Rank(0, mcuLast, mosLast, motLast));
+            SetValue(MosfetZIndexKey, Rank(1, mcuLast, mosLast, motLast));
+            SetValue(MotorZIndexKey,  Rank(2, mcuLast, mosLast, motLast));
 
             // ---- Grid lines: 3 dashed horizontals at 25/50/75 % of the plot. ----
-            var grid = new GeometryGroup();
-            for (int i = 1; i <= 3; i++)
+            if (_gridCache == null || _gridCacheW != w || _gridCacheH != h)
             {
-                double y = pad + plotH * i / 4.0;
-                grid.Children.Add(new LineGeometry(new Point(pad, y), new Point(pad + plotW, y)));
+                var grid = new GeometryGroup();
+                for (int i = 1; i <= 3; i++)
+                {
+                    double y = pad + plotH * i / 4.0;
+                    grid.Children.Add(new LineGeometry(new Point(pad, y), new Point(pad + plotW, y)));
+                }
+                grid.Freeze();
+                _gridCache = grid;
+                _gridCacheW = w;
+                _gridCacheH = h;
             }
-            grid.Freeze();
-            SetValue(GridGeometryKey, grid);
+            SetValue(GridGeometryKey, _gridCache);
+        }
+
+        // Ascending position of series `index` among (a, b, c).
+        private static int Rank(int index, double a, double b, double c)
+        {
+            double v = index == 0 ? a : index == 1 ? b : c;
+            return Before(a, 0) + Before(b, 1) + Before(c, 2);
+
+            int Before(double x, int j)
+            {
+                int cmp = x.CompareTo(v);
+                return cmp < 0 || (cmp == 0 && j < index) ? 1 : 0;
+            }
         }
 
         private void Clear()

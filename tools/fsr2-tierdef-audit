@@ -43,7 +43,7 @@ COMP_BY_CODE_BW = {
     (0x0E, 10): "percent_1",
     (0x17, 10): "float_001",
     (0x0F, 16): "float_6000_1",
-    (0x15, 16): "float_600_2",
+    (0x10, 16): "float_600_2",
     (0x16, 12): "tyre_pressure_1",
     (0x11, 14): "tyre_temp_1",
     (0x12, 14): "track_temp_1",
@@ -64,7 +64,7 @@ COMP_BY_CODE = {
     0x05: "int16_t", 0x07: "float", 0x08: "int32_t", 0x09: "uint32_t", 0x0A: "double",
     0x0B: "location_t", 0x0C: "int64_t", 0x0D: "int30/uint31", 0x0E: "percent_1",
     0x0F: "float_6000_1", 0x11: "tyre_temp_1", 0x12: "track_temp_1", 0x13: "oil_pressure_1",
-    0x14: "uint3/uint8", 0x15: "float_600_2", 0x16: "tyre_pressure_1/brake_temp_1",
+    0x14: "uint3/uint8", 0x10: "float_600_2",0x16: "tyre_pressure_1/brake_temp_1",
     0x17: "float_001", 0x18: "uint24_t", 0x19: "uint64_t",
 }
 

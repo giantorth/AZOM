@@ -84,8 +84,7 @@ namespace MozaPlugin.Devices.Ui
             // for catching a same-instant profile-apply event.
             ResolvePlugin();
             if (!_refreshTimer.IsEnabled) _refreshTimer.Start();
-            Instance = this;
-            EnsureInputsLiveTimer();
+            UpdateInputsLiveTimer();
         }
 
         /// <summary>
@@ -122,6 +121,7 @@ namespace MozaPlugin.Devices.Ui
             // ComboBoxes etc. also raise SelectionChanged and would otherwise
             // re-trigger this every dropdown interaction.
             if (!ReferenceEquals(e.OriginalSource, WheelTabs)) return;
+            UpdateInputsLiveTimer();
             if (_device == null || _plugin == null || _data == null) return;
 
             var selected = WheelTabs.SelectedItem as TabItem;
@@ -185,7 +185,6 @@ skipReadByMode:
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            if (ReferenceEquals(Instance, this)) Instance = null;
             StopInputsLiveTimer();
             _refreshTimer.Stop();
             // A mid-countdown paddle calibration timer would otherwise root the page.
@@ -660,13 +659,6 @@ skipReadByMode:
                             && _plugin!.IsNewWheelDetected
                             && _plugin!.IsWheelPageReady;
 
-            if (wheelConnected)
-            {
-                string modelName = _data!.WheelModelName;
-                string swVersion = _data.WheelSwVersion;
-                string hwVersion = _data.WheelHwVersion;
-            }
-
             using (_suppressor.Begin())
             {
                 bool anyWheel = newWheel || oldWheel;
@@ -716,6 +708,7 @@ skipReadByMode:
                 WheelTabs.Tag = oldWheel ? "headerless" : null;
 
                 EnsureVisibleTabSelected();
+                UpdateInputsLiveTimer();
 
                 if (newWheel)
                 {
