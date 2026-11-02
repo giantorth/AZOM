@@ -2,6 +2,12 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.3]
+
+## Fixed
+
+- **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
+
 ## [1.7.2]
 
 ## Added

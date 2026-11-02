@@ -31,6 +31,10 @@ namespace MozaPlugin.Telemetry.Dashboard
     {
         private MozaSerialConnection _connection;
         private readonly Func<bool> _shouldAbort;
+        /// <summary>Owning sender's live target device (0x17 wheel, 0x14
+        /// base-bridged CM2, 0x12 standalone CM2) — the device that opens the
+        /// FT session, so every upload chunk must address it.</summary>
+        private readonly Func<byte> _getTargetDevice;
 
         /// <summary>Repoint the outbound connection (telemetry sink moved between the
         /// wheelbase and a standalone-USB dashboard connection).</summary>
@@ -308,6 +312,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         public WheelUploadCoordinator(
             MozaSerialConnection connection,
             Func<bool> shouldAbort,
+            Func<byte> getTargetDevice,
             Func<EraPolicy> getPolicy,
             Func<WheelDashboardState?> getConfigJsonState,
             Action<byte, ushort> sendSessionAck,
@@ -325,6 +330,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             _connection = connection;
             _shouldAbort = shouldAbort;
+            _getTargetDevice = getTargetDevice;
             _getPolicy = getPolicy;
             _getConfigJsonState = getConfigJsonState;
             _sendSessionAck = sendSessionAck;
@@ -1024,7 +1030,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         private void EmitSubMsg(byte[] subMsg, byte sess, ref int seq, int interFrameDelayMs)
         {
-            var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq);
+            var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq, _getTargetDevice());
             foreach (var frame in frames)
             {
                 if (_shouldAbort()) return;
@@ -1047,7 +1053,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         private List<byte[]> EmitSubMsgCapturing(byte[] subMsg, byte sess, ref int seq, int interFrameDelayMs)
         {
-            var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq);
+            var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq, _getTargetDevice());
             foreach (var frame in frames)
             {
                 if (_shouldAbort()) return frames;

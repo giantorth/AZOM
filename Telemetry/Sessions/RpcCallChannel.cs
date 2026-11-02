@@ -26,6 +26,7 @@ namespace MozaPlugin.Telemetry.Sessions
     {
         private MozaSerialConnection _connection;
         private readonly Func<bool> _shouldAbort;
+        private readonly Func<byte> _getTargetDevice;
 
         /// <summary>Repoint the outbound connection (telemetry sink moved between the
         /// wheelbase and a standalone-USB dashboard connection).</summary>
@@ -70,9 +71,13 @@ namespace MozaPlugin.Telemetry.Sessions
         /// not connected; checked between chunk emits so an in-flight Call can bail
         /// without sending half a request. Receives the same semantics as the prior
         /// inline <c>_state == Idle || !_connection.IsConnected</c> guard.</param>
-        public RpcCallChannel(MozaSerialConnection connection, Func<bool> shouldAbort)
+        /// <param name="getTargetDevice">Owning sender's live target device id,
+        /// stamped on the default-path chunks.</param>
+        public RpcCallChannel(MozaSerialConnection connection, Func<bool> shouldAbort,
+            Func<byte> getTargetDevice)
         {
             _connection = connection;
+            _getTargetDevice = getTargetDevice;
             _shouldAbort = shouldAbort;
         }
 
@@ -143,7 +148,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 lock (_seqLock)
                 {
                     int seq = OutboundSeq + 1;
-                    var frames = TierDefinitionBuilder.ChunkMessage(envelope, 0x0a, ref seq);
+                    var frames = TierDefinitionBuilder.ChunkMessage(envelope, 0x0a, ref seq, _getTargetDevice());
                     foreach (var frame in frames)
                     {
                         if (_shouldAbort()) { CleanupWaiter(id); return null; }

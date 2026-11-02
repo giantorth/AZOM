@@ -696,7 +696,7 @@ namespace MozaPlugin.Telemetry
                 var prior = _dashboardDownloader;
                 if (value != null)
                     _dashboardDownloader = new DashboardDownloader(
-                        _connection, value,
+                        () => _connection, () => _targetDeviceId, value,
                         MozaPlugin.Instance?.DashProfileStore ?? new DashboardProfileStore(),
                         _retransmitter, _dispatcher);
                 else
@@ -1000,16 +1000,18 @@ namespace MozaPlugin.Telemetry
             _sessionLife = new Sessions.SessionLifecycle(this);
             _rpc = new RpcCallChannel(
                 connection,
-                shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected);
+                shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected,
+                getTargetDevice: () => _targetDeviceId);
             _uploader = new WheelUploadCoordinator(
                 connection,
                 shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected,
+                getTargetDevice: () => _targetDeviceId,
                 getPolicy: () => _policy,
                 getConfigJsonState: () => _configJson.LastState,
                 sendSessionAck: _sessionLife.SendSessionAck,
                 sendSessionEnd: _sessionLife.SendSessionEnd,
                 sendStaleSessionClose: _sessionLife.SendSessionClose,
-                sendAndTrackChunk: SendAndTrackChunk,
+                sendAndTrackChunk: SendAndTrackTransferChunk,
                 sendSessionOpen: _sessionLife.SendSessionOpen,
                 sendFileTransferActivate: _sessionLife.SendFileTransferActivate,
                 getRetransmitBacklog: () => Retransmitter.QueueSize,
