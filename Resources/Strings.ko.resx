@@ -844,4 +844,5 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>파스텔 자홍</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 프리셋 (*.mzpreset;*.json)|*.mzpreset;*.json|모든 파일 (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>활성 프로필에 “{0}” 적용됨</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>전역 설정</value></data>
 </root>

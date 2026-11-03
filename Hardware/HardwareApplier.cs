@@ -812,16 +812,18 @@ namespace MozaPlugin.Hardware
 
         public void ApplyWheelToHardware(MozaWheelProfile? wheelProfile)
         {
-            var profile = wheelProfile ?? EmptyWheelProfile;
             if (!ProfileWritesAllowed)
             {
-                ApplyDisplayRotation(profile, fromProfile: false);
+                ApplyDisplayRotation(wheelProfile ?? EmptyWheelProfile, fromProfile: false);
                 return;
             }
             // SimHub creates per-game profiles all-sentinel; seed the screen fields
             // (rotation included) from the plugin defaults. Idempotent.
             if (wheelProfile != null && _plugin.Settings != null)
                 wheelProfile.SeedBaselineFromFlatFields(_plugin.Settings);
+            // Global LED tabs override the profile's values for those tabs.
+            var profile = _plugin.DeviceProfiles?.EffectiveWheelProfile(wheelProfile, _plugin.GetCurrentWheelPageGuid())
+                          ?? wheelProfile ?? EmptyWheelProfile;
 
             int telemMode      = profile.WheelTelemetryMode;
             // Idle-effect / idle-speed bundle is per-wheel-page (schema v9); null
@@ -2354,7 +2356,7 @@ namespace MozaPlugin.Hardware
                     // read has landed on yet still holds the InitColorArray default, and
                     // pushing that erased the wheel's stored palette (bundle 0TWEX2AK:
                     // "Static mode does not seem to work, all knobs go black").
-                    var wheelProfile = _plugin.ActiveWheelProfile;
+                    var wheelProfile = _plugin.ActiveWheelLedProfile;
                     int[]? savedPrimary = wheelProfile?.WheelKnobPrimaryColors;
                     int[]? savedRing    = wheelProfile?.WheelKnobRingColors;
 

@@ -845,4 +845,5 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Пастельный пурпурный</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Пресет PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Все файлы (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Глобальные настройки</value></data>
 </root>

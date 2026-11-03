@@ -642,9 +642,13 @@ namespace MozaPlugin.UI
             // of them and writes nothing — indistinguishable, without this line, from a
             // wheel that simply already matched.
             var pageGuid = plugin.GetCurrentWheelPageGuid();
-            var overlay = plugin.ActiveWheelProfile;
+            var stored = plugin.ActiveWheelProfile;
+            var overlay = plugin.ActiveWheelLedProfile;   // global LED tabs laid over
+            var glob = plugin.DeviceProfiles?.WheelGlobalLed(pageGuid);
             sb.AppendLine($"Wheel page:     {(pageGuid.HasValue ? pageGuid.Value.ToString().Substring(0, 8) : "unresolved")}"
-                          + $"  profile={(overlay != null ? overlay.Name : "none")}"
+                          + $"  profile={(stored != null ? stored.Name : "none")}"
+                          + $"  global rpm={(glob?.RpmGlobal == true ? "on" : "off")} "
+                          + $"btn={(glob?.ButtonsGlobal == true ? "on" : "off")} knob={(glob?.KnobsGlobal == true ? "on" : "off")}"
                           + (overlay != null
                              ? $"  want modes rpm={Bri(overlay.WheelTelemetryMode)} "
                                + $"btn={Bri(overlay.WheelButtonsLedMode)} knob={Bri(overlay.WheelKnobLedMode)}"

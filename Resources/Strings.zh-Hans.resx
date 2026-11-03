@@ -845,4 +845,5 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>淡品红色</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 预设 (*.mzpreset;*.json)|*.mzpreset;*.json|所有文件 (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>已将“{0}”应用到活动配置</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>全局设置</value></data>
 </root>

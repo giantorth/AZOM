@@ -634,6 +634,12 @@ namespace MozaPlugin.Settings
         /// The device-page settings live here, not on <see cref="ProfileStore"/>.</summary>
         public DeviceProfileRegistry DeviceProfiles { get; set; } = new DeviceProfileRegistry();
 
+        /// <summary>Per-wheel-page LED settings shared by every profile, for the RPM /
+        /// Buttons / Knobs tabs whose "Global settings" toggle is on (the toggles live
+        /// here too). Absent = every tab uses the active device profile.</summary>
+        public Dictionary<Guid, WheelGlobalLedSettings> WheelGlobalLedByPageGuid { get; set; }
+            = new Dictionary<Guid, WheelGlobalLedSettings>();
+
         /// <summary>One-shot sentinel for <c>DeviceProfileMigration.Run</c>. True on new
         /// installs (nothing to split); the initializer stays false for upgrades.</summary>
         public bool DeviceProfilesSplit { get; set; } = false;

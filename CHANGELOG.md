@@ -7,6 +7,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
+- **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
 
 ## Fixed
 

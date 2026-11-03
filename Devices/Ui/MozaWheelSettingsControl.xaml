@@ -310,6 +310,12 @@
                     <!-- New-protocol wheel content -->
                     <StackPanel x:Name="RpmNewContent" Visibility="Collapsed">
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_RpmLedMode}" Icon="{StaticResource IconBolt}">
+                            <ctrl:SectionCard.Header>
+                                <ctrl:OffOnToggle x:Name="RpmGlobalLedToggle" Tag="Rpm"
+                                                  Content="{x:Static res:Strings.Label_GlobalSettings}"
+                                                  VerticalAlignment="Center"
+                                                  Checked="GlobalLedToggle_Changed" Unchecked="GlobalLedToggle_Changed"/>
+                            </ctrl:SectionCard.Header>
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.SliderLabel_RpmLedMode}" Style="{StaticResource SliderLabel}"/>
@@ -403,6 +409,12 @@
                     <StackPanel>
 
                     <ctrl:SectionCard Title="{x:Static res:Strings.Section_ButtonLedMode}" Icon="{StaticResource IconBolt}">
+                        <ctrl:SectionCard.Header>
+                            <ctrl:OffOnToggle x:Name="ButtonsGlobalLedToggle" Tag="Buttons"
+                                              Content="{x:Static res:Strings.Label_GlobalSettings}"
+                                              VerticalAlignment="Center"
+                                              Checked="GlobalLedToggle_Changed" Unchecked="GlobalLedToggle_Changed"/>
+                        </ctrl:SectionCard.Header>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,4">
                                 <TextBlock Text="{x:Static res:Strings.SliderLabel_ButtonLedMode}" Style="{StaticResource SliderLabel}"/>
@@ -464,6 +476,12 @@
 
                     <StackPanel x:Name="WheelKnobSection" Visibility="Collapsed">
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_KnobLedMode}" Icon="{StaticResource IconBolt}">
+                            <ctrl:SectionCard.Header>
+                                <ctrl:OffOnToggle x:Name="KnobsGlobalLedToggle" Tag="Knobs"
+                                                  Content="{x:Static res:Strings.Label_GlobalSettings}"
+                                                  VerticalAlignment="Center"
+                                                  Checked="GlobalLedToggle_Changed" Unchecked="GlobalLedToggle_Changed"/>
+                            </ctrl:SectionCard.Header>
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.SliderLabel_KnobLedMode}" Style="{StaticResource SliderLabel}"/>

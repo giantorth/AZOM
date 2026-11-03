@@ -845,4 +845,5 @@ Id : {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Magenta pastel</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Préréglage PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tous les fichiers (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>« {0} » appliqué au profil actif</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Paramètres globaux</value></data>
 </root>

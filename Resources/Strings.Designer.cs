@@ -903,5 +903,6 @@ namespace MozaPlugin.Resources
         public static string Swatch_PastelMagenta => Get("Swatch_PastelMagenta");
         public static string FileFilter_PitHousePreset => Get("FileFilter_PitHousePreset");
         public static string Import_Footer_Applied => Get("Import_Footer_Applied");
+        public static string Label_GlobalSettings => Get("Label_GlobalSettings");
     }
 }

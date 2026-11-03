@@ -288,6 +288,91 @@ namespace MozaPlugin.Settings
             }
         }
 
+        // ===== Wheel LED tabs: global vs per-profile =====
+
+        /// <summary>A wheel page's global LED settings, or null when none of its tabs
+        /// has ever gone global.</summary>
+        internal WheelGlobalLedSettings? WheelGlobalLed(Guid? pageGuid)
+        {
+            if (!pageGuid.HasValue) return null;
+            var dict = _plugin.Settings?.WheelGlobalLedByPageGuid;
+            return dict != null && dict.TryGetValue(pageGuid.Value, out var g) ? g : null;
+        }
+
+        internal bool IsWheelLedGlobal(Guid? pageGuid, WheelLedGroup group) =>
+            WheelGlobalLed(pageGuid)?.IsGlobal(group) == true;
+
+        /// <summary>
+        /// Switch one LED tab of a wheel page between global and per-profile storage.
+        /// The first time a tab goes global it is seeded from that wheel's active
+        /// profile, so the LEDs don't change; after that the global values persist
+        /// across off/on. Re-applies the wheel when it is the attached one.
+        /// </summary>
+        internal void SetWheelLedGlobal(Guid pageGuid, WheelLedGroup group, bool on)
+        {
+            var settings = _plugin.Settings;
+            if (settings == null) return;
+            lock (_lock)
+            {
+                var dict = settings.WheelGlobalLedByPageGuid;
+                if (dict == null || !dict.TryGetValue(pageGuid, out var g) || g == null)
+                {
+                    if (!on) return;
+                    g = new WheelGlobalLedSettings();
+                    // COW: the save debounce serializes this dict off-thread.
+                    var next = dict != null
+                        ? new Dictionary<Guid, WheelGlobalLedSettings>(dict)
+                        : new Dictionary<Guid, WheelGlobalLedSettings>();
+                    next[pageGuid] = g;
+                    settings.WheelGlobalLedByPageGuid = next;
+                }
+                if (g.IsGlobal(group) == on) return;
+                if (on && !g.IsSeeded(group))
+                {
+                    var source = WheelStore(pageGuid, seed: true)?.CurrentProfile;
+                    if (source != null) WheelGlobalLedSettings.CopyGroup(source, g, group);
+                    g.MarkSeeded(group);
+                }
+                g.SetGlobal(group, on);
+            }
+            MozaLog.Info($"[AZOM] Wheel {group} LEDs ({pageGuid:N}) now stored "
+                         + (on ? "globally" : "in the device profile"));
+            _plugin.PersistSettings();
+            if (_plugin.GetCurrentWheelPageGuid() == pageGuid)
+                _plugin.HardwareApplier.ApplyWheelToHardware();
+            RaiseChanged();
+        }
+
+        /// <summary>Where the attached wheel's <paramref name="group"/> LED edits go:
+        /// the wheel's global settings when that tab is global, else its current profile.</summary>
+        internal IWheelLedFields? WheelLedTarget(WheelLedGroup group)
+        {
+            var page = _plugin.GetCurrentWheelPageGuid();
+            var global = WheelGlobalLed(page);
+            if (global != null && global.IsGlobal(group)) return global;
+            return ActiveWheelProfile;
+        }
+
+        /// <summary>
+        /// <paramref name="profile"/> with the page's global LED tabs laid over it — what
+        /// the wheel actually shows. Returns the profile itself when no tab is global;
+        /// otherwise a copy, so the stored profile is never touched.
+        /// </summary>
+        internal MozaWheelProfile? EffectiveWheelProfile(MozaWheelProfile? profile, Guid? pageGuid)
+        {
+            var global = WheelGlobalLed(pageGuid);
+            if (global == null || !global.AnyGlobal) return profile;
+            var merged = new MozaWheelProfile();
+            if (profile != null) merged.CopyProfilePropertiesFrom(profile);
+            foreach (WheelLedGroup g in Enum.GetValues(typeof(WheelLedGroup)))
+                if (global.IsGlobal(g)) WheelGlobalLedSettings.CopyGroup(global, merged, g);
+            return merged;
+        }
+
+        /// <summary>The attached wheel's effective LED settings (see <see cref="EffectiveWheelProfile"/>).</summary>
+        internal MozaWheelProfile? ActiveWheelLedProfile =>
+            EffectiveWheelProfile(ActiveWheelProfile, _plugin.GetCurrentWheelPageGuid());
+
         // ===== Apply on change =====
 
         private void OnActiveProfileChanged(DeviceProfileKind kind, Guid guid)

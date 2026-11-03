@@ -480,6 +480,16 @@ namespace MozaPlugin.Settings
             mutator(profile);
         }
 
+        /// <summary>Apply <paramref name="mutator"/> to the attached wheel's LED settings for
+        /// one tab — its global settings when that tab's toggle is on, else its profile.</summary>
+        internal void UpdateWheelLed(WheelLedGroup group, Action<IWheelLedFields> mutator)
+        {
+            if (mutator == null) return;
+            var target = _plugin.DeviceProfiles?.WheelLedTarget(group);
+            if (target == null) return;
+            mutator(target);
+        }
+
         /// <summary>Apply <paramref name="mutator"/> to a dash page's current profile.</summary>
         internal void UpdateDashProfile(Guid dashPageGuid, Action<MozaDashProfile> mutator)
         {

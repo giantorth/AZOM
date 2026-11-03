@@ -204,6 +204,9 @@ namespace MozaPlugin
         /// <summary>The attached wheelbase's ambient-LED profile.</summary>
         internal MozaBaseDeviceProfile? ActiveBaseProfile => _deviceProfiles?.ActiveBaseProfile;
         internal void UpdateActiveWheelProfile(Action<MozaWheelProfile> mutator) => _profileCoordinator.UpdateActiveWheelProfile(mutator);
+        /// <summary>The attached wheel's profile with its global LED tabs laid over it.</summary>
+        internal MozaWheelProfile? ActiveWheelLedProfile => _deviceProfiles?.ActiveWheelLedProfile;
+        internal void UpdateWheelLed(WheelLedGroup group, Action<IWheelLedFields> mutator) => _profileCoordinator.UpdateWheelLed(group, mutator);
         internal void UpdateDashProfile(Guid dashPageGuid, Action<MozaDashProfile> mutator) => _profileCoordinator.UpdateDashProfile(dashPageGuid, mutator);
         internal void UpdateBaseProfile(Guid? basePageGuid, Action<MozaBaseDeviceProfile> mutator) => _profileCoordinator.UpdateBaseProfile(basePageGuid, mutator);
         internal void UpdateActiveProfile(Action<MozaProfile> mutator) => _profileCoordinator.UpdateActiveProfile(mutator);

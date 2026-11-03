@@ -17,7 +17,7 @@ namespace MozaPlugin.Settings
     /// </summary>
     public class MozaWheelProfile
         : ProfileBase<MozaWheelProfile, MozaWheelProfileStore>,
-          IProfile, IProfile<MozaWheelProfile, MozaWheelProfileStore>, IDashboardKeyProfile
+          IProfile, IProfile<MozaWheelProfile, MozaWheelProfileStore>, IDashboardKeyProfile, IWheelLedFields
     {
         [JsonIgnore]
         public override Control ProfileContentControl => null!;

@@ -844,4 +844,5 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Παστέλ ματζέντα</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>το «{0}» εφαρμόστηκε στο ενεργό προφίλ</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Καθολικές ρυθμίσεις</value></data>
 </root>
