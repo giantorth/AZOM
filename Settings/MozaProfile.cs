@@ -486,9 +486,6 @@ namespace MozaPlugin.Settings
         public int GameInertia { get; set; } = -1;
         public int GameSpring { get; set; } = -1;
 
-        // ===== Work mode =====
-        public int WorkMode { get; set; } = -1;             // 0/1
-
         // Wheelbase gear-shift vibration intensity (cmd 0x2E base, 0..5).
         // Per-profile so each game gets its own feel. Distinct from the
         // plugin-side coalescing tuning below (GearshiftVibrateOnNeutral /
@@ -751,7 +748,6 @@ namespace MozaPlugin.Settings
             // Game effects
             GameDamper = p.GameDamper; GameFriction = p.GameFriction;
             GameInertia = p.GameInertia; GameSpring = p.GameSpring;
-            WorkMode = p.WorkMode;
             GearshiftVibration = p.GearshiftVibration;
             TempStrategy = p.TempStrategy;
 
@@ -952,7 +948,6 @@ namespace MozaPlugin.Settings
 
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;
-            WorkMode = data.WorkMode;
             GearshiftVibration = data.GearshiftVibration;
             TempStrategy = data.TempStrategy;
             RoadSensitivity = data.RoadSensitivity;

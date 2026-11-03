@@ -1751,9 +1751,6 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.GameSpring,         v => profile.GameSpring         = v,
                   () => _data.GameSpring,           v => _data.GameSpring           = v,
                   "main-set-spring-gain");
-            Apply(() => profile.WorkMode,           v => profile.WorkMode           = v,
-                  () => _data.WorkMode,             v => _data.WorkMode             = v,
-                  "main-set-work-mode");
             Apply(() => profile.GearshiftVibration, v => profile.GearshiftVibration = v,
                   () => _data.GearshiftVibration,   v => _data.GearshiftVibration   = v,
                   "base-gearshift-vibration");
@@ -1915,7 +1912,6 @@ namespace MozaPlugin.Hardware
                 profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
-                profile.WorkMode = -1;
             }
 
             ApplyBaseToHardware(profile);
