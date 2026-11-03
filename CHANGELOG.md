@@ -4,6 +4,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.3]
 
+## Added
+
+- **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
+
 ## Fixed
 
 - **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.

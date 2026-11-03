@@ -793,11 +793,10 @@ namespace MozaPlugin.Hardware
         // Pedals/Handbrake resolvers above.
         private MozaDeviceManager BaseManager => _detectionState.BaseOwner ?? _deviceManager;
 
-        private static int Eff(int overlayVal, int baselineVal) =>
-            overlayVal >= 0 ? overlayVal : baselineVal;
-
-        private static int[]? EffArr(int[]? overlayArr, int[]? baselineArr) =>
-            overlayArr ?? baselineArr;
+        // All-sentinel stand-in while the attached wheel has no store yet (not
+        // identified, or its store is still being seeded): mirrors nothing, writes
+        // nothing saved, but the per-wheel bundles and display-rotation still run.
+        private static readonly MozaWheelProfile EmptyWheelProfile = new MozaWheelProfile();
 
         // ===== Apply*ToHardware =====
 
@@ -808,18 +807,23 @@ namespace MozaPlugin.Hardware
         // not a saved setting and goes out regardless.
         private bool ProfileWritesAllowed => _plugin.ProfileHardwareWritesAllowed;
 
-        public void ApplyWheelToHardware(MozaProfile? profile)
+        /// <summary>Apply the attached wheel's current profile from its own store.</summary>
+        public void ApplyWheelToHardware() => ApplyWheelToHardware(_plugin.ActiveWheelProfile);
+
+        public void ApplyWheelToHardware(MozaWheelProfile? wheelProfile)
         {
-            if (profile == null) return;
+            var profile = wheelProfile ?? EmptyWheelProfile;
             if (!ProfileWritesAllowed)
             {
                 ApplyDisplayRotation(profile, fromProfile: false);
                 return;
             }
+            // SimHub creates per-game profiles all-sentinel; seed the screen fields
+            // (rotation included) from the plugin defaults. Idempotent.
+            if (wheelProfile != null && _plugin.Settings != null)
+                wheelProfile.SeedBaselineFromFlatFields(_plugin.Settings);
 
-            var ov = _plugin.GetCurrentWheelOverlay(profile);
-
-            int telemMode      = Eff(ov?.WheelTelemetryMode ?? -1, profile.WheelTelemetryMode);
+            int telemMode      = profile.WheelTelemetryMode;
             // Idle-effect / idle-speed bundle is per-wheel-page (schema v9); null
             // = leave wheel's value alone. These six fields used to live on the
             // per-game overlay + profile baseline; v9 promoted them to a
@@ -832,25 +836,24 @@ namespace MozaPlugin.Hardware
             int idleSpeed      = idleBundle?.TelemetrySpeedMs ?? -1;
             int btnIdleSpeed   = idleBundle?.ButtonsSpeedMs ?? -1;
             int knobIdleSpeed  = idleBundle?.KnobSpeedMs ?? -1;
-            int knobLedMode    = Eff(ov?.WheelKnobLedMode ?? -1, profile.WheelKnobLedMode);
-            int btnLedMode     = Eff(ov?.WheelButtonsLedMode ?? -1, profile.WheelButtonsLedMode);
+            int knobLedMode    = profile.WheelKnobLedMode;
+            int btnLedMode     = profile.WheelButtonsLedMode;
             // Sleep bundle is per-wheel-page (schema v8); null = leave wheel's value alone.
             var sleepBundle    = _plugin.ActiveWheelSleep;
             int sleepMode      = sleepBundle?.Mode ?? -1;
             int sleepTimeout   = sleepBundle?.TimeoutMin ?? -1;
             int sleepSpeed     = sleepBundle?.SpeedMs ?? -1;
             int[]? sleepColor  = sleepBundle?.Color;
-            int rpmBri         = Eff(ov?.WheelRpmBrightness ?? -1, profile.WheelRpmBrightness);
-            int btnBri         = Eff(ov?.WheelButtonsBrightness ?? -1, profile.WheelButtonsBrightness);
-            int rpmInd         = Eff(ov?.WheelRpmIndicatorMode ?? -1, profile.WheelRpmIndicatorMode);
-            int rpmDisp        = Eff(ov?.WheelRpmDisplayMode ?? -1, profile.WheelRpmDisplayMode);
-            int esRpmBri       = Eff(ov?.WheelESRpmBrightness ?? -1, profile.WheelESRpmBrightness);
-            // Inputs — overlay-only (no profile baseline).
-            int paddles        = ov?.WheelPaddlesMode ?? -1;
-            int clutchPoint    = ov?.WheelClutchPoint ?? -1;
-            int knobMode       = ov?.WheelKnobMode ?? -1;
-            int stickMode      = ov?.WheelStickMode ?? -1;
-            int knobRingBri    = Eff(ov?.WheelKnobRingBrightness ?? -1, profile.WheelKnobRingBrightness);
+            int rpmBri         = profile.WheelRpmBrightness;
+            int btnBri         = profile.WheelButtonsBrightness;
+            int rpmInd         = profile.WheelRpmIndicatorMode;
+            int rpmDisp        = profile.WheelRpmDisplayMode;
+            int esRpmBri       = profile.WheelESRpmBrightness;
+            int paddles        = profile.WheelPaddlesMode;
+            int clutchPoint    = profile.WheelClutchPoint;
+            int knobMode       = profile.WheelKnobMode;
+            int stickMode      = profile.WheelStickMode;
+            int knobRingBri    = profile.WheelKnobRingBrightness;
 
             // Shared/master LED brightness override. Once the user has moved
             // SimHub's master LED-brightness slider (WheelLedMasterBrightness >= 0),
@@ -903,30 +906,28 @@ namespace MozaPlugin.Hardware
             if (clutchPoint >= 0) _data.WheelClutchPoint     = clutchPoint;
             if (knobMode  >= 0) _data.WheelKnobMode          = knobMode;
             if (stickMode >= 0) _data.WheelStickMode         = stickMode;
-            // Per-knob signal modes — overlay-only (no profile baseline), mirrored
-            // for UI display here; re-pushed to the wheel (change-gated) in the
-            // NewWheelDetected block below so a per-game BUTTON/KNOB choice reaches
-            // the wheel on profile switch (firmware persists a single value, so a
-            // readback alone can't re-assert a different profile's saved mode).
-            if (ov?.WheelKnobSignalModes != null)
-                for (int i = 0; i < Math.Min(_data.WheelKnobSignalModes.Length, ov.WheelKnobSignalModes.Length); i++)
-                    if (ov.WheelKnobSignalModes[i] >= 0) _data.WheelKnobSignalModes[i] = ov.WheelKnobSignalModes[i];
+            // Per-knob signal modes, mirrored for UI display here; re-pushed to the
+            // wheel (change-gated) in the NewWheelDetected block below so a per-game
+            // BUTTON/KNOB choice reaches the wheel on profile switch (firmware persists
+            // a single value, so a readback alone can't re-assert a different profile's
+            // saved mode).
+            var signalModes = profile.WheelKnobSignalModes;
+            if (signalModes != null)
+                for (int i = 0; i < Math.Min(_data.WheelKnobSignalModes.Length, signalModes.Length); i++)
+                    if (signalModes[i] >= 0) _data.WheelKnobSignalModes[i] = signalModes[i];
 
-            int[]? rpmColors          = EffArr(ov?.WheelRpmColors, profile.WheelRpmColors);
-            int[]? rpmBlinkColors     = EffArr(ov?.WheelRpmBlinkColors, profile.WheelRpmBlinkColors);
-            int[]? buttonColors       = EffArr(ov?.WheelButtonColors, profile.WheelButtonColors);
-            bool[]? buttonDefaults    = ov?.WheelButtonDefaultDuringTelemetry
-                                        ?? profile.WheelButtonDefaultDuringTelemetry;
-            int[]? flagColors         = EffArr(ov?.WheelFlagColors, profile.WheelFlagColors);
-            int[]? idleColor          = EffArr(ov?.WheelIdleColor, profile.WheelIdleColor);
-            int[]? esRpmColors        = EffArr(ov?.WheelESRpmColors, profile.WheelESRpmColors);
-            int[]? knobPrimaryColors  = EffArr(ov?.WheelKnobPrimaryColors, profile.WheelKnobPrimaryColors);
-            int[]? knobRingColors     = EffArr(ov?.WheelKnobRingColors, profile.WheelKnobRingColors);
-            bool knobDefaultTelemetry = ov?.WheelKnobDefaultDuringTelemetry
-                                        ?? profile.WheelKnobDefaultDuringTelemetry;
-            int knobStaticTimeoutMs   = (ov != null && ov.WheelKnobStaticTimeoutMs >= 0)
-                                        ? ov.WheelKnobStaticTimeoutMs
-                                        : profile.WheelKnobStaticTimeoutMs;
+            int[]? rpmColors          = profile.WheelRpmColors;
+            int[]? rpmBlinkColors     = profile.WheelRpmBlinkColors;
+            int[]? buttonColors       = profile.WheelButtonColors;
+            bool[]? buttonDefaults    = profile.WheelButtonDefaultDuringTelemetry;
+            int[]? flagColors         = profile.WheelFlagColors;
+            int[]? idleColor          = profile.WheelIdleColor;
+            int[]? esRpmColors        = profile.WheelESRpmColors;
+            int[]? knobPrimaryColors  = profile.WheelKnobPrimaryColors;
+            int[]? knobRingColors     = profile.WheelKnobRingColors;
+            bool knobDefaultTelemetry = profile.WheelKnobDefaultDuringTelemetry ?? false;
+            int knobStaticTimeoutMs   = profile.WheelKnobStaticTimeoutMs >= 0
+                                        ? profile.WheelKnobStaticTimeoutMs : 0;
 
             // Mirror colors into _data (UI falls back to _data.* where nothing is
             // saved). Under LedColorLock: the serial thread's SetColor and the UI's
@@ -1047,9 +1048,9 @@ namespace MozaPlugin.Hardware
                 // family this wheel supports — writing whatever is set is safe.
                 //
                 // No hasKnob gate: that is the knob-LED capability, and most rims
-                // have encoders with no knob LEDs. The overlay is its own capability
-                // evidence here — it is keyed by the wheel's page GUID and has no
-                // profile baseline, so a value >= 0 means the user set it on THIS
+                // have encoders with no knob LEDs. The wheel profile is its own
+                // capability evidence here — it lives in this wheel page's store, so a
+                // value >= 0 means the user set it on THIS
                 // rim's page, which only happens when the UI offered the control,
                 // which only happens when the wheel answered the read. Same reasoning
                 // as the paddle/clutch/stick block below. A capability gate would
@@ -1059,12 +1060,12 @@ namespace MozaPlugin.Hardware
                 // wheels that need it.
                 if (knobMode >= 0 && WheelCfgChangedForApply("wheel-knob-mode", knobMode))
                     _deviceManager.WriteSetting("wheel-knob-mode", knobMode);
-                if (ov?.WheelKnobSignalModes != null)
+                if (signalModes != null)
                 {
-                    int nSig = ov.WheelKnobSignalModes.Length;
+                    int nSig = signalModes.Length;
                     for (int i = 0; i < nSig && i < 5; i++)
                     {
-                        int sm = ov.WheelKnobSignalModes[i];
+                        int sm = signalModes[i];
                         if (sm < 0) continue;
                         int fwIdx = model.SignalModeFirmwareIndex(i);
                         if (WheelCfgChangedForApply($"wheel-knob-signal-mode{fwIdx}", sm))
@@ -1201,7 +1202,7 @@ namespace MozaPlugin.Hardware
         // no UI anywhere to clear it. Fires on every wheel (re)detection and
         // profile switch; TelemetrySender.SendSessionInitHandshake covers the
         // session-init case where this push may predate an Active session.
-        private void ApplyDisplayRotation(MozaProfile profile, bool fromProfile)
+        private void ApplyDisplayRotation(MozaWheelProfile profile, bool fromProfile)
         {
             var model = _plugin.WheelModelInfo;
             if (model?.SupportsDisplayRotation == true)
@@ -1220,10 +1221,14 @@ namespace MozaPlugin.Hardware
         /// display brightness/standby) to the dash. _data mirrored always;
         /// writes gated on detection.
         /// </summary>
-        public void ApplyDashToHardware(MozaProfile? profile)
+        /// <summary>Apply the attached dash's (CM2 / CM1) current profile from its own store.</summary>
+        public void ApplyDashToHardware() => ApplyDashToHardware(_plugin.ActiveDashProfile);
+
+        public void ApplyDashToHardware(MozaDashProfile? profile)
         {
-            if (profile == null) return;
-            if (!ProfileWritesAllowed)
+            // No profile = no dash attached, or its store is still being seeded (the
+            // seed re-applies) — the meter mode AZOM needs still goes out.
+            if (!ProfileWritesAllowed || profile == null)
             {
                 if (_detectionState.DashDetected && _plugin.IsCm2Present && !_plugin.DashIsCm1)
                     ApplyCm2MeterMode();
@@ -1300,7 +1305,7 @@ namespace MozaPlugin.Hardware
         /// <see cref="ApplyDashToHardware"/> when the connection target is a
         /// standalone CM2 (PID 0x0025).
         /// </summary>
-        private void ApplyCm2DashboardConfig(MozaProfile profile)
+        private void ApplyCm2DashboardConfig(MozaDashProfile profile)
         {
             ApplyCm2MeterMode();
 
@@ -1388,9 +1393,15 @@ namespace MozaPlugin.Hardware
         /// Push wheel-base ambient LED settings. No-op unless the runtime probe
         /// confirmed strip support.
         /// </summary>
-        public void ApplyBaseAmbientToHardware(MozaProfile? profile)
+        /// <summary>Apply the attached wheelbase's ambient profile from its own store.</summary>
+        public void ApplyBaseAmbientToHardware() => ApplyBaseAmbientToHardware(_plugin.ActiveBaseProfile);
+
+        public void ApplyBaseAmbientToHardware(MozaBaseDeviceProfile? profile)
         {
             if (profile == null || !ProfileWritesAllowed) return;
+            // SimHub creates per-game profiles all-sentinel; seed from the plugin defaults.
+            if (_plugin.Settings != null)
+                profile.SeedBaselineFromFlatFields(_plugin.Settings);
 
             if (profile.BaseAmbientBrightness     >= 0) _data.BaseAmbientBrightness     = profile.BaseAmbientBrightness;
             if (profile.BaseAmbientStandbyMode    >= 0) _data.BaseAmbientStandbyMode    = profile.BaseAmbientStandbyMode;
@@ -1455,7 +1466,7 @@ namespace MozaPlugin.Hardware
         /// device stores them independently. Only the palette of the *active*
         /// mode is visible, which is a display consequence, not a write gate.
         /// </summary>
-        private void ApplyBaseAmbientPalettes(MozaProfile profile)
+        private void ApplyBaseAmbientPalettes(MozaBaseDeviceProfile profile)
         {
             int ledsPerStrip = _data.ResolvedAmbientLedsPerStrip;
             int stride = Devices.BaseModelInfo.MaxLedsPerStrip;
@@ -1880,8 +1891,14 @@ namespace MozaPlugin.Hardware
         /// (persist + dashboard-pending + telemetry sync) stays with
         /// <see cref="MozaPlugin.ApplyProfile"/>; this is the hardware-write half.
         /// </summary>
-        public void ApplyProfileHardware(MozaProfile profile)
+        /// <param name="includeDevices">Also apply the attached wheel / dash / wheelbase
+        /// ambient from their own device profile stores.</param>
+        public void ApplyProfileHardware(MozaProfile profile, bool includeDevices)
         {
+            // Was seeded by the dash apply when the dash fields lived here.
+            if (ProfileWritesAllowed && _plugin.Settings != null)
+                profile.SeedBaselineFromFlatFields(_plugin.Settings);
+
             // Guard: a profile with all core base settings at zero was captured
             // from uninitialized device data (first-launch race). Reset to
             // sentinels so they're skipped — device keeps its own values.
@@ -1900,9 +1917,12 @@ namespace MozaPlugin.Hardware
             }
 
             ApplyBaseToHardware(profile);
-            ApplyWheelToHardware(profile);
-            ApplyDashToHardware(profile);
-            ApplyBaseAmbientToHardware(profile);
+            if (includeDevices)
+            {
+                ApplyWheelToHardware();
+                ApplyDashToHardware();
+                ApplyBaseAmbientToHardware();
+            }
             ApplyHandbrakeToHardware(profile);
             ApplyPedalsToHardware(profile);
             ApplyHgpToHardware(profile);
@@ -1966,7 +1986,12 @@ namespace MozaPlugin.Hardware
             MozaLog.Debug($"[AZOM] Applying wheel device extension settings (prefix={pageModelPrefix ?? "(null)"})");
 
             var settings = _plugin.Settings;
-            var profile = settings?.ProfileStore?.CurrentProfile;
+            // The page's own wheel store, not whichever wheel is attached.
+            MozaWheelProfile? profile = null;
+            var dp = _plugin.DeviceProfiles;
+            var pageGuid = dp?.WheelPageGuidFor(pageModelPrefix);
+            if (pageGuid.HasValue)
+                profile = dp!.WheelStore(pageGuid.Value, seed: true)?.CurrentProfile;
             extSettings.ApplyTo(settings!, _data, profile, pageModelPrefix);
 
             // Hardware writes gated on model match — other-model extensions
@@ -1979,7 +2004,7 @@ namespace MozaPlugin.Hardware
             bool writeHardware = !hasExtModel || modelMatches;
 
             if (writeHardware)
-                ApplyWheelToHardware(profile);
+                ApplyWheelToHardware();
 
             _plugin.PersistSettings();
 
@@ -2001,23 +2026,33 @@ namespace MozaPlugin.Hardware
             }
         }
 
-        public void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings)
+        /// <param name="dashPageGuid">The extension's own dash page
+        /// (<see cref="MozaPlugin.Cm2PageGuid"/> / <see cref="MozaPlugin.Cm1PageGuid"/>).</param>
+        public void ApplyDashExtensionSettings(MozaDashExtensionSettings extSettings, Guid dashPageGuid)
         {
             MozaLog.Debug("[AZOM] Applying dash device extension settings");
 
             var settings = _plugin.Settings;
-            extSettings.ApplyTo(settings!, _data, settings?.ProfileStore?.CurrentProfile);
-            ApplyDashToHardware(settings?.ProfileStore?.CurrentProfile);
+            var dp = _plugin.DeviceProfiles;
+            extSettings.ApplyTo(settings!, _data, dp?.DashProfileFor(dashPageGuid));
+            if (dp?.CurrentDashPageGuid == dashPageGuid)
+                ApplyDashToHardware();
             _plugin.PersistSettings();
         }
 
-        public void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings)
+        /// <param name="basePageGuid">The extension's own base page, or null for the
+        /// legacy shared wheelbase device (follows the attached base).</param>
+        public void ApplyBaseExtensionSettings(MozaBaseExtensionSettings extSettings, Guid? basePageGuid)
         {
             MozaLog.Debug("[AZOM] Applying base ambient device extension settings");
 
             var settings = _plugin.Settings;
-            extSettings.ApplyTo(settings!, _data, settings?.ProfileStore?.CurrentProfile);
-            ApplyBaseAmbientToHardware(settings?.ProfileStore?.CurrentProfile);
+            var dp = _plugin.DeviceProfiles;
+            var g = basePageGuid ?? dp?.CurrentBasePageGuid;
+            var profile = g.HasValue ? dp?.BaseStore(g.Value, seed: true)?.CurrentProfile : null;
+            extSettings.ApplyTo(settings!, _data, profile);
+            if (g.HasValue && dp?.CurrentBasePageGuid == g)
+                ApplyBaseAmbientToHardware();
             _plugin.PersistSettings();
         }
 
@@ -2319,10 +2354,9 @@ namespace MozaPlugin.Hardware
                     // read has landed on yet still holds the InitColorArray default, and
                     // pushing that erased the wheel's stored palette (bundle 0TWEX2AK:
                     // "Static mode does not seem to work, all knobs go black").
-                    var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-                    var ov = _plugin.GetCurrentWheelOverlay(profile);
-                    int[]? savedPrimary = EffArr(ov?.WheelKnobPrimaryColors, profile?.WheelKnobPrimaryColors);
-                    int[]? savedRing    = EffArr(ov?.WheelKnobRingColors,    profile?.WheelKnobRingColors);
+                    var wheelProfile = _plugin.ActiveWheelProfile;
+                    int[]? savedPrimary = wheelProfile?.WheelKnobPrimaryColors;
+                    int[]? savedRing    = wheelProfile?.WheelKnobRingColors;
 
                     // Per-knob "Active" LED color (cmd 0x27 ROLE=0).
                     for (int i = 0; i < knobs; i++)

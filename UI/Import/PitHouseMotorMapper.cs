@@ -16,7 +16,10 @@ namespace MozaPlugin.UI.Import
     /// </summary>
     public static class PitHouseMotorMapper
     {
-        public static ImportPlan BuildPlan(PitHousePreset preset, MozaProfile profile)
+        /// <param name="baseProfile">The attached wheelbase's ambient-LED profile (its
+        /// own device store); null skips the ambient fields.</param>
+        public static ImportPlan BuildPlan(PitHousePreset preset, MozaProfile profile,
+            MozaBaseDeviceProfile? baseProfile)
         {
             var plan = new ImportPlan();
             if (preset == null || profile == null) { plan.FatalError = "internal: null preset or profile"; return plan; }
@@ -140,34 +143,43 @@ namespace MozaPlugin.UI.Import
             // Newer Motor presets bundle the wheelbase ambient-light ring config
             // (the LEDs on the front face of the base, distinct from the wheel's
             // own RPM LEDs). PitHouse uses the prefix "indicator*" / "*LedEffect"
-            // for these — MozaProfile already has matching BaseAmbient* fields,
-            // they just hadn't been wired up to the import.
+            // for these — they land on the attached wheelbase's own profile store.
+            var bp = baseProfile;
+            if (bp != null)
+            {
+                AddInt(plan, dp, "indicatorGroupBrightness", "Ambient Brightness", "",
+                       v => v, v => v,
+                       () => bp.BaseAmbientBrightness, v => bp.BaseAmbientBrightness = v);
 
-            AddInt(plan, dp, "indicatorGroupBrightness", "Ambient Brightness", "",
-                   v => v, v => v,
-                   () => profile.BaseAmbientBrightness, v => profile.BaseAmbientBrightness = v);
+                AddInt(plan, dp, "indicatorGroupStandbyMode", "Ambient Standby Mode", "",
+                       v => v, v => v,
+                       () => bp.BaseAmbientStandbyMode, v => bp.BaseAmbientStandbyMode = v);
 
-            AddInt(plan, dp, "indicatorGroupStandbyMode", "Ambient Standby Mode", "",
-                   v => v, v => v,
-                   () => profile.BaseAmbientStandbyMode, v => profile.BaseAmbientStandbyMode = v);
+                AddInt(plan, dp, "indicatorGroupState", "Ambient Indicator State", "",
+                       v => v, v => v,
+                       () => bp.BaseAmbientIndicatorState, v => bp.BaseAmbientIndicatorState = v);
 
-            AddInt(plan, dp, "indicatorGroupState", "Ambient Indicator State", "",
-                   v => v, v => v,
-                   () => profile.BaseAmbientIndicatorState, v => profile.BaseAmbientIndicatorState = v);
+                AddInt(plan, dp, "indicatorSleepMode", "Ambient Sleep Mode", "",
+                       v => v, v => v,
+                       () => bp.BaseAmbientSleepMode, v => bp.BaseAmbientSleepMode = v);
 
-            AddInt(plan, dp, "indicatorSleepMode", "Ambient Sleep Mode", "",
-                   v => v, v => v,
-                   () => profile.BaseAmbientSleepMode, v => profile.BaseAmbientSleepMode = v);
+                AddInt(plan, dp, "indicatorSleepModeTime", "Ambient Sleep Timeout", " min",
+                       v => v, v => v,
+                       () => bp.BaseAmbientSleepTimeout, v => bp.BaseAmbientSleepTimeout = v);
 
-            AddInt(plan, dp, "indicatorSleepModeTime", "Ambient Sleep Timeout", " min",
-                   v => v, v => v,
-                   () => profile.BaseAmbientSleepTimeout, v => profile.BaseAmbientSleepTimeout = v);
+                AddHexColor(plan, dp, "bootLedEffectColor", "Ambient Startup Color",
+                            () => bp.BaseAmbientStartupColor, v => bp.BaseAmbientStartupColor = v);
 
-            AddHexColor(plan, dp, "bootLedEffectColor", "Ambient Startup Color",
-                        () => profile.BaseAmbientStartupColor, v => profile.BaseAmbientStartupColor = v);
-
-            AddHexColor(plan, dp, "shutDownLedEffectColor", "Ambient Shutdown Color",
-                        () => profile.BaseAmbientShutdownColor, v => profile.BaseAmbientShutdownColor = v);
+                AddHexColor(plan, dp, "shutDownLedEffectColor", "Ambient Shutdown Color",
+                            () => bp.BaseAmbientShutdownColor, v => bp.BaseAmbientShutdownColor = v);
+            }
+            else
+            {
+                foreach (var k in new[] {
+                    "indicatorGroupBrightness", "indicatorGroupStandbyMode", "indicatorGroupState",
+                    "indicatorSleepMode", "indicatorSleepModeTime", "bootLedEffectColor", "shutDownLedEffectColor" })
+                    AddSkipped(plan, dp, k, "no wheelbase identified");
+            }
 
             // Standby breath/colored/quicksand/rainbow timing intervals exist in
             // PitHouse but MozaProfile only tracks the mode, not the timings —

@@ -315,6 +315,12 @@ namespace MozaPlugin
                     if (Devices.BaseModelInfo.IsKnown(baseName))
                         _data.BaseAmbientLedsPerStrip = Devices.BaseModelInfo.LedsPerStrip(baseName);
 
+                    // The ambient profile store is keyed by this model, so an apply
+                    // that ran before the name landed had no store to read. Writes
+                    // are change-gated against the base cfg cache.
+                    if (DetectionState.BaseAmbientLedSupported)
+                        _hardwareApplier?.ApplyBaseAmbientToHardware();
+
                     // This string NAMES the device definition and selects its LED
                     // count, so nothing can be written until it lands. DeviceProber
                     // reads the model before the capability probes so it is normally

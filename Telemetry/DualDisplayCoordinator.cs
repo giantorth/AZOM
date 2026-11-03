@@ -528,7 +528,7 @@ namespace MozaPlugin.Telemetry
             {
                 try { _plugin.DeviceManager.SendDisplayProbe(MozaProtocol.DeviceDash); } catch { }
             }
-            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+            try { _plugin.HardwareApplier.ApplyDashToHardware(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2 lane hygiene apply skipped: {ex.Message}"); }
         }
 

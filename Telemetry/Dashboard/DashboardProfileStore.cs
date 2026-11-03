@@ -43,8 +43,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         // that data; kept removed so the JSON stays authoritative.
 
         // ── Default-mapping overrides (master channel mapper) ─────────────
-        // Layer 2 of the mapping resolution: per-dashboard override (MozaProfile
-        // .TelemetryChannelMappings) > THIS > Telemetry.json simhub_property >
+        // Layer 2 of the mapping resolution: per-dashboard override (device profile
+        // ChannelMappings) > THIS > Telemetry.json simhub_property >
         // StringChannelDefaults. Static because TelemetrySender constructs a
         // throwaway store when MozaPlugin.Instance is null — both must see the
         // same overrides. Copy-on-write: SetDefaultOverrides builds a fresh dict

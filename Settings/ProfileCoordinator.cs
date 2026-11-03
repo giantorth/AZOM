@@ -27,16 +27,19 @@ namespace MozaPlugin.Settings
         internal void SaveSettings()
         {
             // Resolve the current dashboard key (wheel:<name> > file:<...> > builtin:<name>)
-            // so the active SimHub profile records which dashboard the user picked.
+            // so the device profile driving the dashboard records the user's pick.
             // Re-applied on profile load so each game keeps its own dashboard selection.
-            string? activeDashKey = null;
             try
             {
                 var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
-                if (cands.Count > 0) activeDashKey = cands[0];
+                if (cands.Count > 0)
+                {
+                    var holder = _plugin.DeviceProfiles?.ActiveDashboardKeyProfile;
+                    if (holder != null) holder.TelemetryDashboardKey = cands[0];
+                }
             }
             catch { /* candidate resolver is conservative; ignore early-init errors */ }
-            _plugin.Settings.ProfileStore?.CurrentProfile?.CaptureFromCurrent(_plugin.Data, activeDashKey);
+            _plugin.Settings.ProfileStore?.CurrentProfile?.CaptureFromCurrent(_plugin.Data);
             // Single source of truth = profile + overlay. UI handlers write
             // overlay/profile directly; CaptureFromCurrent picks up device-read
             // state. No more legacy slot/UID mirror.
@@ -116,6 +119,7 @@ namespace MozaPlugin.Settings
         internal void ClearSettings()
         {
             _plugin.TelemetrySender?.Stop();
+            _plugin.DeviceProfiles?.DetachAll();
             // Fresh-install defaults, not a bare `new`: reset must land the user
             // where a first-time install would, or "clear all settings" silently
             // hands them a worse configuration than a clean install (dashboard
@@ -170,6 +174,9 @@ namespace MozaPlugin.Settings
             // any telemetry-profile build — but keep it off the device-profile
             // lifecycle: switching one must never switch the other.
             InitChannelDefaultsStore();
+
+            // Each device page's own store, before the initial apply reads them.
+            _plugin.DeviceProfiles?.InitAll();
 
             // Apply the initially selected profile
             if (store.CurrentProfile != null)
@@ -295,6 +302,7 @@ namespace MozaPlugin.Settings
             if (_subscribedChannelDefaultsStore != null)
                 _subscribedChannelDefaultsStore.ActiveProfileChanged -= OnChannelDefaultsProfileChanged;
             _subscribedChannelDefaultsStore = null;
+            _plugin.DeviceProfiles?.DetachAll();
         }
 
         private void OnProfileChanged(object sender, EventArgs e)
@@ -303,7 +311,8 @@ namespace MozaPlugin.Settings
             if (profile != null)
             {
                 MozaLog.Info($"[AZOM] Profile changed: {profile.Name}");
-                ApplyProfile(profile);
+                // Device pages switch on their own stores' events.
+                ApplyProfile(profile, includeDevices: false);
             }
         }
 
@@ -345,15 +354,21 @@ namespace MozaPlugin.Settings
         /// methods. Each method mirrors profile/overlay values into _data (always)
         /// and writes to hardware when the matching device is detected.
         /// </summary>
-        internal void ApplyProfile(MozaProfile profile)
+        /// <param name="includeDevices">Also apply the attached devices' own profile
+        /// stores (wheel / wheelbase ambient / dash). False for a main-selector switch:
+        /// those stores switch on their own events.</param>
+        internal void ApplyProfile(MozaProfile profile, bool includeDevices = true)
         {
             _profileApplied = true;
-            ApplyProfileCore(profile);
+            ApplyProfileCore(profile, includeDevices);
         }
 
         // Set by the first deliberate apply (profile/game switch, import, or the
         // launch apply when the option allows it). Device-detect applies don't set it.
         private volatile bool _profileApplied;
+
+        /// <summary>A device store's selection changed — a deliberate apply too.</summary>
+        internal void MarkProfileApplied() => _profileApplied = true;
 
         /// <summary>
         /// Whether applies may write the saved profile to hardware. With "Apply
@@ -375,41 +390,23 @@ namespace MozaPlugin.Settings
                 return;
             }
             MozaLog.Debug($"[AZOM] Device detected — profile '{profile.Name}' not written (Apply profile settings on launch is off)");
-            _plugin.HardwareApplier.ApplyProfileHardware(profile);
+            _plugin.HardwareApplier.ApplyProfileHardware(profile, includeDevices: true);
             SyncTelemetryAfterApply();
         }
 
-        private void ApplyProfileCore(MozaProfile profile)
+        private void ApplyProfileCore(MozaProfile profile, bool includeDevices = true)
         {
-            MozaLog.Debug($"[AZOM] Applying profile: {profile.Name}");
-            _plugin.HardwareApplier.ApplyProfileHardware(profile);
+            MozaLog.Debug($"[AZOM] Applying profile: {profile.Name}" + (includeDevices ? " (+ device profiles)" : ""));
+            _plugin.HardwareApplier.ApplyProfileHardware(profile, includeDevices);
 
             // Persist without re-capturing _data — profile already has the values
             // we just applied; concurrent device reads could have overwritten _data
             // before our writes were processed.
             PersistSettings();
 
-            // Apply profile-recorded dashboard preference after wheel settings are
-            // in place. Defer to next PollStatus tick when wheel catalog isn't ready.
-            if (!string.IsNullOrEmpty(profile.TelemetryDashboardKey))
-            {
-                bool applied = false;
-                try { applied = _plugin.ApplyTelemetryDashboardFromProfile(profile); }
-                catch (Exception ex)
-                {
-                    MozaLog.Warn("[AZOM] ApplyTelemetryDashboardFromProfile threw: " + ex.Message);
-                    applied = true;
-                }
-                if (!applied)
-                {
-                    _plugin.DashboardBindingCoordinator.SetPendingDashboardKey(profile.TelemetryDashboardKey!);
-                    MozaLog.Debug("[AZOM] Profile dashboard apply deferred — wheel state not ready");
-                }
-                else
-                {
-                    _plugin.DashboardBindingCoordinator.ClearPendingDashboardKey();
-                }
-            }
+            // Apply the dashboard preference after wheel settings are in place.
+            if (includeDevices)
+                ApplySavedDashboardKey(_plugin.DeviceProfiles?.ActiveDashboardKeyProfile);
 
             // Telemetry-enable state is wheel-level, not profile-level — see
             // the design comment on WheelTelemetryEnabledByPageGuid: "Whether
@@ -433,7 +430,32 @@ namespace MozaPlugin.Settings
             SyncTelemetryAfterApply();
         }
 
-        private void SyncTelemetryAfterApply()
+        /// <summary>
+        /// Apply a device profile's recorded dashboard. Defers to the next PollStatus
+        /// tick when the display catalog isn't ready yet.
+        /// </summary>
+        internal void ApplySavedDashboardKey(IDashboardKeyProfile? profile)
+        {
+            if (profile == null || string.IsNullOrEmpty(profile.TelemetryDashboardKey)) return;
+            bool applied;
+            try { applied = _plugin.ApplyTelemetryDashboardFromProfile(profile); }
+            catch (Exception ex)
+            {
+                MozaLog.Warn("[AZOM] ApplyTelemetryDashboardFromProfile threw: " + ex.Message);
+                applied = true;
+            }
+            if (!applied)
+            {
+                _plugin.DashboardBindingCoordinator.SetPendingDashboardKey(profile.TelemetryDashboardKey!);
+                MozaLog.Debug("[AZOM] Profile dashboard apply deferred — display state not ready");
+            }
+            else
+            {
+                _plugin.DashboardBindingCoordinator.ClearPendingDashboardKey();
+            }
+        }
+
+        internal void SyncTelemetryAfterApply()
         {
             try
             {
@@ -447,65 +469,44 @@ namespace MozaPlugin.Settings
         }
 
         /// <summary>
-        /// Look up the wheel overlay for the currently-connected wheel in the given
-        /// profile. Returns null if either the page GUID can't be resolved or the
-        /// overlay isn't present.
+        /// Apply <paramref name="mutator"/> to the connected wheel's current profile in
+        /// its own store. No-op until the wheel has identified itself.
         /// </summary>
-        internal WheelOverride? GetCurrentWheelOverlay(MozaProfile? profile)
-        {
-            if (profile == null) return null;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return null;
-            if (profile.WheelOverridesByPageGuid == null) return null;
-            return profile.WheelOverridesByPageGuid.TryGetValue(g.Value, out var ov) ? ov : null;
-        }
-
-        /// <summary>
-        /// Get or create the wheel overlay for the currently-connected wheel.
-        /// Returns null only when the wheel hasn't identified itself yet.
-        /// </summary>
-        internal WheelOverride? GetOrCreateCurrentWheelOverlay(MozaProfile? profile)
-        {
-            if (profile == null) return null;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return null;
-            // COW swap, like the sleep/idle bundles: the profile store serializes
-            // this dict while the UI and SimHub's SetSettings path insert into it.
-            lock (_pageBundleSwapLock)
-            {
-                var dict = profile.WheelOverridesByPageGuid;
-                if (dict != null && dict.TryGetValue(g.Value, out var ov) && ov != null)
-                    return ov;
-                ov = new WheelOverride();
-                var next = dict == null
-                    ? new Dictionary<Guid, WheelOverride>()
-                    : new Dictionary<Guid, WheelOverride>(dict);
-                next[g.Value] = ov;
-                profile.WheelOverridesByPageGuid = next;
-                return ov;
-            }
-        }
-
-        /// <summary>
-        /// Apply <paramref name="mutator"/> to the active wheel's overlay on the
-        /// current profile. No-op if no profile is selected or no wheel is
-        /// identified. Used by UI handlers to mirror their edits into the
-        /// profile-scoped overlay alongside the legacy flat-field write during
-        /// the R4 transition.
-        /// </summary>
-        internal void UpdateActiveWheelOverlay(Action<WheelOverride> mutator)
+        internal void UpdateActiveWheelProfile(Action<MozaWheelProfile> mutator)
         {
             if (mutator == null) return;
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            var overlay = GetOrCreateCurrentWheelOverlay(profile);
-            if (overlay == null) return;
-            mutator(overlay);
+            var profile = _plugin.DeviceProfiles?.ActiveWheelProfile;
+            if (profile == null) return;
+            mutator(profile);
+        }
+
+        /// <summary>Apply <paramref name="mutator"/> to a dash page's current profile.</summary>
+        internal void UpdateDashProfile(Guid dashPageGuid, Action<MozaDashProfile> mutator)
+        {
+            if (mutator == null) return;
+            var profile = _plugin.DeviceProfiles?.DashProfileFor(dashPageGuid);
+            if (profile == null) return;
+            mutator(profile);
+        }
+
+        /// <summary>Apply <paramref name="mutator"/> to a wheelbase page's current profile
+        /// (the connected base's when <paramref name="basePageGuid"/> is null).</summary>
+        internal void UpdateBaseProfile(Guid? basePageGuid, Action<MozaBaseDeviceProfile> mutator)
+        {
+            if (mutator == null) return;
+            var dp = _plugin.DeviceProfiles;
+            if (dp == null) return;
+            var g = basePageGuid ?? dp.CurrentBasePageGuid;
+            if (!g.HasValue) return;
+            var profile = dp.BaseStore(g.Value, seed: true)?.CurrentProfile;
+            if (profile == null) return;
+            mutator(profile);
         }
 
         /// <summary>
-        /// Apply <paramref name="mutator"/> to the current profile (or no-op if
-        /// no profile is selected). Used by UI handlers that own profile-level
-        /// fields (motor/FFB/handbrake/pedals/dash/base-ambient).
+        /// Apply <paramref name="mutator"/> to the current main profile (or no-op if
+        /// no profile is selected). Used by UI handlers that own main-tab fields
+        /// (motor/FFB/handbrake/pedals/shifters/AB9/LFE).
         /// </summary>
         internal void UpdateActiveProfile(Action<MozaProfile> mutator)
         {
@@ -617,30 +618,22 @@ namespace MozaPlugin.Settings
         /// <summary>Active wheel's dashboard profile name (cache key / builtin name). "" when unset.</summary>
         internal string ActiveTelemetryProfileName
         {
-            get
-            {
-                var ov = GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                return ov?.TelemetryProfileName ?? "";
-            }
+            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
             set
             {
-                var ov = GetOrCreateCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                if (ov != null) ov.TelemetryProfileName = value ?? "";
+                var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
+                if (p != null) p.TelemetryProfileName = value ?? "";
             }
         }
 
         /// <summary>Active wheel's user-loaded .mzdash file path (empty = none).</summary>
         internal string ActiveTelemetryMzdashPath
         {
-            get
-            {
-                var ov = GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                return ov?.TelemetryMzdashPath ?? "";
-            }
+            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
             set
             {
-                var ov = GetOrCreateCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
-                if (ov != null) ov.TelemetryMzdashPath = value ?? "";
+                var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
+                if (p != null) p.TelemetryMzdashPath = value ?? "";
             }
         }
 

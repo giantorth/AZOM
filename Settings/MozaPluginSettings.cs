@@ -58,6 +58,7 @@ namespace MozaPlugin.Settings
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
             KnobColorAllBlackRepaired = true,
             PedalHapticsCombinedDevice = true,
+            DeviceProfilesSplit = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -628,6 +629,19 @@ namespace MozaPlugin.Settings
         /// </summary>
         public MozaChannelDefaultsStore ChannelDefaultsStore { get; set; }
             = new MozaChannelDefaultsStore();
+
+        /// <summary>Each device page's own profile store (wheel / wheelbase / dash).
+        /// The device-page settings live here, not on <see cref="ProfileStore"/>.</summary>
+        public DeviceProfileRegistry DeviceProfiles { get; set; } = new DeviceProfileRegistry();
+
+        /// <summary>One-shot sentinel for <c>DeviceProfileMigration.Run</c>. True on new
+        /// installs (nothing to split); the initializer stays false for upgrades.</summary>
+        public bool DeviceProfilesSplit { get; set; } = false;
+
+        /// <summary>The device-scoped half of the main profile store at split time
+        /// (game-link state + per-profile identity and device fields). Seeds a device
+        /// first seen after the split. Null when there was nothing to split.</summary>
+        public Newtonsoft.Json.Linq.JObject? LegacyDeviceProfileSnapshot { get; set; }
 
         // Name of the active dashboard profile (empty = use first available)
         public string TelemetryProfileName { get; set; } = "";

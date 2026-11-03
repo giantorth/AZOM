@@ -85,6 +85,7 @@ namespace MozaPlugin
                     MozaPluginSettings.CreateForNewInstall);
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
+                _deviceProfiles = new DeviceProfileCoordinator(this, _profileCoordinator);
                 _channelMapping = new ChannelMappingCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
@@ -205,6 +206,15 @@ namespace MozaPlugin
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
                 MozaDeviceConstants.InitializeRegistry();
+
+                // Split the device-page settings off the main profiles into one store
+                // per device page. After the knob repair above (so the copies are
+                // clean) and the registry (page GUIDs resolve through it).
+                if (!_settings.DeviceProfilesSplit)
+                {
+                    DeviceProfileMigration.Run(_settings);
+                    _profileCoordinator.PersistSettings();
+                }
 
                 // v1.6 replaced the code-registered "Wheelbase LFE haptics" device
                 // with the per-model wheelbase device's Haptics section. An upgraded

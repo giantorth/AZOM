@@ -41,7 +41,7 @@ namespace MozaPlugin.Devices.Extensions
         /// the flat-field fallback — the new R5 source of truth.
         /// </summary>
         public void CaptureFromCurrent(MozaPluginSettings settings, MozaData data,
-            MozaProfile? profile = null)
+            MozaBaseDeviceProfile? profile = null)
         {
             int Pick(int p, int s) => p >= 0 ? p : s;
             if (profile != null)
@@ -72,7 +72,7 @@ namespace MozaPlugin.Devices.Extensions
         /// Does NOT write to hardware — caller routes through
         /// <c>ApplyBaseAmbientToHardware</c> after this.
         /// </summary>
-        public void ApplyTo(MozaPluginSettings settings, MozaData data, MozaProfile? profile = null)
+        public void ApplyTo(MozaPluginSettings settings, MozaData data, MozaBaseDeviceProfile? profile = null)
         {
             if (BaseAmbientBrightness     >= 0) data.BaseAmbientBrightness     = BaseAmbientBrightness;
             if (BaseAmbientStandbyMode    >= 0) data.BaseAmbientStandbyMode    = BaseAmbientStandbyMode;

@@ -571,18 +571,24 @@ namespace MozaPlugin.Devices.Extensions
             _settings = new MozaBaseExtensionSettings();
             TryEarlyProviderInstall();
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data, plugin.Settings?.ProfileStore?.CurrentProfile);
+            CaptureFromPlugin();
         }
 
         public override JToken GetSettings()
         {
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data, plugin.Settings?.ProfileStore?.CurrentProfile);
-
+            CaptureFromPlugin();
             return JToken.FromObject(_settings);
+        }
+
+        // Mirror this page's own wheelbase profile into the device JSON.
+        private void CaptureFromPlugin()
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin == null) return;
+            var dp = plugin.DeviceProfiles;
+            var g = dp?.BasePageGuidFor(_modelPrefix);
+            _settings.CaptureFromCurrent(plugin.Settings, plugin.Data,
+                g.HasValue ? dp!.BaseStore(g.Value, seed: false)?.CurrentProfile : null);
         }
 
         public override void SetSettings(JToken settings, bool isDefault)
@@ -594,13 +600,14 @@ namespace MozaPlugin.Devices.Extensions
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin != null)
-                    plugin.HardwareApplier.ApplyBaseExtensionSettings(_settings);
+                    plugin.HardwareApplier.ApplyBaseExtensionSettings(_settings,
+                        plugin.DeviceProfiles?.BasePageGuidFor(_modelPrefix));
             }
         }
 
         public override Control CreateSettingControl()
         {
-            return new MozaBaseSettingsControl();
+            return new MozaBaseSettingsControl { ModelPrefix = _modelPrefix };
         }
 
         public override IEnumerable<DynamicButtonAction> GetDynamicButtonActions()

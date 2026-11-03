@@ -499,6 +499,12 @@ namespace MozaPlugin.Settings
         // so each game keeps its own bandwidth-mode preference.
         public int TempStrategy { get; set; } = -1;
 
+        // LEGACY — every Wheel*, Dash*, BaseAmbient* field plus TelemetryDashboardKey,
+        // WheelOverridesByPageGuid, TelemetryChannelMappings, Fsr1DashboardMappings and
+        // Cm1FieldMappings now live in the device profile stores (DeviceProfileRegistry).
+        // Kept serialized so a downgraded build still reads them; read only by
+        // DeviceProfileMigration.
+
         // ===== Wheel LED settings =====
         public int WheelTelemetryMode { get; set; } = -1;
         public int WheelKnobLedMode { get; set; } = -1;
@@ -924,19 +930,10 @@ namespace MozaPlugin.Settings
         // ===== Capture current state =====
 
         /// <summary>
-        /// Populate this profile by capturing all current device state.
+        /// Populate this profile by capturing the device-read main-tab state.
         /// </summary>
-        /// <param name="activeDashboardKey">
-        /// Identity of the currently-loaded dashboard, in the same format
-        /// <see cref="Telemetry.ChannelMappingCoordinator.GetActiveDashboardKeyCandidates"/> returns.
-        /// Pass <c>null</c> to leave <see cref="TelemetryDashboardKey"/> untouched
-        /// (e.g. when the plugin can't resolve a key — early init, no profile loaded).
-        /// </param>
-        public void CaptureFromCurrent(MozaData data, string? activeDashboardKey = null)
+        public void CaptureFromCurrent(MozaData data)
         {
-            if (!string.IsNullOrEmpty(activeDashboardKey))
-                TelemetryDashboardKey = activeDashboardKey;
-
             // Base/Motor + game effects. These carry the -1 sentinel until the base
             // reports them, so capturing an unread field stores -1 and every
             // downstream write skips it (HardwareApplier's Apply helper). Ungated
@@ -1013,47 +1010,19 @@ namespace MozaPlugin.Settings
             SgpBrightness = data.ShifterSgp.Brightness;
             SgpLed1Index = data.ShifterSgp.Led1Index; SgpLed2Index = data.ShifterSgp.Led2Index;
 
-            // NOTE: wheel-LED / ES-wheel / Dash / Base-ambient / Gearshift / AB9
-            // fields are NOT captured here. They are written directly to the
-            // profile (or wheel-page overlay) by their UI handlers — re-capturing
-            // them from stale flat fields would corrupt the persisted state.
-            // Wheel colors / blink colors / knob colors live in WheelOverride;
-            // dash colors / dash blink live on the profile via the dash UI handler.
+            // NOTE: Gearshift / AB9 fields are written directly by their UI
+            // handlers. Wheel / dash / base-ambient live in the device profile stores.
         }
 
         /// <summary>
-        /// Seed this profile's dash / base-ambient / gearshift baselines from the
-        /// global <see cref="MozaPluginSettings"/> flat defaults. Sentinel-only
-        /// (writes only where the baseline is still at its -1 / null "not set"
-        /// marker), so it's idempotent and never overwrites a user value.
-        ///
-        /// Runs at profile creation (ProfileCoordinator.InitProfileSystem) and on
-        /// every dash apply (HardwareApplier.ApplyDashToHardware)
-        /// — SimHub auto-creates per-game profiles with all-sentinel fields, and
-        /// without seeding the >=0 guards downstream skip every write, leaving the
-        /// display dark.
+        /// Seed this profile's gearshift baselines from the global
+        /// <see cref="MozaPluginSettings"/> flat defaults. Sentinel-only, so it's
+        /// idempotent and never overwrites a user value. The dash / base-ambient
+        /// equivalents live on the device profiles.
         /// </summary>
         public void SeedBaselineFromFlatFields(MozaPluginSettings settings)
         {
             if (settings == null) return;
-
-            // Dash brightness baselines.
-            if (DashRpmBrightness     < 0) DashRpmBrightness     = settings.DashRpmBrightness;
-            if (DashFlagsBrightness   < 0) DashFlagsBrightness   = settings.DashFlagsBrightness;
-            if (DashDisplayBrightness < 0) DashDisplayBrightness = settings.DashDisplayBrightness;
-            if (DashDisplayStandbyMin < 0) DashDisplayStandbyMin = settings.DashDisplayStandbyMin;
-            if (DashDisplayRotation   < 0) DashDisplayRotation   = settings.DashDisplayRotation;
-            if (DashRpmBlinkColors == null && settings.DashRpmBlinkColors != null)
-                DashRpmBlinkColors = (int[])settings.DashRpmBlinkColors.Clone();
-
-            // Base ambient.
-            if (BaseAmbientBrightness     < 0) BaseAmbientBrightness     = settings.BaseAmbientBrightness;
-            if (BaseAmbientStandbyMode    < 0) BaseAmbientStandbyMode    = settings.BaseAmbientStandbyMode;
-            if (BaseAmbientIndicatorState < 0) BaseAmbientIndicatorState = settings.BaseAmbientIndicatorState;
-            if (BaseAmbientSleepMode      < 0) BaseAmbientSleepMode      = settings.BaseAmbientSleepMode;
-            if (BaseAmbientSleepTimeout   < 0) BaseAmbientSleepTimeout   = settings.BaseAmbientSleepTimeout;
-            if (BaseAmbientStartupColor   < 0) BaseAmbientStartupColor   = settings.BaseAmbientStartupColor;
-            if (BaseAmbientShutdownColor  < 0) BaseAmbientShutdownColor  = settings.BaseAmbientShutdownColor;
 
             // Gearshift.
             if (GearshiftVibrateOnNeutral < 0) GearshiftVibrateOnNeutral = settings.GearshiftVibrateOnNeutral ? 1 : 0;

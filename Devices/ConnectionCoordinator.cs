@@ -230,7 +230,7 @@ namespace MozaPlugin.Devices
             try
             {
                 if (rising) _plugin.HardwareApplier.ForgetDashFlagsBrightness();
-                _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                _plugin.HardwareApplier.ApplyDashToHardware();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dashboard profile apply skipped: {ex.Message}"); }
 

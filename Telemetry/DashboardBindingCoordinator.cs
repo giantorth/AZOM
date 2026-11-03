@@ -424,11 +424,11 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Apply <see cref="MozaProfile.TelemetryDashboardKey"/>: resolve to a slot,
+        /// Apply a device profile's <see cref="IDashboardKeyProfile.TelemetryDashboardKey"/>: resolve to a slot,
         /// route through OnDashboardSwitched to emit FF kind=4. Returns false to
         /// defer (PollStatus retries).
         /// </summary>
-        public bool ApplyTelemetryDashboardFromProfile(MozaProfile profile)
+        public bool ApplyTelemetryDashboardFromProfile(IDashboardKeyProfile profile)
         {
             if (profile == null) return true;
             string? key = profile.TelemetryDashboardKey;
@@ -647,7 +647,7 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>Legacy <c>wheel:&lt;id&gt;</c> keys break on re-upload (the wheel
         /// reissues the id); once resolved, rewrite the profile's key to the name form.</summary>
-        private static string CanonicalizeWheelKey(MozaProfile profile, string key, WheelDashboardEntry match)
+        private static string CanonicalizeWheelKey(IDashboardKeyProfile profile, string key, WheelDashboardEntry match)
         {
             string canonical = WheelDashboardKey.For(match);
             if (string.Equals(canonical, key, StringComparison.OrdinalIgnoreCase)) return key;
@@ -664,7 +664,7 @@ namespace MozaPlugin.Telemetry
         /// OnCm2DashboardSwitched — the same path the CM2 UI combo uses. Never
         /// touches the wheel-lane ActiveTelemetryProfileName/MzdashPath fields.
         /// </summary>
-        private bool ApplyProfileDashboardToCm2(MozaProfile profile, string key)
+        private bool ApplyProfileDashboardToCm2(IDashboardKeyProfile profile, string key)
         {
             var cm2 = _plugin.ActiveCm2Sender;
             if (cm2 == null || !cm2.IsActive || cm2.IsInSilenceCooldown)
@@ -1129,7 +1129,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
-            var profile = _plugin.Settings.ProfileStore?.CurrentProfile;
+            var profile = _plugin.DeviceProfiles?.ActiveDashboardKeyProfile;
             if (profile == null ||
                 !string.Equals(profile.TelemetryDashboardKey, snap.Key, StringComparison.OrdinalIgnoreCase))
             {

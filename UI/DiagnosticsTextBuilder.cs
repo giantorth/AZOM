@@ -100,6 +100,20 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
+        /// <summary>Main profile plus each device page's own store and its current pick.</summary>
+        public static string BuildProfiles(MozaPlugin plugin)
+        {
+            var sb = new StringBuilder();
+            var s = plugin?.Settings;
+            sb.Append($"Main:           {s?.ProfileStore?.CurrentProfile?.Name ?? "<none>"} "
+                      + $"({s?.ProfileStore?.Profiles.Count ?? 0} profiles)  split={s?.DeviceProfilesSplit}");
+            var dp = plugin?.DeviceProfiles;
+            if (dp != null)
+                foreach (var line in dp.DescribeStores())
+                    sb.Append(Environment.NewLine + "Device:         " + line);
+            return sb.ToString();
+        }
+
         /// <summary>Control Mapper variant-bridge state; see ControlMapperBridge.BuildDiagnostics.</summary>
         public static string BuildControlMapper(MozaPlugin plugin)
         {
@@ -623,14 +637,14 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Extended groups:0x{mask:X2}  present={JoinList(present)}  (2 single, 3 rotary, 4 ambient)");
             sb.AppendLine($"Master slider:  {Bri(plugin.WheelLedMasterBrightness)}"
                           + $"   ES raw: {Bri(plugin.WheelLedMasterBrightnessRaw)}");
-            // The per-wheel-page overlay is where the LED modes and per-zone brightness
+            // The wheel page's own profile is where the LED modes and per-zone brightness
             // actually live. If it doesn't resolve, ApplyWheelToHardware sees -1 for all
             // of them and writes nothing — indistinguishable, without this line, from a
             // wheel that simply already matched.
             var pageGuid = plugin.GetCurrentWheelPageGuid();
-            var overlay = plugin.GetCurrentWheelOverlay(plugin.Settings?.ProfileStore?.CurrentProfile);
+            var overlay = plugin.ActiveWheelProfile;
             sb.AppendLine($"Wheel page:     {(pageGuid.HasValue ? pageGuid.Value.ToString().Substring(0, 8) : "unresolved")}"
-                          + $"  overlay={(overlay != null ? "yes" : "no")}"
+                          + $"  profile={(overlay != null ? overlay.Name : "none")}"
                           + (overlay != null
                              ? $"  want modes rpm={Bri(overlay.WheelTelemetryMode)} "
                                + $"btn={Bri(overlay.WheelButtonsLedMode)} knob={Bri(overlay.WheelKnobLedMode)}"

@@ -346,12 +346,17 @@ namespace MozaPlugin.Integration
             int b = _plugin.Data?.DashDisplayBrightness ?? -1;
             if (b < 0)
             {
-                var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-                b = profile?.DashDisplayBrightness ?? -1;
+                b = TargetsCm2Screen
+                    ? _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm2PageGuid)?.DashDisplayBrightness ?? -1
+                    : _plugin.ActiveWheelProfile?.DashDisplayBrightness ?? -1;
                 if (b < 0) b = _plugin.Settings?.DashDisplayBrightness ?? 100;
             }
             return b < 0 ? 0 : (b > 100 ? 100 : b);
         }
+
+        // Same screen choice as the push below: the CM2 when it has its own sender,
+        // else the wheel's screen.
+        private bool TargetsCm2Screen => _plugin.ActiveCm2Sender != null;
 
         // Apply an absolute display brightness, mirroring the slider's commit
         // path: update _data + active profile, push on session 0x02, persist.
@@ -361,7 +366,8 @@ namespace MozaPlugin.Integration
         {
             val = val < 0 ? 0 : (val > 100 ? 100 : val);
             if (_plugin.Data != null) _plugin.Data.DashDisplayBrightness = val;
-            _plugin.UpdateActiveProfile(p => p.DashDisplayBrightness = val);
+            if (TargetsCm2Screen) _plugin.UpdateDashProfile(MozaPlugin.Cm2PageGuid, p => p.DashDisplayBrightness = val);
+            else _plugin.UpdateActiveWheelProfile(p => p.DashDisplayBrightness = val);
             // FSR1 wheel display: brightness is a group-0x32 EEPROM param write.
             if (_plugin.IsFsr1DisplayWheel && _plugin.ActiveCm2Sender == null)
                 _plugin.SendFsr1DisplayBrightness(val);
@@ -500,13 +506,13 @@ namespace MozaPlugin.Integration
         // ===== Clutch split point (issue #125) =====
 
         // Current split point using the same source of truth as the wheel device
-        // page: the per-(profile x wheel-page) overlay first, because newer
+        // page: the wheel's own profile first, because newer
         // KS-family firmware silently drops the cmd-9 read-back, then the live
         // _data mirror, then the slider's 50 % default. Never returns a
         // sentinel, so the first nudge always moves from a real value.
         private int CurrentClutchSplitPoint()
         {
-            var overlay = _plugin.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            var overlay = _plugin.ActiveWheelProfile;
             int v = overlay?.WheelClutchPoint ?? -1;
             if (v < 0) v = _plugin.Data?.WheelClutchPoint ?? -1;
             if (v < 0) v = 50;
@@ -522,7 +528,7 @@ namespace MozaPlugin.Integration
             int val = ClampStep(current, delta, 0, 100);
             if (val == current) return; // saturated — skip the redundant flash write
             if (_plugin.Data != null) _plugin.Data.WheelClutchPoint = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelClutchPoint = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] Clutch split point → {val}% via action");

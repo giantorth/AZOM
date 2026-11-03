@@ -291,6 +291,9 @@ namespace MozaPlugin
         // see Settings/ProfileCoordinator.cs. Constructed right after _settings
         // loads, before any serial/timer callback can hit the shims below.
         private ProfileCoordinator _profileCoordinator = null!;
+        // Each device page's own profile store — see Settings/DeviceProfileCoordinator.cs.
+        private DeviceProfileCoordinator _deviceProfiles = null!;
+        internal DeviceProfileCoordinator? DeviceProfiles => _deviceProfiles;
         // Startup GitHub Releases check (24h throttle + per-process dedupe) —
         // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
         private UpdateCheckCoordinator _updateCheck = null!;

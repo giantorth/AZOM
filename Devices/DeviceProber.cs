@@ -396,7 +396,7 @@ namespace MozaPlugin.Devices
             // re-attach; the discriminator restores it if evidence says CM2.
             if (!_plugin.DashIsCm1 && DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
-            _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyDashToHardware();
             MozaLog.Info(bridgedDash
                 ? "[AZOM] Dashboard detected (bridged dash at 0x14 — provisionally deployed the CM2 profile, probing display identity)"
                 : "[AZOM] Dashboard detected");
@@ -941,7 +941,7 @@ namespace MozaPlugin.Devices
                     {
                         _detectionState.BaseAmbientLedSupported = true;
                         DeployBaseDefinition(ambientDetected: true);
-                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware();
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         // Per-LED palettes, sized to the detected strip length so a
                         // 6-LED base never asks for LEDs 6..8.
@@ -1328,7 +1328,7 @@ namespace MozaPlugin.Devices
                             // never fires there. Without this re-apply the meter is never
                             // put into telemetry LED mode and its RPM/flag LEDs stay dark
                             // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
-                            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+                            try { _plugin.HardwareApplier.ApplyDashToHardware(); }
                             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
@@ -1404,7 +1404,7 @@ namespace MozaPlugin.Devices
                         // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
                         LockWheelId(deviceId);
-                        _plugin.HardwareApplier.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyWheelToHardware();
                         _deviceManager.ReadSetting("wheel-model-name");
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
