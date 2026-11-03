@@ -419,6 +419,7 @@ namespace MozaPlugin
             _dualDisplay?.TickCm2LaneHygiene();
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             _dualDisplay?.TickCm2DashboardReassert();
+            _dashboardBindingCoordinator?.TickPendingCm2DashboardRetry();
             _dualDisplay?.TickCm1Discriminator();
             // FSR1 self-heal: _fsr1Driver is per-instance (unlike the persistent
             // tier-def sender) and is only started via the event-driven

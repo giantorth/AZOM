@@ -59,6 +59,7 @@ namespace MozaPlugin.Settings
             KnobColorAllBlackRepaired = true,
             PedalHapticsCombinedDevice = true,
             DeviceProfilesSplit = true,
+            Cm2DashboardKeysReset = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -139,9 +140,15 @@ namespace MozaPlugin.Settings
         private volatile int _negotiationLedColor = 0x0000FF;
         public int NegotiationLedColor { get => _negotiationLedColor; set => _negotiationLedColor = value; }
 
-        // CM2 dash (dual-screen): the dashboard the user selected for the CM2's
-        // own pipeline, independent of the wheel's selection. Empty = catalog default.
+        // CM2 dash (dual-screen): the dashboard last selected for the CM2's own
+        // pipeline, independent of the wheel's. The per-profile pick lives on the CM2
+        // dash profile (MozaPlugin.ActiveCm2DashboardName); this tracks it and seeds a
+        // profile that has none. Empty = catalog default.
         public string Cm2SelectedDashboard { get; set; } = "";
+
+        // One-shot: the CM2 dash profiles' dashboard keys were copied from the wheel's
+        // at the device-profile split; reset them to the CM2's own pick. True on new installs.
+        public bool Cm2DashboardKeysReset { get; set; } = false;
 
         // Wheelbase ambient LED settings (2 strips; strip length per base model,
         // see BaseModelInfo). Defaults match observed R25 capture (rainbow mode,

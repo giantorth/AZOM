@@ -113,6 +113,31 @@ namespace MozaPlugin.Settings
                          + $"{wheels.Count} wheel, {bases.Count} wheelbase, {dashes.Count} dash store(s)");
         }
 
+        /// <summary>
+        /// One-shot for installs split by a build that copied the wheel's dashboard key
+        /// into the CM2 dash profiles: clear those keys so each CM2 profile takes the
+        /// CM2's own pick instead. Nothing ever wrote a CM2 pick to a profile before
+        /// this, so no user choice is lost.
+        /// </summary>
+        internal static void ResetCm2DashboardKeys(MozaPluginSettings settings)
+        {
+            if (settings == null || settings.Cm2DashboardKeysReset) return;
+            settings.Cm2DashboardKeysReset = true;
+            var dashes = settings.DeviceProfiles?.Dashes;
+            if (dashes == null
+                || !dashes.TryGetValue(global::MozaPlugin.MozaPlugin.Cm2PageGuid, out var store)
+                || store == null) return;
+            int cleared = 0;
+            foreach (var p in store.Profiles)
+            {
+                if (p == null || string.IsNullOrEmpty(p.TelemetryDashboardKey)) continue;
+                p.TelemetryDashboardKey = null;
+                cleared++;
+            }
+            if (cleared > 0)
+                MozaLog.Info($"[AZOM] Cleared {cleared} CM2 profile dashboard key(s) copied from the wheel");
+        }
+
         // ===== Store construction (also used for late devices) =====
 
         internal static MozaWheelProfileStore BuildWheelStore(JObject? snapshot, Guid pageGuid) =>
@@ -238,9 +263,11 @@ namespace MozaPlugin.Settings
                 DashRpmBlinkColors     = DeviceProfileCopy.Arr(l.DashRpmBlinkColors),
                 DashFlagColors         = DeviceProfileCopy.Arr(l.DashFlagColors),
             };
+            // TelemetryDashboardKey is deliberately NOT copied: the legacy key was
+            // captured from the wheel's selection, never the CM2's. A CM2 profile with
+            // no key takes the CM2's current pick (Cm2SelectedDashboard) on first apply.
             if (pageGuid == global::MozaPlugin.MozaPlugin.Cm2PageGuid)
             {
-                p.TelemetryDashboardKey = l.TelemetryDashboardKey;
                 if (l.TelemetryChannelMappings != null
                     && l.TelemetryChannelMappings.TryGetValue(pageGuid, out var maps))
                     p.ChannelMappings = DeviceProfileCopy.Mappings(maps);

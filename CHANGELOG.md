@@ -12,6 +12,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Fixed
 
 - **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
+- **CM2 switches dashboards with its profile;** the selected dashboard is saved to the active profile and recalled on every switch.
 
 ## [1.7.2]
 

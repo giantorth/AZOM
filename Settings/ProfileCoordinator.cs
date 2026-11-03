@@ -26,16 +26,17 @@ namespace MozaPlugin.Settings
 
         internal void SaveSettings()
         {
-            // Resolve the current dashboard key (wheel:<name> > file:<...> > builtin:<name>)
-            // so the device profile driving the dashboard records the user's pick.
-            // Re-applied on profile load so each game keeps its own dashboard selection.
+            // Resolve the wheel screen's current dashboard key (wheel:<name> > file:<...>
+            // > builtin:<name>) so the wheel profile records the user's pick. Re-applied
+            // on profile load so each game keeps its own dashboard selection. The CM2's
+            // pick is recorded as it is made (MozaPlugin.ActiveCm2DashboardName).
             try
             {
-                var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
-                if (cands.Count > 0)
+                var holder = _plugin.DeviceProfiles?.WheelDashboardKeyProfile;
+                if (holder != null)
                 {
-                    var holder = _plugin.DeviceProfiles?.ActiveDashboardKeyProfile;
-                    if (holder != null) holder.TelemetryDashboardKey = cands[0];
+                    var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
+                    if (cands.Count > 0) holder.TelemetryDashboardKey = cands[0];
                 }
             }
             catch { /* candidate resolver is conservative; ignore early-init errors */ }
@@ -404,9 +405,13 @@ namespace MozaPlugin.Settings
             // before our writes were processed.
             PersistSettings();
 
-            // Apply the dashboard preference after wheel settings are in place.
+            // Apply each screen's dashboard preference after its settings are in place.
             if (includeDevices)
-                ApplySavedDashboardKey(_plugin.DeviceProfiles?.ActiveDashboardKeyProfile);
+            {
+                ApplySavedDashboardKey(_plugin.DeviceProfiles?.WheelDashboardKeyProfile);
+                if (_plugin.IsCm2Present && !_plugin.DashIsCm1)
+                    ApplyCm2SavedDashboard(_plugin.DeviceProfiles?.Cm2DashboardProfile);
+            }
 
             // Telemetry-enable state is wheel-level, not profile-level — see
             // the design comment on WheelTelemetryEnabledByPageGuid: "Whether
@@ -431,8 +436,40 @@ namespace MozaPlugin.Settings
         }
 
         /// <summary>
-        /// Apply a device profile's recorded dashboard. Defers to the next PollStatus
-        /// tick when the display catalog isn't ready yet.
+        /// Switch the CM2 to its dash profile's recorded dashboard. Defers to the next
+        /// PollStatus tick while the CM2 lane isn't up or hasn't listed its dashboards.
+        /// </summary>
+        internal void ApplyCm2SavedDashboard(MozaDashProfile? profile)
+        {
+            if (profile == null) return;
+            if (string.IsNullOrEmpty(profile.TelemetryDashboardKey))
+            {
+                // A profile with no pick yet takes the dashboard the CM2 is on, so the
+                // active profile always records the selection.
+                var current = _plugin.Settings?.Cm2SelectedDashboard;
+                if (!string.IsNullOrEmpty(current))
+                {
+                    profile.TelemetryDashboardKey = Telemetry.Dashboard.WheelDashboardKey.Prefix + current;
+                    PersistSettings();
+                }
+                return;
+            }
+            bool applied;
+            try { applied = _plugin.DashboardBindingCoordinator.ApplyCm2DashboardFromProfile(profile); }
+            catch (Exception ex)
+            {
+                MozaLog.Warn("[AZOM] ApplyCm2DashboardFromProfile threw: " + ex.Message);
+                applied = true;
+            }
+            if (!applied)
+                _plugin.DashboardBindingCoordinator.SetPendingCm2DashboardKey(profile.TelemetryDashboardKey!);
+            else
+                _plugin.DashboardBindingCoordinator.ClearPendingCm2DashboardKey();
+        }
+
+        /// <summary>
+        /// Apply the wheel profile's recorded dashboard to the wheel screen. Defers to
+        /// the next PollStatus tick when the display catalog isn't ready yet.
         /// </summary>
         internal void ApplySavedDashboardKey(IDashboardKeyProfile? profile)
         {

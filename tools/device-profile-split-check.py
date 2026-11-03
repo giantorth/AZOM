@@ -90,9 +90,10 @@ def to_wheel(p, guid):
 
 
 def to_dash(p, guid):
+    # TelemetryDashboardKey is not copied: the legacy key was the wheel's pick. A CM2
+    # profile records the CM2's own pick from then on (so it differs post-split).
     out = {f: p.get(f) for f in DASH_FIELDS}
     if guid == CM2_PAGE:
-        out["TelemetryDashboardKey"] = p.get("TelemetryDashboardKey")
         out["ChannelMappings"] = lower_keys(p.get("TelemetryChannelMappings")).get(guid) or {}
     out["Cm1Mappings"] = lower_keys(p.get("Cm1FieldMappings")).get(guid) or {}
     return out

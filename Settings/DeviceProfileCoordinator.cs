@@ -272,21 +272,15 @@ namespace MozaPlugin.Settings
             DashStore(pageGuid, seed)?.CurrentProfile;
 
         /// <summary>
-        /// The profile that owns the dashboard pick for the lane
-        /// <c>DashboardBindingCoordinator.ApplyTelemetryDashboardFromProfile</c> drives:
-        /// the wheel's screen, or the CM2 when the wheel can't show a dashboard.
+        /// The wheel profile that owns the wheel screen's dashboard pick — null when the
+        /// attached wheel can't show a dashboard. The CM2 keeps its own pick on its dash
+        /// profile (<see cref="Cm2DashboardProfile"/>); the two lanes never share one.
         /// </summary>
-        internal IDashboardKeyProfile? ActiveDashboardKeyProfile
-        {
-            get
-            {
-                // Same lane test as ApplyTelemetryDashboardFromProfile.
-                if (!_plugin.ShouldDriveDashboard()
-                    && (_plugin.ActiveCm2Sender != null || _plugin.IsCm2Present))
-                    return DashProfileFor(MozaPlugin.Cm2PageGuid);
-                return ActiveWheelProfile;
-            }
-        }
+        internal MozaWheelProfile? WheelDashboardKeyProfile =>
+            _plugin.ShouldDriveDashboard() ? ActiveWheelProfile : null;
+
+        /// <summary>The CM2 page's current profile, which owns the CM2's dashboard pick.</summary>
+        internal MozaDashProfile? Cm2DashboardProfile => DashProfileFor(MozaPlugin.Cm2PageGuid);
 
         // ===== Wheel LED tabs: global vs per-profile =====
 
@@ -414,8 +408,8 @@ namespace MozaPlugin.Settings
                     case DeviceProfileKind.Dash:
                         if (CurrentDashPageGuid != guid) return;
                         _plugin.HardwareApplier.ApplyDashToHardware();
-                        if (guid == MozaPlugin.Cm2PageGuid && !_plugin.ShouldDriveDashboard())
-                            _profiles.ApplySavedDashboardKey(DashStore(guid, false)?.CurrentProfile);
+                        if (guid == MozaPlugin.Cm2PageGuid)
+                            _profiles.ApplyCm2SavedDashboard(DashStore(guid, false)?.CurrentProfile);
                         _profiles.SyncTelemetryAfterApply();
                         break;
                 }

@@ -48,7 +48,7 @@ namespace MozaPlugin
         {
             try
             {
-                var profile = _deviceProfiles?.ActiveDashboardKeyProfile;
+                var profile = _deviceProfiles?.WheelDashboardKeyProfile;
                 if (profile == null) return;
                 if (string.IsNullOrEmpty(profile.TelemetryDashboardKey)) return;
                 bool applied = false;
