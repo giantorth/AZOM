@@ -510,6 +510,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>Caricamento non avviato — volante non connesso o nessuna sessione di gestione.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Caricamento completato (stato 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Caricamento interrotto al {0}% (stato 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Annullamento del caricamento…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Caricamento annullato al {0}%</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleziona un file .mzdash da caricare</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Cruscotto Moza (*.mzdash)|*.mzdash|Tutti i file (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleziona la cartella con i file dashboard .mzdash</value></data>

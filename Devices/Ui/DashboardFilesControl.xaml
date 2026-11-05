@@ -147,6 +147,10 @@
                     <Button x:Name="UploadNowButton" Content="{x:Static res:Strings.Button_UploadNow}" MinWidth="120"
                             Style="{StaticResource MozaButtonPrimary}"
                             Click="UploadNow_Click"/>
+                    <!-- Shown only while an upload attempt is running. -->
+                    <Button x:Name="UploadCancelButton" Content="{x:Static res:Strings.Button_Cancel}" MinWidth="100"
+                            Margin="8,0,0,0" Visibility="Collapsed"
+                            Click="UploadCancel_Click"/>
                     <!-- Blank at rest — the Status line below already says idle.
                          This slot only carries the transient upload hints
                          (queued / not started / complete / stopped / errors). -->

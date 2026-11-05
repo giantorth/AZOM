@@ -506,6 +506,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>업로드를 시작하지 못함 — 휠이 연결되지 않았거나 관리 세션이 아직 없습니다.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>업로드 완료 (상태 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>{0}%에서 업로드 중지됨 (상태 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>업로드 취소 중…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>{0}%에서 업로드 취소됨</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>업로드할 .mzdash 파일을 선택하세요</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 대시보드 (*.mzdash)|*.mzdash|모든 파일 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>.mzdash 대시보드 파일이 있는 폴더를 선택하세요</value></data>

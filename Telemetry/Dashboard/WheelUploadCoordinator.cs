@@ -281,6 +281,8 @@ namespace MozaPlugin.Telemetry.Dashboard
             ExceptionThrown,
             /// <summary>TelemetrySender flipped to Idle while the upload was in flight.</summary>
             Aborted,
+            /// <summary>User cancelled via <see cref="RequestCancel"/>; session closed.</summary>
+            Cancelled,
         }
 
         /// <summary>
@@ -308,6 +310,53 @@ namespace MozaPlugin.Telemetry.Dashboard
         // _acquireOpenSeq, _outboundSeq, the wait events, _isUploadInFlight —
         // so two concurrent attempts corrupt each other rather than queueing.
         private int _attemptInFlight;
+
+        // Set by RequestCancel; cleared when an attempt claims the coordinator.
+        private volatile bool _cancelRequested;
+
+        /// <summary>True from the moment an attempt claims the coordinator until
+        /// its outcome fires — wider than <see cref="IsUploadInFlight"/>, which
+        /// only covers the post-hash-check transfer.</summary>
+        public bool IsAttemptActive => Volatile.Read(ref _attemptInFlight) != 0;
+        public bool IsCancelRequested => _cancelRequested && IsAttemptActive;
+
+        /// <summary>Ask the running attempt to stop and close its session.
+        /// Returns false when no attempt is running.</summary>
+        public bool RequestCancel()
+        {
+            if (!IsAttemptActive) return false;
+            if (!_cancelRequested)
+                MozaLog.Info($"[AZOM] Dashboard upload \"{MzdashName}\": cancel requested");
+            _cancelRequested = true;
+            return true;
+        }
+
+        private bool ShouldStop() => _cancelRequested || _shouldAbort();
+
+        /// <summary>Wait for <paramref name="ev"/> in short slices so a cancel
+        /// doesn't sit out a multi-second wait. False on timeout or stop.</summary>
+        private bool WaitOrStop(ManualResetEventSlim ev, int timeoutMs)
+        {
+            const int SliceMs = 100;
+            DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (true)
+            {
+                if (ShouldStop()) return ev.IsSet;
+                int remaining = (int)(deadline - DateTime.UtcNow).TotalMilliseconds;
+                if (remaining <= 0) return ev.IsSet;
+                if (ev.Wait(Math.Min(SliceMs, remaining))) return true;
+            }
+        }
+
+        /// <summary>Terminal outcome for a stopped attempt. A user cancel closes
+        /// the session so the device isn't left holding a half-written upload; a
+        /// sender stop/disconnect has no wire to close it on.</summary>
+        private UploadOutcome StoppedOutcome(byte sess, bool closeSession)
+        {
+            if (_shouldAbort()) return UploadOutcome.Aborted;
+            if (closeSession) CloseUploadSession(sess);
+            return UploadOutcome.Cancelled;
+        }
 
         public WheelUploadCoordinator(
             MozaSerialConnection connection,
@@ -814,6 +863,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             // finally re-clears this anyway. Clearing here keeps a worker that
             // died without unwinding from locking uploads out for the session.
             _attemptInFlight = 0;
+            _cancelRequested = false;
             LastBytesWritten = 0;
             LastTotalSize = 0;
             LastStatusByte = 0;
@@ -884,6 +934,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                 return;
             }
 
+            // A cancel aimed at a previous attempt must not kill this one.
+            _cancelRequested = false;
             UploadOutcome outcome = UploadOutcome.Aborted;
             try
             {
@@ -902,7 +954,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 if (_getPolicy().UploadWireFormat != FileTransferWireFormat.New2026_04_Type02)
                 {
                     const int FtBurstWaitMs = 60000;
-                    if (!_sessionOpened.Wait(FtBurstWaitMs))
+                    bool opened = WaitOrStop(_sessionOpened, FtBurstWaitMs);
+                    if (ShouldStop())
+                    {
+                        outcome = StoppedOutcome(0, closeSession: false);
+                        return;
+                    }
+                    if (!opened)
                     {
                         MozaLog.Warn(
                             $"[AZOM] No file-transfer session device-opened within " +
@@ -913,7 +971,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     }
                 }
 
-                if (_shouldAbort()) { outcome = UploadOutcome.Aborted; return; }
+                if (ShouldStop()) { outcome = StoppedOutcome(0, closeSession: false); return; }
                 outcome = SendDashboardUpload();
             }
             catch (Exception ex)
@@ -1033,7 +1091,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq, _getTargetDevice());
             foreach (var frame in frames)
             {
-                if (_shouldAbort()) return;
+                if (ShouldStop()) return;
                 _sendAndTrackChunk(frame);
                 if (interFrameDelayMs > 0) Thread.Sleep(interFrameDelayMs);
             }
@@ -1056,7 +1114,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             var frames = TierDefinitionBuilder.ChunkMessage(subMsg, sess, ref seq, _getTargetDevice());
             foreach (var frame in frames)
             {
-                if (_shouldAbort()) return frames;
+                if (ShouldStop()) return frames;
                 _sendAndTrackChunk(frame);
                 if (interFrameDelayMs > 0) Thread.Sleep(interFrameDelayMs);
             }
@@ -1074,7 +1132,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         {
             foreach (var frame in frames)
             {
-                if (_shouldAbort()) return;
+                if (ShouldStop()) return;
                 if (_subMsg1Response.IsSet) return; // ack arrived mid-retransmit; stop early
                 _connection.Send(frame);
                 if (interFrameDelayMs > 0) Thread.Sleep(interFrameDelayMs);
@@ -1136,15 +1194,15 @@ namespace MozaPlugin.Telemetry.Dashboard
                 const int AcquireAttempts = 5;
                 const int AcquireWaitMs = 3000;
                 bool reclaimed = false;
-                for (int attempt = 0; attempt < AcquireAttempts && !_shouldAbort(); attempt++)
+                for (int attempt = 0; attempt < AcquireAttempts && !ShouldStop(); attempt++)
                 {
                     _sendFileTransferActivate(uploadSess);
-                    _acquireOpened.Wait(AcquireWaitMs);
+                    WaitOrStop(_acquireOpened, AcquireWaitMs);
                     if (_acquireOpenSeq >= 0) break;
                     // The device won't re-init a session it still holds open
                     // (CM2 keeps a failed attempt's session alive, bundle
                     // GMGHEQND) — close it once, then re-activate.
-                    if (!reclaimed && IsFtSessionDeviceOpen(uploadSess) && !_shouldAbort())
+                    if (!reclaimed && IsFtSessionDeviceOpen(uploadSess) && !ShouldStop())
                     {
                         reclaimed = true;
                         MozaLog.Warn(
@@ -1159,6 +1217,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 }
                 _acquireTarget = 0;
                 int openSeq = _acquireOpenSeq;
+                if (ShouldStop())
+                {
+                    // Device-inited before the cancel landed: its CLOSE takes the
+                    // first free seq (open-seq + 3).
+                    if (openSeq >= 0) _outboundSeq = openSeq + 3;
+                    return StoppedOutcome(uploadSess, closeSession: openSeq >= 0);
+                }
                 if (openSeq < 0)
                 {
                     MozaLog.Warn(
@@ -1254,15 +1319,16 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
 
             DateTime sm1Deadline = DateTime.UtcNow.AddMilliseconds(Sm1AckTimeoutMs);
-            while (!_subMsg1Response.IsSet && DateTime.UtcNow < sm1Deadline && !_shouldAbort())
+            while (!_subMsg1Response.IsSet && DateTime.UtcNow < sm1Deadline && !ShouldStop())
             {
                 int waitMs = Math.Min(Sm1RetransmitIntervalMs,
                     (int)Math.Max(50, (sm1Deadline - DateTime.UtcNow).TotalMilliseconds));
-                if (_subMsg1Response.Wait(waitMs)) break;
-                if (_shouldAbort()) break;
+                if (WaitOrStop(_subMsg1Response, waitMs)) break;
+                if (ShouldStop()) break;
                 // No ack yet — retransmit the metadata burst with same seq numbers
                 ReemitFrames(sm1Frames, InterFrameDelayMs);
             }
+            if (ShouldStop()) return StoppedOutcome(uploadSess, closeSession: true);
 
             // No ack → ABORT.
             // Optionally retry once with the fallback wire format (era policy).
@@ -1304,14 +1370,15 @@ namespace MozaPlugin.Telemetry.Dashboard
                             ReemitFrames(sm1FallbackFrames, InterFrameDelayMs);
                     }
                     DateTime fbDeadline = DateTime.UtcNow.AddMilliseconds(Sm1AckTimeoutMs);
-                    while (!_subMsg1Response.IsSet && DateTime.UtcNow < fbDeadline && !_shouldAbort())
+                    while (!_subMsg1Response.IsSet && DateTime.UtcNow < fbDeadline && !ShouldStop())
                     {
                         int waitMs = Math.Min(Sm1RetransmitIntervalMs,
                             (int)Math.Max(50, (fbDeadline - DateTime.UtcNow).TotalMilliseconds));
-                        if (_subMsg1Response.Wait(waitMs)) break;
-                        if (_shouldAbort()) break;
+                        if (WaitOrStop(_subMsg1Response, waitMs)) break;
+                        if (ShouldStop()) break;
                         ReemitFrames(sm1FallbackFrames, InterFrameDelayMs);
                     }
+                    if (ShouldStop()) return StoppedOutcome(uploadSess, closeSession: true);
 
                     if (_subMsg1Response.IsSet)
                     {
@@ -1421,7 +1488,11 @@ namespace MozaPlugin.Telemetry.Dashboard
             {
                 long retxBefore = _getHeldRetransmitCount();
                 EmitSubMsg(upload.SubMsg2Chunks[chunkIdx], uploadSess, ref seq2, InterFrameDelayMs);
-                if (_shouldAbort()) return UploadOutcome.Aborted;
+                if (ShouldStop())
+                {
+                    _outboundSeq = seq2;
+                    return StoppedOutcome(uploadSess, closeSession: true);
+                }
                 Volatile.Write(ref _progressChunksSent, chunkIdx + 1);
 
                 // Window pacing: wait for the wheel's cumulative fc-acks to
@@ -1440,7 +1511,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 int backlog = _getRetransmitBacklog();
                 long acked = _getAckedChunkCount();
                 DateTime stallDeadline = DateTime.UtcNow.AddMilliseconds(BacklogStallTimeoutMs);
-                while (backlog > backlogWindow && !_shouldAbort())
+                while (backlog > backlogWindow && !ShouldStop())
                 {
                     Thread.Sleep(50);
                     backlog = _getRetransmitBacklog();
@@ -1459,6 +1530,11 @@ namespace MozaPlugin.Telemetry.Dashboard
                         CloseUploadSession(uploadSess);
                         return UploadOutcome.SubMsg2AckTimeout;
                     }
+                }
+                if (ShouldStop())
+                {
+                    _outboundSeq = seq2;
+                    return StoppedOutcome(uploadSess, closeSession: true);
                 }
 
                 // Round done — adjust the window. Any held-session retransmit
@@ -1495,9 +1571,9 @@ namespace MozaPlugin.Telemetry.Dashboard
             // per-stride ≤40 s on the 104 KB ground truth.
             {
                 DateTime liveDeadline = DateTime.UtcNow.AddMilliseconds(CompleteAckTimeoutMs);
-                while (!_subMsg2Response.IsSet && !_shouldAbort())
+                while (!_subMsg2Response.IsSet && !ShouldStop())
                 {
-                    if (_subMsg2Response.Wait(1000)) break;
+                    if (WaitOrStop(_subMsg2Response, 1000)) break;
                     if (_ackProgress.IsSet)
                     {
                         _ackProgress.Reset();
@@ -1516,6 +1592,9 @@ namespace MozaPlugin.Telemetry.Dashboard
                     }
                 }
                 if (_shouldAbort()) return UploadOutcome.Aborted;
+                // A cancel that lost the race to the complete-ack is a finished upload.
+                if (_cancelRequested && !_subMsg2Response.IsSet)
+                    return StoppedOutcome(uploadSess, closeSession: true);
             }
 
             MozaLog.Debug(

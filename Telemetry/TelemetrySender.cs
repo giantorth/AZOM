@@ -909,6 +909,11 @@ namespace MozaPlugin.Telemetry
         /// <summary>True while a dashboard upload is mid-flight. Cleared on
         /// completion / abort.</summary>
         public bool IsUploadInFlight => _uploader?.IsUploadInFlight ?? false;
+        /// <summary>True while an upload attempt runs, including session acquisition.</summary>
+        public bool IsUploadAttemptActive => _uploader?.IsAttemptActive ?? false;
+        public bool IsUploadCancelRequested => _uploader?.IsCancelRequested ?? false;
+        /// <summary>Stop the running upload and close its session. False when none is running.</summary>
+        public bool CancelUpload() => _uploader?.RequestCancel() ?? false;
         /// <summary>Last <c>bytes_written:u32 BE</c> from a wheel ack sub-msg.</summary>
         public uint UploadLastBytesWritten => _uploader?.LastBytesWritten ?? 0;
         /// <summary>Last <c>total_size:u32 BE</c> from a wheel ack sub-msg.</summary>
@@ -1061,6 +1066,9 @@ namespace MozaPlugin.Telemetry
                         break;
                     case WheelUploadCoordinator.UploadOutcome.Aborted:
                         MozaLog.Debug($"[AZOM] Dashboard upload \"{name}\": Aborted");
+                        break;
+                    case WheelUploadCoordinator.UploadOutcome.Cancelled:
+                        MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": Cancelled");
                         break;
                     default:
                         MozaLog.Warn($"[AZOM] Dashboard upload \"{name}\": {outcome}");

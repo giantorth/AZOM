@@ -512,6 +512,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>Carga no iniciada: el volante no está conectado o aún no hay sesión de gestión.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Carga completada (estado 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Carga detenida al {0} % (estado 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Cancelando la carga…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Carga cancelada al {0} %</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleccione un archivo .mzdash para subir</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Panel Moza (*.mzdash)|*.mzdash|Todos los archivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleccione la carpeta con archivos de panel .mzdash</value></data>

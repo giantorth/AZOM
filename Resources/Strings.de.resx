@@ -507,6 +507,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload nicht gestartet – Lenkrad nicht verbunden oder noch keine Verwaltungssitzung.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Upload abgeschlossen (Status 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Upload bei {0} % gestoppt (Status 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Upload wird abgebrochen…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Upload bei {0} % abgebrochen</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Wählen Sie eine .mzdash-Datei zum Hochladen</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-Dashboard (*.mzdash)|*.mzdash|Alle Dateien (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Ordner mit .mzdash-Dashboard-Dateien auswählen</value></data>

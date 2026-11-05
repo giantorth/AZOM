@@ -527,6 +527,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>Envio não iniciado — volante desconectado ou sem sessão de gerenciamento ainda.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Envio concluído (estado 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Envio interrompido em {0}% (estado 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>A cancelar o envio…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Envio cancelado em {0}%</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Escolha um arquivo .mzdash para enviar</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Painel Moza (*.mzdash)|*.mzdash|Todos os arquivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Selecione a pasta com arquivos de painel .mzdash</value></data>

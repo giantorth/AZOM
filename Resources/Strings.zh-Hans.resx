@@ -507,6 +507,8 @@
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>上传在 {0}% 停止（状态 0x{1}）</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>正在取消上传…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>上传已在 {0}% 取消</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
