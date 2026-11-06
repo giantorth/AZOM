@@ -128,9 +128,21 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             var ports = MozaPortDiscovery.Instance.Enumerate();
             var source = MozaPortDiscovery.Instance.Source;
-            string fallbackState = source != MozaDiscoverySource.None
-                ? "not used (enumeration is authoritative)"
-                : "armed (active — no device source)";
+            string fallbackState;
+            if (MozaPortDiscovery.Instance.TryGetProbeCandidates(out var probeCandidates))
+            {
+                var names = new List<string>(probeCandidates.Count);
+                for (int i = 0; i < probeCandidates.Count; i++) names.Add(probeCandidates[i].PortName);
+                fallbackState = names.Count == 0
+                    ? "not used (registry is authoritative)"
+                    : $"limited to MOZA ports on another driver: {string.Join(", ", names)}";
+            }
+            else
+            {
+                fallbackState = source == MozaDiscoverySource.Sysfs
+                    ? "not used (enumeration is authoritative)"
+                    : "armed (sweeps ports the registry can't classify)";
+            }
             sb.AppendLine($"Source:         {source}  (probe fallback: {fallbackState})");
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
             if (Protocol.WineHost.IsWine)

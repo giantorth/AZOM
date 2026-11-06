@@ -106,9 +106,12 @@ install, or a partially-enumerated bus where some MOZA devices register
 and others don't). The fallback also consults the registry per port:
 ports the registry already pinned to a non-matching MOZA PID are
 skipped without serial bytes, and ports pinned to a matching PID are
-claimed directly. Only unclassified ports actually receive probe
-writes. Both paths use the per-connection PID filter lambdas in
-`MozaPlugin.cs` and `MozaAb9DeviceManager.cs`.
+claimed directly. On native Windows the only ports that receive probe
+writes are live `VID_346E` serial interfaces on a non-`usbser` driver;
+every other COM port has no MOZA `Enum\USB` key and is never opened.
+Only without a usable registry walk (Wine without sysfs) are
+unclassified ports swept. Both paths use the per-connection PID filter
+lambdas in `MozaPlugin.cs` and `MozaAb9DeviceManager.cs`.
 
 ## Hub-on-wheelbase-pipe
 

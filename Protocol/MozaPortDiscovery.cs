@@ -29,9 +29,9 @@ namespace MozaPlugin.Protocol
     /// <see cref="SerialPort.GetPortNames"/> to drop ghost entries), and Linux
     /// sysfs via <see cref="LinuxUsbEnumerator"/> under Wine/Proton, where the
     /// registry has no <c>Enum\USB</c> tree at all. Replaces the prior WMI
-    /// reflection path; the serial-probe fallback in
-    /// <see cref="MozaSerialConnection"/> kicks in only when neither source
-    /// produced anything (<see cref="IsAuthoritative"/> false).
+    /// reflection path. On native Windows the serial-probe fallback in
+    /// <see cref="MozaSerialConnection"/> is limited to
+    /// <see cref="TryGetProbeCandidates"/>; under sysfs it never runs.
     /// </summary>
     public sealed class MozaPortDiscovery
     {
@@ -215,8 +215,10 @@ namespace MozaPlugin.Protocol
         /// COM ports the registry attributes to a NON-MOZA USB device, mapped to
         /// that device's VID. Cached on the same TTL as <see cref="Enumerate"/>.
         ///
-        /// <para>The blind serial probe in <see cref="MozaSerialConnection"/> opens
-        /// every port <see cref="Enumerate"/> did not classify. On a normal Windows
+        /// <para>Used only when <see cref="TryGetProbeCandidates"/> can't scope the
+        /// probe (registry walk failed). The blind serial probe in
+        /// <see cref="MozaSerialConnection"/> then opens every port
+        /// <see cref="Enumerate"/> did not classify. On a normal Windows
         /// box that is every other USB-serial device the user owns — a DIY pedal
         /// set, an Arduino dash, a button box — and opening one both holds it away
         /// from SimHub's own scanner and writes MOZA probe frames into its stream
@@ -470,6 +472,32 @@ namespace MozaPlugin.Protocol
         private static List<PortInfo> s_walkCache = new List<PortInfo>();
         private static IReadOnlyList<string> s_walkLiveCom = Array.Empty<string>();
         private static IReadOnlyList<string> s_walkSkippedMoza = Array.Empty<string>();
+        private static IReadOnlyList<PortInfo> s_walkOtherDriverMoza = Array.Empty<PortInfo>();
+        private static bool s_walkComplete;
+
+        /// <summary>
+        /// The ports a serial probe may open, when the registry can vouch for
+        /// port ownership (native Windows, walk read <c>Enum\USB</c> in full).
+        /// Every USB device has a key there whatever its driver, so a COM port
+        /// not under <c>VID_346E</c> is provably not MOZA — a motherboard UART,
+        /// Bluetooth, another vendor's adapter — and MOZA usbser ports are
+        /// already in <see cref="Enumerate"/>. What remains is a live MOZA serial
+        /// interface bound to another driver. False under Wine (no
+        /// <c>Enum\USB</c> for real hardware) or when the walk failed; the caller
+        /// then sweeps unclassified ports.
+        /// </summary>
+        public bool TryGetProbeCandidates(out IReadOnlyList<PortInfo> candidates)
+        {
+            candidates = Array.Empty<PortInfo>();
+            if (WineHost.IsWine) return false;
+            WalkUsbSerialPortsCached();
+            lock (s_walkLock)
+            {
+                if (!s_walkComplete) return false;
+                candidates = s_walkOtherDriverMoza;
+                return true;
+            }
+        }
 
         /// <summary>OS COM port list (<see cref="SerialPort.GetPortNames"/>) from the last registry walk.</summary>
         public static IReadOnlyList<string> LastLiveComPorts
@@ -495,12 +523,15 @@ namespace MozaPlugin.Protocol
                 if (s_walkTimestamp != 0 && (now - s_walkTimestamp) < CacheTtlTicks)
                     return s_walkCache;
             }
-            var fresh = WalkUsbSerialPorts(out var liveCom, out var skipped);
+            var fresh = WalkUsbSerialPorts(out var liveCom, out var skipped,
+                                           out var otherDriverMoza, out var complete);
             lock (s_walkLock)
             {
                 s_walkCache = fresh;
                 s_walkLiveCom = liveCom;
                 s_walkSkippedMoza = skipped;
+                s_walkOtherDriverMoza = otherDriverMoza;
+                s_walkComplete = complete;
                 s_walkTimestamp = Stopwatch.GetTimestamp();
             }
             MozaLog.DebugIfChanged("registry-walk",
@@ -517,15 +548,22 @@ namespace MozaPlugin.Protocol
         /// <see cref="EnumerateFromRegistry"/> filters this to <see cref="MozaVid"/>;
         /// <see cref="ForeignPortVids"/> takes everything else. Go through
         /// <see cref="WalkUsbSerialPortsCached"/> rather than calling this directly.
+        /// <paramref name="otherDriverMoza"/> gets the live MOZA serial interfaces
+        /// bound to a driver other than usbser; <paramref name="complete"/> is true
+        /// only when both the OS port list and the whole <c>Enum\USB</c> tree were read.
         /// </summary>
         private static List<PortInfo> WalkUsbSerialPorts(out IReadOnlyList<string> liveComList,
-                                                         out IReadOnlyList<string> skippedMoza)
+                                                         out IReadOnlyList<string> skippedMoza,
+                                                         out IReadOnlyList<PortInfo> otherDriverMoza,
+                                                         out bool complete)
         {
+            complete = false;
             // Live COM port set — drops ghost registry entries left by previous
             // USB-port attachments. SerialPort.GetPortNames reads the same
             // SERIALCOMM table the kernel populates with currently-mounted ports.
             HashSet<string> liveCom;
             string[] osPorts;
+            bool osPortsOk = true;
             try
             {
                 osPorts = SerialPort.GetPortNames();
@@ -534,12 +572,15 @@ namespace MozaPlugin.Protocol
             {
                 MozaLog.Debug($"[AZOM] SerialPort.GetPortNames failed: {ex.GetType().Name}: {ex.Message}");
                 osPorts = Array.Empty<string>();
+                osPortsOk = false;
             }
             liveCom = new HashSet<string>(osPorts, StringComparer.OrdinalIgnoreCase);
             Array.Sort(osPorts, StringComparer.OrdinalIgnoreCase);
             liveComList = osPorts;
             var skipped = new List<string>();
             skippedMoza = skipped;
+            var otherDriver = new List<PortInfo>();
+            otherDriverMoza = otherDriver;
 
             var results = new List<PortInfo>();
             try
@@ -583,7 +624,14 @@ namespace MozaPlugin.Protocol
                             // only one carrying a COM name is a serial interface
                             // that moved to another driver.
                             if (!string.IsNullOrEmpty(portName))
+                            {
                                 skipped.Add($"{entry}: {portName} on driver '{service ?? "(none)"}', not usbser");
+                                if (liveCom.Contains(portName!))
+                                    otherDriver.Add(new PortInfo(portName!, vid, pid,
+                                        (instanceKey.GetValue("FriendlyName") as string) ?? string.Empty,
+                                        instanceName,
+                                        (instanceKey.GetValue("ContainerID") as string) ?? string.Empty));
+                            }
                             continue;
                         }
                         if (string.IsNullOrEmpty(portName))
@@ -608,6 +656,7 @@ namespace MozaPlugin.Protocol
                         results.Add(new PortInfo(portName!, vid, pid, friendly, instanceName, containerId));
                     }
                 }
+                complete = osPortsOk;
             }
             catch (SecurityException ex)
             {

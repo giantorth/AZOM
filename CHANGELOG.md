@@ -15,6 +15,7 @@ All notable changes to the AZOM plugin are documented here.
 - **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
 - **CM2 switches dashboards with its profile;** the selected dashboard is saved to the active profile and recalled on every switch.
 - **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.
+- **Device detection no longer writes to non-MOZA COM ports** (Bluetooth, motherboard serial, other adapters); on Windows only MOZA ports are probed.
 
 ## [1.7.2]
 
