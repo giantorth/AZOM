@@ -509,6 +509,7 @@
   <data name="Upload_Stopped" xml:space="preserve"><value>Téléversement arrêté à {0} % (statut 0x{1})</value></data>
   <data name="Upload_Cancelling" xml:space="preserve"><value>Annulation du téléversement…</value></data>
   <data name="Upload_Cancelled" xml:space="preserve"><value>Téléversement annulé à {0} %</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>« {0} » est déjà sur le volant, inchangé — rien n'a été téléversé</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Sélectionnez un fichier .mzdash à téléverser</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Tableau de bord Moza (*.mzdash)|*.mzdash|Tous les fichiers (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Sélectionnez le dossier contenant les fichiers de tableau de bord .mzdash</value></data>

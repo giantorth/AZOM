@@ -920,6 +920,9 @@ namespace MozaPlugin.Telemetry
         public uint UploadLastTotalSize => _uploader?.LastTotalSize ?? 0;
         /// <summary>Last XOR status byte from a wheel ack sub-msg.</summary>
         public byte UploadLastStatusByte => _uploader?.LastStatusByte ?? 0;
+        /// <summary>Outcome of the last finished upload attempt; null before
+        /// one finishes or once a new one is queued.</summary>
+        internal WheelUploadCoordinator.UploadOutcome? UploadLastOutcome => _uploader?.LastOutcome;
         /// <summary>0..1 progress of the in-flight upload; 0 when idle. See
         /// <see cref="Dashboard.WheelUploadCoordinator.UploadProgress"/>.</summary>
         public double UploadProgress => _uploader?.UploadProgress ?? 0.0;
@@ -952,6 +955,7 @@ namespace MozaPlugin.Telemetry
             _uploader.MzdashContent = content;
             _uploader.MzdashName = name ?? "";
             _uploader.MzdashSourceDirectory = sourceDirectory ?? "";
+            _uploader.ClearLastAttempt();
             ThreadPool.QueueUserWorkItem(_ => _uploader.RunBackgroundUpload());
             return true;
         }

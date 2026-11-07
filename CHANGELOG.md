@@ -18,6 +18,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.
 - **Device detection no longer writes to non-MOZA COM ports** (Bluetooth, motherboard serial, other adapters); on Windows only MOZA ports are probed.
 - **Pedals wired into an S12 pedal vibration unit are detected;** the Pedals tab now works through the S12's USB port.
+- **Re-uploading an edited dashboard sends the edit;** the file is re-read at upload time instead of reusing the copy from when it was picked.
 
 ## [1.7.2]
 

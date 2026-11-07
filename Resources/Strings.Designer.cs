@@ -620,6 +620,7 @@ namespace MozaPlugin.Resources
         public static string Upload_Stopped => Get("Upload_Stopped");
         public static string Upload_Cancelling => Get("Upload_Cancelling");
         public static string Upload_Cancelled => Get("Upload_Cancelled");
+        public static string Upload_AlreadyOnWheel => Get("Upload_AlreadyOnWheel");
         public static string Upload_FileDialog_Title => Get("Upload_FileDialog_Title");
         public static string Upload_FileDialog_Filter => Get("Upload_FileDialog_Filter");
         public static string Upload_FolderDialog_Description => Get("Upload_FolderDialog_Description");

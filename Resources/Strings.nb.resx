@@ -514,6 +514,7 @@
   <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet ved {0} % (status 0x{1})</value></data>
   <data name="Upload_Cancelling" xml:space="preserve"><value>Avbryter opplasting…</value></data>
   <data name="Upload_Cancelled" xml:space="preserve"><value>Opplasting avbrutt ved {0} %</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>«{0}» ligger allerede uendret på rattet – ingenting lastet opp</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Velg en .mzdash-fil å laste opp</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-dashbord (*.mzdash)|*.mzdash|Alle filer (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Velg mappe som inneholder .mzdash-dashbordfiler</value></data>

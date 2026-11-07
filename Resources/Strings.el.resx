@@ -508,6 +508,7 @@
   <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε στο {0}% (κατάσταση 0x{1})</value></data>
   <data name="Upload_Cancelling" xml:space="preserve"><value>Ακύρωση αποστολής…</value></data>
   <data name="Upload_Cancelled" xml:space="preserve"><value>Η αποστολή ακυρώθηκε στο {0}%</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>Το «{0}» υπάρχει ήδη αμετάβλητο στο τιμόνι — δεν στάλθηκε τίποτα</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Επιλέξτε ένα αρχείο .mzdash για αποστολή</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Ταμπλό Moza (*.mzdash)|*.mzdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Επιλέξτε φάκελο που περιέχει αρχεία ταμπλό .mzdash</value></data>

@@ -618,6 +618,7 @@ namespace MozaPlugin.Devices.Ui
                     UploadStatusText.Text = Strings.Status_TelemetrySenderUnavailableInit;
                 return;
             }
+            if (!ReloadPickedContent()) return;
             if (_uploadPickedContent == null || _uploadPickedContent.Length == 0)
             {
                 if (UploadStatusText != null)
@@ -635,6 +636,36 @@ namespace MozaPlugin.Devices.Ui
                 UploadStatusText.Text = queued
                     ? string.Format(Strings.Upload_Queued, name)
                     : Strings.Upload_NotStarted;
+            }
+        }
+
+        /// <summary>
+        /// Re-read the pick from disk at upload time. The bytes are captured
+        /// when the dashboard is picked, so an edit saved since (Studio,
+        /// PitHouse) would upload the old file, hash-match the wheel's copy and
+        /// be skipped. False when the re-read failed and the status says why.
+        /// </summary>
+        private bool ReloadPickedContent()
+        {
+            if (LibraryMode)
+            {
+                if (UploadLibraryCombo?.SelectedItem is not string name || string.IsNullOrEmpty(name))
+                    return true;
+                ApplyLibrarySelection(name);
+                return _uploadPickedContent != null;
+            }
+            // A file deleted since the pick still uploads what was picked.
+            if (!System.IO.File.Exists(_uploadPickedSourceLabel)) return true;
+            try
+            {
+                _uploadPickedContent = System.IO.File.ReadAllBytes(_uploadPickedSourceLabel);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Strings.Dialog_ReadMzdashFailed, ex.Message),
+                    "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 
@@ -996,6 +1027,10 @@ namespace MozaPlugin.Devices.Ui
                 ? (Brush)(TryFindResource("AmberBrush") ?? Brushes.Goldenrod)
                 : (Brush)(TryFindResource("TextDimBrush") ?? Brushes.Gray);
 
+            if (UploadStatusText != null && !attemptActive
+                && ts?.UploadLastOutcome == WheelUploadCoordinator.UploadOutcome.SkippedHashMatch
+                && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
+                UploadStatusText.Text = string.Format(Strings.Upload_AlreadyOnWheel, ts.MzdashName);
             if (UploadStatusText != null && !inFlight && total != 0)
             {
                 if (bw == total)

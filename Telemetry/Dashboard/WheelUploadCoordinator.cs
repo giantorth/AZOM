@@ -292,8 +292,28 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public event Action<UploadOutcome>? UploadCompleted;
 
+        /// <summary>Outcome of the last finished attempt; null before the first
+        /// or after <see cref="ClearLastAttempt"/>.</summary>
+        public UploadOutcome? LastOutcome { get; private set; }
+
+        /// <summary>
+        /// Drop the previous attempt's ack counters and outcome before queueing
+        /// a new one, so the UI can't report them as this attempt's result (a
+        /// hash-match skip never touches them and used to show the prior
+        /// upload's "complete"). No-op while an attempt runs.
+        /// </summary>
+        public void ClearLastAttempt()
+        {
+            if (IsAttemptActive) return;
+            LastBytesWritten = 0;
+            LastTotalSize = 0;
+            LastStatusByte = 0;
+            LastOutcome = null;
+        }
+
         private void FireUploadCompleted(UploadOutcome outcome)
         {
+            LastOutcome = outcome;
             try { UploadCompleted?.Invoke(outcome); }
             catch (Exception ex)
             {
@@ -1628,18 +1648,24 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// Compare the active mzdash MD5 against the wheel's reported hash from
         /// its last session 0x09 state blob. Wheel stores hash as ASCII-hex of
         /// ASCII-hex of MD5. Returns true when the wheel already has this exact
-        /// dashboard loaded in enableManager.
+        /// dashboard loaded in enableManager under the SAME dirName — identical
+        /// content under another name is a different wheel dir
+        /// (<see cref="FileTransferBuilder.BuildDashboardDestPath"/>), so
+        /// skipping would silently drop the new entry. Ordinal: the wheel's
+        /// filesystem is case-sensitive.
         /// </summary>
         private bool CanSkipUpload(byte[] content)
         {
             var state = _getConfigJsonState();
             if (state == null || state.EnabledDashboards.Count == 0) return false;
+            string dirName = !string.IsNullOrEmpty(MzdashName) ? MzdashName : "dashboard";
             byte[] md5 = FileTransferBuilder.ComputeMd5(content);
             string md5Hex = FileTransferBuilder.Md5Hex(md5);
             string wireHash = AsciiHexOfAsciiHex(md5Hex);
             foreach (var entry in state.EnabledDashboards)
             {
-                if (string.Equals(entry.Hash, wireHash, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(entry.DirName, dirName, StringComparison.Ordinal)
+                    && string.Equals(entry.Hash, wireHash, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
             return false;
