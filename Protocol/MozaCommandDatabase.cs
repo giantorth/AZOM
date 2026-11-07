@@ -172,14 +172,22 @@ namespace MozaPlugin.Protocol
             AddCommand("pedals-clutch-output",   "pedals", 37, 0xFF, new byte[] { 3 }, 2, "int");
 
             // ===== HUB (read group 100, read-only) =====
-            // Command IDs match foxblat/boxflat serial.yml
-            AddCommand("hub-base-power",    "hub", 100, 0xFF, new byte[] { 2 },    2, "int");
-            AddCommand("hub-port1-power",   "hub", 100, 0xFF, new byte[] { 3 },    2, "int");
-            AddCommand("hub-port2-power",   "hub", 100, 0xFF, new byte[] { 4 },    2, "int");
-            AddCommand("hub-port3-power",   "hub", 100, 0xFF, new byte[] { 5, 1 }, 1, "int");
-            AddCommand("hub-pedals1-power", "hub", 100, 0xFF, new byte[] { 6 },    2, "int");
-            AddCommand("hub-pedals2-power", "hub", 100, 0xFF, new byte[] { 7 },    2, "int");
-            AddCommand("hub-pedals3-power", "hub", 100, 0xFF, new byte[] { 8 },    2, "int");
+            // PitHouse HubGetState_* spec — see docs/protocol/devices/main-hub-0x12.md.
+            // Port N connect: 0 = empty, else device bus id − 0x10.
+            AddCommand("hub-port1-device", "hub", 100, 0xFF, new byte[] { 1, 1 }, 1, "int");
+            AddCommand("hub-port2-device", "hub", 100, 0xFF, new byte[] { 1, 2 }, 1, "int");
+            AddCommand("hub-port3-device", "hub", 100, 0xFF, new byte[] { 1, 3 }, 1, "int");
+            AddCommand("hub-port4-device", "hub", 100, 0xFF, new byte[] { 1, 4 }, 1, "int");
+            AddCommand("hub-pedal-port",   "hub", 100, 0xFF, new byte[] { 1, 5 }, 1, "int");
+            // UART packet loss per port, ×1000 (1000 = nothing attached).
+            AddCommand("hub-port1-loss",   "hub", 100, 0xFF, new byte[] { 2 },    2, "int");
+            AddCommand("hub-port2-loss",   "hub", 100, 0xFF, new byte[] { 3 },    2, "int");
+            AddCommand("hub-port3-loss",   "hub", 100, 0xFF, new byte[] { 4 },    2, "int");
+            AddCommand("hub-port4-loss",   "hub", 100, 0xFF, new byte[] { 5 },    2, "int");
+            // Raw pedal-port ADC.
+            AddCommand("hub-clutch-adc",   "hub", 100, 0xFF, new byte[] { 6 },    2, "int");
+            AddCommand("hub-brake-adc",    "hub", 100, 0xFF, new byte[] { 7 },    2, "int");
+            AddCommand("hub-throttle-adc", "hub", 100, 0xFF, new byte[] { 8 },    2, "int");
 
             // ===== TELEMETRY OUTPUT =====
             AddCommand("dash-send-telemetry",           "dash",  0xFF, 65, new byte[] { 253, 222 }, 4, "int");

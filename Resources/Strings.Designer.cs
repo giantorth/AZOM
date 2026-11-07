@@ -271,7 +271,6 @@ namespace MozaPlugin.Resources
         public static string DefaultName_CustomEffect => Get("DefaultName_CustomEffect");
         public static string Button_ReadFromDevice => Get("Button_ReadFromDevice");
         public static string Section_UniversalHubPedals => Get("Section_UniversalHubPedals");
-        public static string Subtitle_PedalsPort => Get("Subtitle_PedalsPort");
         public static string Label_PedalsPort => Get("Label_PedalsPort");
         public static string Section_Accessories => Get("Section_Accessories");
         public static string Label_Port1 => Get("Label_Port1");
@@ -914,5 +913,15 @@ namespace MozaPlugin.Resources
         public static string Section_PedalHapticsOutput => Get("Section_PedalHapticsOutput");
         public static string SliderLabel_PulseLength => Get("SliderLabel_PulseLength");
         public static string Label_Pedals => Get("Label_Pedals");
+        public static string Label_Port4 => Get("Label_Port4");
+        public static string HubDevice_Wheel => Get("HubDevice_Wheel");
+        public static string HubDevice_Dashboard => Get("HubDevice_Dashboard");
+        public static string HubDevice_Pedals => Get("HubDevice_Pedals");
+        public static string HubDevice_Shifter => Get("HubDevice_Shifter");
+        public static string HubDevice_Handbrake => Get("HubDevice_Handbrake");
+        public static string HubDevice_EsWheel => Get("HubDevice_EsWheel");
+        public static string HubDevice_Wheelbase => Get("HubDevice_Wheelbase");
+        public static string HubDevice_Unknown => Get("HubDevice_Unknown");
+        public static string HubPort_LossFormat => Get("HubPort_LossFormat");
     }
 }

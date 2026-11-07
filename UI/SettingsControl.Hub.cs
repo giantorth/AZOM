@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using MozaPlugin.Devices;
+using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Dashboard;
@@ -35,28 +36,62 @@ namespace MozaPlugin.UI
             HubTab.Visibility = detected ? Visibility.Visible : Visibility.Collapsed;
             if (!detected || !HubTab.IsSelected) return;
 
-            // Pedals port: high byte >= 1 means connected (foxblat convention)
-            UpdateHubPortIndicator(HubPedals1Dot, HubPedals1Label, _data.HubPedals1Power, isPedals: true);
+            // Pedal-port connect byte's enum is unresolved; use detection instead.
+            bool pedals = _plugin.IsPedalsOnHub;
+            HubPedalDot.Fill = pedals ? Brushes.LimeGreen : Brushes.Gray;
+            HubPedalLabel.Text = pedals ? Strings.HubDevice_Pedals : Strings.Status_Disconnected;
 
-            // Accessory ports: value <= 1 means connected
-            UpdateHubPortIndicator(HubPort1Dot, HubPort1Label, _data.HubPort1Power, isPedals: false);
-            UpdateHubPortIndicator(HubPort2Dot, HubPort2Label, _data.HubPort2Power, isPedals: false);
-            UpdateHubPortIndicator(HubPort3Dot, HubPort3Label, _data.HubPort3Power, isPedals: false);
+            UpdateHubPortIndicator(HubPort1Dot, HubPort1Label, 0);
+            UpdateHubPortIndicator(HubPort2Dot, HubPort2Label, 1);
+            UpdateHubPortIndicator(HubPort3Dot, HubPort3Label, 2);
+            UpdateHubPortIndicator(HubPort4Dot, HubPort4Label, 3);
         }
 
-        private static void UpdateHubPortIndicator(Ellipse dot, TextBlock label, int value, bool isPedals)
+        private void UpdateHubPortIndicator(Ellipse dot, TextBlock label, int port)
         {
-            if (value < 0)
+            int code = _data.HubPortDevice[port];
+            if (code < 0)
             {
                 dot.Fill = Brushes.Gray;
                 label.Text = "--";
                 return;
             }
+            if (code == 0)
+            {
+                dot.Fill = Brushes.Gray;
+                label.Text = Strings.Status_Disconnected;
+                return;
+            }
 
-            bool connected = isPedals ? (value >> 8) >= 1 : value <= 1;
-            dot.Fill = connected ? Brushes.LimeGreen : Brushes.Gray;
-            label.Text = connected ? Strings.Status_Connected : Strings.Status_Disconnected;
+            dot.Fill = Brushes.LimeGreen;
+            string text = HubPortDeviceName(code);
+            int loss = _data.HubPortLoss[port];
+            if (loss >= 0 && loss < 1000)
+                text += " · " + string.Format(Strings.HubPort_LossFormat, loss / 10.0);
+            label.Text = text;
         }
+
+        // Port connect code = device bus id − 0x10. Wheel (0x07) and dash (0x04)
+        // are observed; the rest follow the same rule.
+        private string HubPortDeviceName(int code)
+        {
+            switch (code + 0x10)
+            {
+                case MozaProtocol.DeviceWheel:
+                    return WithModel(Strings.HubDevice_Wheel, _data.WheelModelName);
+                case MozaProtocol.DeviceDash:      return Strings.HubDevice_Dashboard;
+                case MozaProtocol.DevicePedals:    return Strings.HubDevice_Pedals;
+                case MozaProtocol.DeviceHPattern:
+                    return WithModel(Strings.HubDevice_Shifter, _data.RelayShifterModelName);
+                case MozaProtocol.DeviceHandbrake: return Strings.HubDevice_Handbrake;
+                case MozaProtocol.DeviceEsWheel:   return Strings.HubDevice_EsWheel;
+                case MozaProtocol.DeviceBase:      return Strings.HubDevice_Wheelbase;
+                default: return string.Format(Strings.HubDevice_Unknown, code);
+            }
+        }
+
+        private static string WithModel(string category, string model) =>
+            string.IsNullOrEmpty(model) ? category : category + " · " + model;
 
         private void ApplyPedalCurvePreset(string pedal, int[] curve, int[] dataArray, Slider[] sliders)
         {

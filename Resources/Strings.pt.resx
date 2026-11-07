@@ -193,8 +193,7 @@
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Excluir efeito</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Efeito personalizado</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LER DO DISPOSITIVO</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>HUB UNIVERSAL · PEDAIS</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// porta dos pedais (consultada a cada 2 segundos)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDAIS</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Porta dos pedais</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ACESSÓRIOS</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Porta 1</value></data>
@@ -855,4 +854,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Saída em direto</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Duração do impulso</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Pedais</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Porta 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Volante</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Painel</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedais</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Câmbio</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Freio de mão</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Volante ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Base do volante</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% de perda</value></data>
 </root>

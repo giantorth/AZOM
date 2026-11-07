@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>触发输入电平</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>振动衰减</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>从设备读取</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>通用 Hub · 踏板</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// 踏板端口(每 2 秒轮询一次)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>踏板</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>踏板端口</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>配件</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>端口 1</value></data>
@@ -856,4 +855,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>实时输出</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>脉冲长度</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>端口 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>方向盘</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>仪表盘</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>换挡器</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>手刹</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES 方向盘</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>方向盘基座</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>设备 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>丢包 {0:0.#}%</value></data>
 </root>

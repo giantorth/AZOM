@@ -602,7 +602,7 @@ namespace MozaPlugin
             // not suppress the base-slot probe (both can be attached at once).
             if (DetectionState.ShifterModelForOwner(_deviceManager) == Devices.ShifterModelKind.Unknown)
                 _deviceManager.SendPresenceProbe(MozaProtocol.DeviceHPattern);
-            // No hub-port-power poll on the wheelbase connection — a Universal Hub
+            // No hub port-status poll on the wheelbase connection — a Universal Hub
             // is found by the dedicated hub connection on its own port, never by
             // sending hub commands to a device we already know is a wheelbase.
 
@@ -701,15 +701,15 @@ namespace MozaPlugin
 
             // Poll hub port status while hub is connected (read-only, no settings to save).
             // When the primary is itself bound to a hub (hub-only setup) and the hub
-            // hasn't been detected yet, keep issuing the hub-port1-power presence read
+            // hasn't been detected yet, keep issuing the hub-port2-loss presence read
             // — the connect-time read is tracked/retried, but this also recovers if the
             // hub re-enumerates without a full reconnect. Once detected, poll the full
-            // port-power set so the Hub-tab indicators stay current. Mirrors
+            // port-status set so the Hub-tab indicators stay current. Mirrors
             // PollHubPeripherals' trigger/full-set split for the dedicated hub pipe.
             if (DetectionState.HubDetected)
                 _deviceManager.ReadSettings(DeviceProber.HubReadCommands);
             else if (_connectionCoordinator?.PrimaryBoundToHub == true)
-                _deviceManager.ReadSetting("hub-port1-power");
+                _deviceManager.ReadSetting("hub-port2-loss");
         }
 
         internal int _unmatched;   // Interlocked (two dispatch threads increment it)

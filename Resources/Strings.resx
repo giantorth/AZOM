@@ -201,8 +201,7 @@
   <data name="Button_DeleteCustomEffect" xml:space="preserve"><value>Delete Effect</value></data>
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Custom Effect</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>READ FROM DEVICE</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · PEDALS</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// pedals port (polled every 2 seconds)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALS</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedals Port</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ACCESSORIES</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
@@ -863,4 +862,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Live Output</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulse length</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Pedals</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Port 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Wheel</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedals</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Shifter</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Handbrake</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES wheel</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Wheelbase</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Device 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% loss</value></data>
 </root>

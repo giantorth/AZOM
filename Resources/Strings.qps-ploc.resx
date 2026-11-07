@@ -200,7 +200,6 @@
   <data name="DefaultName_CustomEffect" xml:space="preserve"><value>Woof!</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="Section_UniversalHubPedals" xml:space="preserve"><value>YOWL!!</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>Bork Arf!</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Wan!</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>YOWL!!</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Boof!</value></data>
@@ -846,4 +845,14 @@
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Yip Grr!</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Arf Woof!</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Bork!</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Awoo!</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Woof!</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Yowl!</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Bork!</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Yap!</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Yap!</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Woof Woof!</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Grr!</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Arf 0x{0:X2}!</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% Bark!</value></data>
 </root>

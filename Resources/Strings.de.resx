@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Auslöseschwelle</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrationsabklingen</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>VOM GERÄT LESEN</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL-HUB · PEDALE</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// Pedal-Port (alle 2 Sekunden abgefragt)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALE</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedal-Port</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ZUBEHÖR</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Anschluss 1</value></data>
@@ -856,4 +855,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Live-Ausgabe</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Impulsdauer</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Pedale</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Anschluss 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Lenkrad</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedale</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Schaltung</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Handbremse</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES-Lenkrad</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Lenkradbasis</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Gerät 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % Verlust</value></data>
 </root>

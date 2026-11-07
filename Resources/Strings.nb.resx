@@ -177,8 +177,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LES FRA ENHET</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · PEDALER</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// pedalport (pollet hvert 2. sekund)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALER</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedalport</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>TILBEHØR</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
@@ -861,4 +860,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Sanntidsutdata</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulslengde</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Port 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Ratt</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Dashbord</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Girspak</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Håndbrekk</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES-ratt</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Rattbase</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Enhet 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % tap</value></data>
 </root>

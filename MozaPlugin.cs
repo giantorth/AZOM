@@ -209,7 +209,7 @@ namespace MozaPlugin
         // Hub detection belongs ONLY to the dedicated hub connection (_hubManager),
         // which probes for a Universal Hub on the hub's OWN port and skips the
         // wheelbase port. The base/wheelbase connection must NEVER emit hub calls
-        // (hub-port-power / cmd 0x64): that device answered the base probe, so it is
+        // (group 0x64): that device answered the base probe, so it is
         // a known wheelbase and rejects hub commands ("Unexpected cmd: 100").
         private MozaHidReader _hidReader = null!;
         private StalksTruckSimController _stalksController = null!;
@@ -558,6 +558,7 @@ namespace MozaPlugin
         internal bool IsHgpShifterDetected => DetectionState.HgpDetected;
         internal bool IsSgpShifterDetected => DetectionState.SgpDetected;
         internal bool IsHubDetected => DetectionState.HubDetected;
+        internal bool IsPedalsOnHub => _connectionCoordinator?.PedalsOnHub == true;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;

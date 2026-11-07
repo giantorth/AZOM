@@ -3865,13 +3865,12 @@
                     <StackPanel>
 
                         <ctrl:SectionCard Title="{x:Static res:Strings.Section_UniversalHubPedals}"
-                                          Subtitle="{x:Static res:Strings.Subtitle_PedalsPort}"
                                           Icon="{StaticResource IconPedals}">
                             <StackPanel Orientation="Horizontal" Margin="0,4">
-                                <Ellipse x:Name="HubPedals1Dot" Width="10" Height="10" Fill="Gray"
+                                <Ellipse x:Name="HubPedalDot" Width="10" Height="10" Fill="Gray"
                                          VerticalAlignment="Center" Margin="0,0,12,0"/>
                                 <TextBlock Text="{x:Static res:Strings.Label_PedalsPort}" Style="{StaticResource SliderLabel}"/>
-                                <TextBlock x:Name="HubPedals1Label" Text="—"
+                                <TextBlock x:Name="HubPedalLabel" Text="—"
                                            FontFamily="{StaticResource FontMono}"
                                            Foreground="{StaticResource TextDimBrush}"
                                            VerticalAlignment="Center"/>
@@ -3903,6 +3902,15 @@
                                              VerticalAlignment="Center" Margin="0,0,12,0"/>
                                     <TextBlock Text="{x:Static res:Strings.Label_Port3}" Style="{StaticResource SliderLabel}"/>
                                     <TextBlock x:Name="HubPort3Label" Text="—"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Foreground="{StaticResource TextDimBrush}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,4">
+                                    <Ellipse x:Name="HubPort4Dot" Width="10" Height="10" Fill="Gray"
+                                             VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                    <TextBlock Text="{x:Static res:Strings.Label_Port4}" Style="{StaticResource SliderLabel}"/>
+                                    <TextBlock x:Name="HubPort4Label" Text="—"
                                                FontFamily="{StaticResource FontMono}"
                                                Foreground="{StaticResource TextDimBrush}"
                                                VerticalAlignment="Center"/>

@@ -490,7 +490,7 @@ namespace MozaPlugin
                 // Dedicated connection for a Universal Hub (PID 0x0020) on its
                 // own COM port. Brought up alongside the wheelbase so a base with
                 // no pedal port + a hub-for-pedals enumerates the hub's peripherals
-                // (pedals / handbrake / port-power) in parallel. Like the dashboard
+                // (pedals / handbrake / port status) in parallel. Like the dashboard
                 // manager it's a fresh instance each Init (not part of the
                 // persistent-connection reuse, which is wheel-session-scoped).
                 _hubManager = new MozaHubDeviceManager();

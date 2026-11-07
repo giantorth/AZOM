@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ΑΝΑΓΝΩΣΗ ΑΠΟ ΣΥΣΚΕΥΗ</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · ΠΕΝΤΆΛ</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// Θύρα πεντάλ (ανανέωση κάθε 2 δευτερόλεπτα)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>ΠΕΝΤΆΛ</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Θύρα Πεντάλ</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ΑΞΕΣΟΥΑΡ</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Θύρα 1</value></data>
@@ -855,4 +854,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Ζωντανή έξοδος</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Διάρκεια παλμού</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Θύρα 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Τιμόνι</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Ταμπλό</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Λεβιέ ταχυτήτων</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Χειρόφρενο</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Τιμόνι ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Βάση τιμονιού</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Συσκευή 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>απώλεια {0:0.#}%</value></data>
 </root>

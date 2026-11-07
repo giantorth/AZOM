@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>트리거 입력 레벨</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>진동 감쇠</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>장치에서 읽기</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>유니버설 허브 · 페달</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// 페달 포트 (2초마다 폴링)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>페달</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>페달 포트</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>액세서리</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>포트 1</value></data>
@@ -855,4 +854,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>실시간 출력</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>펄스 길이</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>포트 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>스티어링 휠</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>대시보드</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>시프터</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>핸드브레이크</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES 스티어링 휠</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>휠베이스</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>장치 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>손실 {0:0.#}%</value></data>
 </root>

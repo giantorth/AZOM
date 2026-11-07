@@ -177,8 +177,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Nivel de activación</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decaimiento de la vibración</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LEER DEL DISPOSITIVO</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>HUB UNIVERSAL · PEDALES</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// puerto de pedales (sondeado cada 2 segundos)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALES</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Puerto de pedales</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ACCESORIOS</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Puerto 1</value></data>
@@ -861,4 +860,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Salida en vivo</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Duración del pulso</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Puerto 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Volante</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Panel</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Palanca de cambios</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Freno de mano</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Volante ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Base del volante</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % de pérdida</value></data>
 </root>

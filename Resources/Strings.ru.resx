@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ПРОЧИТАТЬ С УСТРОЙСТВА</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>УНИВЕРСАЛЬНЫЙ ХАБ · ПЕДАЛИ</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// порт педалей (опрос каждые 2 секунды)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>ПЕДАЛИ</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Порт педалей</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>АКСЕССУАРЫ</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Порт 1</value></data>
@@ -856,4 +855,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Текущий вывод</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Длительность импульса</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Порт 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Руль</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Приборная панель</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Коробка передач</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Ручной тормоз</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Руль ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>База руля</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Устройство 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>потери {0:0.#}%</value></data>
 </root>

@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ĐỌC TỪ THIẾT BỊ</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>HUB ĐA NĂNG · BÀN ĐẠP</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// cổng bàn đạp (kiểm tra mỗi 2 giây)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>BÀN ĐẠP</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Cổng bàn đạp</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>PHỤ KIỆN</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Cổng 1</value></data>
@@ -856,4 +855,14 @@ Id: {2}</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Đầu ra trực tiếp</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Độ dài xung</value></data>
   <data name="Label_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Cổng 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Vô lăng</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Bảng đồng hồ</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Cần số</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Phanh tay</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Vô lăng ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Đế vô lăng</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Thiết bị 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>mất {0:0.#}%</value></data>
 </root>
