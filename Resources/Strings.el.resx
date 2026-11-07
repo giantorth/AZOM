@@ -203,7 +203,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Ενεργοποίηση UDP control server</value></data>
   <data name="Section_About" xml:space="preserve"><value>ΣΧΕΤΙΚΑ</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -252,7 +252,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Διαμόρφωση SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Απόρριψη</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Επανεκκίνηση SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Νέα στην v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Αυτόματος έλεγχος για ενημερώσεις</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Κανάλι έκδοσης</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Σταθερό</value></data>

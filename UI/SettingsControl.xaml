@@ -4117,7 +4117,12 @@
 
             <TabItem x:Name="OptionsTab" Header="{x:Static res:Strings.TabHeader_Options}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,18,22,8">
-                    <StackPanel>
+                    <!-- Every row is a label/control Grid whose label column joins a
+                         SharedSizeGroup: OptLabelL for left-column cards (Settings,
+                         Device definitions), OptLabelR for right-column cards (Language, SDK,
+                         Updates), so controls line up down each column at the
+                         widest label instead of drifting with each label's length. -->
+                    <StackPanel Grid.IsSharedSizeScope="True">
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -4128,16 +4133,19 @@
                             <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
                                               Title="{x:Static res:Strings.Section_Settings}" Icon="{StaticResource IconBolt}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
-                                                  Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
-                                    </StackPanel>
-                                    <!-- Grid, not a horizontal StackPanel: the status line
-                                         (firmware note) is long and must wrap under the selector. -->
-                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,8">
+                                    <Grid Margin="0,8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ApplyProfileOnLaunch}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="AutoApplyProfileCheck" VerticalAlignment="Center"
+                                                  Checked="AutoApplyProfileCheck_Changed" Unchecked="AutoApplyProfileCheck_Changed"/>
+                                    </Grid>
+                                    <!-- Status line (firmware note) is long and wraps under the selector. -->
+                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions>
@@ -4158,9 +4166,9 @@
                                     </Grid>
                                     <!-- What drives the S12: the plugin's S12 tab, or ShakeIt
                                          as one device per pedal / one combined device. -->
-                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,8">
+                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <Grid.RowDefinitions>
@@ -4184,67 +4192,146 @@
                                          Persistent base-side state, read back from the device
                                          rather than stored in settings — so the toggle shows what
                                          the base actually holds, including a value PitHouse set. -->
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="ForzaCompatCheck" VerticalAlignment="Center"
-                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
-                                                  Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
-                                    </StackPanel>
                                     <Grid Margin="0,8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
+                                    </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
+                                                  Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
                                         <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_KeepaliveTimeout}" Style="{StaticResource SliderLabel}"/>
                                         <Slider Grid.Column="1" x:Name="KeepaliveTimeoutSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="300" TickFrequency="5" SmallChange="1" LargeChange="15" IsSnapToTickEnabled="True" ValueChanged="KeepaliveTimeoutSlider_ValueChanged"/>
                                         <TextBox Grid.Column="2" x:Name="KeepaliveTimeoutValue" Style="{StaticResource SliderValueEditBox}"
                                                  Tag="{Binding ElementName=KeepaliveTimeoutSlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="45 s"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                                   Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
+                                                   Style="{StaticResource MutedHintText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
                                     </Grid>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_KeepaliveTimeout}"
-                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
 
-                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
-                                              Title="{x:Static res:Strings.Section_Language}" Icon="{StaticResource IconBolt}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_Language}" Style="{StaticResource SliderLabel}"/>
-                                        <ComboBox x:Name="LanguageCombo" Width="200" VerticalAlignment="Center"
-                                                  SelectionChanged="LanguageCombo_Changed"/>
+                            <!-- Language + SDK stacked beside Settings; SDK fills the
+                                 remaining height so both columns end level. -->
+                            <Grid Grid.Column="1" Margin="7,0,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <ctrl:SectionCard Grid.Row="0" Margin="0,0,0,14"
+                                                  Title="{x:Static res:Strings.Section_Language}" Icon="{StaticResource IconBolt}">
+                                    <StackPanel>
+                                        <Grid Margin="0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="{x:Static res:Strings.SliderLabel_Language}" Style="{StaticResource SliderLabel}"/>
+                                            <ComboBox Grid.Column="1" x:Name="LanguageCombo" Width="200" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                      SelectionChanged="LanguageCombo_Changed"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Static res:Strings.Hint_LanguageChangeRestart}"
+                                                       Style="{StaticResource MutedHintText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                        </Grid>
                                     </StackPanel>
-                                    <TextBlock Text="{x:Static res:Strings.Hint_LanguageChangeRestart}"
-                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </ctrl:SectionCard>
+                                </ctrl:SectionCard>
+
+                                <ctrl:SectionCard Grid.Row="1" Margin="0,0,0,14"
+                                                  Title="{x:Static res:Strings.Section_Sdk}" Icon="{StaticResource IconBolt}">
+                                    <StackPanel>
+                                        <Grid Margin="0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
+                                            <ctrl:OffOnToggle Grid.Column="1" x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
+                                                      Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
+                                            <TextBlock Grid.Row="1" Grid.Column="1" x:Name="SdkCoapStatusText" Text=""
+                                                       Style="{StaticResource MutedHintText}"
+                                                       FontFamily="{StaticResource FontMono}"
+                                                       Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <Grid Margin="0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
+                                            <ctrl:OffOnToggle Grid.Column="1" x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
+                                                      Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </ctrl:SectionCard>
+                            </Grid>
                         </Grid>
 
                         <!-- ============ Updates ============
                              Owned by the SettingsControl.UpdateBanner.cs partial.
-                             Banner is collapsed by default; only paints when a
-                             newer release is detected. The settings row below it
-                             (enable toggle, channel, "check now") is always
-                             visible so users can opt out / pick stable vs dev. -->
+                             Left half: CHANGELOG.md of the selected channel's latest
+                             release. Right half: the update banner (collapsed until a
+                             newer release is detected) above the always-visible
+                             settings rows; these sit in the right column, so their
+                             labels join OptLabelR. -->
                         <ctrl:SectionCard x:Name="UpdatesSection"
                                           Title="{x:Static res:Strings.Section_Updates}"
                                           Subtitle="{x:Static res:Strings.Subtitle_Updates}"
                                           Icon="{StaticResource IconRefresh}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <!-- MaxWidth bounds the wrapping banner + release-notes box,
-                                     which would otherwise measure unconstrained in the Auto column. -->
-                                <StackPanel x:Name="UpdatesSettingsPanel" Grid.Column="0" Margin="0,0,10,0"
-                                            MaxWidth="520">
+                                <!-- Height tracks the settings column, with a floor so it stays readable. -->
+                                <Border Grid.Column="0" Margin="0,0,10,0" MinHeight="300"
+                                        Height="{Binding ActualHeight, ElementName=UpdatesSettingsPanel}"
+                                        BorderBrush="{StaticResource BorderBrush}"
+                                        BorderThickness="1"
+                                        Background="{StaticResource BgDeepBrush}"
+                                        CornerRadius="4" Padding="2">
+                                    <RichTextBox x:Name="ChangelogBox"
+                                                 IsReadOnly="True"
+                                                 IsDocumentEnabled="True"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Foreground="{StaticResource TextDimBrush}"
+                                                 FontFamily="{StaticResource FontUi}"
+                                                 FontSize="12"
+                                                 Padding="8"
+                                                 VerticalScrollBarVisibility="Auto"/>
+                                </Border>
+                                <StackPanel x:Name="UpdatesSettingsPanel" Grid.Column="1" Margin="10,0,0,0"
+                                            VerticalAlignment="Top">
                                     <Border x:Name="UpdateBannerBorder"
                                             Visibility="Collapsed"
                                             BorderBrush="{StaticResource CyanBrush}"
@@ -4290,53 +4377,36 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- Release notes for the latest available version
-                                         (GitHub release body, rendered as selectable
-                                         plain text). Shown only when notes are cached
-                                         and an update is available / pending restart. -->
-                                    <StackPanel x:Name="UpdateReleaseNotesPanel"
-                                                Visibility="Collapsed"
-                                                Margin="0,0,0,14">
-                                        <TextBlock x:Name="UpdateReleaseNotesHeader"
-                                                   Style="{StaticResource SectionTitleText}"
-                                                   Margin="0,0,0,6"/>
-                                        <Border BorderBrush="{StaticResource BorderBrush}"
-                                                BorderThickness="1"
-                                                Background="{StaticResource BgDeepBrush}"
-                                                CornerRadius="4" Padding="2">
-                                            <RichTextBox x:Name="UpdateReleaseNotesBox"
-                                                         IsReadOnly="True"
-                                                         IsDocumentEnabled="True"
-                                                         Background="Transparent"
-                                                         BorderThickness="0"
-                                                         Foreground="{StaticResource TextDimBrush}"
-                                                         FontFamily="{StaticResource FontUi}"
-                                                         FontSize="12"
-                                                         Padding="8"
-                                                         MaxHeight="220"
-                                                         VerticalScrollBarVisibility="Auto"/>
-                                        </Border>
-                                    </StackPanel>
-
-                                    <ctrl:OffOnToggle x:Name="UpdateCheckEnabledToggle"
-                                              Content="{x:Static res:Strings.Label_CheckForUpdates}"
-                                              Click="UpdateCheckEnabled_Click"
-                                              Margin="0,0,0,10"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Static res:Strings.Label_ReleaseChannel}"
-                                                   Style="{StaticResource MutedHintText}"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,10,0"/>
-                                        <ComboBox x:Name="UpdateChannelCombo"
-                                                  MinWidth="160"
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.Label_CheckForUpdates}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="UpdateCheckEnabledToggle" VerticalAlignment="Center"
+                                                  Click="UpdateCheckEnabled_Click"/>
+                                    </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.Label_ReleaseChannel}" Style="{StaticResource SliderLabel}"/>
+                                        <ComboBox Grid.Column="1" x:Name="UpdateChannelCombo"
+                                                  MinWidth="160" HorizontalAlignment="Left" VerticalAlignment="Center"
                                                   SelectionChanged="UpdateChannelCombo_SelectionChanged"
                                                   DropDownOpened="UpdateChannelCombo_DropDownOpened"/>
-                                    </StackPanel>
-                                    <ctrl:OffOnToggle x:Name="FollowBetaToggle"
-                                              Content="{x:Static res:Strings.Label_FollowBetaChannel}"
-                                              Click="FollowBeta_Click"
-                                              Margin="0,0,0,10"/>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelR"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.Label_FollowBetaChannel}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="FollowBetaToggle" VerticalAlignment="Center"
+                                                  Click="FollowBeta_Click"/>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,8,0,0">
                                         <Button x:Name="UpdateCheckNowButton"
                                                 Content="{x:Static res:Strings.Button_CheckNow}"
                                                 Click="UpdateCheckNow_Click"
@@ -4346,24 +4416,6 @@
                                                    VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
-                                <!-- Bundled CHANGELOG.md; height tracks the left column. -->
-                                <Border Grid.Column="1" Margin="10,0,0,0" MinHeight="220"
-                                        Height="{Binding ActualHeight, ElementName=UpdatesSettingsPanel}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        Background="{StaticResource BgDeepBrush}"
-                                        CornerRadius="4" Padding="2">
-                                    <RichTextBox x:Name="ChangelogBox"
-                                                 IsReadOnly="True"
-                                                 IsDocumentEnabled="True"
-                                                 Background="Transparent"
-                                                 BorderThickness="0"
-                                                 Foreground="{StaticResource TextDimBrush}"
-                                                 FontFamily="{StaticResource FontUi}"
-                                                 FontSize="12"
-                                                 Padding="8"
-                                                 VerticalScrollBarVisibility="Auto"/>
-                                </Border>
                             </Grid>
                         </ctrl:SectionCard>
 
@@ -4386,59 +4438,40 @@
                             </Grid.ColumnDefinitions>
 
                             <ctrl:SectionCard Grid.Column="0" Margin="0,0,7,14"
-                                              Title="{x:Static res:Strings.Section_Sdk}" Icon="{StaticResource IconBolt}">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableCoapServer}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="SdkEmulationEnabledCheck" VerticalAlignment="Center"
-                                                  Checked="SdkEmulationEnabledCheck_Changed" Unchecked="SdkEmulationEnabledCheck_Changed"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="SdkCoapStatusText" Text=""
-                                               Style="{StaticResource MutedHintText}"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_EnableUdpControl}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="UdpControlEnabledCheck" VerticalAlignment="Center"
-                                                  Checked="UdpControlEnabledCheck_Changed" Unchecked="UdpControlEnabledCheck_Changed"/>
-                                    </StackPanel>
-                                    <TextBlock x:Name="SdkUdpStatusText" Text=""
-                                               Style="{StaticResource MutedHintText}"
-                                               FontFamily="{StaticResource FontMono}"
-                                               Margin="0,4,0,0" TextWrapping="Wrap"/>
-                                </StackPanel>
-                            </ctrl:SectionCard>
-
-                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
                                               Title="{x:Static res:Strings.Section_DeviceDefinitions}" Icon="{StaticResource IconRefresh}">
                                 <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
+                                                  Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <Button x:Name="RedeployDefinitionsButton" Content="{x:Static res:Strings.Button_RedeployDefinitions}"
                                                 Click="RedeployDefinitionsButton_Click" MinWidth="120"/>
                                         <TextBlock x:Name="RedeployDefinitionsStatusText" Text=""
                                                    Style="{StaticResource MutedHintText}"
                                                    VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
+                                </StackPanel>
+                            </ctrl:SectionCard>
+
+                            <ctrl:SectionCard Grid.Column="1" Margin="7,0,0,14"
+                                              Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
+                                <StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ShowAllTabs}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="ShowAllTabsCheck" VerticalAlignment="Center"
-                                                  Checked="ShowAllTabsCheck_Changed" Unchecked="ShowAllTabsCheck_Changed"/>
+                                        <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
+                                                Style="{StaticResource MozaButtonDanger}"
+                                                Click="ClearAllSettingsButton_Click"/>
                                     </StackPanel>
+                                    <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
+                                               Style="{StaticResource MutedHintText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </ctrl:SectionCard>
                         </Grid>
-
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Reset}" Icon="{StaticResource IconAlert}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,8">
-                                    <Button x:Name="ClearAllSettingsButton" Content="{x:Static res:Strings.Button_ClearAllSettings}"
-                                            Style="{StaticResource MozaButtonDanger}"
-                                            Click="ClearAllSettingsButton_Click"/>
-                                </StackPanel>
-                                <TextBlock Text="{x:Static res:Strings.Hint_ClearAllSettingsWarning}"
-                                           Style="{StaticResource MutedHintText}" Margin="0,4,0,0"/>
-                            </StackPanel>
-                        </ctrl:SectionCard>
 
                     </StackPanel>
                 </ScrollViewer>

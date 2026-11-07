@@ -146,7 +146,6 @@ namespace MozaPlugin
                         _settings.LastSeenLatestVersion = "";
                         _settings.LastSeenReleaseUrl = "";
                         _settings.LastSeenAssetUrl = "";
-                        _settings.LastSeenReleaseNotes = "";
                         _settings.LastSkippedVersion = "";
                     }
                 }

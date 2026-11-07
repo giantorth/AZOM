@@ -203,7 +203,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tiêu đề</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sửa đổi lần cuối</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>XÓA</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật máy chủ CoAP SDK</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Bật máy chủ điều khiển UDP</value></data>
   <data name="Section_About" xml:space="preserve"><value>GIỚI THIỆU</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -252,7 +252,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Cấu hình SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Đóng</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Khởi động lại SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Có gì mới trong v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Tự động kiểm tra cập nhật</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Kênh phát hành</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Ổn định</value></data>

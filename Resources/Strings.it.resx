@@ -206,7 +206,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Titolo</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Ultima modifica</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ELIMINA</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Abilita server CoAP SDK</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Abilita SDK iRacing</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Abilita server di controllo UDP</value></data>
   <data name="Section_About" xml:space="preserve"><value>INFORMAZIONI</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -255,7 +255,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Configura SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Ignora</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Riavvia SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Novità nella v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Controlla aggiornamenti automaticamente</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Canale di rilascio</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stabile</value></data>

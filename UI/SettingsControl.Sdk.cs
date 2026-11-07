@@ -33,42 +33,19 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Render one status line under each toggle: the CoAP listener (port
-        /// 40266) plus its stub-manager process, and the PitHouse UDP control
-        /// listener (port 40288). Each component has its own enable gate, so a
-        /// user may run one without the other and the two lines report
-        /// independently — a port collision or a stub that couldn't extract
-        /// shows up against the piece that broke.
+        /// Render the stub-manager line under the SDK toggle.
         /// </summary>
         private void RefreshSdkStatus()
         {
-            // Defensive null checks: called from InitSdkCard before the controls
-            // may have realized, and from the 500 ms refresh tick afterwards.
+            // Null check: called from InitSdkCard before the controls may have
+            // realized, and from the 500 ms refresh tick afterwards.
             if (SdkCoapStatusText != null)
             {
                 SdkCoapStatusText.Text = string.Format(
-                    "{0}: {1}  ·  {2}: {3}",
-                    MozaSdkCoapServer.CoapPort,
-                    DescribeServerStatus(_plugin.SdkServer?.Status, _plugin.Settings.SdkEmulationEnabled),
+                    "{0}: {1}",
                     Strings.Label_StubManager,
                     DescribeStubStatus(_plugin.SdkStubManager, _plugin.Settings.SdkEmulationEnabled));
             }
-
-            if (SdkUdpStatusText != null)
-            {
-                SdkUdpStatusText.Text = string.Format(
-                    "{0}: {1}",
-                    Sdk.PitHouseUdp.MozaControlUdpServer.ControlPort,
-                    DescribeServerStatus(_plugin.ControlUdpServer?.Status, _plugin.Settings.UdpControlEnabled));
-            }
-        }
-
-        private static string DescribeServerStatus(string? liveStatus, bool enabledIntent)
-        {
-            if (!string.IsNullOrEmpty(liveStatus)) return liveStatus!;
-            // The toggles are live, so an "enabled" intent with no live status
-            // yet is just the brief window before the background start finishes.
-            return enabledIntent ? Strings.Sdk_Status_Starting : Strings.Sdk_Status_Disabled;
         }
 
         private static string DescribeStubStatus(Sdk.CoapStubManager? stub, bool enabledIntent)
@@ -82,7 +59,7 @@ namespace MozaPlugin.UI
 
         /// <summary>
         /// Tick hook used by the SettingsControl refresh DispatcherTimer to
-        /// poll the servers' live state. Cheap — two formatted strings.
+        /// poll the stub manager's live state. Cheap — one formatted string.
         /// </summary>
         private void RefreshSdkStatusTick()
         {

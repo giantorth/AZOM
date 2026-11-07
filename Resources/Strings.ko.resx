@@ -203,7 +203,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>제목</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>마지막 수정</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>삭제</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>CoAP SDK 서버 사용</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>iRacing SDK 사용</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>UDP 제어 서버 사용</value></data>
   <data name="Section_About" xml:space="preserve"><value>정보</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -252,7 +252,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>SDK 설정</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>닫기</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>SimHub 재시작</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>v{0}의 새로운 기능</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>자동으로 업데이트 확인</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>릴리스 채널</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>안정</value></data>

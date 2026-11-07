@@ -97,10 +97,10 @@ namespace MozaPlugin.UI
             }
         }
 
-        // Repaints the About > Updates card banner + release-notes panel. Called
-        // on construction and after every user action / check / install. Safe on
-        // the UI thread; no-ops while an install is mid-flight so it doesn't wipe
-        // the live progress UI. The cross-tab header banner is the separate
+        // Repaints the Updates card banner + changelog. Called on construction
+        // and after every user action / check / install. Safe on the UI thread;
+        // no-ops while an install is mid-flight so it doesn't wipe the live
+        // progress UI. The cross-tab header banner is the separate
         // self-refreshing PluginBanners control.
         internal void RefreshUpdateNotifications()
         {
@@ -113,7 +113,7 @@ namespace MozaPlugin.UI
                 s, current, latest, out bool visible, out bool pendingRestart, out bool hasAsset);
 
             PaintAboutBanner(visible, pendingRestart, hasAsset, current, latest);
-            RefreshReleaseNotes(visible, latest);
+            RefreshChangelog();
         }
 
         private void PaintAboutBanner(
@@ -135,46 +135,75 @@ namespace MozaPlugin.UI
             }
         }
 
-        // The markdown source currently rendered into the RichTextBox, so we
-        // only rebuild the FlowDocument when the notes actually change (avoids
-        // resetting scroll/selection on every unrelated banner repaint).
-        private string? _renderedReleaseNotes;
+        // ----- Changelog -----
+        //
+        // Shows CHANGELOG.md from the selected channel's latest release (its
+        // tag, or the built commit for a PR build). Falls back to the copy
+        // embedded in the running build until a check has found a release, or
+        // when the fetch fails.
 
-        // Populates the About-card "What's new in vX" panel from the cached
-        // release body. Hidden when there's nothing to show or no active
-        // notification.
-        private void RefreshReleaseNotes(bool visible, string latest)
-        {
-            if (UpdateReleaseNotesPanel == null) return;
-
-            string notes = _plugin?.Settings?.LastSeenReleaseNotes ?? "";
-            if (!visible || string.IsNullOrWhiteSpace(notes))
-            {
-                UpdateReleaseNotesPanel.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            if (UpdateReleaseNotesHeader != null)
-                UpdateReleaseNotesHeader.Text = string.Format(Strings.Label_WhatsNew, latest);
-            if (UpdateReleaseNotesBox != null
-                && !string.Equals(_renderedReleaseNotes, notes, StringComparison.Ordinal))
-            {
-                UpdateReleaseNotesBox.Document = BuildReleaseNotesDocument(notes, UpdateReleaseNotesBox);
-                _renderedReleaseNotes = notes;
-            }
-            UpdateReleaseNotesPanel.Visibility = Visibility.Visible;
-        }
+        // False until the box is first shown, so a pane SimHub builds but never
+        // displays doesn't fetch anything.
+        private bool _changelogArmed;
+        // Ref whose changelog is rendered or being fetched; "" = embedded copy,
+        // null = nothing yet (or the last fetch failed, so the next refresh retries).
+        private string? _changelogRef;
 
         private void OnChangelogBoxVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (!(bool)e.NewValue) return;
             ChangelogBox.IsVisibleChanged -= OnChangelogBoxVisibleChanged;
-            LoadChangelog();
+            _changelogArmed = true;
+            RefreshChangelog();
         }
 
-        // Renders the CHANGELOG.md embedded at build time into the right half
-        // of the Updates card.
-        private void LoadChangelog()
+        private void RefreshChangelog()
+        {
+            if (ChangelogBox == null || !_changelogArmed) return;
+
+            string want = UpdateCheckService.ChangelogRefForVersion(_plugin?.Settings?.LastSeenLatestVersion);
+            if (string.Equals(want, _changelogRef, StringComparison.Ordinal)) return;
+            _changelogRef = want;
+
+            if (want.Length == 0)
+            {
+                RenderEmbeddedChangelog();
+                return;
+            }
+            // Keep whatever is showing until the fetch lands; an empty box gets
+            // the embedded copy meanwhile.
+            if (ChangelogBox.Document == null || ChangelogBox.Document.Blocks.Count == 0)
+                RenderEmbeddedChangelog();
+            _ = LoadRemoteChangelogAsync(want);
+        }
+
+        private async Task LoadRemoteChangelogAsync(string gitRef)
+        {
+            string? md = null;
+            try
+            {
+                md = await Task.Run(
+                    () => UpdateCheckService.FetchChangelogAsync(gitRef, CancellationToken.None))
+                    .ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Debug($"[UpdateBanner] changelog fetch threw: {ex.Message}");
+            }
+
+            // A channel switch or newer check moved on to another ref.
+            if (!string.Equals(_changelogRef, gitRef, StringComparison.Ordinal)) return;
+
+            if (md == null)
+            {
+                _changelogRef = null;
+                RenderEmbeddedChangelog();
+                return;
+            }
+            ChangelogBox.Document = BuildReleaseNotesDocument(md, ChangelogBox);
+        }
+
+        private void RenderEmbeddedChangelog()
         {
             if (ChangelogBox == null) return;
             try
@@ -193,12 +222,11 @@ namespace MozaPlugin.UI
 
         // ----- Lightweight markdown → FlowDocument renderer -----
         //
-        // GitHub release bodies (especially the auto-generated "What's Changed"
-        // list) use a small, predictable subset of markdown: ATX headings,
-        // '-'/'*'/'+' bullets, '1.' ordered items, **bold**, `inline code`,
-        // [label](url) links, and bare URLs. We render exactly that subset —
-        // a full CommonMark engine would be overkill for a changelog blurb and
-        // would mean pulling in a dependency.
+        // CHANGELOG.md uses a small, predictable subset of markdown: ATX
+        // headings, '-'/'*'/'+' bullets, '1.' ordered items, **bold**,
+        // `inline code`, [label](url) links, and bare URLs. We render exactly
+        // that subset — a full CommonMark engine would be overkill and would
+        // mean pulling in a dependency.
 
         private static readonly Regex s_inlineRx = new Regex(
             @"(?<code>`[^`]+`)" +
@@ -475,22 +503,10 @@ namespace MozaPlugin.UI
 
         private void UpdateBanner_OpenNotes_Click(object sender, RoutedEventArgs e) => OpenReleaseNotes();
 
-        // Prefer the in-app "What's new" panel so the user doesn't have to leave
-        // SimHub: switch to the About tab and scroll the Updates section into
-        // view. Only falls back to the GitHub release page when we have no
-        // embedded notes to show (e.g. a hand-cut release with an empty body).
+        // Switch to the Options tab and scroll the Updates card (whose changelog
+        // follows the selected channel) into view.
         private void OpenReleaseNotes()
         {
-            string notes = _plugin?.Settings?.LastSeenReleaseNotes ?? "";
-            if (string.IsNullOrWhiteSpace(notes))
-            {
-                string url = _plugin?.Settings?.LastSeenReleaseUrl ?? "";
-                if (string.IsNullOrEmpty(url))
-                    url = "https://github.com/giantorth/AZOM/releases";
-                OpenExternalUrl(url);
-                return;
-            }
-
             try
             {
                 if (MainTabs != null && OptionsTab != null)
@@ -657,7 +673,6 @@ namespace MozaPlugin.UI
             s.LastSeenLatestVersion = "";
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
-            s.LastSeenReleaseNotes = "";
             s.LastSkippedVersion = "";
             try { _plugin!.PersistSettings(); } catch { }
             RefreshUpdateNotifications();
@@ -764,7 +779,6 @@ namespace MozaPlugin.UI
                     s.LastSeenLatestVersion = result.LatestVersion;
                     s.LastSeenReleaseUrl = result.ReleaseUrl;
                     s.LastSeenAssetUrl = result.AssetUrl;
-                    s.LastSeenReleaseNotes = result.ReleaseNotes;
                 }
                 // Empty LatestVersion = the channel resolves to nothing right
                 // now (repo without a stable release). Leave cached values

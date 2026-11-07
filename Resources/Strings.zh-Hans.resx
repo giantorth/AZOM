@@ -203,7 +203,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>标题</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>最后修改</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 CoAP SDK 服务器</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>启用 UDP 控制服务器</value></data>
   <data name="Section_About" xml:space="preserve"><value>关于</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -252,7 +252,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>配置 SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>忽略</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>重启 SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>v{0} 新增内容</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>自动检查更新</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>发布通道</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>稳定版</value></data>

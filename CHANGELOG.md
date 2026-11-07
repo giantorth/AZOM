@@ -12,6 +12,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
 - **S12 Haptics tab drives the pedal shakers without ShakeIt;** one card per S12 channel, picked in Options alongside the ShakeIt layouts.
 - **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
+- **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
 
 ## Fixed
 
@@ -22,6 +23,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Pedals wired into an S12 pedal vibration unit are detected;** the Pedals tab now works through the S12's USB port.
 - **Re-uploading an edited dashboard sends the edit;** the file is re-read at upload time instead of reusing the copy from when it was picked.
 - **Hub tab shows the device on each port;** all four accessory ports plus the pedal port, with link loss.
+- **Options tab controls line up;** toggles and selectors in each column start at the same position.
 
 ## [1.7.2]
 

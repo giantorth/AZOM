@@ -279,7 +279,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Arf!</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Snarf!</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Yowff!</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Awoo Wroof {0}!</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Yip!</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Snarf!</value></data>
