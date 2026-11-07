@@ -837,17 +837,30 @@
                                         <TextBlock Text="{x:Static res:Strings.Label_EqSensitivity}"
                                                    Style="{StaticResource KvKeyText}"
                                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <Button Content="0"  Tag="0"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="1"  Tag="1"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="2"  Tag="2"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="3"  Tag="3"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="4"  Tag="4"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="5"  Tag="5"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="6"  Tag="6"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="7"  Tag="7"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="8"  Tag="8"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="9"  Tag="9"  MinWidth="30" Margin="0,0,4,0" Click="EqSensitivity_Click"/>
-                                        <Button Content="10" Tag="10" MinWidth="30" Click="EqSensitivity_Click"/>
+                                        <!-- Selection is derived from the 0x0C + EQ tuple each refresh tick;
+                                             the last item is the "custom" state and isn't clickable. -->
+                                        <ctrl:SegmentedControl x:Name="EqSensitivitySelector" SelectionChanged="EqSensitivity_Changed">
+                                            <ListBoxItem Content="0"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="1"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="2"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="3"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="4"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="5"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="6"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="7"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="8"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="9"  Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Content="10" Padding="6,6" MinWidth="28"/>
+                                            <ListBoxItem Padding="6,6" MinWidth="28" IsHitTestVisible="False" Focusable="False">
+                                                <Path Data="{StaticResource IconEqCustom}"
+                                                      Stretch="Uniform" Width="14" Height="14"
+                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                      StrokeThickness="1.5" Fill="{x:Null}"
+                                                      StrokeLineJoin="Round"
+                                                      StrokeStartLineCap="Round"
+                                                      StrokeEndLineCap="Round"/>
+                                            </ListBoxItem>
+                                        </ctrl:SegmentedControl>
                                     </StackPanel>
                                 </StackPanel>
                             </ctrl:SectionCard>

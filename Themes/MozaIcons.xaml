@@ -28,6 +28,8 @@
 
     <Geometry x:Key="IconEq">M5,4 V10 M5,14 V20 M12,4 V7 M12,11 V20 M19,4 V9 M19,13 V20 M3.4,12 A1.6,1.6 0 1 1 6.6,12 A1.6,1.6 0 1 1 3.4,12 Z M10.4,9 A1.6,1.6 0 1 1 13.6,9 A1.6,1.6 0 1 1 10.4,9 Z M17.4,11 A1.6,1.6 0 1 1 20.6,11 A1.6,1.6 0 1 1 17.4,11 Z</Geometry>
 
+    <Geometry x:Key="IconEqCustom">M2,12 C5,4 9,4 12,12 S19,20 22,12 M5.4,18 A1.6,1.6 0 1 1 8.6,18 A1.6,1.6 0 1 1 5.4,18 Z M15.4,6 A1.6,1.6 0 1 1 18.6,6 A1.6,1.6 0 1 1 15.4,6 Z</Geometry>
+
     <Geometry x:Key="IconCurve">M3,20 C7,20 9,4 21,4 M3,20 H21</Geometry>
 
     <Geometry x:Key="IconShift">M12,3 V21 M5,8 L12,3 L19,8 M5,16 L12,21 L19,16</Geometry>

@@ -15,6 +15,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
 - **Default tab setting in Options** picks which tab the plugin opens on.
 - **mBooster pedals as a SimHub ShakeIt device;** pick plugin tab or ShakeIt in Options, one channel per pedal role.
+- **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
 
 ## Fixed
 

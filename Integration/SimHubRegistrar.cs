@@ -467,7 +467,7 @@ namespace MozaPlugin.Integration
         }
 
         // Road sensitivity: step the 0..10 preset index (cf. the Base tab's
-        // sensitivity buttons / EqSensitivity_Click). There is no dedicated
+        // sensitivity selector / EqSensitivity_Changed). There is no dedicated
         // sensitivity register — a preset is the 0x0C value plus a canned EQ
         // curve, so both move together or the base ends up in a state the Base
         // tab can't represent. Legacy firmware gets only the six old registers.

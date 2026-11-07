@@ -22,6 +22,7 @@ using static MozaPlugin.UI.UiHelpers;
 using SerialTrafficCapture = MozaPlugin.Diagnostics.SerialTrafficCapture;
 using CaptureRedactor = MozaPlugin.Diagnostics.CaptureRedactor;
 using MozaPlugin.Devices.Ui;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin.UI
 {
@@ -445,6 +446,7 @@ namespace MozaPlugin.UI
                 SetDataSlider(Eq9Slider, _data.Equalizer9, 0, 500);
                 SetDataSlider(Eq10Slider, _data.Equalizer10, 0, 500);
             }
+            EqSensitivitySelector.SelectedIndex = BaseSettingCatalog.EqSensitivitySelection(_data);
 
             // FFB Curve — X1..X4 are the draggable input positions of points 1-4
             // (point 5 fixed at input=100%); Y1..Y5 the output values.

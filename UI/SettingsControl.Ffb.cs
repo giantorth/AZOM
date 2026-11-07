@@ -114,7 +114,8 @@ namespace MozaPlugin.UI
 
         // PitHouse "sensitivity" presets 0..10 — one-shot macros writing
         // road-sensitivity (0x0C = 10 + 4*N) plus a canned EQ curve; no
-        // dedicated sensitivity register exists, so the buttons are momentary.
+        // dedicated sensitivity register exists, so the highlighted position
+        // is re-derived from the values each tick (EqSensitivitySelection).
         // Values in frequency order 5/10/15/25/30/40/50/60/80/100 Hz. On
         // legacy firmware only the six old registers are written (columns
         // via Eq6FreqColumns) — the four new bands are skipped.
@@ -124,10 +125,12 @@ namespace MozaPlugin.UI
         // (5/15/25/40/60/100 Hz).
         private static readonly int[] Eq6FreqColumns = BaseSettingCatalog.Eq6FreqColumns;
 
-        private void EqSensitivity_Click(object sender, RoutedEventArgs e)
+        private void EqSensitivity_Changed(object sender, SelectionChangedEventArgs e)
         {
-            if (!(sender is Button b) || !int.TryParse(b.Tag as string, out int n)
-                || n < 0 || n > 10)
+            if (_suppressEvents) return;
+            int n = EqSensitivitySelector.SelectedIndex;
+            if (n < BaseSettingCatalog.RoadSensitivityMinPreset
+                || n > BaseSettingCatalog.RoadSensitivityMaxPreset)
                 return;
 
             int sensitivity = 10 + 4 * n;
