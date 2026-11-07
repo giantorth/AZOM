@@ -199,6 +199,14 @@ own device manager, retransmit tracker and prober — the same handling the
 Universal Hub pipe gets. The host→`0x19` direction through the S12 had not been
 captured when this was added; the Diagnostics `S12 pedal vibration` section shows
 whether the pedals answered (`answered=`) and own the writes (`ownsWrites=`).
+Bundle `8EJTVB5M` confirmed it: the SRP2 ACKed on the S12 pipe, its settings read
+back, and the routed mBooster model probe read `SRP2`.
+
+Live positions come from the S12's HID, read as a pedal set (`MozaHidClass.Pedals`,
+Rx/Ry/Rz → throttle/brake/clutch). Pedal axes are only taken from the HID device
+whose pipe owns the pedals (`MozaHidReader.PedalAxesSource`): the R9's report keeps
+its own pedal axes with nothing attached, and in `8EJTVB5M` its resting value held
+the brake bar at 100 % while the S12's HID went unread.
 
 ## How the plugin uses this
 

@@ -751,6 +751,15 @@ namespace MozaPlugin
                 _stalksController = new StalksTruckSimController();
                 _stalksController.ApplySettings(_settings.StalksMode, _settings.StalksTruckSim);
                 _hidReader.StalksButtonChanged += _stalksController.OnStalkButton;
+                // Pedal axes come only from the HID device whose pipe owns the pedals.
+                _hidReader.PedalAxesSource = pid =>
+                {
+                    var owner = DetectionState.PedalsOwner;
+                    if (owner == null || !DetectionState.PedalsDetected) return null;
+                    return MozaUsbIds.TryParsePid(owner.Connection?.DiscoveredPid, out var ownerPid)
+                        ? ownerPid == pid
+                        : (bool?)null;
+                };
                 _hidReader.Start();
                 _propertyResolver = new SimHubPropertyResolver(_pluginManager, _data, _hidReader);
                 _hardwareApplier = new HardwareApplier(this, _data, _deviceManager, _ab9Manager, DetectionState, _dashboardManager);

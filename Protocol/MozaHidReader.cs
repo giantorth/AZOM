@@ -20,7 +20,9 @@ namespace MozaPlugin.Protocol
         MBooster = 1,
         /// <summary>
         /// Pedals plugged STRAIGHT into the PC (their own VID 0x346E PID 0x0001/
-        /// 0x0003/0x0011 HID), NOT through a wheelbase. Their 3-axis HID layout
+        /// 0x0003/0x0011 HID), NOT through a wheelbase — and the S12 pedal
+        /// vibration unit (PID 0x002F), whose HID is the pedal set wired into it.
+        /// Their 3-axis HID layout
         /// (Rx/Ry/Rz = 0x33/0x34/0x35) differs from the base's pedal layout
         /// (Z/Rz/Slider), so the Standard usage→field switch would route them to
         /// paddle/brake fields. This class maps them to throttle/brake/clutch.
@@ -86,6 +88,15 @@ namespace MozaPlugin.Protocol
         /// key output; also mirrored into <c>MozaData.StalksButtonStates</c>.
         /// </summary>
         public event Action<int, bool>? StalksButtonChanged;
+
+        /// <summary>
+        /// Which HID device carries the pedal axes, by PID: null = unknown (any
+        /// device may write them), true = this device has the pedals, false =
+        /// another device does. A wheelbase's report keeps its pedal axes with no
+        /// pedals attached, and their resting value would otherwise pin the bars.
+        /// Called per report on the HID read threads.
+        /// </summary>
+        public Func<ushort, bool?>? PedalAxesSource { get; set; }
 
         // Live HidStreams so Dispose can force-close silent devices' blocked reads.
         private readonly object _streamsLock = new object();
@@ -393,6 +404,7 @@ namespace MozaPlugin.Protocol
                 case MozaDeviceCategory.Ab9:
                 case MozaDeviceCategory.Wheelbase:
                 case MozaDeviceCategory.Pedals:
+                case MozaDeviceCategory.PedalHaptics:
                 case MozaDeviceCategory.Handbrake:
                 case MozaDeviceCategory.Hub:
                 case MozaDeviceCategory.Stalks:
@@ -471,7 +483,8 @@ namespace MozaPlugin.Protocol
                     if (usages.Count > 0)
                     {
                         var kind = isMBooster ? MozaHidClass.MBooster
-                                 : category == MozaDeviceCategory.Pedals ? MozaHidClass.Pedals
+                                 : category == MozaDeviceCategory.Pedals
+                                   || category == MozaDeviceCategory.PedalHaptics ? MozaHidClass.Pedals
                                  : category == MozaDeviceCategory.Stalks ? MozaHidClass.Stalks
                                  : isAb9 ? MozaHidClass.Ab9
                                  : MozaHidClass.Standard;
@@ -567,6 +580,19 @@ namespace MozaPlugin.Protocol
                                                               .Where(u => usages.ContainsKey(0x00090000u | u))))
                         .Where(g => g.Usages.Length > 0)
                         .ToArray();
+
+                    // Throttle/brake/clutch fields, gated by PedalAxesSource.
+                    ushort devicePid = (ushort)device.ProductID;
+                    bool IsPedalUsage(uint u) =>
+                        kind == MozaHidClass.Pedals ? (u == UsageRx || u == UsageRy || u == UsageRz)
+                        : kind == MozaHidClass.Standard
+                          && (u == UsageZ || u == UsageRz || u == UsageSlider || u == UsageSimThr);
+                    var pedalField = new bool[fields.Length];
+                    bool anyPedalField = false;
+                    for (int i = 0; i < fields.Length; i++)
+                        anyPedalField |= pedalField[i] = IsPedalUsage(fields[i].FullUsage);
+                    bool? pedalSource = null;
+                    bool wasPedalOwner = false;
 
                     if (fields.Length == 0 && buttonGroups.Length == 0)
                     {
@@ -720,6 +746,8 @@ namespace MozaPlugin.Protocol
                                     return;
                                 }
 
+                                if (pedalSource == false && IsPedalUsage(usage)) return;
+
                                 int pct = NormalizePct(logical, range.min, range.max);
 
                                 if (kind == MozaHidClass.Pedals)
@@ -783,6 +811,18 @@ namespace MozaPlugin.Protocol
                                 long r = System.Threading.Interlocked.Increment(ref mbReceivedCount);
                                 if (r == 1 || r % 500 == 0)
                                     MozaLog.Debug($"[AZOM/mBooster] {identity}: Received report #{r}");
+                            }
+
+                            if (anyPedalField)
+                            {
+                                pedalSource = PedalAxesSource?.Invoke(devicePid);
+                                bool isPedalOwner = pedalSource == true;
+                                // Just became the owner: re-send the current positions,
+                                // since another device may have written them meanwhile.
+                                if (isPedalOwner && !wasPedalOwner)
+                                    for (int i = 0; i < fields.Length; i++)
+                                        if (pedalField[i]) seenValues[i] = false;
+                                wasPedalOwner = isPedalOwner;
                             }
 
                             byte reportId = buffer[0];
