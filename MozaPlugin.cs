@@ -507,6 +507,14 @@ namespace MozaPlugin
                 ? ref s_pedalHapticsCombinedExtensionsActive
                 : ref s_pedalHapticsDeviceExtensionsActive);
 
+        private static int s_mboosterDeviceExtensionsActive;
+        internal bool MBoosterDeviceExtensionActive
+            => System.Threading.Volatile.Read(ref s_mboosterDeviceExtensionsActive) > 0;
+        internal static void MBoosterDeviceExtensionStarted()
+            => System.Threading.Interlocked.Increment(ref s_mboosterDeviceExtensionsActive);
+        internal static void MBoosterDeviceExtensionEnded()
+            => System.Threading.Interlocked.Decrement(ref s_mboosterDeviceExtensionsActive);
+
         /// <summary>
         /// Model prefixes with an active device extension. Copy-on-write: reads see a
         /// consistent snapshot; mutations (extension init/end only) allocate a new set.

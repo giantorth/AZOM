@@ -24,6 +24,15 @@ namespace MozaPlugin.Settings
         PluginTab = 1,
     }
 
+    /// <summary>Which subsystem drives the mBooster pedals' vibration effects.</summary>
+    public enum MBoosterHapticsSource
+    {
+        /// <summary>The plugin's own mBooster tab effects.</summary>
+        PluginTab = 0,
+        /// <summary>SimHub ShakeIt, via the combined mBooster device definition.</summary>
+        ShakeIt = 1,
+    }
+
     /// <summary>Which graph fills the right-hand slot of the Base tab's live
     /// telemetry pair. Torque additionally gates its own ~15 Hz wire poll, so
     /// this is not purely cosmetic.</summary>
@@ -67,6 +76,7 @@ namespace MozaPlugin.Settings
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
             KnobColorAllBlackRepaired = true,
             PedalHapticsCombinedDevice = true,
+            MBoosterHapticsSource = MBoosterHapticsSource.ShakeIt,
             DeviceProfilesSplit = true,
             Cm2DashboardKeysReset = true,
         };
@@ -385,6 +395,12 @@ namespace MozaPlugin.Settings
         // What drives the S12: ShakeIt (layout above) or the plugin's S12 Haptics
         // tab. The two would fight over the same slots, so exactly one owns them.
         public PedalHapticsSource PedalHapticsSource { get; set; } = PedalHapticsSource.ShakeIt;
+
+        // What drives the mBooster vibrations: the plugin's mBooster tab or ShakeIt.
+        // G-Force and Brake Fade stay with the plugin either way. Initializer stays
+        // PluginTab so upgraders keep their configured effects; new installs get
+        // ShakeIt via CreateForNewInstall.
+        public MBoosterHapticsSource MBoosterHapticsSource { get; set; } = MBoosterHapticsSource.PluginTab;
 
         // One-shot marker for the migration off the pre-1.6 "Wheelbase LFE haptics"
         // device (DeviceTypeID F208F60B-…), which was code-registered and vanished

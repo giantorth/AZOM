@@ -865,4 +865,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Gerät 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % Verlust</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standard-Registerkarte</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster-Vibration</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>mBooster-Tab des Plugins</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt erfordert SimHub 9.12 oder neuer — es wird der mBooster-Tab des Plugins verwendet.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster nicht in SimHub hinzugefügt</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Die mBooster-Pedale sind verbunden und auf ShakeIt eingestellt, aber das mBooster-Gerät wurde nicht in SimHub hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
 </root>

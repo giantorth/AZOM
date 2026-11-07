@@ -287,6 +287,53 @@ namespace MozaPlugin.UI
             UpdatePedalHapticsSourceStatus();
         }
 
+        // ===== mBooster source: plugin tab | ShakeIt =====
+
+        // Set once a source switch has deployed the mBooster definition.
+        private bool _mboosterRestartPending;
+
+        /// <summary>
+        /// Seed the mBooster source selector. On a SimHub without device haptics
+        /// (pre-9.12) ShakeIt is disabled and the plugin tab shown as the
+        /// effective source; the stored preference is left alone.
+        /// </summary>
+        private void SyncMBoosterSourceCombo()
+        {
+            MBoosterSourceShakeItItem.IsEnabled = Devices.Haptics.MozaMBoosterHapticsBridge.IsSupported;
+            MBoosterSourceCombo.SelectedIndex = _plugin.MBoosterRoutedToShakeIt ? 1 : 0;
+            UpdateMBoosterSourceStatus();
+        }
+
+        private void UpdateMBoosterSourceStatus()
+        {
+            string text;
+            if (!Devices.Haptics.MozaMBoosterHapticsBridge.IsSupported)
+                text = Strings.Status_MBoosterShakeItUnavailable;
+            else if (_mboosterRestartPending)
+                text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+            else
+                text = "";
+            if (MBoosterSourceStatusText.Text != text)
+            {
+                MBoosterSourceStatusText.Text = text;
+                MBoosterSourceStatusText.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void MBoosterSource_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            int idx = MBoosterSourceCombo.SelectedIndex;
+            if (idx < 0) return;
+
+            var source = idx == 1 ? MBoosterHapticsSource.ShakeIt : MBoosterHapticsSource.PluginTab;
+            if (_plugin.SetMBoosterHapticsSource(source))
+                _mboosterRestartPending = true;
+            UpdateMBoosterSourceStatus();
+            StopMBoosterPedalTests();
+            ApplyMBoosterEffectSourceVisibility();
+        }
+
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
@@ -300,10 +347,18 @@ namespace MozaPlugin.UI
 
             bool wasCombined = _plugin.PedalHapticsCombined;
             bool wasShakeIt = _plugin.PedalHapticsRoutedToShakeIt;
+            bool wasMBoosterShakeIt = _plugin.MBoosterRoutedToShakeIt;
             _plugin.ClearSettings();
             if ((_plugin.PedalHapticsCombined != wasCombined || _plugin.PedalHapticsRoutedToShakeIt != wasShakeIt)
                 && _plugin.ApplyPedalHapticsLayout())
                 _pedalHapticsRestartPending = true;
+            if (_plugin.MBoosterRoutedToShakeIt != wasMBoosterShakeIt)
+            {
+                if (_plugin.ApplyMBoosterHapticsSource())
+                    _mboosterRestartPending = true;
+                StopMBoosterPedalTests();
+                ApplyMBoosterEffectSourceVisibility();
+            }
 
             using (_suppressor.Begin())
             {
@@ -313,6 +368,7 @@ namespace MozaPlugin.UI
                 Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
                 SyncPedalHapticsSourceCombo();
                 SyncWheelbaseLfeSourceCombo();
+                SyncMBoosterSourceCombo();
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;
                 ProfileListControl.DataContext = _plugin.ProfileStore;

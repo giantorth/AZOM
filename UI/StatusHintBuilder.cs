@@ -271,6 +271,20 @@ namespace MozaPlugin.UI
                               + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
             }
 
+            // Rule 6b: ProfileNotAddedMBooster. Same shape as rule 6.
+            if (elapsed >= ProfileNotAddedSettling
+                && !plugin.DeviceDefinitionDeployed
+                && plugin.MBoosterRoutedToShakeIt
+                && plugin.IsMBoosterDetected
+                && !plugin.MBoosterDeviceExtensionActive)
+            {
+                list.Add(new StatusHint(
+                    StatusHintKind.ProfileNotAddedMBooster,
+                    Strings.Banner_ProfileNotAddedMBooster_Title,
+                    string.Format(Strings.Banner_ProfileNotAddedMBooster_Body,
+                        Devices.Extensions.DeviceDefinitionDeployer.MBoosterShakeItDeviceName)));
+            }
+
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —
             // either the Motion plugin is off or its active setup has no HMA150 output.
             // Presence, not connection: the lane only opens the port while motion runs.

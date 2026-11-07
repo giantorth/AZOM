@@ -865,4 +865,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Thiết bị 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>mất {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Tab mặc định</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Rung mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ mBooster của plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ mBooster của plugin.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Chưa thêm mBooster trong SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Bàn đạp mBooster đang được kết nối và đặt dùng ShakeIt, nhưng thiết bị mBooster chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
 </root>

@@ -70,6 +70,9 @@ namespace MozaPlugin.Devices.MBooster
         // effect that's a genuine self-terminating pulse rather than a
         // level-triggered continuous effect. See UpdateGearShiftRequest.
         private const double GearShiftPulseDurationSec = 0.15;
+        // ShakeIt gain 1.0 maps to the same ceiling as Engine/Custom at 100 %.
+        private const double ShakeItScaleMax = 0.10;
+        private const double ShakeItMinAmp = 1e-4;
 
         private readonly MBoosterDeviceController _device;
         private readonly Func<MBoosterDeviceSettings?> _settingsLookup;
@@ -99,6 +102,11 @@ namespace MozaPlugin.Devices.MBooster
         private EffectState _roadTexture;
         private EffectState _gforce;
         private EffectState _bitePoint;
+        // ShakeIt's tone for this pedal's role, on Engine's wire slot.
+        private EffectState _shakeIt;
+        private readonly MBoosterShakeItSink? _shakeItSink;
+        // Source seen by the last tick; an edge silences what the old source left playing.
+        private bool _shakeItRouted;
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
         // Hysteresis flag for the Bite Point effect (Clutch-only) — same
         // pattern as _thresholdLatched, but latches on a FALLING edge (the
@@ -324,7 +332,8 @@ namespace MozaPlugin.Devices.MBooster
             Func<bool> isShuttingDown,
             Func<string, double>? customEffectFormulaEvaluator = null,
             int pedalAxisIndex = 0,
-            bool isPrimary = true)
+            bool isPrimary = true,
+            MBoosterShakeItSink? shakeItSink = null)
         {
             _device = device;
             _settingsLookup = settingsLookup;
@@ -332,6 +341,7 @@ namespace MozaPlugin.Devices.MBooster
             _customEffectFormulaEvaluator = customEffectFormulaEvaluator ?? (_ => 0.0);
             _pedalAxisIndex = pedalAxisIndex;
             _isPrimary = isPrimary;
+            _shakeItSink = shakeItSink;
             _tickErrorLogKey = "mbooster-tick:" + device.Identity + ":" + pedalAxisIndex;
         }
 
@@ -474,16 +484,21 @@ namespace MozaPlugin.Devices.MBooster
         /// (<see cref="_effectsDevice"/>), one frame per wire id, and reset
         /// the states — the effect gate closed or the pedal's unit changed.
         /// </summary>
-        private void SilenceEffects()
+        private void SilenceEffects() => SilenceEffects(keepGForce: false);
+
+        /// <param name="keepGForce">Leave G-Force playing: a vibration source change
+        /// (plugin tab ↔ ShakeIt) doesn't touch it.</param>
+        private void SilenceEffects(bool keepGForce)
         {
             int mask = 0;
             if (_abs.Active) mask |= 1 << (int)MBoosterEffectId.Abs;
             if (_lockup.Active) mask |= 1 << (int)MBoosterEffectId.Lockup;
             if (_threshold.Active) mask |= 1 << (int)MBoosterEffectId.Threshold;
             if (_roadTexture.Active) mask |= 1 << (int)MBoosterEffectId.RoadTexture;
-            if (_gforce.Active) mask |= 1 << (int)MBoosterEffectId.GForce;
+            if (_gforce.Active && !keepGForce) mask |= 1 << (int)MBoosterEffectId.GForce;
             // Engine's wire slot carries every effect without a verified id of its own.
-            bool engine = _engine.Active || _tc.Active || _wheelSpin.Active || _gearShift.Active || _bitePoint.Active;
+            bool engine = _engine.Active || _tc.Active || _wheelSpin.Active || _gearShift.Active
+                          || _bitePoint.Active || _shakeIt.Active;
             if (!engine)
                 foreach (var st in _customEffectStates.Values)
                     if (st.Active) { engine = true; break; }
@@ -492,10 +507,10 @@ namespace MozaPlugin.Devices.MBooster
             foreach (var id in MozaMBoosterProtocol.AllEffectIds)
                 if ((mask & (1 << (int)id)) != 0)
                     _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, _effectsDevice));
-            ResetEffectStates();
+            ResetEffectStates(keepGForce);
         }
 
-        private void ResetEffectStates()
+        private void ResetEffectStates(bool keepGForce = false)
         {
             ResetEffectState(ref _abs);
             ResetEffectState(ref _tc);
@@ -505,8 +520,9 @@ namespace MozaPlugin.Devices.MBooster
             ResetEffectState(ref _threshold);
             ResetEffectState(ref _engine);
             ResetEffectState(ref _roadTexture);
-            ResetEffectState(ref _gforce);
+            if (!keepGForce) ResetEffectState(ref _gforce);
             ResetEffectState(ref _bitePoint);
+            ResetEffectState(ref _shakeIt);
             _customEffectStates.Clear();
         }
 
@@ -573,6 +589,14 @@ namespace MozaPlugin.Devices.MBooster
             MBoosterTelemetrySnapshot snap;
             lock (_telemetryLock) snap = _latest;
 
+            // Vibration source flipped: stop what the old one left latched.
+            bool shakeItRouted = _shakeItSink?.Routed == true;
+            if (shakeItRouted != _shakeItRouted)
+            {
+                _shakeItRouted = shakeItRouted;
+                SilenceEffects(keepGForce: true);
+            }
+
             // Only compute/send THIS pedal's vibration effects if its axis is
             // actually wired AND motorized. This controller's HID interface
             // commonly reports 3 axes regardless of how many pedals are
@@ -599,94 +623,101 @@ namespace MozaPlugin.Devices.MBooster
                 }
 
                 var effects = PedalEffects(lane);
-
-                // Brake/throttle signal for THIS pedal: the game's value, rising to
-                // this pedal's own HID position when it's the one assigned that role
-                // (so its modulated test pulses feel right with no game running).
                 var role = PedalRole(lane);
-                double brakeSignal = EffectiveBrake(role, snap);
-                // Test-toggle modulator: THIS pedal's own press, whatever role
-                // it holds. Traction Control / Wheel Spin used to test against
-                // the throttle, which a single-active-pedal lane can never
-                // supply — only the motorized axis runs a worker, so on a brake
-                // booster the gate never opened and both tests were dead
-                // (bundle NWS6EY7X). Telemetry-driven activation still keys off
-                // real throttle/slip below; only the tests use this.
-                double ownPressSignal = EffectiveOwnPress(role, snap);
 
-                // --- Compute per-effect requests from telemetry per doc § 4 -----
+                if (shakeItRouted)
+                {
+                    TickShakeItMode(effects, snap, role);
+                }
+                else
+                {
+                    // Brake/throttle signal for THIS pedal: the game's value, rising to
+                    // this pedal's own HID position when it's the one assigned that role
+                    // (so its modulated test pulses feel right with no game running).
+                    double brakeSignal = EffectiveBrake(role, snap);
+                    // Test-toggle modulator: THIS pedal's own press, whatever role
+                    // it holds. Traction Control / Wheel Spin used to test against
+                    // the throttle, which a single-active-pedal lane can never
+                    // supply — only the motorized axis runs a worker, so on a brake
+                    // booster the gate never opened and both tests were dead
+                    // (bundle NWS6EY7X). Telemetry-driven activation still keys off
+                    // real throttle/slip below; only the tests use this.
+                    double ownPressSignal = EffectiveOwnPress(role, snap);
 
-                UpdateEngineRequest(effects, snap, ref _engine);
-                UpdateAbsRequest(effects, brakeSignal, snap, ref _abs);
-                UpdateTractionControlRequest(effects, ownPressSignal, snap, ref _tc);
-                UpdateWheelSpinRequest(effects, ownPressSignal, snap, ref _wheelSpin);
-                UpdateGearShiftRequest(effects, snap, ref _gearShift);
-                UpdateLockupRequest(effects, brakeSignal, snap, ref _lockup);
-                UpdateThresholdRequest(effects, brakeSignal, snap, ref _threshold);
-                UpdateRoadTextureRequest(effects, snap, ref _roadTexture);
-                UpdateGForceRequest(effects, snap, ref _gforce);
-                UpdateBitePointRequest(effects, snap, role, ref _bitePoint);
+                    // --- Compute per-effect requests from telemetry per doc § 4 -----
 
-                // --- Apply per-effect activation edges + emit motor frame ------
-                //
-                // All of THIS axis's vibration effects share its one latest-wins
-                // motor stream slot (SendMotor — SendStream overwrites the
-                // pending value), so when more than one effect is
-                // active in the same tick only the LAST frame emitted here
-                // reaches the motor. Emission order is therefore a priority
-                // ladder, lowest first: the two continuous "ambient" effects
-                // (Engine, Road Texture) are emitted BEFORE the transient
-                // wheel-slip cues (ABS, Traction Control, Wheel Spin, Lockup,
-                // Threshold) and the Gear Shift pulse, so a lockup/ABS/TC/
-                // wheel-spin/threshold/gear-shift pulse always overrides the
-                // ambient vibration instead of being masked by it.
-                ProcessEffect(MBoosterEffectId.Engine,    ref _engine);
-                // (ProcessRoadTextureEffect / custom below now take this pedal's effects.)
-                // Road Texture has a materially different wire payload (see
-                // MozaMBoosterProtocol.BuildRoadTextureFrame) so it doesn't go
-                // through the shared ProcessEffect/BuildMotorFrame path. Even
-                // though it now only streams frames for the duration of a bump's
-                // decaying pulse (see UpdateRoadTextureRequest) rather than the
-                // whole time the car is moving, it still needs to sit here
-                // (ambient tier, before the braking cues) so a lockup/ABS/
-                // threshold pulse that lands in the same tick as a bump always
-                // wins instead of being masked by it.
-                ProcessRoadTextureEffect(effects, ref _roadTexture);
-                // G-Force — same ambient tier as Engine/Road Texture (before
-                // the wheel-slip cues) so a lockup/ABS/TC/wheel-spin/
-                // threshold/gear-shift pulse always wins if it lands in the
-                // same tick, matching every other continuous effect's
-                // priority. Its own frame shape is unrelated to any of the
-                // others' (see ProcessGForceEffect).
-                ProcessGForceEffect(effects, ref _gforce);
-                // Custom (NCalc) effects — Experimental. Placed in the ambient
-                // tier (after Engine/Road Texture, before the wheel-slip cues) so
-                // a user-authored effect can override built-in ambient vibration
-                // but never masks a real ABS/TC/Wheel Spin/Gear Shift/Lockup/
-                // Threshold safety pulse. They also share Engine's wire slot (effect type 4 — see
-                // ProcessCustomEffect), so a custom effect active in the same
-                // tick as the real Engine effect wins on the wire, same
-                // last-write-wins masking rule as every other pair on this ladder.
-                UpdateAndProcessCustomEffects(effects);
-                ProcessEffect(MBoosterEffectId.Abs,       ref _abs);
-                ProcessEffect(MBoosterEffectId.Lockup,    ref _lockup);
-                ProcessEffect(MBoosterEffectId.Threshold, ref _threshold);
-                // Traction Control, Wheel Spin, Gear Shift, and Bite Point —
-                // same wheel-slip-adjacent cue tier as ABS/Lockup/Threshold,
-                // emitted last so they always win over ambient vibration.
-                // None has a verified wire effect-type of its own (unlike
-                // ABS's confirmed type 1), so — like Custom Effects — all
-                // four reuse Engine's already-verified frame shape (effect
-                // type 4) rather than an invented, unconfirmed protocol ID
-                // (see each one's Process*/UpdateBitePointRequest method
-                // for details). Bite Point is additionally hard-gated to
-                // the Clutch role inside UpdateBitePointRequest itself, so
-                // it stays silent here (IntensityRequest 0) on any other
-                // role regardless of this ordering.
-                ProcessTractionControlEffect(ref _tc);
-                ProcessWheelSpinEffect(ref _wheelSpin);
-                ProcessGearShiftEffect(ref _gearShift);
-                ProcessBitePointEffect(ref _bitePoint);
+                    UpdateEngineRequest(effects, snap, ref _engine);
+                    UpdateAbsRequest(effects, brakeSignal, snap, ref _abs);
+                    UpdateTractionControlRequest(effects, ownPressSignal, snap, ref _tc);
+                    UpdateWheelSpinRequest(effects, ownPressSignal, snap, ref _wheelSpin);
+                    UpdateGearShiftRequest(effects, snap, ref _gearShift);
+                    UpdateLockupRequest(effects, brakeSignal, snap, ref _lockup);
+                    UpdateThresholdRequest(effects, brakeSignal, snap, ref _threshold);
+                    UpdateRoadTextureRequest(effects, snap, ref _roadTexture);
+                    UpdateGForceRequest(effects, snap, ref _gforce);
+                    UpdateBitePointRequest(effects, snap, role, ref _bitePoint);
+
+                    // --- Apply per-effect activation edges + emit motor frame ------
+                    //
+                    // All of THIS axis's vibration effects share its one latest-wins
+                    // motor stream slot (SendMotor — SendStream overwrites the
+                    // pending value), so when more than one effect is
+                    // active in the same tick only the LAST frame emitted here
+                    // reaches the motor. Emission order is therefore a priority
+                    // ladder, lowest first: the two continuous "ambient" effects
+                    // (Engine, Road Texture) are emitted BEFORE the transient
+                    // wheel-slip cues (ABS, Traction Control, Wheel Spin, Lockup,
+                    // Threshold) and the Gear Shift pulse, so a lockup/ABS/TC/
+                    // wheel-spin/threshold/gear-shift pulse always overrides the
+                    // ambient vibration instead of being masked by it.
+                    ProcessEffect(MBoosterEffectId.Engine,    ref _engine);
+                    // (ProcessRoadTextureEffect / custom below now take this pedal's effects.)
+                    // Road Texture has a materially different wire payload (see
+                    // MozaMBoosterProtocol.BuildRoadTextureFrame) so it doesn't go
+                    // through the shared ProcessEffect/BuildMotorFrame path. Even
+                    // though it now only streams frames for the duration of a bump's
+                    // decaying pulse (see UpdateRoadTextureRequest) rather than the
+                    // whole time the car is moving, it still needs to sit here
+                    // (ambient tier, before the braking cues) so a lockup/ABS/
+                    // threshold pulse that lands in the same tick as a bump always
+                    // wins instead of being masked by it.
+                    ProcessRoadTextureEffect(effects, ref _roadTexture);
+                    // G-Force — same ambient tier as Engine/Road Texture (before
+                    // the wheel-slip cues) so a lockup/ABS/TC/wheel-spin/
+                    // threshold/gear-shift pulse always wins if it lands in the
+                    // same tick, matching every other continuous effect's
+                    // priority. Its own frame shape is unrelated to any of the
+                    // others' (see ProcessGForceEffect).
+                    ProcessGForceEffect(effects, ref _gforce);
+                    // Custom (NCalc) effects — Experimental. Placed in the ambient
+                    // tier (after Engine/Road Texture, before the wheel-slip cues) so
+                    // a user-authored effect can override built-in ambient vibration
+                    // but never masks a real ABS/TC/Wheel Spin/Gear Shift/Lockup/
+                    // Threshold safety pulse. They also share Engine's wire slot (effect type 4 — see
+                    // ProcessCustomEffect), so a custom effect active in the same
+                    // tick as the real Engine effect wins on the wire, same
+                    // last-write-wins masking rule as every other pair on this ladder.
+                    UpdateAndProcessCustomEffects(effects);
+                    ProcessEffect(MBoosterEffectId.Abs,       ref _abs);
+                    ProcessEffect(MBoosterEffectId.Lockup,    ref _lockup);
+                    ProcessEffect(MBoosterEffectId.Threshold, ref _threshold);
+                    // Traction Control, Wheel Spin, Gear Shift, and Bite Point —
+                    // same wheel-slip-adjacent cue tier as ABS/Lockup/Threshold,
+                    // emitted last so they always win over ambient vibration.
+                    // None has a verified wire effect-type of its own (unlike
+                    // ABS's confirmed type 1), so — like Custom Effects — all
+                    // four reuse Engine's already-verified frame shape (effect
+                    // type 4) rather than an invented, unconfirmed protocol ID
+                    // (see each one's Process*/UpdateBitePointRequest method
+                    // for details). Bite Point is additionally hard-gated to
+                    // the Clutch role inside UpdateBitePointRequest itself, so
+                    // it stays silent here (IntensityRequest 0) on any other
+                    // role regardless of this ordering.
+                    ProcessTractionControlEffect(ref _tc);
+                    ProcessWheelSpinEffect(ref _wheelSpin);
+                    ProcessGearShiftEffect(ref _gearShift);
+                    ProcessBitePointEffect(ref _bitePoint);
+                }
             }
             else
             {
@@ -1743,6 +1774,51 @@ namespace MozaPlugin.Devices.MBooster
 
             var frame = MozaMBoosterProtocol.BuildGForceFrame(true, responseRaw, forwardRaw, backwardRaw, TargetDevice);
             SendMotor(frame);
+        }
+
+        /// <summary>
+        /// One tick with ShakeIt driving the vibrations: G-Force (not a
+        /// vibration) still runs from the plugin, and the pedal's role channel
+        /// plays as a constant amplitude + frequency on Engine's wire slot —
+        /// ShakeIt has already mixed the effects, so no host-side waveform.
+        ///
+        /// Both share this axis's single latest-wins lane, so when both are
+        /// active they take alternate ticks (25 Hz each) instead of the later
+        /// one masking the other every tick. Each id holds its last frame on
+        /// the unit between refreshes.
+        /// </summary>
+        private void TickShakeItMode(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, MBoosterRole role)
+        {
+            UpdateGForceRequest(effects, snap, ref _gforce);
+            UpdateShakeItRequest(role, ref _shakeIt);
+
+            bool shareLane = _gforce.IntensityRequest > 0
+                             && _shakeIt.IntensityRequest > 0 && _shakeIt.FreqHz > 0;
+            bool gforceTurn = !shareLane || (_tickSeq & 1) == 0;
+            if (gforceTurn)
+                ProcessGForceEffect(effects, ref _gforce);
+            if (!shareLane || !gforceTurn)
+                ProcessEffect(MBoosterEffectId.Engine, ref _shakeIt, ShakeItSynthesizer);
+        }
+
+        private static readonly Func<EffectState, double> ShakeItSynthesizer = s => s.IntensityRequest;
+
+        private void UpdateShakeItRequest(MBoosterRole role, ref EffectState st)
+        {
+            st.IntensityRequest = 0;
+            st.FreqHz = 0;
+
+            int roleIdx = MBoosterDeviceController.RoleIndexOf(role);
+            if (_shakeItSink == null || !_shakeItSink.TryGet(roleIdx, out double gain, out double freq))
+                return;
+            if (double.IsNaN(gain) || double.IsNaN(freq) || freq <= 0) return;
+
+            double amp = Clamp01(gain) * ShakeItScaleMax;
+            if (amp < ShakeItMinAmp) return;
+
+            st.IntensityRequest = amp;
+            st.FreqHz = Math.Max(MozaMBoosterProtocol.ShakeItMinFrequencyHz,
+                Math.Min(MozaMBoosterProtocol.ShakeItMaxFrequencyHz, freq));
         }
 
         /// <summary>

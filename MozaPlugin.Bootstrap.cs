@@ -576,6 +576,7 @@ namespace MozaPlugin
                 // mBooster Pedals registry — multi-device owner. Refresh() is
                 // called from the reconnect timer alongside TryConnectAb9. Each
                 // detected mBooster spawns its own controller + 50 Hz worker.
+                _mboosterShakeItSink = new MBoosterShakeItSink(() => MBoosterRoutedToShakeIt);
                 _mboosterRegistry = new MozaMBoosterRegistry(
                     _data,
                     settingsLookup: id => GetOrCreateMBoosterSettings(id),
@@ -591,7 +592,8 @@ namespace MozaPlugin
                     axisTypesSeedLookup: LookupMBoosterKnownPedalTypes,
                     onAxisTypesResolved: OnMBoosterAxisTypesResolved,
                     settingsReady: c => IsMBoosterSettingsResolved(c, requireDetected: false),
-                    onChainUnitSerialResolved: OnMBoosterChainUnitSerialResolved);
+                    onChainUnitSerialResolved: OnMBoosterChainUnitSerialResolved,
+                    shakeItSink: _mboosterShakeItSink);
                 // Initial walk so any mBooster plugged in BEFORE SimHub launched
                 // appears immediately — without this, the user waits up to 5 s
                 // for the reconnect timer to fire.

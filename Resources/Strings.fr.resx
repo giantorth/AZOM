@@ -865,4 +865,10 @@ Id : {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Appareil 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % de perte</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Onglet par défaut</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Vibration mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Onglet mBooster du plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt nécessite SimHub 9.12 ou plus récent — l'onglet mBooster du plugin est utilisé.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster non ajouté dans SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Les pédales mBooster sont connectées et réglées sur ShakeIt, mais le périphérique mBooster n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
 </root>

@@ -33,6 +33,11 @@ namespace MozaPlugin.Devices.Extensions
                 yield return typeof(MozaPedalHapticsDeviceExtension);
             }
 
+            if (MozaDeviceConstants.IsMBoosterShakeItDevice(typeId))
+            {
+                yield return typeof(MozaMBoosterDeviceExtension);
+            }
+
             if (MozaDeviceConstants.IsBaseDevice(typeId))
             {
                 yield return typeof(MozaBaseDeviceExtension);

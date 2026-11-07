@@ -230,6 +230,17 @@ namespace MozaPlugin.UI
             RefreshMBoosterCalUi();
         }
 
+        /// <summary>
+        /// Hide the vibration effect cards and Custom Effects while ShakeIt
+        /// drives the vibrations; Brake Fade and G-Force stay plugin-driven.
+        /// </summary>
+        private void ApplyMBoosterEffectSourceVisibility()
+        {
+            var v = _plugin.MBoosterRoutedToShakeIt ? Visibility.Collapsed : Visibility.Visible;
+            if (MBoosterVibrationEffectsPanel.Visibility != v) MBoosterVibrationEffectsPanel.Visibility = v;
+            if (MBoosterCustomEffectsCard.Visibility != v) MBoosterCustomEffectsCard.Visibility = v;
+        }
+
         // Pedal Feel axis maxima as 4 × step, so the 5 Y labels stay whole kg.
         private static readonly double[] MBoosterFeelAxisSteps = { 1, 2, 5, 10, 20, 25, 50 };
 

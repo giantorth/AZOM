@@ -872,4 +872,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Device 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% loss</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Default tab</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster vibrations</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Plugin mBooster tab</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt requires SimHub 9.12 or newer — using the plugin's mBooster tab.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster not added in SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster pedals are connected and set to ShakeIt, but the mBooster device has not been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
 </root>

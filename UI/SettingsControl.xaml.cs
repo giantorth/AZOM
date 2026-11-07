@@ -73,6 +73,7 @@ namespace MozaPlugin.UI
                 Ab9DetectionCheck.IsChecked = plugin.Settings.Ab9DetectionEnabled;
                 SyncPedalHapticsSourceCombo();
                 SyncWheelbaseLfeSourceCombo();
+                SyncMBoosterSourceCombo();
                 SyncAutoStandbyCombo();
                 int kaSec = plugin.Settings.WheelKeepaliveTimeoutSec;
                 KeepaliveTimeoutSlider.Value = Math.Max(KeepaliveTimeoutSlider.Minimum, Math.Min(KeepaliveTimeoutSlider.Maximum, kaSec));

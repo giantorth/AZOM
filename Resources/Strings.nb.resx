@@ -870,4 +870,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Enhet 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % tap</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standardfane</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster-vibrasjon</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>mBooster-fanen i programtillegget</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets mBooster-fane brukes.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster er ikke lagt til i SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster-pedalene er tilkoblet og satt til ShakeIt, men mBooster-enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
 </root>

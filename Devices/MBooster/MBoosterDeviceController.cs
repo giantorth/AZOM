@@ -333,6 +333,10 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>When the latest detection edge fired (see <see cref="MarkDetected"/>).</summary>
         public DateTime DetectedAtUtc { get; private set; }
         public bool IsConnected => _connection.IsConnected;
+
+        /// <summary>USB PID SimHub detects this lane on: the unit's own on USB, the
+        /// host base's on a routed lane (the shared pipe).</summary>
+        public string? DiscoveredPid => _connection.DiscoveredPid;
         public MozaSerialConnection Connection => _connection;
 
         // Latest HID axis value (0..1), AFTER Pedal Feel shaping (deadzone,
@@ -517,7 +521,8 @@ namespace MozaPlugin.Devices.MBooster
             Func<bool> isShuttingDown,
             Func<bool>? disableProbeFallback = null,
             Func<string, double>? customEffectFormulaEvaluator = null,
-            string containerId = "")
+            string containerId = "",
+            MBoosterShakeItSink? shakeItSink = null)
         {
             Identity = identity ?? throw new ArgumentNullException(nameof(identity));
             PortName = portName ?? throw new ArgumentNullException(nameof(portName));
@@ -560,7 +565,7 @@ namespace MozaPlugin.Devices.MBooster
             for (int i = 0; i < motorIds.Length; i++)
                 _workers[i] = new MBoosterEffectWorker(
                     this, () => CurrentSettings, _isShuttingDown, customEffectFormulaEvaluator,
-                    pedalAxisIndex: i, isPrimary: i == 0);
+                    pedalAxisIndex: i, isPrimary: i == 0, shakeItSink: shakeItSink);
         }
 
         /// <summary>
@@ -583,7 +588,8 @@ namespace MozaPlugin.Devices.MBooster
             string portLabel,
             Func<MBoosterDeviceSettings?> settingsLookup,
             Func<bool> isShuttingDown,
-            Func<string, double>? customEffectFormulaEvaluator = null)
+            Func<string, double>? customEffectFormulaEvaluator = null,
+            MBoosterShakeItSink? shakeItSink = null)
         {
             Identity = identity ?? throw new ArgumentNullException(nameof(identity));
             _connection = sharedConnection ?? throw new ArgumentNullException(nameof(sharedConnection));
@@ -606,7 +612,7 @@ namespace MozaPlugin.Devices.MBooster
             for (int i = 0; i < _workers.Length; i++)
                 _workers[i] = new MBoosterEffectWorker(
                     this, () => CurrentSettings, _isShuttingDown, customEffectFormulaEvaluator,
-                    pedalAxisIndex: i, isPrimary: i == 0);
+                    pedalAxisIndex: i, isPrimary: i == 0, shakeItSink: shakeItSink);
         }
 
         /// <summary>Start the per-axis effect workers — the registry calls this

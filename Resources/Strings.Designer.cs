@@ -923,5 +923,11 @@ namespace MozaPlugin.Resources
         public static string HubDevice_Unknown => Get("HubDevice_Unknown");
         public static string HubPort_LossFormat => Get("HubPort_LossFormat");
         public static string SliderLabel_DefaultTab => Get("SliderLabel_DefaultTab");
+        public static string SliderLabel_MBoosterSource => Get("SliderLabel_MBoosterSource");
+        public static string Option_MBoosterSourcePlugin => Get("Option_MBoosterSourcePlugin");
+        public static string Option_MBoosterSourceShakeIt => Get("Option_MBoosterSourceShakeIt");
+        public static string Status_MBoosterShakeItUnavailable => Get("Status_MBoosterShakeItUnavailable");
+        public static string Banner_ProfileNotAddedMBooster_Title => Get("Banner_ProfileNotAddedMBooster_Title");
+        public static string Banner_ProfileNotAddedMBooster_Body => Get("Banner_ProfileNotAddedMBooster_Body");
     }
 }

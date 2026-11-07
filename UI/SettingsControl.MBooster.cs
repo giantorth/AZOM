@@ -104,6 +104,7 @@ namespace MozaPlugin.UI
             // rows, role/passive visibility and seeding only while the tab is
             // shown (MainTabs_SelectionChanged repaints it on selection).
             bool tabShown = MBoosterTab.IsSelected;
+            if (tabShown) ApplyMBoosterEffectSourceVisibility();
             if (devices.Count == 0)
             {
                 _mboosterUiSeeded = false;

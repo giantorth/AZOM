@@ -333,6 +333,13 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             var devs = registry.Devices;
             sb.AppendLine($"Discovered:     {devs.Count} mBooster device(s)");
+            var shakeItGains = plugin.MBoosterShakeItGains();
+            sb.AppendLine(
+                $"Vibration src:  {plugin.Settings?.MBoosterHapticsSource} " +
+                $"(routed={(plugin.MBoosterRoutedToShakeIt ? "ShakeIt" : "plugin tab")}, " +
+                $"ready={(plugin.IsMBoosterShakeItReady ? "yes" : "no")}, " +
+                $"SimHub device added={(plugin.MBoosterDeviceExtensionActive ? "yes" : "no")}, " +
+                $"gain T={shakeItGains[0]:0.###} B={shakeItGains[1]:0.###} C={shakeItGains[2]:0.###})");
             // Merged (post role-merge) positions — what the trace graph and the
             // game-facing properties actually receive. "max seen" proves whether
             // pedal input ever flowed through the merge this session, settling

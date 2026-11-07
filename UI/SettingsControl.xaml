@@ -2802,6 +2802,8 @@
 
                             <StackPanel x:Name="MBoosterEffectsCardsPanel">
 
+                            <!-- Hidden while ShakeIt drives the vibrations; Brake Fade and G-Force below stay. -->
+                            <StackPanel x:Name="MBoosterVibrationEffectsPanel">
                             <Expander x:Name="MBoosterAbsExpander" Header="{x:Static res:Strings.Section_Abs}" IsExpanded="True" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -3219,6 +3221,7 @@
                                     </Grid>
                                 </StackPanel>
                             </Expander>
+                            </StackPanel><!-- MBoosterVibrationEffectsPanel -->
                             <Expander x:Name="MBoosterBrakeFadeExpander" Header="{x:Static res:Strings.Section_BrakeFade}" IsExpanded="False" Margin="0,0,0,10">
                                 <StackPanel Margin="8,4">
                                     <TextBlock TextWrapping="Wrap" Foreground="#FFE082" FontSize="11" Margin="0,0,0,8" Text="{x:Static res:Strings.Hint_BrakeFadeExperimental}"/>
@@ -3282,7 +3285,7 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
 
-                            <ctrl:SectionCard Title="{x:Static res:Strings.Section_CustomEffects}"
+                            <ctrl:SectionCard x:Name="MBoosterCustomEffectsCard" Title="{x:Static res:Strings.Section_CustomEffects}"
                                               Subtitle="{x:Static res:Strings.Subtitle_CustomEffectsExperimental}"
                                               Icon="{StaticResource IconBolt}"
                                               AccentBrush="{StaticResource AmberBrush}"
@@ -4195,6 +4198,29 @@
                                             <ListBoxItem x:Name="PedalHapticsSourceCombinedItem" Content="{x:Static res:Strings.Option_PedalHapticsSourceCombined}"/>
                                         </ctrl:SegmentedControl>
                                         <TextBlock x:Name="PedalHapticsSourceStatusText" Text="" Grid.Row="1" Grid.Column="1" Visibility="Collapsed"
+                                                   Style="{StaticResource MutedHintText}"
+                                                   Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                    </Grid>
+                                    <!-- What drives the mBooster vibrations: the plugin's mBooster
+                                         tab, or ShakeIt as one device with a channel per pedal role. -->
+                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_MBoosterSource}" Style="{StaticResource SliderLabel}"
+                                                   VerticalAlignment="Center"/>
+                                        <ctrl:SegmentedControl x:Name="MBoosterSourceCombo" Grid.Column="1"
+                                                               VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                               SelectionChanged="MBoosterSource_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_MBoosterSourcePlugin}"/>
+                                            <ListBoxItem x:Name="MBoosterSourceShakeItItem" Content="{x:Static res:Strings.Option_MBoosterSourceShakeIt}"/>
+                                        </ctrl:SegmentedControl>
+                                        <TextBlock x:Name="MBoosterSourceStatusText" Text="" Grid.Row="1" Grid.Column="1" Visibility="Collapsed"
                                                    Style="{StaticResource MutedHintText}"
                                                    Margin="0,6,0,0" TextWrapping="Wrap"/>
                                     </Grid>

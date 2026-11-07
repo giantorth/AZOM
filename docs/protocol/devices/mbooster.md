@@ -747,16 +747,21 @@ completing poll is the firmware's only exit from debug mode / MotorMode 8.
 
 ## Stream lane
 
-All motor frames go through a single per-connection lane:
+Motor frames go through one coalescing lane per pedal axis, each owned by
+that axis's effect worker:
 
 ```text
-StreamKind.MBoosterEffect = 17
+StreamKind.MBoosterEffect      = 17   axis 0
+StreamKind.MBoosterEffectAxis1 = 44   axis 1
+StreamKind.MBoosterEffectAxis2 = 45   axis 2
 ```
 
 Per protocol note § 4 the worker emits at most one motor frame per tick
-(~50 Hz), so a single coalesced lane is sufficient — the latest-wins
-behaviour on writer lag is the same property the doc relies on when it
-says "the motor plays the instantaneous amplitude you send".
+(~50 Hz), so one latest-wins lane per axis is sufficient — the same
+property the doc relies on when it says "the motor plays the instantaneous
+amplitude you send". It also means that when several effects are active in
+one tick, only the last frame emitted reaches the wire; the worker's
+emission order is the priority ladder.
 
 Keepalives go via the one-shot FIFO (`MozaSerialConnection.Send`) so
 they aren't coalesced.
@@ -778,6 +783,48 @@ override, queues a disable for every effect id to the pedal's current unit
 state, so no tick frame can follow the disables and effects restart from
 their activation edge after the routine. The 500 ms keepalive keeps
 flowing throughout, as Pit House's does.
+
+## ShakeIt output
+
+Options › mBooster vibrations picks the source: the plugin's mBooster tab or
+SimHub ShakeIt (`MozaPluginSettings.MBoosterHapticsSource`, global, not per
+profile). Exactly one drives the vibrations; G-Force and Brake Fade stay
+plugin-driven in both modes because ShakeIt has no equivalent for a travel
+offset or a calibration override.
+
+**Device.** One haptics-only definition, `MOZA mBooster Pedals`
+(`DeviceDefinitionDeployer.MBooster.cs`), deployed once a unit answers and
+only while ShakeIt is selected. `HapticsFeature` declares 3 motors,
+5–200 Hz; the detection PID is the unit's own on USB (`0x0008`) and the host
+base's on a routed lane, the same anchor rule as the S12. The extension
+(`MozaMBoosterDeviceExtension`) swaps in `MozaHapticsConnectionManager` and
+keeps `MozaMBoosterChannelsProvider` installed.
+
+**Channels.** `Throttle`, `Brake`, `Clutch`, one oscillator each, addressed
+by pedal **role**: each worker plays the channel of its own role
+(`MBoosterDeviceController.AxisRole`), routed to its unit through
+`MotorDeviceForRole` like every other effect. The tone mixer sums an effect
+set into one tone per channel; one oscillator per pedal because the axis
+lane carries one motor frame per tick and whether the firmware sums
+concurrent effect ids is unverified.
+
+**Wire.** ShakeIt has already mixed the effects, so there is no host-side
+waveform: each tick sends a constant `24/b1` frame on effect id 4 (Engine's
+slot, like every effect without a verified id of its own) with
+`amp = clamp(gain, 0, 1) × 0.10` — gain 1.0 lands on the plugin's own
+100 % ceiling — `freq` clamped to 5–200 Hz and
+`param1 = ComputeParam1(ParamKEngine, freq)`. A disable frame goes out on the
+deactivation edge (gain below `1e-4`, or no sample for 500 ms).
+
+**G-Force sharing.** G-Force (id 6) and ShakeIt (id 4) share the axis lane.
+When both are active in the same tick they take alternate ticks (25 Hz each)
+so neither masks the other; both are level-set frames. Not yet checked on
+hardware.
+
+**Source switch.** Each worker sees the edge on its next tick and disables
+whatever the old source left playing on its unit (`SilenceEffects(keepGForce:
+true)`). Calibration suspend, unit changes and dispose silence the ShakeIt
+state along with every other effect.
 
 ## Effect synthesis
 

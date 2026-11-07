@@ -864,4 +864,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>장치 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>손실 {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>기본 탭</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster 진동</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>플러그인 mBooster 탭</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt에는 SimHub 9.12 이상이 필요합니다 — 플러그인의 mBooster 탭을 사용합니다.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster가 SimHub에 추가되지 않음</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 페달이 연결되어 ShakeIt으로 설정되어 있지만 SimHub에 mBooster 장치가 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
 </root>

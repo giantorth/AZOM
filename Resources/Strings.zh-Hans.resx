@@ -865,4 +865,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>设备 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>丢包 {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>默认选项卡</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster 振动</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>插件 mBooster 选项卡</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt 需要 SimHub 9.12 或更高版本 — 当前使用插件的 mBooster 选项卡。</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster 未在 SimHub 中添加</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 踏板已连接并设置为 ShakeIt，但尚未在 SimHub 中添加 mBooster 设备。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
 </root>

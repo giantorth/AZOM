@@ -865,4 +865,10 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Устройство 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>потери {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Вкладка по умолчанию</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Вибрация mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Вкладка mBooster плагина</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>Для ShakeIt требуется SimHub 9.12 или новее — используется вкладка mBooster плагина.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster не добавлен в SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Педали mBooster подключены и настроены на ShakeIt, но устройство mBooster не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
 </root>

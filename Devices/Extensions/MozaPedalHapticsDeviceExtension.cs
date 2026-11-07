@@ -57,7 +57,7 @@ namespace MozaPlugin.Devices.Extensions
 
         private object? _motorsDevice;
         private object? _connectionDevice;
-        private MozaPedalHapticsConnectionManager? _connectionManager;
+        private MozaHapticsConnectionManager? _connectionManager;
         private object? _originalConnectionManager;
 
         // Which motor port this device drives. Resolved in Init from the
@@ -134,7 +134,7 @@ namespace MozaPlugin.Devices.Extensions
 
             try
             {
-                var manager = (MozaPedalHapticsConnectionManager)(_combined
+                var manager = (MozaHapticsConnectionManager)(_combined
                     ? MozaPedalHapticsBridge.CreateCombinedConnectionManager()
                     : MozaPedalHapticsBridge.CreateConnectionManager(_pedal));
                 var previous = LedDriverInjection.SwapConnectionManager(instance, manager);

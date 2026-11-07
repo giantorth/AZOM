@@ -658,7 +658,8 @@ namespace MozaPlugin
                     portLabel: string.IsNullOrEmpty(port) ? "via base" : $"via {port}",
                     settingsLookup: () => GetOrCreateMBoosterSettings(identity),
                     isShuttingDown: () => IsShuttingDown,
-                    customEffectFormulaEvaluator: CreateHapticsFormulaResolver());
+                    customEffectFormulaEvaluator: CreateHapticsFormulaResolver(),
+                    shakeItSink: _mboosterShakeItSink);
                 c.ModelNameResolved += name => OnRoutedMBoosterModelResolved(c, name);
                 _routedMBoosterProbes[owner] = c;
                 _routedMBoosterProbeAttempts[owner] = 1;
@@ -1034,6 +1035,7 @@ namespace MozaPlugin
             {
                 MozaLog.Warn($"[AZOM/mBooster] OnDetected for {controller.Identity}: {ex.Message}");
             }
+            DeployMBoosterShakeItDefinition(controller);
         }
 
         /// <summary>A unit that never answers the serial read keeps its transport
