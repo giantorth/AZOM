@@ -378,6 +378,7 @@ namespace MozaPlugin.UI.UpdateCheck
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
             s.LastSkippedVersion = "";
+            s.StableDowngradeFromVersion = "";
             return true;
         }
 
@@ -506,16 +507,13 @@ namespace MozaPlugin.UI.UpdateCheck
         /// user should be offered over <paramref name="current"/> on the
         /// selected channel. A PR channel tracks a moving head, so any
         /// differing build is an update — a newer commit, or the target build
-        /// right after a channel switch. On stable, a running prerelease build
-        /// (a PR/dev build whose channel the user left) is offered the stable
-        /// release even though its numeric core is lower — that downgrade is
-        /// the point of switching back. Stable-on-stable only ever moves
-        /// forward, by spec-correct SemVer. With <paramref name="followBeta"/>
-        /// the stable fallback (no beta open right now) never downgrades a
-        /// running beta — only a newer stable is offered.
+        /// right after a channel switch. Stable only moves forward by SemVer,
+        /// so a running beta/PR build is never offered an older stable — except
+        /// the build the user explicitly switched to Stable from
+        /// (<paramref name="stableDowngradeFrom"/>), where going back is the point.
         /// </summary>
         public static bool IsUpdateAvailable(
-            string latest, string current, string? channelId, bool followBeta)
+            string latest, string current, string? channelId, string? stableDowngradeFrom)
         {
             if (string.IsNullOrEmpty(latest)) return false;
             if (string.IsNullOrEmpty(current)) return true;
@@ -523,7 +521,8 @@ namespace MozaPlugin.UI.UpdateCheck
             if (TryParsePrChannelId(channelId, out _))
                 return !string.Equals(latest, current, StringComparison.Ordinal);
 
-            if (HasPrereleaseTag(current) && !followBeta)
+            if (HasPrereleaseTag(current)
+                && string.Equals(current, stableDowngradeFrom, StringComparison.Ordinal))
                 return !string.Equals(latest, current, StringComparison.Ordinal);
 
             return CompareSemVer(latest, current) > 0;

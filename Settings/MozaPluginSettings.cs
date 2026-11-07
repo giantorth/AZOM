@@ -473,10 +473,15 @@ namespace MozaPlugin.Settings
         // when the tracked PR closes. See UpdateCheckService.ResolveBetaChannelId.
         public bool FollowBetaChannel { get; set; } = false;
 
-        // Version the user clicked "Skip this version" on — the banner stays
-        // hidden as long as the latest published version still equals this
-        // string. When a newer version appears the banner re-shows.
+        // Version the user skipped or dismissed — the banner stays hidden as
+        // long as the latest published version still equals this string. When
+        // a newer version appears the banner re-shows.
         public string LastSkippedVersion { get; set; } = "";
+
+        // Prerelease build the user was running when they explicitly picked
+        // the stable channel. Only that build is offered the (older) stable
+        // release; any other prerelease build on stable only moves forward.
+        public string StableDowngradeFromVersion { get; set; } = "";
 
         // UTC timestamp of the last successful (or failed) check; the
         // automatic check skips while less than 24h has passed. DateTime.MinValue

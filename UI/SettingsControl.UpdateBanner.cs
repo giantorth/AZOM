@@ -31,8 +31,8 @@ namespace MozaPlugin.UI
         // on Unload so a slow request doesn't try to update a torn-down UI.
         private CancellationTokenSource? _updateCheckCts;
 
-        // The install flow + its "in progress" / "dismissed this session" state
-        // live on UpdateInstallCoordinator (shared with the cross-page
+        // The install flow + its "in progress" state live on
+        // UpdateInstallCoordinator (shared with the cross-page
         // PluginBanners control), so both surfaces stay in sync.
 
         private void InitUpdateBannerControls()
@@ -522,18 +522,13 @@ namespace MozaPlugin.UI
             }
         }
 
-        private void UpdateBanner_Skip_Click(object sender, RoutedEventArgs e)
-        {
-            var s = _plugin?.Settings;
-            if (s == null) return;
-            s.LastSkippedVersion = s.LastSeenLatestVersion ?? "";
-            try { _plugin!.PersistSettings(); } catch { /* persistence is best-effort */ }
-            RefreshUpdateNotifications();
-        }
+        private void UpdateBanner_Skip_Click(object sender, RoutedEventArgs e) => DismissLatestUpdate();
 
-        private void UpdateBanner_Dismiss_Click(object sender, RoutedEventArgs e)
+        private void UpdateBanner_Dismiss_Click(object sender, RoutedEventArgs e) => DismissLatestUpdate();
+
+        private void DismissLatestUpdate()
         {
-            UpdateInstallCoordinator.Instance.DismissedThisSession = true;
+            UpdateInstallCoordinator.DismissLatest(_plugin);
             RefreshUpdateNotifications();
         }
 
@@ -557,6 +552,7 @@ namespace MozaPlugin.UI
             var s = _plugin?.Settings;
             if (s == null) return;
             s.FollowBetaChannel = FollowBetaToggle?.IsChecked == true;
+            if (s.FollowBetaChannel) s.StableDowngradeFromVersion = "";
             try { _plugin!.PersistSettings(); } catch { }
             RepopulateChannelCombo();
             if (s.FollowBetaChannel) _ = RunManualCheckAsync();
@@ -674,6 +670,13 @@ namespace MozaPlugin.UI
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
             s.LastSkippedVersion = "";
+            // Picking Stable while on a beta/PR build is a request to go back.
+            string current = DiagnosticsTextBuilder.GetPluginVersion();
+            s.StableDowngradeFromVersion =
+                channelId == UpdateCheckService.StableChannelId
+                && UpdateCheckService.HasPrereleaseTag(current)
+                    ? current
+                    : "";
             try { _plugin!.PersistSettings(); } catch { }
             RefreshUpdateNotifications();
             // Fetch + offer the selected channel's build right away rather
@@ -690,12 +693,6 @@ namespace MozaPlugin.UI
         {
             if (_plugin?.Settings == null || UpdateCheckNowButton == null) return;
             var s = _plugin.Settings;
-
-            // An explicit "Check now" is a clear request to see the current
-            // status, so it overrides a prior Dismiss — otherwise the banner
-            // would stay hidden for the rest of the session even when the check
-            // finds an available update.
-            UpdateInstallCoordinator.Instance.DismissedThisSession = false;
 
             // Cancel any in-flight manual check before kicking off a new one;
             // the superseded run leaves the button and status to this one.
@@ -769,6 +766,7 @@ namespace MozaPlugin.UI
                     s.UpdateChannelId = UpdateCheckService.StableChannelId;
                     s.UpdateChannelLabel = "";
                     s.LastSkippedVersion = "";
+                    s.StableDowngradeFromVersion = "";
                     result = UpdateCheckService.ResolveChannel(
                         fetch.Snapshot, s.UpdateChannelId, out _);
                 }
@@ -801,7 +799,7 @@ namespace MozaPlugin.UI
                         bool upToDate = string.IsNullOrEmpty(result.LatestVersion)
                             || !UpdateCheckService.IsUpdateAvailable(
                                 result.LatestVersion, current, s.UpdateChannelId,
-                                s.FollowBetaChannel);
+                                s.StableDowngradeFromVersion);
                         if (upToDate)
                             UpdateLastCheckedText.Text = Strings.Status_UpdateUpToDate;
                         else

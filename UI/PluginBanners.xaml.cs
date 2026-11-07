@@ -17,8 +17,8 @@ namespace MozaPlugin.UI
     ///
     /// The update install is driven through the session-scoped <see
     /// cref="UpdateInstallCoordinator"/> so this control and the plugin pane's
-    /// About-tab "Updates" card share one install flow + one dismiss/in-progress
-    /// state and never diverge.
+    /// About-tab "Updates" card share one install flow + in-progress state and
+    /// never diverge.
     /// </summary>
     public partial class PluginBanners : UserControl
     {
@@ -198,9 +198,10 @@ namespace MozaPlugin.UI
 
         private void HeaderUpdateDismiss_Click(object sender, RoutedEventArgs e)
         {
-            // One dismiss flag hides the banner on every surface for the session.
-            UpdateInstallCoordinator.Instance.DismissedThisSession = true;
+            UpdateInstallCoordinator.DismissLatest(MozaPlugin.Instance);
             RefreshUpdateBanner();
+            // The About card only repaints on demand.
+            try { SettingsControl.Instance?.RefreshUpdateNotifications(); } catch { }
         }
 
         // In-app navigation when hosted on the plugin pane; else open the release

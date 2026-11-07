@@ -24,6 +24,8 @@ All notable changes to the AZOM plugin are documented here.
 - **Re-uploading an edited dashboard sends the edit;** the file is re-read at upload time instead of reusing the copy from when it was picked.
 - **Hub tab shows the device on each port;** all four accessory ports plus the pedal port, with link loss.
 - **Options tab controls line up;** toggles and selectors in each column start at the same position.
+- **Dismissing an update notification sticks across restarts;** it reappears only when a newer version is published.
+- **Beta builds are no longer offered an older stable release;** only switching the channel back to Stable offers the downgrade.
 
 ## [1.7.2]
 

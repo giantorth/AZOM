@@ -79,6 +79,7 @@ namespace MozaPlugin.UI.UpdateCheck
                                 settings.UpdateChannelId = channelId;
                                 settings.UpdateChannelLabel = "";
                                 settings.LastSkippedVersion = "";
+                                settings.StableDowngradeFromVersion = "";
                                 result = UpdateCheckService.ResolveChannel(
                                     snap, channelId, out _);
                             }
