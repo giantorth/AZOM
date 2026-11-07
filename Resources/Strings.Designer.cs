@@ -906,5 +906,6 @@ namespace MozaPlugin.Resources
         public static string FileFilter_PitHousePreset => Get("FileFilter_PitHousePreset");
         public static string Import_Footer_Applied => Get("Import_Footer_Applied");
         public static string Label_GlobalSettings => Get("Label_GlobalSettings");
+        public static string Status_WheelbaseLfeFirmwareTooOldFmt => Get("Status_WheelbaseLfeFirmwareTooOldFmt");
     }
 }

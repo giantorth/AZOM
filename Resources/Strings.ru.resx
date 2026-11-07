@@ -848,4 +848,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Пресет PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Все файлы (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Глобальные настройки</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Телеметрические эффекты (вибрация двигателя, ABS и переключения передач через базу) требуют прошивку базы 1.2.10.10 или новее. На этой базе {0}. Обновите прошивку базы в Pit House, чтобы их использовать.</value></data>
 </root>

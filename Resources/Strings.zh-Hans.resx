@@ -848,4 +848,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 预设 (*.mzpreset;*.json)|*.mzpreset;*.json|所有文件 (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>已将“{0}”应用到活动配置</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>全局设置</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>遥测效果（通过底座输出的引擎、ABS 和换挡振动）需要底座固件 1.2.10.10 或更高版本。此底座为 {0}。请在 Pit House 中更新底座固件以使用这些效果。</value></data>
 </root>

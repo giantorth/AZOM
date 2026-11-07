@@ -848,4 +848,5 @@ Id : {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Préréglage PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tous les fichiers (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>« {0} » appliqué au profil actif</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Paramètres globaux</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Les effets de télémétrie (vibrations moteur, ABS et passage de rapport via la base) nécessitent le firmware de base 1.2.10.10 ou plus récent. Cette base a la version {0}. Mettez à jour le firmware de la base dans Pit House pour les utiliser.</value></data>
 </root>

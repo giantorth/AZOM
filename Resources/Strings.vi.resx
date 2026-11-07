@@ -848,4 +848,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Cài đặt sẵn PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>đã áp dụng “{0}” cho hồ sơ đang hoạt động</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Cài đặt chung</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Hiệu ứng telemetry (rung động cơ, ABS và sang số qua đế vô lăng) cần firmware đế 1.2.10.10 trở lên. Đế này đang có {0}. Hãy cập nhật firmware đế trong Pit House để sử dụng.</value></data>
 </root>

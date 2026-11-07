@@ -853,4 +853,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse-forhåndsinnstilling (*.mzpreset;*.json)|*.mzpreset;*.json|Alle filer (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» brukt på den aktive profilen</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Globale innstillinger</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetrieffekter (motor-, ABS- og girskiftvibrasjon gjennom basen) krever basefastvare 1.2.10.10 eller nyere. Denne basen har {0}. Oppdater basefastvaren i Pit House for å bruke dem.</value></data>
 </root>

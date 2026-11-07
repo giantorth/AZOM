@@ -847,4 +847,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>το «{0}» εφαρμόστηκε στο ενεργό προφίλ</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Καθολικές ρυθμίσεις</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Τα εφέ τηλεμετρίας (δόνηση κινητήρα, ABS και αλλαγής ταχυτήτων μέσω της βάσης) απαιτούν υλικολογισμικό βάσης 1.2.10.10 ή νεότερο. Αυτή η βάση έχει {0}. Ενημερώστε το υλικολογισμικό της βάσης στο Pit House για να τα χρησιμοποιήσετε.</value></data>
 </root>

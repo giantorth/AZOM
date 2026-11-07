@@ -838,4 +838,5 @@
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse woof-preset (*.mzpreset;*.json)|*.mzpreset;*.json|Every last file (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>Buried “{0}” in the active kennel!</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Woof!</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Woof Grr Yip Barff Arf Howl Boof Yowl {0} Snarf Bork Yowff Grrowl Woof!</value></data>
 </root>

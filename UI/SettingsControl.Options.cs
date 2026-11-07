@@ -94,6 +94,7 @@ namespace MozaPlugin.UI
             if (!OptionsTab.IsSelected) return;
             if (ForzaCompatCheck != null)
                 ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
+            UpdateWheelbaseLfeSourceStatus();
         }
 
         private void RedeployDefinitionsButton_Click(object sender, RoutedEventArgs e)
@@ -133,7 +134,31 @@ namespace MozaPlugin.UI
             if (!supported) source = WheelbaseLfeSource.PluginTab;
             WheelbaseLfeSourceCombo.SelectedIndex = source == WheelbaseLfeSource.ShakeIt ? 1 : 0;
 
-            WheelbaseLfeSourceStatusText.Text = supported ? "" : Strings.Status_WheelbaseLfeShakeItUnavailable;
+            UpdateWheelbaseLfeSourceStatus();
+        }
+
+        // Set once the LFE-source switch has redeployed the base definition.
+        private bool _lfeSourceRestartPending;
+
+        // Re-run every Options tick: the base firmware version lands after connect.
+        // A pre-LFE base gets a firmware note instead of a restart prompt — neither
+        // source does anything on that firmware.
+        private void UpdateWheelbaseLfeSourceStatus()
+        {
+            string text;
+            if (!Devices.Haptics.MozaBaseHapticsBridge.IsSupported)
+                text = Strings.Status_WheelbaseLfeShakeItUnavailable;
+            else if (_data.BaseFwVersion != 0 && !_data.BaseSupportsLfe)
+                text = string.Format(Strings.Status_WheelbaseLfeFirmwareTooOldFmt, _data.BaseFwVersionText);
+            else if (_lfeSourceRestartPending)
+                text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+            else
+                text = "";
+            if (WheelbaseLfeSourceStatusText.Text != text)
+            {
+                WheelbaseLfeSourceStatusText.Text = text;
+                WheelbaseLfeSourceStatusText.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
         }
 
         private void WheelbaseLfeSource_Changed(object sender, SelectionChangedEventArgs e)
@@ -157,8 +182,8 @@ namespace MozaPlugin.UI
                     _plugin.WheelbaseWantsShakeItHaptics))
                 _plugin.DeviceDefinitionDeployed = true;
 
-            WheelbaseLfeSourceStatusText.Text = _plugin.DeviceDefinitionDeployed
-                ? Strings.Status_WheelbaseLfeSourceRestartRequired : "";
+            _lfeSourceRestartPending = _plugin.DeviceDefinitionDeployed;
+            UpdateWheelbaseLfeSourceStatus();
         }
 
         private void PedalHapticsCombinedCheck_Changed(object sender, RoutedEventArgs e)

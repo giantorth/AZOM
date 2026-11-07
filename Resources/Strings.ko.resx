@@ -847,4 +847,5 @@ Id: {2}</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 프리셋 (*.mzpreset;*.json)|*.mzpreset;*.json|모든 파일 (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>활성 프로필에 “{0}” 적용됨</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>전역 설정</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>텔레메트리 효과(휠베이스를 통한 엔진, ABS, 기어 변속 진동)에는 휠베이스 펌웨어 1.2.10.10 이상이 필요합니다. 이 베이스는 {0}입니다. 사용하려면 Pit House에서 베이스 펌웨어를 업데이트하세요.</value></data>
 </root>

@@ -9,6 +9,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
 - **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
 - **Cancel button for dashboard uploads** on the Files tab; stops the transfer and closes the wheel's upload session.
+- **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
 
 ## Fixed
 
