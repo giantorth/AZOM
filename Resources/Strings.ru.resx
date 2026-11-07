@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>ГАЗ</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>ТОРМОЗ</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>СЦЕПЛЕНИЕ</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>ГАЗ · НАПРАВЛЕНИЕ И ДИАПАЗОН</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>ТОРМОЗ · НАПРАВЛЕНИЕ И ДИАПАЗОН</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>СЦЕПЛЕНИЕ · НАПРАВЛЕНИЕ И ДИАПАЗОН</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>КРИВАЯ ВЫХОДА ГАЗА</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>КРИВАЯ ВЫХОДА ТОРМОЗА</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>КРИВАЯ ВЫХОДА СЦЕПЛЕНИЯ</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// сопоставление физического положения с входом игры</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// настройка отклика тормоза</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// настройка отклика сцепления</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ГАЗ · КАЛИБРОВКА</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>ТОРМОЗ · КАЛИБРОВКА</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>СЦЕПЛЕНИЕ · КАЛИБРОВКА</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Соотношение датчиков</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>МЕХАНИЧЕСКАЯ СХЕМА</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Схема 1</value></data>
@@ -871,4 +859,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>Для ShakeIt требуется SimHub 9.12 или новее — используется вкладка mBooster плагина.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster не добавлен в SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Педали mBooster подключены и настроены на ShakeIt, но устройство mBooster не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Диапазон</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>КАЛИБРОВКА</value></data>
 </root>

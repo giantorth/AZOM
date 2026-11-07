@@ -107,18 +107,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>THROTTLE</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>BRAKE</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>CLUTCH</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>THROTTLE · DIRECTION &amp; RANGE</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>BRAKE · DIRECTION &amp; RANGE</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>CLUTCH · DIRECTION &amp; RANGE</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>THROTTLE OUTPUT CURVE</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>BRAKE OUTPUT CURVE</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>CLUTCH OUTPUT CURVE</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value></value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// shape the brake response</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// shape the clutch response</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>THROTTLE · CALIBRATION</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>BRAKE · CALIBRATION</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>CLUTCH · CALIBRATION</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensor Ratio</value></data>
   <data name="Label_AngleSensor" xml:space="preserve"><value>Angle</value></data>
   <data name="Label_LoadCell" xml:space="preserve"><value>Load Cell</value></data>
@@ -878,4 +866,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt requires SimHub 9.12 or newer — using the plugin's mBooster tab.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster not added in SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster pedals are connected and set to ShakeIt, but the mBooster device has not been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Range</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRATE</value></data>
 </root>

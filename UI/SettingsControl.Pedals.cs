@@ -76,20 +76,14 @@ namespace MozaPlugin.UI
             ApplyPedalGroupAvailability(passive);
             if (passive)
             {
-                SeedPassivePedal("throttle", ThrottleDirCheck, ThrottleMinSlider, ThrottleMinValue,
-                    ThrottleMaxSlider, ThrottleMaxValue, _throttleCurveSliders!);
-                SeedPassivePedal("brake", BrakeDirCheck, BrakeMinSlider, BrakeMinValue,
-                    BrakeMaxSlider, BrakeMaxValue, _brakeCurveSliders!);
-                SeedPassivePedal("clutch", ClutchDirCheck, ClutchMinSlider, ClutchMinValue,
-                    ClutchMaxSlider, ClutchMaxValue, _clutchCurveSliders!);
+                SeedPassivePedal("throttle", ThrottleDirCheck, ThrottleRange, ThrottleRangeText, _throttleCurveSliders!);
+                SeedPassivePedal("brake", BrakeDirCheck, BrakeRange, BrakeRangeText, _brakeCurveSliders!);
+                SeedPassivePedal("clutch", ClutchDirCheck, ClutchRange, ClutchRangeText, _clutchCurveSliders!);
                 return;
             }
 
             ThrottleDirCheck.IsChecked = _data.PedalsThrottleDir != 0;
-            ThrottleMinSlider.Value = Clamp(_data.PedalsThrottleMin, 0, 100);
-            SetValueText(ThrottleMinValue, $"{_data.PedalsThrottleMin}%");
-            ThrottleMaxSlider.Value = Clamp(_data.PedalsThrottleMax, 0, 100);
-            SetValueText(ThrottleMaxValue, $"{_data.PedalsThrottleMax}%");
+            SeedPedalRange("throttle", ThrottleRange, ThrottleRangeText, _data.PedalsThrottleMin, _data.PedalsThrottleMax);
             SetDataSlider(ThrottleY1Slider, _data.PedalsThrottleCurve[0], 0, 100);
             SetDataSlider(ThrottleY2Slider, _data.PedalsThrottleCurve[1], 0, 100);
             SetDataSlider(ThrottleY3Slider, _data.PedalsThrottleCurve[2], 0, 100);
@@ -97,10 +91,7 @@ namespace MozaPlugin.UI
             SetDataSlider(ThrottleY5Slider, _data.PedalsThrottleCurve[4], 0, 100);
 
             BrakeDirCheck.IsChecked = _data.PedalsBrakeDir != 0;
-            BrakeMinSlider.Value = Clamp(_data.PedalsBrakeMin, 0, 100);
-            SetValueText(BrakeMinValue, $"{_data.PedalsBrakeMin}%");
-            BrakeMaxSlider.Value = Clamp(_data.PedalsBrakeMax, 0, 100);
-            SetValueText(BrakeMaxValue, $"{_data.PedalsBrakeMax}%");
+            SeedPedalRange("brake", BrakeRange, BrakeRangeText, _data.PedalsBrakeMin, _data.PedalsBrakeMax);
             BrakeAngleRatioSlider.Value = Clamp(_data.PedalsBrakeAngleRatio, 0, 100);
             SetValueText(BrakeAngleRatioValue, $"{_data.PedalsBrakeAngleRatio}%");
             SetDataSlider(BrakeY1Slider, _data.PedalsBrakeCurve[0], 0, 100);
@@ -110,10 +101,7 @@ namespace MozaPlugin.UI
             SetDataSlider(BrakeY5Slider, _data.PedalsBrakeCurve[4], 0, 100);
 
             ClutchDirCheck.IsChecked = _data.PedalsClutchDir != 0;
-            ClutchMinSlider.Value = Clamp(_data.PedalsClutchMin, 0, 100);
-            SetValueText(ClutchMinValue, $"{_data.PedalsClutchMin}%");
-            ClutchMaxSlider.Value = Clamp(_data.PedalsClutchMax, 0, 100);
-            SetValueText(ClutchMaxValue, $"{_data.PedalsClutchMax}%");
+            SeedPedalRange("clutch", ClutchRange, ClutchRangeText, _data.PedalsClutchMin, _data.PedalsClutchMax);
             SetDataSlider(ClutchY1Slider, _data.PedalsClutchCurve[0], 0, 100);
             SetDataSlider(ClutchY2Slider, _data.PedalsClutchCurve[1], 0, 100);
             SetDataSlider(ClutchY3Slider, _data.PedalsClutchCurve[2], 0, 100);
@@ -122,30 +110,21 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Passive mode shows only the groups a passive pedal holds (the active
+        /// Passive mode shows only the columns a passive pedal holds (the active
         /// pedal stays on the mBooster tab), and drops Sensor Ratio — a
         /// brake-named singleton register that would land on the active pedal.
         /// </summary>
         private void ApplyPedalGroupAvailability(bool passive)
         {
-            bool throttle = !passive || _passivePedals[0] != null;
-            bool brake = !passive || _passivePedals[1] != null;
-            bool clutch = !passive || _passivePedals[2] != null;
-            PedalSelectorThrottle.Visibility = throttle ? Visibility.Visible : Visibility.Collapsed;
-            PedalSelectorBrake.Visibility = brake ? Visibility.Visible : Visibility.Collapsed;
-            PedalSelectorClutch.Visibility = clutch ? Visibility.Visible : Visibility.Collapsed;
+            ThrottlePedalGroup.Visibility = !passive || _passivePedals[0] != null ? Visibility.Visible : Visibility.Collapsed;
+            BrakePedalGroup.Visibility = !passive || _passivePedals[1] != null ? Visibility.Visible : Visibility.Collapsed;
+            ClutchPedalGroup.Visibility = !passive || _passivePedals[2] != null ? Visibility.Visible : Visibility.Collapsed;
             BrakeAngleRatioRow.Visibility = passive ? Visibility.Collapsed : Visibility.Visible;
-            // A passive pedal's group edits its mBooster's settings entry —
+            // A passive pedal's column edits its mBooster's settings entry —
             // read-only until that entry is final, same as the mBooster tab.
             ThrottlePedalGroup.IsEnabled = PassiveGroupEditable(0, passive);
             BrakePedalGroup.IsEnabled = PassiveGroupEditable(1, passive);
             ClutchPedalGroup.IsEnabled = PassiveGroupEditable(2, passive);
-
-            bool selectedAvailable = _pedalGroup == "throttle" ? throttle
-                                   : _pedalGroup == "brake" ? brake
-                                   : clutch;
-            if (!selectedAvailable)
-                SelectPedalGroup(throttle ? "throttle" : brake ? "brake" : "clutch");
         }
 
         private bool PassiveGroupEditable(int role, bool passive)
@@ -159,8 +138,8 @@ namespace MozaPlugin.UI
         /// Seed one passive pedal's group: the profile's override where set,
         /// else what the device last reported, else the CRP defaults.
         /// </summary>
-        private void SeedPassivePedal(string pedal, System.Windows.Controls.Primitives.ToggleButton dir, Slider min, TextBox minValue,
-            Slider max, TextBox maxValue, Slider[] curveSliders)
+        private void SeedPassivePedal(string pedal, System.Windows.Controls.Primitives.ToggleButton dir,
+            MozaControls.MozaRangeSlider range, TextBlock rangeText, Slider[] curveSliders)
         {
             var target = PassivePedalFor(pedal);
             if (target == null) return;
@@ -179,12 +158,7 @@ namespace MozaPlugin.UI
 
             dir.IsChecked = Pick(cfg?.Direction ?? -1, "dir", 0) != 0;
             MozaMBoosterRegistry.ResolveOutputMapping(cfg, Device, out int lo, out int hi, out float[] curve);
-            lo = (int)Clamp(lo, 0, 100);
-            hi = (int)Clamp(hi, 0, 100);
-            min.Value = lo;
-            SetValueText(minValue, $"{lo}%");
-            max.Value = hi;
-            SetValueText(maxValue, $"{hi}%");
+            SeedPedalRange(pedal, range, rangeText, lo, hi);
             for (int i = 0; i < 5; i++)
                 SetDataSlider(curveSliders[i], (int)Math.Round(curve[i]), 0, 100);
         }
@@ -223,18 +197,49 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
-        private void PedalRangeChanged(string pedal, bool isMin, double newValue, Slider self, Slider other,
-            int plainOther, TextBox label, Action<int> plain)
+        // Last seeded/committed bounds per role, so a range change writes only
+        // the end that moved.
+        private readonly int[] _pedalRangeLo = { 0, 0, 0 };
+        private readonly int[] _pedalRangeHi = { 100, 100, 100 };
+
+        private static string PedalRangeText(int lo, int hi) => $"{lo} – {hi}%";
+
+        private void SeedPedalRange(string pedal, MozaControls.MozaRangeSlider range, TextBlock text, int lo, int hi)
         {
+            int role = PedalRoleIndex(pedal);
+            lo = (int)Clamp(lo, 0, 100);
+            hi = (int)Clamp(hi, 0, 100);
+            _pedalRangeLo[role] = lo;
+            _pedalRangeHi[role] = hi;
+            range.LowValue = lo;
+            range.HighValue = hi;
+            text.Text = PedalRangeText(lo, hi);
+        }
+
+        private void PedalRangeChanged(string pedal, MozaControls.MozaRangeSlider range, TextBlock text,
+            Action<int> plainMin, Action<int> plainMax)
+        {
+            if (_suppressEvents) return;
+            int role = PedalRoleIndex(pedal);
+            int lo = (int)Math.Round(range.LowValue), hi = (int)Math.Round(range.HighValue);
+            text.Text = PedalRangeText(lo, hi);
+            bool minMoved = lo != _pedalRangeLo[role], maxMoved = hi != _pedalRangeHi[role];
+            if (!minMoved && !maxMoved) return;
+            _pedalRangeLo[role] = lo;
+            _pedalRangeHi[role] = hi;
+
             var target = PassivePedalFor(pedal);
-            int otherBound = target != null ? (int)Math.Round(other.Value) : plainOther;
-            OnMinMaxSliderChanged(newValue, self, otherBound, isMin, label, v =>
+            if (minMoved) Commit("min", lo, plainMin);
+            if (maxMoved) Commit("max", hi, plainMax);
+            _plugin.SaveSettings();
+
+            void Commit(string field, int v, Action<int> plain)
             {
                 if (target == null) { plain(v); return; }
-                string field = isMin ? "min" : "max";
+                bool isMin = field == "min";
                 WritePassivePedal(pedal, target.Value, cfg => { if (isMin) cfg.Min = v; else cfg.Max = v; }, field,
                     (c, dev) => c.SendIntWrite($"mbooster-{pedal}-{field}", v, dev));
-            });
+            }
         }
 
         private void PedalCurveChanged(string pedal, double newValue, Slider[] sliders, Action<int> plain)

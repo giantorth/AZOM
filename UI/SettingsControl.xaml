@@ -1450,291 +1450,168 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Pedal sub-selector chips -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
-                            <Button x:Name="PedalSelectorThrottle" Content="{x:Static res:Strings.Label_Throttle}"
-                                    Style="{StaticResource MozaButtonPrimary}"
-                                    Margin="0,0,8,0" Padding="22,8"
-                                    Click="PedalSelector_Throttle_Click"
-                                    Tag="green"/>
-                            <Button x:Name="PedalSelectorBrake" Content="{x:Static res:Strings.Label_Brake}"
-                                    Margin="0,0,8,0" Padding="22,8"
-                                    Click="PedalSelector_Brake_Click"
-                                    Tag="red"/>
-                            <Button x:Name="PedalSelectorClutch" Content="{x:Static res:Strings.Label_Clutch}"
-                                    Padding="22,8"
-                                    Click="PedalSelector_Clutch_Click"
-                                    Tag="cyan"/>
-                        </StackPanel>
+                        <!-- One column per pedal. Rows=1 lets UniformGrid skip a
+                             Collapsed column (passive mode) and widen the rest. -->
+                        <UniformGrid Rows="1" Margin="-5,0">
 
                         <!-- ===== THROTTLE ===== -->
-                        <StackPanel x:Name="ThrottlePedalGroup">
-                            <!-- Green accent override for active button-selectors
-                                 inside this group (toggle ON pill, SegmentedControl
-                                 selected item). -->
-                            <StackPanel.Resources>
+                        <ctrl:SectionCard x:Name="ThrottlePedalGroup" Title="{x:Static res:Strings.Label_Throttle}"
+                                          Icon="{StaticResource IconPedals}"
+                                          AccentBrush="{StaticResource GreenBrush}"
+                                          Margin="5,0,5,14">
+                            <ctrl:SectionCard.Resources>
                                 <StaticResource x:Key="ToggleOnBrush" ResourceKey="GreenToggleOnBrush"/>
                                 <SolidColorBrush x:Key="ToggleOnTextBrush" Color="{StaticResource GreenColor}"/>
-                            </StackPanel.Resources>
-                        <!-- THROTTLE Direction & Range + Output Curve side-by-side. -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_ThrottleDirectionRange}"
-                                              Icon="{StaticResource IconPedals}"
-                                          AccentBrush="{StaticResource GreenBrush}"
-                                              Margin="0,0,7,14">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="ThrottleDirCheck" VerticalAlignment="Center" Click="ThrottleDirCheck_Click"/>
-                                    </StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeStart}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="ThrottleMinSlider" Style="{StaticResource GreenSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleMinSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="ThrottleMinValue" Style="{StaticResource GreenSliderValueEditBox}"
-                                                     Tag="{Binding ElementName=ThrottleMinSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="0%"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeEnd}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="ThrottleMaxSlider" Style="{StaticResource GreenSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleMaxSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="ThrottleMaxValue" Style="{StaticResource GreenSliderValueEditBox}"
-                                                     Tag="{Binding ElementName=ThrottleMaxSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="100%"/>
-                                    </Grid>
+                            </ctrl:SectionCard.Resources>
+                            <ctrl:SectionCard.Header>
+                                <Button x:Name="ThrottleCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="ThrottleCalStartButton_Click"/>
+                            </ctrl:SectionCard.Header>
+                            <StackPanel>
+                                <TextBlock x:Name="ThrottleCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
+                                <ProgressBar x:Name="ThrottleLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
+                                             Foreground="{StaticResource GreenBrush}" Margin="0,0,0,12"/>
+                                <ctrl:MozaCurveEditor x:Name="ThrottleCurveEditor" Height="200"
+                                                      AccentBrush="{StaticResource GreenBrush}"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,6,6" Click="ThrottleCurvePreset_Linear"/>
+                                    <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,6,6" Click="ThrottleCurvePreset_SCurve"/>
+                                    <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,6,6" Click="ThrottleCurvePreset_Exponential"/>
+                                    <Button Content="{x:Static res:Strings.Button_Parabolic}" Margin="0,0,6,6" Click="ThrottleCurvePreset_Parabolic"/>
+                                </WrapPanel>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource LabelText}" TextWrapping="Wrap"/>
+                                    <ctrl:OffOnToggle Grid.Column="1" x:Name="ThrottleDirCheck" VerticalAlignment="Center" Click="ThrottleDirCheck_Click"/>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Range}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Column="1" x:Name="ThrottleRangeText" Text="0 – 100%" FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="{StaticResource GreenBrush}" VerticalAlignment="Center"/>
+                                </Grid>
+                                <ctrl:MozaRangeSlider x:Name="ThrottleRange" Template="{StaticResource MozaRangeSliderAccentTemplate}"
+                                                      AccentBrush="{StaticResource GreenBrush}"
+                                                      MinHeight="0" Height="30" EdgePad="8" NodeSize="22" TrackThickness="6"
+                                                      Minimum="0" Maximum="100" Decimals="0" LowValue="0" HighValue="100"
+                                                      Margin="0,2,0,0" RangeChanged="ThrottleRange_RangeChanged"/>
+                                <!-- Data-store sliders, driven by ThrottleCurveEditor -->
+                                <StackPanel Visibility="Collapsed">
+                                    <Slider x:Name="ThrottleY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY1Slider_ValueChanged"/>
+                                    <Slider x:Name="ThrottleY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY2Slider_ValueChanged"/>
+                                    <Slider x:Name="ThrottleY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY3Slider_ValueChanged"/>
+                                    <Slider x:Name="ThrottleY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY4Slider_ValueChanged"/>
+                                    <Slider x:Name="ThrottleY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY5Slider_ValueChanged"/>
                                 </StackPanel>
-                                                    </ctrl:SectionCard>
-                            <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_ThrottleOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_MapPhysicalPositionToGame}"
-                                          Icon="{StaticResource IconCurve}"
-                                          AccentBrush="{StaticResource GreenBrush}"
-                                              Margin="7,0,0,14">
-                                <StackPanel>
-                                    <ctrl:MozaCurveEditor x:Name="ThrottleCurveEditor" Height="240"
-                                                          AccentBrush="{StaticResource GreenBrush}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="ThrottleCurvePreset_Linear"/>
-                                        <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="ThrottleCurvePreset_SCurve"/>
-                                        <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="ThrottleCurvePreset_Exponential"/>
-                                        <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="ThrottleCurvePreset_Parabolic"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                                    </ctrl:SectionCard>
-                        </Grid>
-
-                        <!-- Data-store sliders, driven by ThrottleCurveEditor -->
-                        <StackPanel Visibility="Collapsed">
-                            <Slider x:Name="ThrottleY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY1Slider_ValueChanged"/>
-                            <Slider x:Name="ThrottleY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY2Slider_ValueChanged"/>
-                            <Slider x:Name="ThrottleY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY3Slider_ValueChanged"/>
-                            <Slider x:Name="ThrottleY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY4Slider_ValueChanged"/>
-                            <Slider x:Name="ThrottleY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ThrottleY5Slider_ValueChanged"/>
-                        </StackPanel>
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_ThrottleCalibration}"
-                                          Icon="{StaticResource IconCal}"
-                                          AccentBrush="{StaticResource GreenBrush}">
-                            <StackPanel Margin="0,4">
-                                <Button x:Name="ThrottleCalStartButton" Content="{x:Static res:Strings.Button_StartCalibration}" HorizontalAlignment="Left" Click="ThrottleCalStartButton_Click"/>
-                                <TextBlock x:Name="ThrottleCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
                             </StackPanel>
                         </ctrl:SectionCard>
-
-                        </StackPanel>
 
                         <!-- ===== BRAKE ===== -->
-                        <StackPanel x:Name="BrakePedalGroup" Visibility="Collapsed">
-                            <StackPanel.Resources>
+                        <ctrl:SectionCard x:Name="BrakePedalGroup" Title="{x:Static res:Strings.Label_Brake}"
+                                          Icon="{StaticResource IconPedals}"
+                                          AccentBrush="{StaticResource RedBrush}"
+                                          Margin="5,0,5,14">
+                            <ctrl:SectionCard.Resources>
                                 <StaticResource x:Key="ToggleOnBrush" ResourceKey="RedToggleOnBrush"/>
                                 <SolidColorBrush x:Key="ToggleOnTextBrush" Color="{StaticResource RedColor}"/>
-                            </StackPanel.Resources>
-                        <!-- BRAKE Direction & Range + Output Curve side-by-side. -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_BrakeDirectionRange}"
-                                              Icon="{StaticResource IconPedals}"
-                                          AccentBrush="{StaticResource RedBrush}"
-                                              Margin="0,0,7,14">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="BrakeDirCheck" VerticalAlignment="Center" Click="BrakeDirCheck_Click"/>
-                                    </StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeStart}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="BrakeMinSlider" Style="{StaticResource RedSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeMinSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="BrakeMinValue" Style="{StaticResource RedSliderValueEditBox}"
-                                                     Tag="{Binding ElementName=BrakeMinSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="0%"/>
+                            </ctrl:SectionCard.Resources>
+                            <ctrl:SectionCard.Header>
+                                <Button x:Name="BrakeCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="BrakeCalStartButton_Click"/>
+                            </ctrl:SectionCard.Header>
+                            <StackPanel>
+                                <TextBlock x:Name="BrakeCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
+                                <ProgressBar x:Name="BrakeLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
+                                             Foreground="{StaticResource RedBrush}" Margin="0,0,0,12"/>
+                                <ctrl:MozaCurveEditor x:Name="BrakeCurveEditor" Height="200"
+                                                      AccentBrush="{StaticResource RedBrush}"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,6,6" Click="BrakeCurvePreset_Linear"/>
+                                    <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,6,6" Click="BrakeCurvePreset_SCurve"/>
+                                    <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,6,6" Click="BrakeCurvePreset_Exponential"/>
+                                    <Button Content="{x:Static res:Strings.Button_Parabolic}" Margin="0,0,6,6" Click="BrakeCurvePreset_Parabolic"/>
+                                </WrapPanel>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource LabelText}" TextWrapping="Wrap"/>
+                                    <ctrl:OffOnToggle Grid.Column="1" x:Name="BrakeDirCheck" VerticalAlignment="Center" Click="BrakeDirCheck_Click"/>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Range}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Column="1" x:Name="BrakeRangeText" Text="0 – 100%" FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="{StaticResource RedBrush}" VerticalAlignment="Center"/>
+                                </Grid>
+                                <ctrl:MozaRangeSlider x:Name="BrakeRange" Template="{StaticResource MozaRangeSliderAccentTemplate}"
+                                                      AccentBrush="{StaticResource RedBrush}"
+                                                      MinHeight="0" Height="30" EdgePad="8" NodeSize="22" TrackThickness="6"
+                                                      Minimum="0" Maximum="100" Decimals="0" LowValue="0" HighValue="100"
+                                                      Margin="0,2,0,0" RangeChanged="BrakeRange_RangeChanged"/>
+                                <StackPanel x:Name="BrakeAngleRatioRow" Margin="0,12,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SensorRatio}" Style="{StaticResource LabelText}" TextWrapping="Wrap"/>
+                                        <TextBox Grid.Column="1" x:Name="BrakeAngleRatioValue" Style="{StaticResource RedSliderValueEditBox}"
+                                                 Tag="{Binding ElementName=BrakeAngleRatioSlider}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="50%"/>
                                     </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeEnd}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="BrakeMaxSlider" Style="{StaticResource RedSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeMaxSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="BrakeMaxValue" Style="{StaticResource RedSliderValueEditBox}"
-                                                     Tag="{Binding ElementName=BrakeMaxSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="100%"/>
-                                    </Grid>
-                                    <Grid x:Name="BrakeAngleRatioRow" Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_SensorRatio}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="BrakeAngleRatioSlider" Style="{StaticResource RedSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeAngleRatioSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="BrakeAngleRatioValue" Style="{StaticResource RedSliderValueEditBox}"
-                                                     Tag="{Binding ElementName=BrakeAngleRatioSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="50%"/>
-                                    </Grid>
+                                    <Slider x:Name="BrakeAngleRatioSlider" Style="{StaticResource RedSettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" Margin="0,2,0,0" ValueChanged="BrakeAngleRatioSlider_ValueChanged"/>
                                 </StackPanel>
-                                                    </ctrl:SectionCard>
-                            <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_BrakeOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_ShapeBrakeResponse}"
-                                          Icon="{StaticResource IconCurve}"
-                                          AccentBrush="{StaticResource RedBrush}"
-                                              Margin="7,0,0,14">
-                                <StackPanel>
-                                    <ctrl:MozaCurveEditor x:Name="BrakeCurveEditor" Height="240"
-                                                          AccentBrush="{StaticResource RedBrush}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="BrakeCurvePreset_Linear"/>
-                                        <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="BrakeCurvePreset_SCurve"/>
-                                        <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="BrakeCurvePreset_Exponential"/>
-                                        <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="BrakeCurvePreset_Parabolic"/>
-                                    </StackPanel>
+                                <!-- Data-store sliders, driven by BrakeCurveEditor -->
+                                <StackPanel Visibility="Collapsed">
+                                    <Slider x:Name="BrakeY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY1Slider_ValueChanged"/>
+                                    <Slider x:Name="BrakeY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY2Slider_ValueChanged"/>
+                                    <Slider x:Name="BrakeY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY3Slider_ValueChanged"/>
+                                    <Slider x:Name="BrakeY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY4Slider_ValueChanged"/>
+                                    <Slider x:Name="BrakeY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY5Slider_ValueChanged"/>
                                 </StackPanel>
-                                                    </ctrl:SectionCard>
-                        </Grid>
-
-                        <!-- Data-store sliders, driven by BrakeCurveEditor -->
-                        <StackPanel Visibility="Collapsed">
-                            <Slider x:Name="BrakeY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY1Slider_ValueChanged"/>
-                            <Slider x:Name="BrakeY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY2Slider_ValueChanged"/>
-                            <Slider x:Name="BrakeY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY3Slider_ValueChanged"/>
-                            <Slider x:Name="BrakeY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY4Slider_ValueChanged"/>
-                            <Slider x:Name="BrakeY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="BrakeY5Slider_ValueChanged"/>
-                        </StackPanel>
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_BrakeCalibration}"
-                                          Icon="{StaticResource IconCal}"
-                                          AccentBrush="{StaticResource RedBrush}">
-                            <StackPanel Margin="0,4">
-                                <Button x:Name="BrakeCalStartButton" Content="{x:Static res:Strings.Button_StartCalibration}" HorizontalAlignment="Left" Click="BrakeCalStartButton_Click"/>
-                                <TextBlock x:Name="BrakeCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
                             </StackPanel>
                         </ctrl:SectionCard>
-
-                        </StackPanel>
 
                         <!-- ===== CLUTCH ===== -->
-                        <StackPanel x:Name="ClutchPedalGroup" Visibility="Collapsed">
-                        <!-- CLUTCH Direction & Range + Output Curve side-by-side. -->
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_ClutchDirectionRange}"
-                                              Icon="{StaticResource IconPedals}"
+                        <ctrl:SectionCard x:Name="ClutchPedalGroup" Title="{x:Static res:Strings.Label_Clutch}"
+                                          Icon="{StaticResource IconPedals}"
                                           AccentBrush="{StaticResource CyanBrush}"
-                                              Margin="0,0,7,14">
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,8">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle x:Name="ClutchDirCheck" VerticalAlignment="Center" Click="ClutchDirCheck_Click"/>
-                                    </StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeStart}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="ClutchMinSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchMinSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="ClutchMinValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=ClutchMinSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="0%"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_RangeEnd}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="ClutchMaxSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchMaxSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="ClutchMaxValue" Style="{StaticResource SliderValueEditBox}"
-                                                     Tag="{Binding ElementName=ClutchMaxSlider}"
-                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                     Text="100%"/>
-                                    </Grid>
+                                          Margin="5,0,5,14">
+                            <ctrl:SectionCard.Header>
+                                <Button x:Name="ClutchCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="ClutchCalStartButton_Click"/>
+                            </ctrl:SectionCard.Header>
+                            <StackPanel>
+                                <TextBlock x:Name="ClutchCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
+                                <ProgressBar x:Name="ClutchLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
+                                             Foreground="{StaticResource CyanBrush}" Margin="0,0,0,12"/>
+                                <ctrl:MozaCurveEditor x:Name="ClutchCurveEditor" Height="200"
+                                                      AccentBrush="{StaticResource CyanBrush}"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,6,6" Click="ClutchCurvePreset_Linear"/>
+                                    <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,6,6" Click="ClutchCurvePreset_SCurve"/>
+                                    <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,6,6" Click="ClutchCurvePreset_Exponential"/>
+                                    <Button Content="{x:Static res:Strings.Button_Parabolic}" Margin="0,0,6,6" Click="ClutchCurvePreset_Parabolic"/>
+                                </WrapPanel>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_ReverseDirection}" Style="{StaticResource LabelText}" TextWrapping="Wrap"/>
+                                    <ctrl:OffOnToggle Grid.Column="1" x:Name="ClutchDirCheck" VerticalAlignment="Center" Click="ClutchDirCheck_Click"/>
+                                </Grid>
+                                <Grid Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Range}" Style="{StaticResource LabelText}"/>
+                                    <TextBlock Grid.Column="1" x:Name="ClutchRangeText" Text="0 – 100%" FontFamily="{StaticResource FontMono}" FontSize="13" Foreground="{StaticResource CyanBrush}" VerticalAlignment="Center"/>
+                                </Grid>
+                                <ctrl:MozaRangeSlider x:Name="ClutchRange" Template="{StaticResource MozaRangeSliderAccentTemplate}"
+                                                      AccentBrush="{StaticResource CyanBrush}"
+                                                      MinHeight="0" Height="30" EdgePad="8" NodeSize="22" TrackThickness="6"
+                                                      Minimum="0" Maximum="100" Decimals="0" LowValue="0" HighValue="100"
+                                                      Margin="0,2,0,0" RangeChanged="ClutchRange_RangeChanged"/>
+                                <!-- Data-store sliders, driven by ClutchCurveEditor -->
+                                <StackPanel Visibility="Collapsed">
+                                    <Slider x:Name="ClutchY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY1Slider_ValueChanged"/>
+                                    <Slider x:Name="ClutchY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY2Slider_ValueChanged"/>
+                                    <Slider x:Name="ClutchY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY3Slider_ValueChanged"/>
+                                    <Slider x:Name="ClutchY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY4Slider_ValueChanged"/>
+                                    <Slider x:Name="ClutchY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY5Slider_ValueChanged"/>
                                 </StackPanel>
-                                                    </ctrl:SectionCard>
-                            <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_ClutchOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_ShapeClutchResponse}"
-                                          Icon="{StaticResource IconCurve}"
-                                          AccentBrush="{StaticResource CyanBrush}"
-                                              Margin="7,0,0,14">
-                                <StackPanel>
-                                    <ctrl:MozaCurveEditor x:Name="ClutchCurveEditor" Height="240"
-                                                          AccentBrush="{StaticResource CyanBrush}"/>
-                                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                                        <Button Content="{x:Static res:Strings.Button_Linear}" Margin="0,0,8,0" Click="ClutchCurvePreset_Linear"/>
-                                        <Button Content="{x:Static res:Strings.Button_SCurve}" Margin="0,0,8,0" Click="ClutchCurvePreset_SCurve"/>
-                                        <Button Content="{x:Static res:Strings.Button_Exponential}" Margin="0,0,8,0" Click="ClutchCurvePreset_Exponential"/>
-                                        <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="ClutchCurvePreset_Parabolic"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                                    </ctrl:SectionCard>
-                        </Grid>
-
-                        <!-- Data-store sliders, driven by ClutchCurveEditor -->
-                        <StackPanel Visibility="Collapsed">
-                            <Slider x:Name="ClutchY1Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY1Slider_ValueChanged"/>
-                            <Slider x:Name="ClutchY2Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY2Slider_ValueChanged"/>
-                            <Slider x:Name="ClutchY3Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY3Slider_ValueChanged"/>
-                            <Slider x:Name="ClutchY4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY4Slider_ValueChanged"/>
-                            <Slider x:Name="ClutchY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="ClutchY5Slider_ValueChanged"/>
-                        </StackPanel>
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_ClutchCalibration}"
-                                          Icon="{StaticResource IconCal}"
-                                          AccentBrush="{StaticResource CyanBrush}">
-                            <StackPanel Margin="0,4">
-                                <Button x:Name="ClutchCalStartButton" Content="{x:Static res:Strings.Button_StartCalibration}" HorizontalAlignment="Left" Click="ClutchCalStartButton_Click"/>
-                                <TextBlock x:Name="ClutchCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,6,0,0" Visibility="Collapsed"/>
                             </StackPanel>
                         </ctrl:SectionCard>
-                        </StackPanel><!-- /ClutchPedalGroup -->
+
+                        </UniformGrid>
 
                     </StackPanel>
                 </ScrollViewer>

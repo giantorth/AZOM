@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>ACELERADOR</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>FREIO</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>EMBREAGEM</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>ACELERADOR · DIREÇÃO E FAIXA</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>FREIO · DIREÇÃO E FAIXA</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>EMBREAGEM · DIREÇÃO E FAIXA</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>CURVA DE SAÍDA DO ACELERADOR</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>CURVA DE SAÍDA DO FREIO</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>CURVA DE SAÍDA DA EMBREAGEM</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value></value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// molde a resposta do freio</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// molde a resposta da embreagem</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ACELERADOR · CALIBRAÇÃO</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>FREIO · CALIBRAÇÃO</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>EMBREAGEM · CALIBRAÇÃO</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Proporção do sensor</value></data>
   <data name="Label_AngleSensor" xml:space="preserve"><value>Ângulo</value></data>
   <data name="Label_LoadCell" xml:space="preserve"><value>Célula de carga</value></data>
@@ -870,4 +858,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>O ShakeIt requer o SimHub 9.12 ou mais recente — está a ser usado o separador mBooster do plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster não adicionado no SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Os pedais mBooster estão conectados e configurados para ShakeIt, mas o dispositivo mBooster não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Faixa</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRAR</value></data>
 </root>

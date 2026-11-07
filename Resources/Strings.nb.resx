@@ -104,18 +104,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>GASS</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>BREMS</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>CLUTCH</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GASS · RETNING &amp; OMRÅDE</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>BREMS · RETNING &amp; OMRÅDE</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>CLUTCH · RETNING &amp; OMRÅDE</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>UTGANGSKURVE GASS</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>UTGANGSKURVE BREMS</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>UTGANGSKURVE CLUTCH</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// kartlegg fysisk posisjon til spillinngang</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// form bremseresponsen</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// form clutchresponsen</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>GASS · KALIBRERING</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>BREMS · KALIBRERING</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>CLUTCH · KALIBRERING</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensorforhold</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MEKANISK OPPSETT</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R-oppsett 1</value></data>
@@ -876,4 +864,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets mBooster-fane brukes.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster-pedalene er tilkoblet og satt til ShakeIt, men mBooster-enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Område</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>KALIBRER</value></data>
 </root>

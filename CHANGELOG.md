@@ -18,6 +18,10 @@ All notable changes to the AZOM plugin are documented here.
 - **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
 - **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
 
+## Changed
+
+- **Pedals tab shows all three pedals side by side;** each column has its live input, curve, direction and range slider, with calibrate in the card header.
+
 ## Fixed
 
 - **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.

@@ -12,10 +12,8 @@ namespace MozaControls
     /// horizontal track, each clamped against the other by [MinGap, MaxGap]
     /// so the two can never cross and the gap between them always stays in
     /// range. Used for the mBooster Pedal Feel "Start/End of Travel (mm)"
-    /// control; no dual-thumb slider exists anywhere else in this app —
-    /// every other "linked min/max" pair (Handbrake, Throttle, Brake,
-    /// Clutch, mBooster raw calibration) is two separate <see cref="Slider"/>
-    /// controls instead. See docs/protocol/devices/mbooster.md "Pedal Feel".
+    /// control, the Pedals tab's per-pedal output range, and the LFE/S12
+    /// frequency limits. See docs/protocol/devices/mbooster.md "Pedal Feel".
     /// </summary>
     public class MozaRangeSlider : Control
     {

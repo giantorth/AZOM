@@ -104,18 +104,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>ACELERADOR</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>FRENO</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>EMBRAGUE</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>ACELERADOR · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>FRENO · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>EMBRAGUE · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL ACELERADOR</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL FRENO</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL EMBRAGUE</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// mapea la posición física a la entrada del juego</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// modela la respuesta del freno</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// modela la respuesta del embrague</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ACELERADOR · CALIBRACIÓN</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>FRENO · CALIBRACIÓN</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>EMBRAGUE · CALIBRACIÓN</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Relación de sensores</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>DISPOSICIÓN MECÁNICA</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>Disposición 5+R 1</value></data>
@@ -876,4 +864,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt requiere SimHub 9.12 o posterior: se usa la pestaña mBooster del plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster no añadido en SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Los pedales mBooster están conectados y configurados para ShakeIt, pero el dispositivo mBooster no se ha añadido en SimHub. Abra Dispositivos &gt; Añadir dispositivo &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Rango</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRAR</value></data>
 </root>

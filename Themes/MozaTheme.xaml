@@ -1199,6 +1199,34 @@
         </Canvas>
     </ControlTemplate>
 
+    <!-- Thin variant coloured by the control's AccentBrush (per-pedal colours on the Pedals tab). -->
+    <ControlTemplate x:Key="MozaRangeSliderAccentTemplate" TargetType="{x:Type controls:MozaRangeSlider}">
+        <Canvas x:Name="PART_Canvas" Background="Transparent">
+            <Path Fill="{StaticResource BgTrackBrush}"
+                  Data="{Binding TrackGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
+            <Path Fill="{Binding AccentBrush, RelativeSource={RelativeSource TemplatedParent}}" Opacity="0.55"
+                  Data="{Binding RangeGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
+            <Border Background="Transparent"
+                    Width="{Binding NodeSize, RelativeSource={RelativeSource TemplatedParent}}"
+                    Height="{Binding NodeSize, RelativeSource={RelativeSource TemplatedParent}}"
+                    Canvas.Left="{Binding LowThumbX, RelativeSource={RelativeSource TemplatedParent}}"
+                    Canvas.Top="{Binding ThumbTop, RelativeSource={RelativeSource TemplatedParent}}">
+                <Rectangle Width="14" Height="22" RadiusX="3" RadiusY="3"
+                           Fill="{Binding AccentBrush, RelativeSource={RelativeSource TemplatedParent}}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            </Border>
+            <Border Background="Transparent"
+                    Width="{Binding NodeSize, RelativeSource={RelativeSource TemplatedParent}}"
+                    Height="{Binding NodeSize, RelativeSource={RelativeSource TemplatedParent}}"
+                    Canvas.Left="{Binding HighThumbX, RelativeSource={RelativeSource TemplatedParent}}"
+                    Canvas.Top="{Binding ThumbTop, RelativeSource={RelativeSource TemplatedParent}}">
+                <Rectangle Width="14" Height="22" RadiusX="3" RadiusY="3"
+                           Fill="{Binding AccentBrush, RelativeSource={RelativeSource TemplatedParent}}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+            </Border>
+        </Canvas>
+    </ControlTemplate>
+
     <!-- ============================================================ -->
     <!-- MozaSegmentedBarEditor                                        -->
     <!-- ============================================================ -->

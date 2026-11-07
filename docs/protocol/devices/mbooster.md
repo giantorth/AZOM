@@ -390,11 +390,11 @@ editing a passive pedal exists to confirm how it handles this.
 What a passive pedal does have — Direction, Range Start/End, the 5-point
 output curve and the pot calibration — is exactly the CRP pedal surface, so
 once the type verdict lands (`AxisTypesComplete`) a passive pedal with a
-role leaves the mBooster tab and appears as its role's group on the
+role leaves the mBooster tab and appears as its role's column on the
 **Pedals** tab (`MozaMBoosterRegistry.IsPedalsTabPassive`; first passive
 pedal per role wins; never while plain CRP/SRP pedals hold the pedal slot).
 The active pedal stays on the mBooster tab. A passive pedal set to Disabled
-has no Pedals-tab group, so it stays on the mBooster tab to be reassigned.
+has no Pedals-tab column, so it stays on the mBooster tab to be reassigned.
 
 Storage stays the pedal's mBooster config (`Direction`/`Min`/`Max` plus
 `HardwareCurveY`), so the connect-time apply replays it and both USB and

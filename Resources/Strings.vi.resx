@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>GA</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>PHANH</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>CÔN</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GA · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>PHANH · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>CÔN · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA GA</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA PHANH</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA CÔN</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// ánh xạ vị trí vật lý sang đầu vào game</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// định hình phản hồi phanh</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// định hình phản hồi côn</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>GA · HIỆU CHUẨN</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>PHANH · HIỆU CHUẨN</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>CÔN · HIỆU CHUẨN</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Tỷ lệ cảm biến</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>BỐ CỤC CƠ HỌC</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Bố cục 1</value></data>
@@ -871,4 +859,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ mBooster của plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Chưa thêm mBooster trong SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Bàn đạp mBooster đang được kết nối và đặt dùng ShakeIt, nhưng thiết bị mBooster chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Khoảng</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>HIỆU CHUẨN</value></data>
 </root>

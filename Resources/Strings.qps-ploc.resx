@@ -105,18 +105,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>RUFF!!</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>WROOF!!</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>RUFF!!</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>RUFF!!</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>RUFF!!</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>ARF!!</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>GRRR!!</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>YOWL!!</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value></value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>Wan!</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>Boof!</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>AWOO!!</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>BORK!!</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Awoo!</value></data>
   <data name="Label_AngleSensor" xml:space="preserve"><value>Wan!</value></data>
   <data name="Label_LoadCell" xml:space="preserve"><value>Bark!</value></data>
@@ -861,4 +849,6 @@
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>Boof Grr Howl Barff Yip Arf Wroof Woof!</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Grr Bark Woof Arf!</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Boof Snarf Grr Rrrf Barff Yip Bark Grrowl Howl Arf {0}!</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Wuff!</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>BORK!!</value></data>
 </root>

@@ -167,18 +167,6 @@ namespace MozaPlugin.Resources
         public static string Label_Throttle => Get("Label_Throttle");
         public static string Label_Brake => Get("Label_Brake");
         public static string Label_Clutch => Get("Label_Clutch");
-        public static string Section_ThrottleDirectionRange => Get("Section_ThrottleDirectionRange");
-        public static string Section_BrakeDirectionRange => Get("Section_BrakeDirectionRange");
-        public static string Section_ClutchDirectionRange => Get("Section_ClutchDirectionRange");
-        public static string Section_ThrottleOutputCurve => Get("Section_ThrottleOutputCurve");
-        public static string Section_BrakeOutputCurve => Get("Section_BrakeOutputCurve");
-        public static string Section_ClutchOutputCurve => Get("Section_ClutchOutputCurve");
-        public static string Subtitle_MapPhysicalPositionToGame => Get("Subtitle_MapPhysicalPositionToGame");
-        public static string Subtitle_ShapeBrakeResponse => Get("Subtitle_ShapeBrakeResponse");
-        public static string Subtitle_ShapeClutchResponse => Get("Subtitle_ShapeClutchResponse");
-        public static string Section_ThrottleCalibration => Get("Section_ThrottleCalibration");
-        public static string Section_BrakeCalibration => Get("Section_BrakeCalibration");
-        public static string Section_ClutchCalibration => Get("Section_ClutchCalibration");
         public static string SliderLabel_SensorRatio => Get("SliderLabel_SensorRatio");
         public static string Label_AngleSensor => Get("Label_AngleSensor");
         public static string Label_LoadCell => Get("Label_LoadCell");
@@ -929,5 +917,7 @@ namespace MozaPlugin.Resources
         public static string Status_MBoosterShakeItUnavailable => Get("Status_MBoosterShakeItUnavailable");
         public static string Banner_ProfileNotAddedMBooster_Title => Get("Banner_ProfileNotAddedMBooster_Title");
         public static string Banner_ProfileNotAddedMBooster_Body => Get("Banner_ProfileNotAddedMBooster_Body");
+        public static string SliderLabel_Range => Get("SliderLabel_Range");
+        public static string Button_Calibrate => Get("Button_Calibrate");
     }
 }

@@ -201,6 +201,13 @@ namespace MozaPlugin.UI
             PushTraceSample(_pedalThrottleTraceSamples, connected ? _data.ThrottlePosition : 0);
             PushTraceSample(_pedalClutchTraceSamples,   connected ? _data.ClutchPosition : 0);
 
+            if (PedalsTab.IsSelected)
+            {
+                ThrottleLiveBar.Value = connected ? _data.ThrottlePosition : 0;
+                BrakeLiveBar.Value = connected ? _data.BrakePosition : 0;
+                ClutchLiveBar.Value = connected ? _data.ClutchPosition : 0;
+            }
+
             UpdateMBoosterCurveMarkers(connected);
         }
 

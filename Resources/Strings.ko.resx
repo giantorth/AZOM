@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>스로틀</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>브레이크</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>클러치</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>스로틀 · 방향 및 범위</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>브레이크 · 방향 및 범위</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>클러치 · 방향 및 범위</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>스로틀 출력 커브</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>브레이크 출력 커브</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>클러치 출력 커브</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// 물리적 위치를 게임 입력으로 매핑</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// 브레이크 응답 곡선 조정</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// 클러치 응답 곡선 조정</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>스로틀 · 보정</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>브레이크 · 보정</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>클러치 · 보정</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>센서 비율</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>기계식 레이아웃</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R 레이아웃 1</value></data>
@@ -870,4 +858,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt에는 SimHub 9.12 이상이 필요합니다 — 플러그인의 mBooster 탭을 사용합니다.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster가 SimHub에 추가되지 않음</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 페달이 연결되어 ShakeIt으로 설정되어 있지만 SimHub에 mBooster 장치가 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>범위</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>보정</value></data>
 </root>

@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>GAS</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>BREMSE</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>KUPPLUNG</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GAS · RICHTUNG &amp; BEREICH</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>BREMSE · RICHTUNG &amp; BEREICH</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>KUPPLUNG · RICHTUNG &amp; BEREICH</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>GAS-AUSGABEKURVE</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>BREMSEN-AUSGABEKURVE</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>KUPPLUNGS-AUSGABEKURVE</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// physische Position auf Spieleingabe abbilden</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// Bremsverhalten formen</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// Kupplungsverhalten formen</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>GAS · KALIBRIERUNG</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>BREMSE · KALIBRIERUNG</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>KUPPLUNG · KALIBRIERUNG</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Sensor-Mischung</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>MECHANISCHES LAYOUT</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Layout 1</value></data>
@@ -871,4 +859,6 @@ Id: {2}</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt erfordert SimHub 9.12 oder neuer — es wird der mBooster-Tab des Plugins verwendet.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster nicht in SimHub hinzugefügt</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Die mBooster-Pedale sind verbunden und auf ShakeIt eingestellt, aber das mBooster-Gerät wurde nicht in SimHub hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Bereich</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>KALIBRIEREN</value></data>
 </root>
