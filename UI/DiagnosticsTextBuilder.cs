@@ -1340,6 +1340,34 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
+        /// S12 pedal vibration lanes, and for each USB unit whether a pedal set wired
+        /// into it answered as dev 0x19 on its pipe and owns the pedal writes.
+        /// </summary>
+        public static string BuildPedalHaptics(MozaPlugin plugin, MozaData data)
+        {
+            var devices = plugin.PedalHapticsRegistry?.Devices;
+            if (devices == null || devices.Count == 0)
+                return "(no S12 pedal vibration unit — USB lanes claim PID 0x002F; a routed lane is added per wheelbase pipe)";
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < devices.Count; i++)
+            {
+                var c = devices[i];
+                sb.AppendLine(
+                    $"  [{i}] {(c.IsRouted ? "routed" : "USB"),-6} {Blank(c.PortName),-8}  " +
+                    $"connected={(c.IsConnected ? "yes" : "no")}  detected={(c.Detected ? "yes" : "no")}  " +
+                    $"probes={c.ProbeAttempts}");
+                var p = c.RelayedPedals;
+                if (p != null)
+                    sb.AppendLine(
+                        $"        relayed pedals: answered={(p.Answered ? "yes" : "no")}  " +
+                        $"ownsWrites={(p.OwnsPedals ? "yes" : "no")}  " +
+                        $"settingsRead={(data.PedalsSettingsRead ? "yes" : "no")}  pendingReads={p.PendingReads}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
         /// MOZA Motion Controller lane (HMA150 platform): lifecycle phase, controller mode
         /// and flags, port map, setup values and the tail of the controller's own log.
         /// </summary>

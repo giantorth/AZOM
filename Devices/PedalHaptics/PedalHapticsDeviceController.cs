@@ -10,7 +10,8 @@ namespace MozaPlugin.Devices.PedalHaptics
     ///
     /// <list type="bullet">
     /// <item>USB — plugged straight into the PC on its own CDC port
-    /// (PID <c>0x002F</c>), addressed <c>0x12</c>.</item>
+    /// (PID <c>0x002F</c>), addressed <c>0x12</c>. A pedal set wired into the
+    /// unit answers as dev <c>0x19</c> on this pipe (<see cref="RelayedPedalsLane"/>).</item>
     /// <item>ROUTED — reached through a wheelbase/hub pipe, so frames ride that
     /// connection using the extended envelope (<c>0x1F</c> + extended id
     /// <c>0x1E</c>) and the pipe's lifecycle stays with its owning manager.</item>
@@ -36,6 +37,8 @@ namespace MozaPlugin.Devices.PedalHaptics
         private readonly bool _ownsConnection;
         private readonly Func<bool> _isShuttingDown;
         private readonly PedalHapticsEffectScheduler _effects;
+        // USB lane only: pedals wired into this unit, relayed on its pipe.
+        private readonly RelayedPedalsLane? _relayedPedals;
 
         private int _detected;      // 0/1, latched on the first vibration reply
         private int _probeAttempts;
@@ -58,6 +61,9 @@ namespace MozaPlugin.Devices.PedalHaptics
 
         /// <summary>The PID this lane's USB port enumerated as. Null on a routed lane.</summary>
         public string? DiscoveredPid => _ownsConnection ? _connection.DiscoveredPid : null;
+
+        /// <summary>Pedals relayed on this unit's own pipe. Null on a routed lane.</summary>
+        public RelayedPedalsLane? RelayedPedals => _relayedPedals;
 
         /// <summary>Raised the first time the unit answers a vibration query.</summary>
         public event Action<PedalHapticsDeviceController>? DetectedRisingEdge;
@@ -84,7 +90,8 @@ namespace MozaPlugin.Devices.PedalHaptics
         internal PedalHapticsDeviceController(
             string identity,
             string portName,
-            Func<bool>? isShuttingDown)
+            Func<bool>? isShuttingDown,
+            Func<MozaSerialConnection, RelayedPedalsLane?>? relayedPedalsFactory = null)
         {
             Identity = identity ?? throw new ArgumentNullException(nameof(identity));
             PortName = portName ?? throw new ArgumentNullException(nameof(portName));
@@ -104,9 +111,16 @@ namespace MozaPlugin.Devices.PedalHaptics
             };
             _connection.MessageReceived += OnConnectionMessage;
             _effects = new PedalHapticsEffectScheduler(this, _isShuttingDown);
+            _relayedPedals = relayedPedalsFactory?.Invoke(_connection);
         }
 
         public bool IsConnected => _connection.IsConnected;
+
+        /// <summary>Probe for pedals relayed on this unit's pipe. No-op on a routed lane.</summary>
+        public void PollRelayedPedals() => _relayedPedals?.Poll();
+
+        /// <summary>Retransmit the relayed pedals' tracked reads on this pipe.</summary>
+        public void TickRelayedPedalsRetransmits() => _relayedPedals?.TickRetransmits();
 
         /// <summary>True when this lane is bound to <paramref name="connection"/>. A routed lane
         /// borrows its owner's pipe, so if the owner ever swaps in a fresh connection object the
@@ -231,6 +245,8 @@ namespace MozaPlugin.Devices.PedalHaptics
             try { _effects.Stop(); } catch { /* shutting down */ }
 
             _connection.MessageReceived -= OnConnectionMessage;
+            // Before the pipe closes, so pedal ownership doesn't outlive it.
+            try { _relayedPedals?.Dispose(); } catch { /* shutting down */ }
             if (_ownsConnection)
             {
                 try { _connection.Disconnect(); } catch { /* shutting down */ }

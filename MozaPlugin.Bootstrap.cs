@@ -600,13 +600,14 @@ namespace MozaPlugin
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Initial refresh: {ex.Message}"); }
 
                 // Pedal-haptics registry — owns routed lanes handed over by the
-                // device prober plus any USB unit it discovers by probe. Same
-                // initial-walk reasoning as the mBooster above.
+                // device prober plus any USB unit it discovers by PID. Each USB
+                // unit also carries a lane for pedals wired into it. Initial walk
+                // is deferred until the hardware applier exists (see below).
                 _pedalHapticsRegistry = new Devices.PedalHaptics.MozaPedalHapticsRegistry(
-                    isShuttingDown: () => IsShuttingDown);
+                    isShuttingDown: () => IsShuttingDown,
+                    relayedPedalsFactory: conn => new RelayedPedalsLane(
+                        this, conn, _data, DetectionState, () => IsShuttingDown));
                 _pedalHapticsRegistry.DeviceDetected += OnPedalHapticsDeviceDetected;
-                try { _pedalHapticsRegistry.Refresh(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
 
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
@@ -684,6 +685,9 @@ namespace MozaPlugin
                     // reads on its own Send (same per-pipe isolation as the hub).
                     try { _peripheralRegistry?.TickRetransmits(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone peripheral retransmit tick failed: {ex.Message}"); }
+                    // Pedals relayed on an S12's pipe, same isolation.
+                    try { _pedalHapticsRegistry?.TickRetransmits(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Pedal-haptics retransmit tick failed: {ex.Message}"); }
                     // Old-protocol (ES/ESX) master LED brightness settle + write. This
                     // steady tick is the only cadence that survives idle (Display() is
                     // bursty, DataUpdate goes quiet) — see TickEsMasterBrightness (#113).
@@ -749,6 +753,10 @@ namespace MozaPlugin
                 // before SimHub launched without waiting for the 5 s reconnect tick.
                 try { _peripheralRegistry.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral initial refresh: {ex.Message}"); }
+                // Same constraint for the S12: a pedal set relayed on its pipe
+                // ACKs within milliseconds of the first probe.
+                try { _pedalHapticsRegistry.Refresh(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
                 // Hub-pipe peripheral prober: same _data + DetectionState, but
                 // bound to the hub connection + hub device manager so its reads
                 // and Mark*Detected ownership go out on the hub pipe.

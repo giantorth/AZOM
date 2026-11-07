@@ -182,6 +182,23 @@ throttled ring unrelated to command boundaries — it kept reporting `duration :
 through a burst whose duration field held 100 — so it is a rate-limited
 last-message repeat, not a per-effect trace.
 
+## Pedals wired into the unit
+
+A pedal set can be wired into the S12 instead of a wheelbase or hub; Pit House
+supports this hookup. The pedals then sit behind the S12's CDC port as bus device
+`0x19`. In bundle `MYMT5BM1` (SRP2 into an S12 on USB, R9 base, no Universal Hub
+enumerated) the S12 pipe carried the pedals' own `pedal_diagnostic.c` block on
+group `0x0E` from `0x91` (`PD Linked:[T 1 B 1 C 1]`, per-pedal min/max/angle,
+`Sensor Dir`, `P-Sens raw`), while the base pipe never answered the `0x19`
+presence probe.
+
+The USB lane therefore carries a `RelayedPedalsLane` (`Devices/RelayedPedalsLane.cs`)
+that probes `0x19` on the S12 pipe and, on the ACK, becomes `PedalsOwner` with its
+own device manager, retransmit tracker and prober — the same handling the
+Universal Hub pipe gets. The host→`0x19` direction through the S12 had not been
+captured when this was added; the Diagnostics `S12 pedal vibration` section shows
+whether the pedals answered (`answered=`) and own the writes (`ownsWrites=`).
+
 ## How the plugin uses this
 
 Two SimHub device layouts, picked by **Options > Combined pedal haptics device**
