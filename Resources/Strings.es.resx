@@ -317,7 +317,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>SUSPENSIÓN</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Modo de suspensión</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Tiempo de suspensión</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>TABLERO MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Buscando tablero…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>MODOS DE INDICADOR</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Modo indicador de RPM</value></data>
@@ -505,7 +504,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Emisor de telemetría no disponible (complemento no inicializado).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Primero seleccione un archivo .mzdash o una entrada de la biblioteca.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(aún no se ha recibido el estado configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Complemento no cargado</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>No se pueden obtener los bytes sin procesar de «{0}»; seleccione un archivo local en su lugar.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Carpeta: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Carga en cola: enviando «{0}» al volante…</value></data>

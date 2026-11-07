@@ -312,7 +312,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>VEILLE</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Mode veille</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Délai de veille</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>TABLEAU DE BORD MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Recherche du tableau de bord…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>MODES D'INDICATEUR</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Mode indicateur RPM</value></data>
@@ -500,7 +499,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Émetteur de télémétrie indisponible (plugin non initialisé).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Sélectionnez d'abord un fichier .mzdash ou une entrée de bibliothèque.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(aucun état configJson reçu pour l'instant)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin non chargé</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Impossible de résoudre les octets bruts pour « {0} » — choisissez plutôt un fichier local.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Dossier : {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Téléversement en file d'attente — envoi de « {0} » vers le volant…</value></data>

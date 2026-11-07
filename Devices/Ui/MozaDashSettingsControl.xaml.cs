@@ -6,7 +6,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
-using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Ui;
 
@@ -257,8 +256,6 @@ namespace MozaPlugin.Devices.Ui
             // net48 lacks [MemberNotNullWhen] to express that on ResolvePlugin.
             if (!ResolvePlugin() || _plugin == null)
             {
-                StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = Strings.Status_PluginNotLoaded;
                 DashNotDetectedPanel.Visibility = Visibility.Visible;
                 DashPanel.Visibility = Visibility.Collapsed;
                 return;
@@ -272,9 +269,7 @@ namespace MozaPlugin.Devices.Ui
 
             // Detection-based (matches MozaDashLedDeviceManager.IsConnected) so the
             // tab reflects detection independent of the lazily-injected LED driver.
-            bool dashConnected = _plugin!.IsDashDetected;
-            StatusDot.Fill = dashConnected ? Brushes.LimeGreen : Brushes.Red;
-            StatusText.Text = dashConnected ? "Connected" : "Disconnected";
+            bool dashDetected = _plugin!.IsDashDetected;
 
             // Dashboard tab (dash selection + channel mapping + files) shows whenever
             // a CM2 EXISTS to manage — behind the base or standalone-USB — since the
@@ -283,8 +278,6 @@ namespace MozaPlugin.Devices.Ui
             DashMgmtTab.Visibility =
                 _plugin.IsCm2Present ? Visibility.Visible : Visibility.Collapsed;
             DashFilesTab.Visibility = DashMgmtTab.Visibility;
-
-            bool dashDetected = dashConnected;
 
             using (_suppressor.Begin())
             {

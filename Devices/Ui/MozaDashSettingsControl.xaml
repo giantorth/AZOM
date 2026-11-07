@@ -72,22 +72,6 @@
                 <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
             </StackPanel>
 
-            <!-- Device header -->
-            <Border Background="{StaticResource BgCardBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="8"
-                    Padding="18,14" Margin="0,0,0,14">
-                <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="Gray"
-                             VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <TextBlock Text="{x:Static res:Strings.Section_MozaDashboard}"
-                               FontWeight="SemiBold" FontSize="14"
-                               VerticalAlignment="Center" Margin="0,0,18,0"/>
-                    <TextBlock x:Name="StatusText" Style="{StaticResource MutedHintText}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
             <TabControl x:Name="DashTabs" Style="{StaticResource MozaTabControl}" Margin="0,4,0,0">
 
             <TabItem x:Name="DashLedsTab" Header="{x:Static res:Strings.TabHeader_Leds}">

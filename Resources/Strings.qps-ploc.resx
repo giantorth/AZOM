@@ -339,7 +339,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>WOOF!!</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Snarf!</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Bork!</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Snarf…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>BORK!!</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Wan!</value></data>
@@ -526,7 +525,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Grr Woof!</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Wroof Ruff Grrowl!</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>Yowff Awoo!</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Arf!</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Wroof Woof Howl Barff {0} Barff Grrowl Ruff Howl!</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Wan {0}!</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Boof Yap {0} Yap Arf…</value></data>

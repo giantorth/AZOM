@@ -341,7 +341,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>SLEEP</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Sleep Mode</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Sleep Timeout</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA DASHBOARD</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Searching for dashboard...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>INDICATOR MODES</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>RPM Indicator Mode</value></data>
@@ -529,7 +528,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Telemetry sender unavailable (plugin not initialised).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Pick a .mzdash file or library entry first.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(no configJson state received yet)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin not loaded</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Cannot resolve raw bytes for "{0}" — pick a local file instead.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Folder: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload queued — pushing "{0}" to the wheel…</value></data>

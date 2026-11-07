@@ -315,7 +315,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>SOSPENSIONE</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Modalità Sleep</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Timeout Sleep</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>DASHBOARD MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Ricerca dashboard in corso...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>MODALITÀ INDICATORI</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Modalità Indicatore RPM</value></data>
@@ -503,7 +502,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Trasmettitore telemetria non disponibile (plugin non inizializzato).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Seleziona prima un file .mzdash o una voce della libreria.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(nessuno stato configJson ancora ricevuto)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin non caricato</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Impossibile risolvere i byte grezzi per «{0}» — scegli invece un file locale.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Cartella: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Caricamento in coda — invio di «{0}» al volante…</value></data>

@@ -312,7 +312,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>ΑΔΡΑΝΕΙΑ</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Λειτουργία Αδράνειας</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Χρόνος Αδράνειας</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>ΟΘΟΝΗ MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Αναζήτηση Οθόνης...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΕΣ ΔΕΙΚΤΗ</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Λειτουργία δείκτη RPM</value></data>
@@ -499,7 +498,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Ο αποστολέας τηλεμετρίας δεν είναι διαθέσιμος (το πρόσθετο δεν αρχικοποιήθηκε).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Επιλέξτε πρώτα ένα αρχείο .mzdash ή μια καταχώριση βιβλιοθήκης.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(δεν έχει ληφθεί ακόμη κατάσταση configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Το πρόσθετο δεν φορτώθηκε</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Δεν είναι δυνατή η ανάκτηση των ακατέργαστων δεδομένων για «{0}» — επιλέξτε ένα τοπικό αρχείο.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Φάκελος: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Η αποστολή σε ουρά — μεταφορά «{0}» στο τιμόνι…</value></data>

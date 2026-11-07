@@ -423,7 +423,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_SleepTimeout => Get("SliderLabel_SleepTimeout");
 
         // ----- MozaDashSettingsControl
-        public static string Section_MozaDashboard => Get("Section_MozaDashboard");
         public static string Status_SearchingForDashboard => Get("Status_SearchingForDashboard");
         public static string Section_IndicatorModes => Get("Section_IndicatorModes");
         public static string SliderLabel_RpmIndicatorMode => Get("SliderLabel_RpmIndicatorMode");
@@ -611,7 +610,6 @@ namespace MozaPlugin.Resources
         public static string Status_TelemetrySenderUnavailableInit => Get("Status_TelemetrySenderUnavailableInit");
         public static string Status_PickMzdashFirst => Get("Status_PickMzdashFirst");
         public static string Status_NoConfigJsonState => Get("Status_NoConfigJsonState");
-        public static string Status_PluginNotLoaded => Get("Status_PluginNotLoaded");
         public static string Upload_CannotResolveBytes => Get("Upload_CannotResolveBytes");
         public static string Upload_FolderPrefix => Get("Upload_FolderPrefix");
         public static string Upload_Queued => Get("Upload_Queued");

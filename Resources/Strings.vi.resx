@@ -312,7 +312,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>NGỦ</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Chế độ ngủ</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Thời gian chờ ngủ</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>BẢNG ĐIỀU KHIỂN MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Đang tìm bảng điều khiển...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>CHẾ ĐỘ ĐÈN BÁO</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Chế độ đèn báo RPM</value></data>
@@ -500,7 +499,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Bộ gửi telemetry không khả dụng (plugin chưa khởi tạo).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Trước tiên hãy chọn một tệp .mzdash hoặc một mục thư viện.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(chưa nhận được trạng thái configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin chưa được tải</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Không thể lấy dữ liệu byte cho "{0}" — hãy chọn một tệp cục bộ.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Thư mục: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Đã đưa tải lên vào hàng đợi — đang gửi "{0}" đến vô-lăng…</value></data>

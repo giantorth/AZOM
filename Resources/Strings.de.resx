@@ -312,7 +312,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>RUHEZUSTAND</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Ruhezustands-Modus</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Ruhezustands-Zeit</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA-DASHBOARD</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Suche nach Dashboard…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>INDIKATORMODI</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>RPM-Indikatormodus</value></data>
@@ -500,7 +499,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Telemetrie-Sender nicht verfügbar (Plugin nicht initialisiert).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Wählen Sie zuerst eine .mzdash-Datei oder einen Bibliothekseintrag.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(noch kein configJson-Status empfangen)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin nicht geladen</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Rohdaten für „{0}“ können nicht aufgelöst werden – wählen Sie stattdessen eine lokale Datei.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Ordner: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload in Warteschlange – „{0}“ wird an das Lenkrad gesendet…</value></data>

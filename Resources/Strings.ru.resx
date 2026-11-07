@@ -312,7 +312,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>СОН</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Режим сна</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Время до сна</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>ТАБЛО MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Поиск табло…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>РЕЖИМЫ ИНДИКАТОРА</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Режим индикатора RPM</value></data>
@@ -500,7 +499,6 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Отправитель телеметрии недоступен (плагин не инициализирован).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Сначала выберите файл .mzdash или запись из библиотеки.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(состояние configJson ещё не получено)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Плагин не загружен</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Не удаётся получить байты для «{0}» — выберите локальный файл.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Папка: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Загрузка в очереди — отправка «{0}» на руль…</value></data>
