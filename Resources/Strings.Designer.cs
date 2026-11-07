@@ -922,5 +922,6 @@ namespace MozaPlugin.Resources
         public static string HubDevice_Wheelbase => Get("HubDevice_Wheelbase");
         public static string HubDevice_Unknown => Get("HubDevice_Unknown");
         public static string HubPort_LossFormat => Get("HubPort_LossFormat");
+        public static string SliderLabel_DefaultTab => Get("SliderLabel_DefaultTab");
     }
 }

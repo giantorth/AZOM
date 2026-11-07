@@ -116,7 +116,8 @@ namespace MozaPlugin.UI
             RefreshDisplay(this, EventArgs.Empty);
         }
 
-        // The tab to land on whenever it's visible: Base until the user picks one.
+        // The tab to land on whenever it's visible: the configured default
+        // until the user picks one.
         private TabItem? _preferredTab;
         private bool _autoTabSwitch;
 

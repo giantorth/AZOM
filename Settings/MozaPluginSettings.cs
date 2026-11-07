@@ -252,6 +252,10 @@ namespace MozaPlugin.Settings
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
 
+        // x:Name of the plugin-pane tab selected when the pane opens. Empty or
+        // unknown = Base. A hidden device tab is selected once its device appears.
+        public string DefaultTab { get; set; } = "";
+
         // Which graph occupies the right-hand slot of the Base tab's live
         // telemetry pair. Defaults to Bandwidth: it costs nothing on the wire,
         // whereas Torque runs a ~15 Hz poll whenever the panel is open.

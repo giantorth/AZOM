@@ -871,4 +871,5 @@ Id: {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Wheelbase</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Device 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% loss</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Default tab</value></data>
 </root>

@@ -864,4 +864,5 @@ Id: {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Lenkradbasis</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Gerät 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % Verlust</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standard-Registerkarte</value></data>
 </root>

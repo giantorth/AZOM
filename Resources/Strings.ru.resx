@@ -864,4 +864,5 @@ Id: {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>База руля</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Устройство 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>потери {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Вкладка по умолчанию</value></data>
 </root>

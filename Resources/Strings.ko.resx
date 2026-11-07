@@ -863,4 +863,5 @@ Id: {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>휠베이스</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>장치 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>손실 {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>기본 탭</value></data>
 </root>

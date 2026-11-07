@@ -864,4 +864,5 @@ Id : {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Base du volant</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Appareil 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % de perte</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Onglet par défaut</value></data>
 </root>

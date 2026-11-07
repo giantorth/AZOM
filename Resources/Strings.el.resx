@@ -863,4 +863,5 @@ Id: {2}</value></data>
   <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Βάση τιμονιού</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Συσκευή 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>απώλεια {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Προεπιλεγμένη καρτέλα</value></data>
 </root>

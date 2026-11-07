@@ -13,6 +13,7 @@ All notable changes to the AZOM plugin are documented here.
 - **S12 Haptics tab drives the pedal shakers without ShakeIt;** one card per S12 channel, picked in Options alongside the ShakeIt layouts.
 - **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
 - **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
+- **Default tab setting in Options** picks which tab the plugin opens on.
 
 ## Fixed
 

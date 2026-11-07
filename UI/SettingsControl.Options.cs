@@ -57,6 +57,55 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        // ===== Default tab =====
+
+        // One entry per MainTabs tab, labelled with its header.
+        private void InitDefaultTabCombo()
+        {
+            DefaultTabCombo.Items.Clear();
+            foreach (var item in MainTabs.Items)
+            {
+                if (item is TabItem tab)
+                    DefaultTabCombo.Items.Add(new ComboBoxItem { Content = tab.Header, Tag = tab });
+            }
+            SyncDefaultTabCombo();
+        }
+
+        private void SyncDefaultTabCombo()
+        {
+            var tab = ResolveDefaultTab();
+            foreach (var item in DefaultTabCombo.Items)
+            {
+                if (item is ComboBoxItem ci && ReferenceEquals(ci.Tag, tab))
+                {
+                    DefaultTabCombo.SelectedItem = ci;
+                    return;
+                }
+            }
+        }
+
+        private TabItem ResolveDefaultTab()
+        {
+            string? name = _plugin.Settings.DefaultTab;
+            if (!string.IsNullOrEmpty(name))
+            {
+                foreach (var item in MainTabs.Items)
+                {
+                    if (item is TabItem t && t.Name == name) return t;
+                }
+            }
+            return BaseTab;
+        }
+
+        // Takes effect the next time the pane is built; doesn't switch tabs now.
+        private void DefaultTabCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (!(DefaultTabCombo.SelectedItem is ComboBoxItem ci && ci.Tag is TabItem tab)) return;
+            _plugin.Settings.DefaultTab = tab.Name;
+            _plugin.SaveSettings();
+        }
+
         private void Ab9DetectionCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -259,6 +308,7 @@ namespace MozaPlugin.UI
             using (_suppressor.Begin())
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
+                SyncDefaultTabCombo();
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
                 SyncPedalHapticsSourceCombo();
