@@ -93,8 +93,11 @@ namespace MozaPlugin.Devices.Extensions
         {
             RemoveLegacyPedalHapticsDefinition();
 
-            string pid = wheelbasePid;
+            // Routed to the plugin's S12 tab: no SimHub device is wanted.
             var plugin = MozaPlugin.Instance;
+            if (plugin != null && !plugin.PedalHapticsRoutedToShakeIt) return (0, 0);
+
+            string pid = wheelbasePid;
             var registry = plugin?.PedalHapticsRegistry;
             if (registry != null)
             {

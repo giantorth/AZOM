@@ -11,17 +11,14 @@ namespace MozaPlugin.UI.UpdateCheck
     {
         public string Version { get; }
         public string HtmlUrl { get; }
-        public string Notes { get; }
         public string AssetUrl { get; }
         public DateTime PublishedAtUtc { get; }
 
         public ReleaseEntry(
-            string version, string htmlUrl,
-            string notes, string assetUrl, DateTime publishedAtUtc)
+            string version, string htmlUrl, string assetUrl, DateTime publishedAtUtc)
         {
             Version = version ?? "";
             HtmlUrl = htmlUrl ?? "";
-            Notes = notes ?? "";
             AssetUrl = assetUrl ?? "";
             PublishedAtUtc = publishedAtUtc;
         }

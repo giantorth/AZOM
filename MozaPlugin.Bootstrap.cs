@@ -85,6 +85,7 @@ namespace MozaPlugin
                     MozaPluginSettings.CreateForNewInstall);
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
+                _deviceProfiles = new DeviceProfileCoordinator(this, _profileCoordinator);
                 _channelMapping = new ChannelMappingCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
@@ -145,7 +146,6 @@ namespace MozaPlugin
                         _settings.LastSeenLatestVersion = "";
                         _settings.LastSeenReleaseUrl = "";
                         _settings.LastSeenAssetUrl = "";
-                        _settings.LastSeenReleaseNotes = "";
                         _settings.LastSkippedVersion = "";
                     }
                 }
@@ -205,6 +205,20 @@ namespace MozaPlugin
                 // resolution (current-wheel page lookup, per-page settings dicts)
                 // depends on it throughout runtime.
                 MozaDeviceConstants.InitializeRegistry();
+
+                // Split the device-page settings off the main profiles into one store
+                // per device page. After the knob repair above (so the copies are
+                // clean) and the registry (page GUIDs resolve through it).
+                if (!_settings.DeviceProfilesSplit)
+                {
+                    DeviceProfileMigration.Run(_settings);
+                    _profileCoordinator.PersistSettings();
+                }
+                if (!_settings.Cm2DashboardKeysReset)
+                {
+                    DeviceProfileMigration.ResetCm2DashboardKeys(_settings);
+                    _profileCoordinator.PersistSettings();
+                }
 
                 // v1.6 replaced the code-registered "Wheelbase LFE haptics" device
                 // with the per-model wheelbase device's Haptics section. An upgraded
@@ -475,7 +489,7 @@ namespace MozaPlugin
                 // Dedicated connection for a Universal Hub (PID 0x0020) on its
                 // own COM port. Brought up alongside the wheelbase so a base with
                 // no pedal port + a hub-for-pedals enumerates the hub's peripherals
-                // (pedals / handbrake / port-power) in parallel. Like the dashboard
+                // (pedals / handbrake / port status) in parallel. Like the dashboard
                 // manager it's a fresh instance each Init (not part of the
                 // persistent-connection reuse, which is wheel-session-scoped).
                 _hubManager = new MozaHubDeviceManager();
@@ -585,13 +599,24 @@ namespace MozaPlugin
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] Initial refresh: {ex.Message}"); }
 
                 // Pedal-haptics registry — owns routed lanes handed over by the
-                // device prober plus any USB unit it discovers by probe. Same
-                // initial-walk reasoning as the mBooster above.
+                // device prober plus any USB unit it discovers by PID. Each USB
+                // unit also carries a lane for pedals wired into it. Initial walk
+                // is deferred until the hardware applier exists (see below).
                 _pedalHapticsRegistry = new Devices.PedalHaptics.MozaPedalHapticsRegistry(
-                    isShuttingDown: () => IsShuttingDown);
+                    isShuttingDown: () => IsShuttingDown,
+                    relayedPedalsFactory: conn => new RelayedPedalsLane(
+                        this, conn, _data, DetectionState, () => IsShuttingDown));
                 _pedalHapticsRegistry.DeviceDetected += OnPedalHapticsDeviceDetected;
-                try { _pedalHapticsRegistry.Refresh(); }
-                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
+
+                // S12 tab worker — idles unless Options routes the unit to the
+                // plugin tab and a unit is ready.
+                _pedalHapticsWorker = new Devices.PedalHaptics.PedalHapticsEffectWorker(
+                    () => _pedalHapticsRegistry,
+                    () => _settings?.ProfileStore?.CurrentProfile?.PedalHaptics,
+                    CreateHapticsFormulaResolver(),
+                    () => PedalHapticsRoutedToPluginTab,
+                    () => IsShuttingDown);
+                _pedalHapticsWorker.Start();
 
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
@@ -669,6 +694,9 @@ namespace MozaPlugin
                     // reads on its own Send (same per-pipe isolation as the hub).
                     try { _peripheralRegistry?.TickRetransmits(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone peripheral retransmit tick failed: {ex.Message}"); }
+                    // Pedals relayed on an S12's pipe, same isolation.
+                    try { _pedalHapticsRegistry?.TickRetransmits(); }
+                    catch (Exception ex) { MozaLog.Warn($"[AZOM] Pedal-haptics retransmit tick failed: {ex.Message}"); }
                     // Old-protocol (ES/ESX) master LED brightness settle + write. This
                     // steady tick is the only cadence that survives idle (Display() is
                     // bursty, DataUpdate goes quiet) — see TickEsMasterBrightness (#113).
@@ -723,6 +751,15 @@ namespace MozaPlugin
                 _stalksController = new StalksTruckSimController();
                 _stalksController.ApplySettings(_settings.StalksMode, _settings.StalksTruckSim);
                 _hidReader.StalksButtonChanged += _stalksController.OnStalkButton;
+                // Pedal axes come only from the HID device whose pipe owns the pedals.
+                _hidReader.PedalAxesSource = pid =>
+                {
+                    var owner = DetectionState.PedalsOwner;
+                    if (owner == null || !DetectionState.PedalsDetected) return null;
+                    return MozaUsbIds.TryParsePid(owner.Connection?.DiscoveredPid, out var ownerPid)
+                        ? ownerPid == pid
+                        : (bool?)null;
+                };
                 _hidReader.Start();
                 _propertyResolver = new SimHubPropertyResolver(_pluginManager, _data, _hidReader);
                 _hardwareApplier = new HardwareApplier(this, _data, _deviceManager, _ab9Manager, DetectionState, _dashboardManager);
@@ -734,6 +771,10 @@ namespace MozaPlugin
                 // before SimHub launched without waiting for the 5 s reconnect tick.
                 try { _peripheralRegistry.Refresh(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone peripheral initial refresh: {ex.Message}"); }
+                // Same constraint for the S12: a pedal set relayed on its pipe
+                // ACKs within milliseconds of the first probe.
+                try { _pedalHapticsRegistry.Refresh(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/PedalHaptics] Initial refresh: {ex.Message}"); }
                 // Hub-pipe peripheral prober: same _data + DetectionState, but
                 // bound to the hub connection + hub device manager so its reads
                 // and Mark*Detected ownership go out on the hub pipe.

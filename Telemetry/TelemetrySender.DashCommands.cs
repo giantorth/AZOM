@@ -75,11 +75,10 @@ namespace MozaPlugin.Telemetry
         /// Context C a denominator: "no inbound on this lane" is only evidence
         /// of a dead binding once we have actually driven the lane.
         ///
-        /// Covers the two telemetry chunk wrappers (this and
-        /// <see cref="SendRawFrame"/>), which between them carry every tier-def,
-        /// string-value and property-push chunk on the mgmt / tier-def lanes.
-        /// The uploader / downloader / RPC lanes send straight through
-        /// <c>ConnectionRef.Send</c> and are not counted.</summary>
+        /// Covers the telemetry chunk wrappers (this, <see cref="SendRawFrame"/>
+        /// and the upload's <see cref="SendAndTrackTransferChunk"/>). The
+        /// downloader / RPC lanes send straight through the connection and are
+        /// not counted.</summary>
         private void NoteOutboundChunk(byte[] frame)
         {
             // 7E [N] 43 <dev> 7C 00 [session] [type=01] [seq lo] [seq hi] …
@@ -96,6 +95,18 @@ namespace MozaPlugin.Telemetry
         /// broad wheel-only gate in Track stays for value-frame paths).</summary>
         private void SendAndTrackConfigChunk(byte[] frame)
         {
+            _connection.Send(frame);
+            _retransmitter.Track(frame, anyDevice: true);
+        }
+
+        /// <summary>File-transfer variant (dashboard upload): tracked regardless
+        /// of target device. The upload's flow control, frontier retransmits
+        /// and stall abort all run off the retransmit queue, so an untracked
+        /// CM2 chunk would leave the transfer with no window and no recovery.
+        /// The CM2 fc:00-acks data chunks cumulatively like the wheel.</summary>
+        private void SendAndTrackTransferChunk(byte[] frame)
+        {
+            NoteOutboundChunk(frame);
             _connection.Send(frame);
             _retransmitter.Track(frame, anyDevice: true);
         }

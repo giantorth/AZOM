@@ -219,7 +219,7 @@ namespace MozaPlugin.UI.Import
                     return;
                 }
                 SelectedPreset = preset;
-                Plan = PitHouseMotorMapper.BuildPlan(preset, profile);
+                Plan = PitHouseMotorMapper.BuildPlan(preset, profile, _plugin?.ActiveBaseProfile);
                 _pedalControllers = Array.Empty<MBoosterDeviceController>();
                 PopulatePedalTargets(null);
             }

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using MozaPlugin.Diagnostics;
 using MozaPlugin.Telemetry.Dashboard;
 
 namespace MozaPlugin.UI
@@ -28,9 +29,13 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Resolve raw mzdash bytes for a library entry. Tries the cache first
-        /// (wheel download or local folder), then falls back to the embedded
-        /// builtin resource. Returns null when neither resolves.
+        /// Resolve raw mzdash bytes for a library entry. A folder entry is
+        /// re-read from its file: the library scan is a snapshot, and an edit
+        /// saved since (Studio, PitHouse) must be what uploads — the stale
+        /// bytes hash-match the wheel's copy and the upload is skipped. Then
+        /// the cache (folder snapshot or wheel download), then the embedded
+        /// builtin. Returns null when nothing resolves or the file exists but
+        /// can't be read (e.g. mid-save).
         /// </summary>
         public static byte[]? ResolveBytes(
             DashboardCache? dashCache,
@@ -39,6 +44,16 @@ namespace MozaPlugin.UI
         {
             if (dashCache != null)
             {
+                string? path = dashCache.TryGetFolderFilePath(name);
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                {
+                    try { return File.ReadAllBytes(path); }
+                    catch (Exception ex)
+                    {
+                        MozaLog.Warn($"[AZOM] Cannot read dashboard '{name}' from {path}: {ex.Message}");
+                        return null;
+                    }
+                }
                 var bytes = dashCache.TryGetRawContent(name);
                 if (bytes != null) return bytes;
             }

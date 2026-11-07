@@ -79,6 +79,7 @@ namespace MozaPlugin.UI.UpdateCheck
                                 settings.UpdateChannelId = channelId;
                                 settings.UpdateChannelLabel = "";
                                 settings.LastSkippedVersion = "";
+                                settings.StableDowngradeFromVersion = "";
                                 result = UpdateCheckService.ResolveChannel(
                                     snap, channelId, out _);
                             }
@@ -100,7 +101,6 @@ namespace MozaPlugin.UI.UpdateCheck
                                 settings.LastSeenLatestVersion = result.LatestVersion;
                                 settings.LastSeenReleaseUrl = result.ReleaseUrl;
                                 settings.LastSeenAssetUrl = result.AssetUrl;
-                                settings.LastSeenReleaseNotes = result.ReleaseNotes;
                                 MozaLog.Debug(
                                     $"[UpdateCheck] {channelId}: latest={result.LatestVersion} asset={(string.IsNullOrEmpty(result.AssetUrl) ? "(none)" : "ok")}");
                             }
@@ -115,8 +115,8 @@ namespace MozaPlugin.UI.UpdateCheck
                         catch { /* persistence is best-effort */ }
 
                         // Repaint the settings pane if it's open so a fresh
-                        // result lands immediately — without this the About-card
-                        // banner + release notes would only update on the next
+                        // result lands immediately — without this the Updates-card
+                        // banner + changelog would only update on the next
                         // tab reopen or manual "Check now" (the header banner
                         // already self-refreshes on its 500ms tick).
                         try

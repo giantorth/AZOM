@@ -784,14 +784,30 @@ namespace MozaPlugin
             return true;
         }
 
-        // ===== Hub port power status (-1 = not read yet) =====
-        public volatile int HubBasePower = -1;
-        public volatile int HubPort1Power = -1;
-        public volatile int HubPort2Power = -1;
-        public volatile int HubPort3Power = -1;
-        public volatile int HubPedals1Power = -1;
-        public volatile int HubPedals2Power = -1;
-        public volatile int HubPedals3Power = -1;
+        // ===== Universal Hub port status (-1 = not read yet) =====
+        // Index 0..3 = hub ports 1..4. Device code: 0 = empty, else bus id − 0x10.
+        public readonly int[] HubPortDevice = NewNegativeOnes(4);
+        // UART packet loss ×1000 per port (1000 = nothing attached).
+        public readonly int[] HubPortLoss = NewNegativeOnes(4);
+        // Raw pedal-port connect byte; enum unresolved (see main-hub-0x12.md).
+        public volatile int HubPedalPortRaw = -1;
+        public volatile int HubClutchAdc = -1;
+        public volatile int HubBrakeAdc = -1;
+        public volatile int HubThrottleAdc = -1;
+
+        /// <summary>Forget hub port state when the hub goes away.</summary>
+        public void ResetHubPorts()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                HubPortDevice[i] = -1;
+                HubPortLoss[i] = -1;
+            }
+            HubPedalPortRaw = -1;
+            HubClutchAdc = -1;
+            HubBrakeAdc = -1;
+            HubThrottleAdc = -1;
+        }
 
         private static int[] NewNegativeOnes(int count)
         {
@@ -1100,14 +1116,19 @@ namespace MozaPlugin
                 // Shifter settings (HGP/SGP) are model-aware — routed via
                 // UpdateShifter/TryUpdateShifter, not this shared switch.
 
-                // Hub port power status
-                case "hub-base-power":    HubBasePower    = value; IsHubConnected = true; break;
-                case "hub-port1-power":   HubPort1Power   = value; IsHubConnected = true; break;
-                case "hub-port2-power":   HubPort2Power   = value; break;
-                case "hub-port3-power":   HubPort3Power   = value; break;
-                case "hub-pedals1-power": HubPedals1Power = value; break;
-                case "hub-pedals2-power": HubPedals2Power = value; break;
-                case "hub-pedals3-power": HubPedals3Power = value; break;
+                // Universal Hub port status
+                case "hub-port1-device": HubPortDevice[0] = value; break;
+                case "hub-port2-device": HubPortDevice[1] = value; break;
+                case "hub-port3-device": HubPortDevice[2] = value; break;
+                case "hub-port4-device": HubPortDevice[3] = value; break;
+                case "hub-pedal-port":   HubPedalPortRaw  = value; break;
+                case "hub-port1-loss":   HubPortLoss[0]   = value; IsHubConnected = true; break;
+                case "hub-port2-loss":   HubPortLoss[1]   = value; IsHubConnected = true; break;
+                case "hub-port3-loss":   HubPortLoss[2]   = value; break;
+                case "hub-port4-loss":   HubPortLoss[3]   = value; break;
+                case "hub-clutch-adc":   HubClutchAdc     = value; break;
+                case "hub-brake-adc":    HubBrakeAdc      = value; break;
+                case "hub-throttle-adc": HubThrottleAdc   = value; break;
             }
 
         }

@@ -33,6 +33,13 @@ namespace MozaPlugin.Devices.Ui
 
         private enum PaletteKind { IdleConstant, IdleBreath, Sleep }
 
+        /// <summary>Model token of the wheelbase device this page belongs to ("" =
+        /// the legacy shared device, which follows the attached base).</summary>
+        public string ModelPrefix { get; set; } = "";
+
+        /// <summary>This page's own profile store key.</summary>
+        private Guid? PageGuid => _plugin?.DeviceProfiles?.BasePageGuidFor(ModelPrefix);
+
         public MozaBaseSettingsControl()
         {
             using (_suppressor.Begin())
@@ -90,6 +97,10 @@ namespace MozaPlugin.Devices.Ui
             var plugin = _plugin;
             var data = _data;
             if (plugin == null || data == null) return;
+
+            var pageGuid = PageGuid;
+            DeviceProfileSelector.Bind(DeviceProfileRow, DeviceProfileList,
+                pageGuid.HasValue ? plugin.DeviceProfiles?.BaseStore(pageGuid.Value, seed: true) : null);
 
             // Detection-based (matches MozaBaseLedDeviceManager.IsConnected) so the
             // tab reflects detection independent of the lazily-injected LED driver.
@@ -182,7 +193,7 @@ namespace MozaPlugin.Devices.Ui
             int ms = (int)Math.Round(e.NewValue);
             StandbySpeedValue.Text = $"{ms}";
             _data.BaseAmbientStandbyIntervals[mode] = ms;
-            _plugin.UpdateActiveProfile(p =>
+            _plugin.UpdateBaseProfile(PageGuid, p =>
             {
                 p.BaseAmbientStandbyIntervals = EnsureIntArray(p.BaseAmbientStandbyIntervals, 6);
                 p.BaseAmbientStandbyIntervals[mode] = ms;
@@ -198,7 +209,7 @@ namespace MozaPlugin.Devices.Ui
             int ms = (int)Math.Round(e.NewValue);
             SleepSpeedValue.Text = $"{ms}";
             _data.BaseAmbientSleepBreathInterval = ms;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepBreathInterval = ms);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientSleepBreathInterval = ms);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-breath-interval", ms);
             _plugin.SaveSettings();
         }
@@ -382,7 +393,7 @@ namespace MozaPlugin.Devices.Ui
         private void PersistPerLed(PerLedTag tag, int packed)
         {
             int length = BaseModelInfo.MaxLedsPerStrip * 2;
-            _plugin!.UpdateActiveProfile(p =>
+            _plugin!.UpdateBaseProfile(PageGuid, p =>
             {
                 int[] target = EnsureIntArray(SelectProfilePalette(p, tag.Kind), length);
                 target[tag.Index] = packed;
@@ -390,7 +401,7 @@ namespace MozaPlugin.Devices.Ui
             });
         }
 
-        private static int[]? SelectProfilePalette(MozaProfile p, PaletteKind kind)
+        private static int[]? SelectProfilePalette(MozaBaseDeviceProfile p, PaletteKind kind)
         {
             switch (kind)
             {
@@ -400,7 +411,7 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
-        private static void AssignProfilePalette(MozaProfile p, PaletteKind kind, int[] value)
+        private static void AssignProfilePalette(MozaBaseDeviceProfile p, PaletteKind kind, int[] value)
         {
             switch (kind)
             {
@@ -439,7 +450,7 @@ namespace MozaPlugin.Devices.Ui
             int val = IndicatorStateCombo.SelectedIndex;
             if (val < 0) return;
             _data!.BaseAmbientIndicatorState = val;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientIndicatorState = val);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientIndicatorState = val);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-indicator-state", val);
             _plugin.SaveSettings();
         }
@@ -451,7 +462,7 @@ namespace MozaPlugin.Devices.Ui
             int deviceMode = StandbyModeCombo.SelectedIndex;
             if (deviceMode < 0) return;
             _data!.BaseAmbientStandbyMode = deviceMode;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientStandbyMode = deviceMode);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientStandbyMode = deviceMode);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-standby-mode", deviceMode);
             _plugin.SaveSettings();
             // Show/hide the speed row for the newly selected mode without
@@ -465,7 +476,7 @@ namespace MozaPlugin.Devices.Ui
             int val = SleepModeCombo.SelectedIndex;
             if (val < 0) return;
             _data!.BaseAmbientSleepMode = val;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepMode = val);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientSleepMode = val);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-mode", val);
             _plugin.SaveSettings();
             using (_suppressor.Begin()) RefreshEffectRows();
@@ -477,7 +488,7 @@ namespace MozaPlugin.Devices.Ui
             int val = (int)Math.Round(e.NewValue);
             BrightnessValue.Text = $"{val}";
             _data!.BaseAmbientBrightness = val;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientBrightness = val);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientBrightness = val);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-brightness", val);
             _plugin.SaveSettings();
         }
@@ -488,7 +499,7 @@ namespace MozaPlugin.Devices.Ui
             int val = (int)Math.Round(e.NewValue);
             SleepTimeoutValue.Text = $"{val}";
             _data!.BaseAmbientSleepTimeout = val;
-            _plugin.UpdateActiveProfile(p => p.BaseAmbientSleepTimeout = val);
+            _plugin.UpdateBaseProfile(PageGuid, p => p.BaseAmbientSleepTimeout = val);
             _plugin.HardwareApplier.WriteIfBaseAmbientSupported("base-ambient-sleep-timeout", val);
             _plugin.SaveSettings();
         }

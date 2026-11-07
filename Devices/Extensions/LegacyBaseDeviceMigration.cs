@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 
@@ -92,31 +91,11 @@ namespace MozaPlugin.Devices.Extensions
             var result = new LegacyBaseScanResult();
             try
             {
-                var root = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "PluginsData", "Common", "Devices");
-                if (!Directory.Exists(root)) return result;
-
-                foreach (var dir in Directory.GetDirectories(root))
+                foreach (var entry in SimHubDeviceRoster.Enumerate())
                 {
-                    // SimHub keeps rolling copies of index.json under _Backups.
-                    var folder = Path.GetFileName(dir);
-                    if (folder.StartsWith("_", StringComparison.Ordinal)) continue;
-
-                    var path = Path.Combine(dir, "settings.json");
-                    if (!File.Exists(path)) continue;
-
-                    JObject doc;
-                    try { doc = JObject.Parse(File.ReadAllText(path)); }
-                    catch (Exception ex)
-                    {
-                        MozaLog.Debug($"[AZOM] Skipping unreadable device settings '{folder}': {ex.Message}");
-                        continue;
-                    }
-
-                    var typeId = doc["DeviceTypeID"]?.Value<string>() ?? "";
-                    if (typeId.Length == 0) continue;
-
-                    var settings = doc["Settings"];
+                    var folder = entry.InstanceId;
+                    var typeId = entry.DeviceTypeId;
+                    var settings = entry.Document["Settings"];
 
                     if (Matches(typeId, LegacyShakeItDeviceTypeId))
                     {

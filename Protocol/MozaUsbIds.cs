@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace MozaPlugin.Protocol
 {
@@ -165,17 +164,29 @@ namespace MozaPlugin.Protocol
         // -------------------------------------------------------------
 
         // Accept "0xNNNN" (the canonical form produced by
-        // MozaSerialConnection.FormatPid) and bare 4-hex strings, with
-        // case-insensitive comparison. Anything else is treated as an
-        // unparseable PID (caller decides the fallback).
-        private static bool TryParsePid(string? pid, out ushort value)
+        // MozaSerialConnection.FormatPid) and bare hex strings, case-insensitive.
+        // Anything else is unparseable (caller decides the fallback).
+        // Allocation-free: the HID read path calls it per report.
+        internal static bool TryParsePid(string? pid, out ushort value)
         {
             value = 0;
             if (string.IsNullOrEmpty(pid)) return false;
             var s = pid!;
-            if (s.Length >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
-                s = s.Substring(2);
-            return ushort.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
+            int i = s.Length >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') ? 2 : 0;
+            if (i == s.Length || s.Length - i > 4) return false;
+            int v = 0;
+            for (; i < s.Length; i++)
+            {
+                char c = s[i];
+                int d = c >= '0' && c <= '9' ? c - '0'
+                      : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                      : c >= 'A' && c <= 'F' ? c - 'A' + 10
+                      : -1;
+                if (d < 0) return false;
+                v = (v << 4) | d;
+            }
+            value = (ushort)v;
+            return true;
         }
 
         private readonly struct InventoryEntry

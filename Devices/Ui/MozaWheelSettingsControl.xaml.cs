@@ -347,7 +347,7 @@ skipReadByMode:
             int i = (int)cb.Tag;
             if (i < 0 || i >= _data.WheelButtonDefaultDuringTelemetry.Length) return;
             _data.WheelButtonDefaultDuringTelemetry[i] = cb.IsChecked == true;
-            _plugin.UpdateActiveWheelOverlay(o =>
+            _plugin.UpdateWheelLed(WheelLedGroup.Buttons, o =>
                 o.WheelButtonDefaultDuringTelemetry = (bool[])_data.WheelButtonDefaultDuringTelemetry.Clone());
             _plugin.SaveSettings();
         }
@@ -526,20 +526,53 @@ skipReadByMode:
             switch (info.Section)
             {
                 case SwatchSection.Rpm:
-                    _plugin.UpdateActiveWheelOverlay(o =>
+                    _plugin.UpdateWheelLed(WheelLedGroup.Rpm, o =>
                         o.WheelRpmColors = MozaProfile.PackColors(_data.WheelRpmColors));
                     break;
                 case SwatchSection.Flag:
-                    _plugin.UpdateActiveWheelOverlay(o =>
+                    _plugin.UpdateWheelLed(WheelLedGroup.Rpm, o =>
                         o.WheelFlagColors = MozaProfile.PackColors(_data.WheelFlagColors));
                     break;
                 case SwatchSection.Button:
-                    _plugin.UpdateActiveWheelOverlay(o =>
+                    _plugin.UpdateWheelLed(WheelLedGroup.Buttons, o =>
                         o.WheelButtonColors = MozaProfile.PackColors(_data.WheelButtonColors));
                     break;
             }
 
             _plugin.SaveSettings();
+        }
+
+        // ===== Global vs per-profile LED tabs =====
+
+        private void SyncGlobalLedToggles(Guid? pageGuid)
+        {
+            var dp = _plugin?.DeviceProfiles;
+            using (_suppressor.Begin())
+            {
+                foreach (var (toggle, group) in new[]
+                {
+                    (RpmGlobalLedToggle, WheelLedGroup.Rpm),
+                    (ButtonsGlobalLedToggle, WheelLedGroup.Buttons),
+                    (KnobsGlobalLedToggle, WheelLedGroup.Knobs),
+                })
+                {
+                    var vis = pageGuid.HasValue ? Visibility.Visible : Visibility.Collapsed;
+                    if (toggle.Visibility != vis) toggle.Visibility = vis;
+                    bool on = dp?.IsWheelLedGlobal(pageGuid, group) == true;
+                    if ((toggle.IsChecked == true) != on) toggle.IsChecked = on;
+                }
+            }
+        }
+
+        private void GlobalLedToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null) return;
+            if (!(sender is System.Windows.Controls.Primitives.ToggleButton toggle) || !(toggle.Tag is string tag)
+                || !Enum.TryParse(tag, out WheelLedGroup group)) return;
+            var dp = _plugin.DeviceProfiles;
+            var pageGuid = dp?.WheelPageGuidFor(ExpectedModelPrefix);
+            if (dp == null || !pageGuid.HasValue) return;
+            dp.SetWheelLedGlobal(pageGuid.Value, group, toggle.IsChecked == true);
         }
 
         // ===== Knob palette persistence =====
@@ -550,7 +583,7 @@ skipReadByMode:
         private void PersistKnobRingSlots(System.Collections.Generic.IEnumerable<(int absIdx, int packed)> slots)
         {
             if (_plugin == null) return;
-            _plugin.UpdateActiveWheelOverlay(o =>
+            _plugin.UpdateWheelLed(WheelLedGroup.Knobs, o =>
             {
                 var arr = GrowUnset(o.WheelKnobRingColors, MozaData.KnobRingLedMax);
                 foreach (var (absIdx, packed) in slots)
@@ -562,7 +595,7 @@ skipReadByMode:
         private void PersistKnobActiveSlot(int knob, int packed)
         {
             if (_plugin == null || knob < 0 || knob >= MozaData.WheelKnobMax) return;
-            _plugin.UpdateActiveWheelOverlay(o =>
+            _plugin.UpdateWheelLed(WheelLedGroup.Knobs, o =>
             {
                 var arr = GrowUnset(o.WheelKnobPrimaryColors, MozaData.WheelKnobMax);
                 arr[knob] = packed;
@@ -636,6 +669,14 @@ skipReadByMode:
             if (!_swatchesBuilt)
                 BuildColorSwatches();
 
+            // This wheel page's own store; the generic / old-protocol pages follow
+            // the attached wheel (null until one identifies).
+            var dp = _plugin!.DeviceProfiles;
+            var pageGuid = dp?.WheelPageGuidFor(ExpectedModelPrefix);
+            DeviceProfileSelector.Bind(DeviceProfileRow, DeviceProfileList,
+                pageGuid.HasValue ? dp!.WheelStore(pageGuid.Value, seed: true) : null);
+            SyncGlobalLedToggles(pageGuid);
+
             // Model-aware connection check sourced from plugin detection state
             // (not the lazily-injected LED driver) so the tab reflects detection
             // even at the desktop before any DataUpdate injects the driver.
@@ -688,9 +729,9 @@ skipReadByMode:
                 // Inputs is gated on THIS page's wheel being the attached one, like
                 // every other tab. Its handlers (paddles mode / clutch point /
                 // calibration / joystick) resolve their target from the CONNECTED
-                // wheel — UpdateActiveWheelOverlay keys on _data.WheelModelName and
+                // wheel — UpdateActiveWheelProfile keys on _data.WheelModelName and
                 // WriteIfWheelDetected only checks "some wheel is detected" — so an
-                // ungated Inputs tab let the CS Pro page rewrite the KS Pro's overlay
+                // ungated Inputs tab let the CS Pro page rewrite the KS Pro's profile
                 // slot and flash its firmware (and vice versa).
                 InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
@@ -799,7 +840,7 @@ skipReadByMode:
                     // can mask the user's saved color — observed on the first
                     // RPM swatch where the wheel reports a stale value and the
                     // UI shows it instead of the just-saved user pick.
-                    var wheelOv = _plugin.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                    var wheelOv = _plugin.ActiveWheelLedProfile;
                     var rpmOverlay = MergeOverlayIntoData(wheelOv?.WheelRpmColors, _data.WheelRpmColors);
                     var flagOverlay = MergeOverlayIntoData(wheelOv?.WheelFlagColors, _data.WheelFlagColors);
                     var buttonOverlay = MergeOverlayIntoData(wheelOv?.WheelButtonColors, _data.WheelButtonColors);
@@ -825,17 +866,13 @@ skipReadByMode:
                     WiKnobSignalModeSection.Visibility = hasEncoders ? Visibility.Visible : Visibility.Collapsed;
                     WiKnobColoursSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-                    // Knob palettes render overlay-first like the RPM/button swatches
+                    // Knob palettes render saved-first like the RPM/button swatches
                     // above: the saved (sparse) arrays win and _data fills the unset
-                    // slots with the wheel's own values. Profile baseline is the
-                    // fallback tier, as in ApplyWheelToHardware.
-                    var curProfile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+                    // slots with the wheel's own values.
                     var knobActive = MergeOverlayIntoData(
-                        wheelOv?.WheelKnobPrimaryColors ?? curProfile?.WheelKnobPrimaryColors,
-                        _data.WheelKnobPrimaryColors);
+                        wheelOv?.WheelKnobPrimaryColors, _data.WheelKnobPrimaryColors);
                     var knobRing = MergeOverlayIntoData(
-                        wheelOv?.WheelKnobRingColors ?? curProfile?.WheelKnobRingColors,
-                        _data.KnobRingColors);
+                        wheelOv?.WheelKnobRingColors, _data.KnobRingColors);
                     RefreshKnobRingViz(knobActive, knobRing, knobCount, modelInfo?.KnobRingLeds);
                 }
 
@@ -890,7 +927,7 @@ skipReadByMode:
             if (_suppressEvents || _plugin == null) return;
             int val = WheelTelemetryModeCombo.SelectedIndex;
             _data!.WheelTelemetryMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelTelemetryMode = val);
+            _plugin.UpdateWheelLed(WheelLedGroup.Rpm, o => o.WheelTelemetryMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-telemetry-mode", val);
             // Transition to Static: re-push stored palette so EEPROM picks up
             // edits the user made while the group was in SimHub mode (writes
@@ -994,7 +1031,7 @@ skipReadByMode:
             int val = WheelKnobLedModeCombo.SelectedIndex;
             if (val < 0) return;
             _data!.WheelKnobLedMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobLedMode = val);
+            _plugin.UpdateWheelLed(WheelLedGroup.Knobs, o => o.WheelKnobLedMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-led-mode", val);
             if (val == 2) _plugin.HardwareApplier.RepushStaticPalette(LedKind.Knob);
             _plugin.SaveSettings();
@@ -1009,7 +1046,7 @@ skipReadByMode:
             if (_suppressEvents || _plugin == null || _data == null) return;
             bool on = WiKnobDefaultTelemetryToggle.IsChecked == true;
             _data.WheelKnobDefaultDuringTelemetry = on;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobDefaultDuringTelemetry = on);
+            _plugin.UpdateWheelLed(WheelLedGroup.Knobs, o => o.WheelKnobDefaultDuringTelemetry = on);
             _plugin.SaveSettings();
         }
 
@@ -1022,7 +1059,7 @@ skipReadByMode:
             int ms = (int)System.Math.Round(e.NewValue);
             WiKnobStaticTimeoutValue.Text = ms == 0 ? Strings.Option_Off : $"{ms} ms";
             _data.WheelKnobStaticTimeoutMs = ms;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobStaticTimeoutMs = ms);
+            _plugin.UpdateWheelLed(WheelLedGroup.Knobs, o => o.WheelKnobStaticTimeoutMs = ms);
             _plugin.SaveSettings();
         }
 
@@ -1032,7 +1069,7 @@ skipReadByMode:
             int val = WheelButtonLedModeCombo.SelectedIndex;
             if (val < 0) return;
             _data!.WheelButtonsLedMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelButtonsLedMode = val);
+            _plugin.UpdateWheelLed(WheelLedGroup.Buttons, o => o.WheelButtonsLedMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-buttons-led-mode", val);
             if (val == 2) _plugin.HardwareApplier.RepushStaticPalette(LedKind.Button);
             _plugin.SaveSettings();
@@ -1138,7 +1175,7 @@ skipReadByMode:
             // ES wheel uses +1 expression: stored 0 -> raw 1, stored 1 -> raw 2, etc.
             int raw = stored + 1;
             _data!.WheelRpmIndicatorMode = stored;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelRpmIndicatorMode = stored);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelRpmIndicatorMode = stored);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-rpm-indicator-mode", raw);
             _plugin.SaveSettings();
         }

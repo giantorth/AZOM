@@ -506,7 +506,10 @@ namespace MozaPlugin.Telemetry
         private void QueueBackgroundUploadIfReady()
         {
             if (UploadDashboard && MzdashContent != null && _mgmtPort != 0)
+            {
+                _uploader.ClearLastAttempt();
                 ThreadPool.QueueUserWorkItem(_ => _uploader.RunBackgroundUpload());
+            }
         }
 
         /// <summary>Final phase: arm the tick timer and transition to Preamble.

@@ -209,7 +209,7 @@ namespace MozaPlugin
         // Hub detection belongs ONLY to the dedicated hub connection (_hubManager),
         // which probes for a Universal Hub on the hub's OWN port and skips the
         // wheelbase port. The base/wheelbase connection must NEVER emit hub calls
-        // (hub-port-power / cmd 0x64): that device answered the base probe, so it is
+        // (group 0x64): that device answered the base probe, so it is
         // a known wheelbase and rejects hub commands ("Unexpected cmd: 100").
         private MozaHidReader _hidReader = null!;
         private StalksTruckSimController _stalksController = null!;
@@ -291,6 +291,9 @@ namespace MozaPlugin
         // see Settings/ProfileCoordinator.cs. Constructed right after _settings
         // loads, before any serial/timer callback can hit the shims below.
         private ProfileCoordinator _profileCoordinator = null!;
+        // Each device page's own profile store — see Settings/DeviceProfileCoordinator.cs.
+        private DeviceProfileCoordinator _deviceProfiles = null!;
+        internal DeviceProfileCoordinator? DeviceProfiles => _deviceProfiles;
         // Startup GitHub Releases check (24h throttle + per-process dedupe) —
         // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
         private UpdateCheckCoordinator _updateCheck = null!;
@@ -368,6 +371,9 @@ namespace MozaPlugin
         // Wheelbase LFE worker (complex gearshift / engine / ABS on base fw
         // >= 1.2.10.10). See Devices/BaseLfeEffectWorker.cs.
         private BaseLfeEffectWorker? _baseLfeWorker;
+
+        // S12 tab worker (plugin-tab mode). See Devices/PedalHaptics/PedalHapticsEffectWorker.cs.
+        private Devices.PedalHaptics.PedalHapticsEffectWorker? _pedalHapticsWorker;
 
         // Keeps the process responsive in the background: opts out of EcoQoS
         // throttling during active gameplay, and holds the 1 ms timer during gameplay
@@ -545,6 +551,7 @@ namespace MozaPlugin
         }
 
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
+        internal bool IsBaseDetected => DetectionState.BaseDetected;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
         // Independent per-model gates for the dedicated HGP / SGP tabs — both can be
@@ -552,6 +559,7 @@ namespace MozaPlugin
         internal bool IsHgpShifterDetected => DetectionState.HgpDetected;
         internal bool IsSgpShifterDetected => DetectionState.SgpDetected;
         internal bool IsHubDetected => DetectionState.HubDetected;
+        internal bool IsPedalsOnHub => _connectionCoordinator?.PedalsOnHub == true;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;

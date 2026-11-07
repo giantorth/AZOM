@@ -6,7 +6,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.UI;
 using static MozaPlugin.UI.UiHelpers;
-using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 using MozaPlugin.Devices.Ui;
 
@@ -29,6 +28,9 @@ namespace MozaPlugin.Devices.Ui
         private readonly Border[] _dashRpmBlinkColorSwatches = new Border[10];
         private readonly Border[] _dashFlagColorSwatches = new Border[6];
 
+        /// <summary>This page's own dash profile store (CM2 or CM1).</summary>
+        public Guid DashPageGuid { get; set; } = MozaPlugin.Cm2PageGuid;
+
         public MozaDashSettingsControl()
         {
             using (_suppressor.Begin())
@@ -39,8 +41,8 @@ namespace MozaPlugin.Devices.Ui
                 DashMgmtHostCm2.Content = new Ui.DashboardManagementControl { IsCm2Target = true };
                 DashFilesHostCm2.Content = new Ui.DashboardFilesControl { IsCm2Target = true };
 
-                if (ResolvePlugin())
-                    BuildColorSwatches();
+                // Swatches are built on the first refresh, once DashPageGuid is set.
+                ResolvePlugin();
             }
 
             _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -113,7 +115,7 @@ namespace MozaPlugin.Devices.Ui
             string commandPrefix)
         {
             // Blink colors are write-only (can't be polled) — read from the active profile.
-            var saved = _plugin?.Settings?.ProfileStore?.CurrentProfile?.DashRpmBlinkColors;
+            var saved = _plugin?.DeviceProfiles?.DashProfileFor(DashPageGuid)?.DashRpmBlinkColors;
             for (int i = 0; i < count; i++)
             {
                 byte r = 0, g = 0, b = 0;
@@ -173,7 +175,7 @@ namespace MozaPlugin.Devices.Ui
                 border.Background = new SolidColorBrush(Color.FromRgb(r, g, b));
 
                 // Mirror into profile color array
-                _plugin.UpdateActiveProfile(p =>
+                _plugin.UpdateDashProfile(DashPageGuid, p =>
                 {
                     int packed = (r << 16) | (g << 8) | b;
                     int[]? arr = info.CommandPrefix switch
@@ -215,7 +217,7 @@ namespace MozaPlugin.Devices.Ui
             // colors are write-only on the wire, so the profile is the only place
             // they're persisted).
             byte r = 0, g = 0, b = 0;
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+            var profile = _plugin.DeviceProfiles?.DashProfileFor(DashPageGuid);
             var currentArr = profile?.DashRpmBlinkColors;
             if (currentArr != null && info.Index < currentArr.Length)
             {
@@ -232,7 +234,7 @@ namespace MozaPlugin.Devices.Ui
                 _plugin.HardwareApplier.WriteColorIfDashDetected(cmdName, r, g, b);
 
                 int packed = (r << 16) | (g << 8) | b;
-                _plugin.UpdateActiveProfile(p =>
+                _plugin.UpdateDashProfile(DashPageGuid, p =>
                 {
                     var arr = p.DashRpmBlinkColors ?? new int[10];
                     if (info.Index < arr.Length) arr[info.Index] = packed;
@@ -254,8 +256,6 @@ namespace MozaPlugin.Devices.Ui
             // net48 lacks [MemberNotNullWhen] to express that on ResolvePlugin.
             if (!ResolvePlugin() || _plugin == null)
             {
-                StatusDot.Fill = Brushes.Gray;
-                StatusText.Text = Strings.Status_PluginNotLoaded;
                 DashNotDetectedPanel.Visibility = Visibility.Visible;
                 DashPanel.Visibility = Visibility.Collapsed;
                 return;
@@ -264,11 +264,12 @@ namespace MozaPlugin.Devices.Ui
             if (!_swatchesBuilt)
                 BuildColorSwatches();
 
+            DeviceProfileSelector.Bind(DeviceProfileRow, DeviceProfileList,
+                _plugin.DeviceProfiles?.DashStore(DashPageGuid, seed: true));
+
             // Detection-based (matches MozaDashLedDeviceManager.IsConnected) so the
             // tab reflects detection independent of the lazily-injected LED driver.
-            bool dashConnected = _plugin!.IsDashDetected;
-            StatusDot.Fill = dashConnected ? Brushes.LimeGreen : Brushes.Red;
-            StatusText.Text = dashConnected ? "Connected" : "Disconnected";
+            bool dashDetected = _plugin!.IsDashDetected;
 
             // Dashboard tab (dash selection + channel mapping + files) shows whenever
             // a CM2 EXISTS to manage — behind the base or standalone-USB — since the
@@ -277,8 +278,6 @@ namespace MozaPlugin.Devices.Ui
             DashMgmtTab.Visibility =
                 _plugin.IsCm2Present ? Visibility.Visible : Visibility.Collapsed;
             DashFilesTab.Visibility = DashMgmtTab.Visibility;
-
-            bool dashDetected = dashConnected;
 
             using (_suppressor.Begin())
             {
@@ -298,7 +297,27 @@ namespace MozaPlugin.Devices.Ui
 
                     WheelUiHelpers.UpdateSwatches(_dashRpmColorSwatches, _data.DashRpmColors, 10);
                     WheelUiHelpers.UpdateSwatches(_dashFlagColorSwatches, _data.DashFlagColors, 6);
+                    RefreshBlinkSwatches();
                 }
+            }
+        }
+
+        // Blink colours are write-only on the wire — repaint from the page's profile so
+        // a profile switch shows its palette.
+        private void RefreshBlinkSwatches()
+        {
+            var saved = _plugin?.DeviceProfiles?.DashProfileFor(DashPageGuid)?.DashRpmBlinkColors;
+            for (int i = 0; i < _dashRpmBlinkColorSwatches.Length; i++)
+            {
+                var border = _dashRpmBlinkColorSwatches[i];
+                if (border == null) continue;
+                byte r = 0, g = 0, b = 0;
+                if (saved != null && i < saved.Length && saved[i] >= 0)
+                {
+                    var rgb = MozaProfile.UnpackColor(saved[i]);
+                    r = rgb[0]; g = rgb[1]; b = rgb[2];
+                }
+                border.Background = WheelUiHelpers.GetCachedBrush(r, g, b);
             }
         }
 
@@ -313,7 +332,7 @@ namespace MozaPlugin.Devices.Ui
             if (display < 0 || display > 2) return;
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashRpmIndicatorMode = stored;
-            _plugin.UpdateActiveProfile(p => p.DashRpmIndicatorMode = stored);
+            _plugin.UpdateDashProfile(DashPageGuid, p => p.DashRpmIndicatorMode = stored);
             _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-indicator-mode", stored);
             _plugin.SaveSettings();
         }
@@ -323,7 +342,7 @@ namespace MozaPlugin.Devices.Ui
             if (_suppressEvents || _plugin == null) return;
             int val = DashRpmDisplayCombo.SelectedIndex;
             _data!.DashRpmDisplayMode = val;
-            _plugin.UpdateActiveProfile(p => p.DashRpmDisplayMode = val);
+            _plugin.UpdateDashProfile(DashPageGuid, p => p.DashRpmDisplayMode = val);
             _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-display-mode", val);
             _plugin.SaveSettings();
         }
@@ -335,7 +354,7 @@ namespace MozaPlugin.Devices.Ui
             if (display < 0 || display > 2) return;
             int stored = IndicatorMode.ToDashStored((IndicatorDisplayMode)display);
             _data!.DashFlagsIndicatorMode = stored;
-            _plugin.UpdateActiveProfile(p => p.DashFlagsIndicatorMode = stored);
+            _plugin.UpdateDashProfile(DashPageGuid, p => p.DashFlagsIndicatorMode = stored);
             _plugin.HardwareApplier.WriteIfDashDetected("dash-flags-indicator-mode", stored);
             _plugin.SaveSettings();
         }
@@ -346,7 +365,7 @@ namespace MozaPlugin.Devices.Ui
             int val = (int)Math.Round(e.NewValue);
             DashRpmBrightnessValue.Text = $"{val}";
             _data!.DashRpmBrightness = val;
-            _plugin.UpdateActiveProfile(p => p.DashRpmBrightness = val);
+            _plugin.UpdateDashProfile(DashPageGuid, p => p.DashRpmBrightness = val);
             _plugin.HardwareApplier.WriteIfDashDetected("dash-rpm-brightness", val);
             _plugin.SaveSettings();
         }
@@ -357,7 +376,7 @@ namespace MozaPlugin.Devices.Ui
             int val = (int)Math.Round(e.NewValue);
             DashFlagsBrightnessValue.Text = $"{val}";
             _data!.DashFlagsBrightness = val;
-            _plugin.UpdateActiveProfile(p => p.DashFlagsBrightness = val);
+            _plugin.UpdateDashProfile(DashPageGuid, p => p.DashFlagsBrightness = val);
             _plugin.HardwareApplier.WriteIfDashDetected("dash-flags-brightness", val);
             _plugin.SaveSettings();
         }

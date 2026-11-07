@@ -450,6 +450,158 @@ namespace MozaPlugin.Settings
     }
 
     /// <summary>
+    /// One S12 channel card. Sent to its own firmware slot on every ticked pedal.
+    /// Trigger / frequency / intensity are each a slider or a formula, as on the
+    /// LFE tab. On the Road Texture card the frequency fields carry the
+    /// suspension position (0..100) instead of Hz. See PedalHapticsEffectWorker.
+    /// </summary>
+    public sealed class PedalHapticsEffect
+    {
+        public bool Enabled { get; set; } = false;
+
+        public bool Throttle { get; set; } = false;
+        public bool Brake { get; set; } = false;
+        public bool Clutch { get; set; } = false;
+
+        public BaseLfeTriggerMode TriggerMode { get; set; } = BaseLfeTriggerMode.Level;
+        public string TriggerFormula { get; set; } = "";
+
+        // Hz (10..100); Road Texture: position. A formula's 0..100 output is
+        // rescaled into [FrequencyMin, FrequencyMax].
+        public float Frequency { get; set; } = 50;
+        public string FrequencyFormula { get; set; } = "";
+        public float FrequencyMin { get; set; } = 10;
+        public float FrequencyMax { get; set; } = 100;
+
+        public int Intensity { get; set; } = 50;
+        public string IntensityFormula { get; set; } = "";
+
+        // On-change burst length. Timed slots get it as the firmware duration.
+        public int PulseMs { get; set; } = 120;
+        public bool VibrateOnNeutral { get; set; } = false;
+        public int DebounceMs { get; set; } = 50;
+
+        public bool OnPedal(int pedalIndex) => pedalIndex switch
+        {
+            0 => Throttle,
+            1 => Brake,
+            2 => Clutch,
+            _ => false,
+        };
+
+        /// <summary>Map a frequency formula's 0..100 output into the [min,max] band.</summary>
+        public double RescaleFreq(double rawEval)
+        {
+            double lo = System.Math.Min(FrequencyMin, FrequencyMax);
+            double hi = System.Math.Max(FrequencyMin, FrequencyMax);
+            double raw01 = rawEval / 100.0;
+            if (raw01 < 0) raw01 = 0; else if (raw01 > 1) raw01 = 1;
+            return lo + raw01 * (hi - lo);
+        }
+
+        public PedalHapticsEffect Clone() => new PedalHapticsEffect
+        {
+            Enabled = Enabled,
+            Throttle = Throttle,
+            Brake = Brake,
+            Clutch = Clutch,
+            TriggerMode = TriggerMode,
+            TriggerFormula = TriggerFormula,
+            Frequency = Frequency,
+            FrequencyFormula = FrequencyFormula,
+            FrequencyMin = FrequencyMin,
+            FrequencyMax = FrequencyMax,
+            Intensity = Intensity,
+            IntensityFormula = IntensityFormula,
+            PulseMs = PulseMs,
+            VibrateOnNeutral = VibrateOnNeutral,
+            DebounceMs = DebounceMs,
+        };
+    }
+
+    /// <summary>
+    /// S12 plugin-tab effects: one card per firmware channel (S12 vibration guide,
+    /// "Effect channels"). Used only when Options routes the S12 to the plugin tab.
+    /// </summary>
+    public sealed class PedalHapticsSettings
+    {
+        private const string G = "[DataCorePlugin.GameData.";
+        public const string TcTrigger = G + "TCActive]";
+        public const string AbsTrigger = G + "ABSActive]";
+        public const string LockupTrigger = "[MozaPlugin.AZOM.WheelLockup]";
+        public const string BrakeThresholdTrigger = "if(" + G + "Brake] >= 60, 1, 0)";
+        public const string EngineTrigger = G + "Rpms]";
+        public const string EngineFrequency = G + "Rpms] / " + G + "MaxRpm] * 100";
+        public const string ClutchBiteTrigger = "if(" + G + "Clutch] >= 30 && " + G + "Clutch] <= 60, 1, 0)";
+        public const string GearTrigger = G + "Gear]";
+        public const string WheelSlipTrigger = "[MozaPlugin.AZOM.WheelSlip]";
+        public const string RoadTrigger = G + "SpeedKmh]";
+        public const string RoadPosition = "[MozaPlugin.AZOM.RoadPosition]";
+
+        public PedalHapticsEffect TractionControl { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = TcTrigger, Frequency = 40 };
+        public PedalHapticsEffect Abs { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = AbsTrigger, Frequency = 30 };
+        public PedalHapticsEffect Lockup { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = LockupTrigger, Frequency = 50 };
+        public PedalHapticsEffect BrakeThreshold { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = BrakeThresholdTrigger, TriggerMode = BaseLfeTriggerMode.OnChange, Frequency = 60, PulseMs = 150 };
+        public PedalHapticsEffect Engine { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = EngineTrigger, FrequencyFormula = EngineFrequency, Frequency = 50, FrequencyMin = 20, FrequencyMax = 80, Intensity = 30 };
+        public PedalHapticsEffect ClutchBite { get; set; } = new PedalHapticsEffect
+        { Clutch = true, TriggerFormula = ClutchBiteTrigger, Frequency = 40 };
+        public PedalHapticsEffect GearShift { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = GearTrigger, TriggerMode = BaseLfeTriggerMode.OnChange, Frequency = 50, Intensity = 70, PulseMs = 100 };
+        public PedalHapticsEffect WheelSlip { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = WheelSlipTrigger, Frequency = 35 };
+        public PedalHapticsEffect RoadTexture { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = RoadTrigger, FrequencyFormula = RoadPosition, Frequency = 50, FrequencyMin = 0, FrequencyMax = 100, Intensity = 30 };
+
+        private static readonly PedalHapticsEffect Disabled = new PedalHapticsEffect();
+
+        /// <summary>Read-only lookup for the worker and UI seeding — never mutates the profile.</summary>
+        public PedalHapticsEffect Get(Protocol.PedalHapticsEffectSlot slot) => slot switch
+        {
+            Protocol.PedalHapticsEffectSlot.TractionControl => TractionControl,
+            Protocol.PedalHapticsEffectSlot.Abs => Abs,
+            Protocol.PedalHapticsEffectSlot.Lockup => Lockup,
+            Protocol.PedalHapticsEffectSlot.BrakeThreshold => BrakeThreshold,
+            Protocol.PedalHapticsEffectSlot.EngineVibration => Engine,
+            Protocol.PedalHapticsEffectSlot.ClutchBitePoint => ClutchBite,
+            Protocol.PedalHapticsEffectSlot.GearShift => GearShift,
+            Protocol.PedalHapticsEffectSlot.WheelSlip => WheelSlip,
+            _ => RoadTexture,
+        } ?? Disabled;
+
+        /// <summary>Lookup for editing: a null card (hand-edited JSON) is replaced so it can be written.</summary>
+        public PedalHapticsEffect For(Protocol.PedalHapticsEffectSlot slot) => slot switch
+        {
+            Protocol.PedalHapticsEffectSlot.TractionControl => TractionControl ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.Abs => Abs ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.Lockup => Lockup ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.BrakeThreshold => BrakeThreshold ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.EngineVibration => Engine ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.ClutchBitePoint => ClutchBite ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.GearShift => GearShift ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.WheelSlip => WheelSlip ??= new PedalHapticsEffect(),
+            _ => RoadTexture ??= new PedalHapticsEffect(),
+        };
+
+        public PedalHapticsSettings Clone() => new PedalHapticsSettings
+        {
+            TractionControl = TractionControl?.Clone() ?? new PedalHapticsEffect(),
+            Abs = Abs?.Clone() ?? new PedalHapticsEffect(),
+            Lockup = Lockup?.Clone() ?? new PedalHapticsEffect(),
+            BrakeThreshold = BrakeThreshold?.Clone() ?? new PedalHapticsEffect(),
+            Engine = Engine?.Clone() ?? new PedalHapticsEffect(),
+            ClutchBite = ClutchBite?.Clone() ?? new PedalHapticsEffect(),
+            GearShift = GearShift?.Clone() ?? new PedalHapticsEffect(),
+            WheelSlip = WheelSlip?.Clone() ?? new PedalHapticsEffect(),
+            RoadTexture = RoadTexture?.Clone() ?? new PedalHapticsEffect(),
+        };
+    }
+
+    /// <summary>
     /// A named profile snapshot of all Moza device configuration.
     /// Extends SimHub's ProfileBase for native per-game profile switching.
     /// All integer settings use -1 as sentinel for "not included in this profile".
@@ -486,9 +638,6 @@ namespace MozaPlugin.Settings
         public int GameInertia { get; set; } = -1;
         public int GameSpring { get; set; } = -1;
 
-        // ===== Work mode =====
-        public int WorkMode { get; set; } = -1;             // 0/1
-
         // Wheelbase gear-shift vibration intensity (cmd 0x2E base, 0..5).
         // Per-profile so each game gets its own feel. Distinct from the
         // plugin-side coalescing tuning below (GearshiftVibrateOnNeutral /
@@ -498,6 +647,12 @@ namespace MozaPlugin.Settings
         // Performance output (cmd 0x1E base): 0 = Reserved, 1 = Full. Per-profile
         // so each game keeps its own bandwidth-mode preference.
         public int TempStrategy { get; set; } = -1;
+
+        // LEGACY — every Wheel*, Dash*, BaseAmbient* field plus TelemetryDashboardKey,
+        // WheelOverridesByPageGuid, TelemetryChannelMappings, Fsr1DashboardMappings and
+        // Cm1FieldMappings now live in the device profile stores (DeviceProfileRegistry).
+        // Kept serialized so a downgraded build still reads them; read only by
+        // DeviceProfileMigration.
 
         // ===== Wheel LED settings =====
         public int WheelTelemetryMode { get; set; } = -1;
@@ -627,6 +782,10 @@ namespace MozaPlugin.Settings
         // dropdown; "" = none/custom). Persisted so the dropdown remembers its pick.
         public string BaseLfePresetName { get; set; } = "";
 
+        // ===== S12 pedal haptics (plugin-tab mode) =====
+        // Null until the user touches the S12 Haptics tab for this profile.
+        public PedalHapticsSettings? PedalHaptics { get; set; }
+
         // ===== HMA150 motion platform effects =====
         // Null until set from the HMA150 panel or a Motion Manager preset import; the
         // controller then keeps its own values. Not captured from device reads.
@@ -745,7 +904,6 @@ namespace MozaPlugin.Settings
             // Game effects
             GameDamper = p.GameDamper; GameFriction = p.GameFriction;
             GameInertia = p.GameInertia; GameSpring = p.GameSpring;
-            WorkMode = p.WorkMode;
             GearshiftVibration = p.GearshiftVibration;
             TempStrategy = p.TempStrategy;
 
@@ -828,6 +986,7 @@ namespace MozaPlugin.Settings
             Ab9 = p.Ab9?.Clone();
             BaseLfe = p.BaseLfe?.Clone();
             BaseLfePresetName = p.BaseLfePresetName;
+            PedalHaptics = p.PedalHaptics?.Clone();
             MotionEffects = p.MotionEffects?.Clone();
 
             // mBooster — deep-copy each per-device settings entry.
@@ -924,19 +1083,10 @@ namespace MozaPlugin.Settings
         // ===== Capture current state =====
 
         /// <summary>
-        /// Populate this profile by capturing all current device state.
+        /// Populate this profile by capturing the device-read main-tab state.
         /// </summary>
-        /// <param name="activeDashboardKey">
-        /// Identity of the currently-loaded dashboard, in the same format
-        /// <see cref="Telemetry.ChannelMappingCoordinator.GetActiveDashboardKeyCandidates"/> returns.
-        /// Pass <c>null</c> to leave <see cref="TelemetryDashboardKey"/> untouched
-        /// (e.g. when the plugin can't resolve a key — early init, no profile loaded).
-        /// </param>
-        public void CaptureFromCurrent(MozaData data, string? activeDashboardKey = null)
+        public void CaptureFromCurrent(MozaData data)
         {
-            if (!string.IsNullOrEmpty(activeDashboardKey))
-                TelemetryDashboardKey = activeDashboardKey;
-
             // Base/Motor + game effects. These carry the -1 sentinel until the base
             // reports them, so capturing an unread field stores -1 and every
             // downstream write skips it (HardwareApplier's Apply helper). Ungated
@@ -955,7 +1105,6 @@ namespace MozaPlugin.Settings
 
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;
-            WorkMode = data.WorkMode;
             GearshiftVibration = data.GearshiftVibration;
             TempStrategy = data.TempStrategy;
             RoadSensitivity = data.RoadSensitivity;
@@ -1013,47 +1162,19 @@ namespace MozaPlugin.Settings
             SgpBrightness = data.ShifterSgp.Brightness;
             SgpLed1Index = data.ShifterSgp.Led1Index; SgpLed2Index = data.ShifterSgp.Led2Index;
 
-            // NOTE: wheel-LED / ES-wheel / Dash / Base-ambient / Gearshift / AB9
-            // fields are NOT captured here. They are written directly to the
-            // profile (or wheel-page overlay) by their UI handlers — re-capturing
-            // them from stale flat fields would corrupt the persisted state.
-            // Wheel colors / blink colors / knob colors live in WheelOverride;
-            // dash colors / dash blink live on the profile via the dash UI handler.
+            // NOTE: Gearshift / AB9 fields are written directly by their UI
+            // handlers. Wheel / dash / base-ambient live in the device profile stores.
         }
 
         /// <summary>
-        /// Seed this profile's dash / base-ambient / gearshift baselines from the
-        /// global <see cref="MozaPluginSettings"/> flat defaults. Sentinel-only
-        /// (writes only where the baseline is still at its -1 / null "not set"
-        /// marker), so it's idempotent and never overwrites a user value.
-        ///
-        /// Runs at profile creation (ProfileCoordinator.InitProfileSystem) and on
-        /// every dash apply (HardwareApplier.ApplyDashToHardware)
-        /// — SimHub auto-creates per-game profiles with all-sentinel fields, and
-        /// without seeding the >=0 guards downstream skip every write, leaving the
-        /// display dark.
+        /// Seed this profile's gearshift baselines from the global
+        /// <see cref="MozaPluginSettings"/> flat defaults. Sentinel-only, so it's
+        /// idempotent and never overwrites a user value. The dash / base-ambient
+        /// equivalents live on the device profiles.
         /// </summary>
         public void SeedBaselineFromFlatFields(MozaPluginSettings settings)
         {
             if (settings == null) return;
-
-            // Dash brightness baselines.
-            if (DashRpmBrightness     < 0) DashRpmBrightness     = settings.DashRpmBrightness;
-            if (DashFlagsBrightness   < 0) DashFlagsBrightness   = settings.DashFlagsBrightness;
-            if (DashDisplayBrightness < 0) DashDisplayBrightness = settings.DashDisplayBrightness;
-            if (DashDisplayStandbyMin < 0) DashDisplayStandbyMin = settings.DashDisplayStandbyMin;
-            if (DashDisplayRotation   < 0) DashDisplayRotation   = settings.DashDisplayRotation;
-            if (DashRpmBlinkColors == null && settings.DashRpmBlinkColors != null)
-                DashRpmBlinkColors = (int[])settings.DashRpmBlinkColors.Clone();
-
-            // Base ambient.
-            if (BaseAmbientBrightness     < 0) BaseAmbientBrightness     = settings.BaseAmbientBrightness;
-            if (BaseAmbientStandbyMode    < 0) BaseAmbientStandbyMode    = settings.BaseAmbientStandbyMode;
-            if (BaseAmbientIndicatorState < 0) BaseAmbientIndicatorState = settings.BaseAmbientIndicatorState;
-            if (BaseAmbientSleepMode      < 0) BaseAmbientSleepMode      = settings.BaseAmbientSleepMode;
-            if (BaseAmbientSleepTimeout   < 0) BaseAmbientSleepTimeout   = settings.BaseAmbientSleepTimeout;
-            if (BaseAmbientStartupColor   < 0) BaseAmbientStartupColor   = settings.BaseAmbientStartupColor;
-            if (BaseAmbientShutdownColor  < 0) BaseAmbientShutdownColor  = settings.BaseAmbientShutdownColor;
 
             // Gearshift.
             if (GearshiftVibrateOnNeutral < 0) GearshiftVibrateOnNeutral = settings.GearshiftVibrateOnNeutral ? 1 : 0;

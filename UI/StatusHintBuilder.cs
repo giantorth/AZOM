@@ -256,7 +256,7 @@ namespace MozaPlugin.UI
             // leaving out a pedal with no motor is a valid setup.
             if (elapsed >= ProfileNotAddedSettling
                 && !plugin.DeviceDefinitionDeployed
-                && Devices.Haptics.MozaPedalHapticsBridge.IsSupported
+                && plugin.PedalHapticsRoutedToShakeIt
                 && plugin.PedalHapticsRegistry?.AnyDetected == true
                 && !plugin.PedalHapticsDeviceExtensionActive)
             {

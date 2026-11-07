@@ -19,7 +19,7 @@ namespace MozaPlugin.Devices.Ui
     //
     // No forwarding to SettingsControl.Instance: all reads come from `_data`,
     // all writes go to `_plugin.WriteIfWheelDetected` + `_plugin.SaveSettings`
-    // and update `_plugin.UpdateActiveWheelOverlay`. Same path the plugin-pane
+    // and update `_plugin.UpdateActiveWheelProfile`. Same path the plugin-pane
     // handlers use, no logic duplication risk because plugin-pane WheelTab is
     // hidden and its handlers no longer fire.
     public partial class MozaWheelSettingsControl
@@ -158,7 +158,7 @@ namespace MozaPlugin.Devices.Ui
             if (_suppressEvents || _plugin == null || _data == null) return;
             int val = WiPaddlesModeCombo.SelectedIndex;
             _data.WheelPaddlesMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelPaddlesMode = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelPaddlesMode = val);
             ApplyPaddleVisibility(val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-paddles-mode", val + 1);
             _plugin.SaveSettings();
@@ -208,7 +208,7 @@ namespace MozaPlugin.Devices.Ui
             int val = (int)Math.Round(e.NewValue);
             WiClutchPointValue.Text = $"{val}%";
             _data.WheelClutchPoint = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelClutchPoint = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
         }
@@ -218,7 +218,7 @@ namespace MozaPlugin.Devices.Ui
             if (_suppressEvents || _plugin == null || _data == null) return;
             int val = WiKnobModeCombo.SelectedIndex;
             _data.WheelKnobMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelKnobMode = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelKnobMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-mode", val);
             _plugin.SaveSettings();
         }
@@ -232,7 +232,7 @@ namespace MozaPlugin.Devices.Ui
             if (_suppressEvents || _plugin == null || _data == null) return;
             if (value < 0) return; // no selection
             _data.WheelKnobSignalModes[index] = value;
-            _plugin.UpdateActiveWheelOverlay(o =>
+            _plugin.UpdateActiveWheelProfile(o =>
                 o.WheelKnobSignalModes = (int[])_data.WheelKnobSignalModes.Clone());
             // index is the logical knob (LED/UI order); the wire command addresses
             // the firmware signal-mode index, which differs on the KS Pro.
@@ -249,7 +249,7 @@ namespace MozaPlugin.Devices.Ui
             int val = WiStickModeOldCombo.SelectedIndex;
             if (val < 0) return; // fires during refresh
             _data.WheelStickMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelStickMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-stick-mode", val * 256);
             _plugin.SaveSettings();
         }
@@ -259,7 +259,7 @@ namespace MozaPlugin.Devices.Ui
             if (_suppressEvents || _plugin == null || _data == null) return;
             int val = WiStickModeCombo.SelectedIndex;
             _data.WheelStickMode = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelStickMode = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelStickMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-stick-mode-new", val);
             _plugin.SaveSettings();
         }
@@ -292,9 +292,9 @@ namespace MozaPlugin.Devices.Ui
                 // silently drops the wheel-paddles-mode / wheel-clutch-point readback
                 // (see WheelOverride's "Inputs" comment), and _data is not per-wheel:
                 // ClearWheelIdentity leaves these mirrors alone, so after a rim swap
-                // _data still holds the OTHER rim's mode. The overlay is keyed by the
-                // wheel's page GUID, so it is the only per-wheel truth available.
-                var ov = _plugin?.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                // _data still holds the OTHER rim's mode. The wheel profile lives in the
+                // wheel page's own store, so it is the only per-wheel truth available.
+                var ov = _plugin?.ActiveWheelProfile;
 
                 if (newWheelDetected)
                 {

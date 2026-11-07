@@ -66,9 +66,12 @@ namespace MozaPlugin.UI
                 _clutchCurveSliders   = new[] { ClutchY1Slider,   ClutchY2Slider,   ClutchY3Slider,   ClutchY4Slider,   ClutchY5Slider };
                 ConnectionToggle.IsChecked = plugin.ConnectionEnabled;
                 AutoApplyProfileCheck.IsChecked = plugin.Settings.AutoApplyProfileOnLaunch;
+                InitDefaultTabCombo();
+                _preferredTab = ResolveDefaultTab();
+                MainTabs.SelectedItem = _preferredTab;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = plugin.Settings.Ab9DetectionEnabled;
-                PedalHapticsCombinedCheck.IsChecked = plugin.Settings.PedalHapticsCombinedDevice;
+                SyncPedalHapticsSourceCombo();
                 SyncWheelbaseLfeSourceCombo();
                 SyncAutoStandbyCombo();
                 int kaSec = plugin.Settings.WheelKeepaliveTimeoutSec;
@@ -158,12 +161,13 @@ namespace MozaPlugin.UI
             // waiting for _refreshTimer's first post-reload tick would show up
             // to 500ms of the PREVIOUS profile's mBooster values the instant the
             // tab becomes visible again. Force one immediate, synchronous
-            // reseed instead of waiting for that first tick.
+            // refresh instead of waiting for that first tick — it also settles
+            // tab visibility so the default tab is selected before first paint.
             if (!wasRunning)
             {
                 RequestAllSettingsThrottled();
                 _mboosterUiSeeded = false;
-                RefreshMBoosterTab();
+                RefreshDisplay(this, EventArgs.Empty);
             }
         }
 

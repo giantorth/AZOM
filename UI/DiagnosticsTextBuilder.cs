@@ -100,6 +100,20 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
+        /// <summary>Main profile plus each device page's own store and its current pick.</summary>
+        public static string BuildProfiles(MozaPlugin plugin)
+        {
+            var sb = new StringBuilder();
+            var s = plugin?.Settings;
+            sb.Append($"Main:           {s?.ProfileStore?.CurrentProfile?.Name ?? "<none>"} "
+                      + $"({s?.ProfileStore?.Profiles.Count ?? 0} profiles)  split={s?.DeviceProfilesSplit}");
+            var dp = plugin?.DeviceProfiles;
+            if (dp != null)
+                foreach (var line in dp.DescribeStores())
+                    sb.Append(Environment.NewLine + "Device:         " + line);
+            return sb.ToString();
+        }
+
         /// <summary>Control Mapper variant-bridge state; see ControlMapperBridge.BuildDiagnostics.</summary>
         public static string BuildControlMapper(MozaPlugin plugin)
         {
@@ -114,9 +128,21 @@ namespace MozaPlugin.UI
             var sb = new StringBuilder();
             var ports = MozaPortDiscovery.Instance.Enumerate();
             var source = MozaPortDiscovery.Instance.Source;
-            string fallbackState = source != MozaDiscoverySource.None
-                ? "not used (enumeration is authoritative)"
-                : "armed (active — no device source)";
+            string fallbackState;
+            if (MozaPortDiscovery.Instance.TryGetProbeCandidates(out var probeCandidates))
+            {
+                var names = new List<string>(probeCandidates.Count);
+                for (int i = 0; i < probeCandidates.Count; i++) names.Add(probeCandidates[i].PortName);
+                fallbackState = names.Count == 0
+                    ? "not used (registry is authoritative)"
+                    : $"limited to MOZA ports on another driver: {string.Join(", ", names)}";
+            }
+            else
+            {
+                fallbackState = source == MozaDiscoverySource.Sysfs
+                    ? "not used (enumeration is authoritative)"
+                    : "armed (sweeps ports the registry can't classify)";
+            }
             sb.AppendLine($"Source:         {source}  (probe fallback: {fallbackState})");
             sb.AppendLine($"Platform:       {Protocol.WineHost.Describe()}");
             if (Protocol.WineHost.IsWine)
@@ -623,14 +649,18 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Extended groups:0x{mask:X2}  present={JoinList(present)}  (2 single, 3 rotary, 4 ambient)");
             sb.AppendLine($"Master slider:  {Bri(plugin.WheelLedMasterBrightness)}"
                           + $"   ES raw: {Bri(plugin.WheelLedMasterBrightnessRaw)}");
-            // The per-wheel-page overlay is where the LED modes and per-zone brightness
+            // The wheel page's own profile is where the LED modes and per-zone brightness
             // actually live. If it doesn't resolve, ApplyWheelToHardware sees -1 for all
             // of them and writes nothing — indistinguishable, without this line, from a
             // wheel that simply already matched.
             var pageGuid = plugin.GetCurrentWheelPageGuid();
-            var overlay = plugin.GetCurrentWheelOverlay(plugin.Settings?.ProfileStore?.CurrentProfile);
+            var stored = plugin.ActiveWheelProfile;
+            var overlay = plugin.ActiveWheelLedProfile;   // global LED tabs laid over
+            var glob = plugin.DeviceProfiles?.WheelGlobalLed(pageGuid);
             sb.AppendLine($"Wheel page:     {(pageGuid.HasValue ? pageGuid.Value.ToString().Substring(0, 8) : "unresolved")}"
-                          + $"  overlay={(overlay != null ? "yes" : "no")}"
+                          + $"  profile={(stored != null ? stored.Name : "none")}"
+                          + $"  global rpm={(glob?.RpmGlobal == true ? "on" : "off")} "
+                          + $"btn={(glob?.ButtonsGlobal == true ? "on" : "off")} knob={(glob?.KnobsGlobal == true ? "on" : "off")}"
                           + (overlay != null
                              ? $"  want modes rpm={Bri(overlay.WheelTelemetryMode)} "
                                + $"btn={Bri(overlay.WheelButtonsLedMode)} knob={Bri(overlay.WheelKnobLedMode)}"
@@ -1305,6 +1335,37 @@ namespace MozaPlugin.UI
                     sb.Append(b.ToString("X2"));
                     sb.Append(' ');
                 }
+            }
+            return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// S12 pedal vibration lanes, and for each USB unit whether a pedal set wired
+        /// into it answered as dev 0x19 on its pipe and owns the pedal writes.
+        /// </summary>
+        public static string BuildPedalHaptics(MozaPlugin plugin, MozaData data)
+        {
+            var devices = plugin.PedalHapticsRegistry?.Devices;
+            if (devices == null || devices.Count == 0)
+                return "(no S12 pedal vibration unit — USB lanes claim PID 0x002F; a routed lane is added per wheelbase pipe)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine(
+                $"  source={plugin.Settings?.PedalHapticsSource}  combined={plugin.PedalHapticsCombined}  " +
+                $"routed={(plugin.PedalHapticsRoutedToShakeIt ? "ShakeIt" : "plugin tab")}");
+            for (int i = 0; i < devices.Count; i++)
+            {
+                var c = devices[i];
+                sb.AppendLine(
+                    $"  [{i}] {(c.IsRouted ? "routed" : "USB"),-6} {Blank(c.PortName),-8}  " +
+                    $"connected={(c.IsConnected ? "yes" : "no")}  detected={(c.Detected ? "yes" : "no")}  " +
+                    $"probes={c.ProbeAttempts}");
+                var p = c.RelayedPedals;
+                if (p != null)
+                    sb.AppendLine(
+                        $"        relayed pedals: answered={(p.Answered ? "yes" : "no")}  " +
+                        $"ownsWrites={(p.OwnsPedals ? "yes" : "no")}  " +
+                        $"settingsRead={(data.PedalsSettingsRead ? "yes" : "no")}  pendingReads={p.PendingReads}");
             }
             return sb.ToString().TrimEnd();
         }

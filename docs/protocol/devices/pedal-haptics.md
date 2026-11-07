@@ -9,7 +9,8 @@ USB: VID `0x346E`, PID `0x002F`, CDC (a virtual serial port), 115200 8N1.
 
 Plugin implementation: `Protocol/MozaPedalHapticsProtocol.cs`,
 `Devices/PedalHaptics/`, `Integration/MozaPedalHapticsChannelsProvider.cs`,
-`Devices/Haptics/MozaPedalHapticsBridge.cs`. Frame-level regression check:
+`Devices/Haptics/MozaPedalHapticsBridge.cs`, `UI/SettingsControl.PedalHaptics.cs`
+(S12 Haptics tab). Frame-level regression check:
 `tools/pedal-haptics-frame-check` (no capture, hardware or build needed).
 
 ## Two envelopes
@@ -182,10 +183,71 @@ throttled ring unrelated to command boundaries — it kept reporting `duration :
 through a burst whose duration field held 100 — so it is a rate-limited
 last-message repeat, not a per-effect trace.
 
+## Pedals wired into the unit
+
+A pedal set can be wired into the S12 instead of a wheelbase or hub; Pit House
+supports this hookup. The pedals then sit behind the S12's CDC port as bus device
+`0x19`. In bundle `MYMT5BM1` (SRP2 into an S12 on USB, R9 base, no Universal Hub
+enumerated) the S12 pipe carried the pedals' own `pedal_diagnostic.c` block on
+group `0x0E` from `0x91` (`PD Linked:[T 1 B 1 C 1]`, per-pedal min/max/angle,
+`Sensor Dir`, `P-Sens raw`), while the base pipe never answered the `0x19`
+presence probe.
+
+The USB lane therefore carries a `RelayedPedalsLane` (`Devices/RelayedPedalsLane.cs`)
+that probes `0x19` on the S12 pipe and, on the ACK, becomes `PedalsOwner` with its
+own device manager, retransmit tracker and prober — the same handling the
+Universal Hub pipe gets. The host→`0x19` direction through the S12 had not been
+captured when this was added; the Diagnostics `S12 pedal vibration` section shows
+whether the pedals answered (`answered=`) and own the writes (`ownsWrites=`).
+Bundle `8EJTVB5M` confirmed it: the SRP2 ACKed on the S12 pipe, its settings read
+back, and the routed mBooster model probe read `SRP2`.
+
+Live positions come from the S12's HID, read as a pedal set (`MozaHidClass.Pedals`,
+Rx/Ry/Rz → throttle/brake/clutch). Pedal axes are only taken from the HID device
+whose pipe owns the pedals (`MozaHidReader.PedalAxesSource`): the R9's report keeps
+its own pedal axes with nothing attached, and in `8EJTVB5M` its resting value held
+the brake bar at 100 % while the S12's HID went unread.
+
 ## How the plugin uses this
 
-Two SimHub device layouts, picked by **Options > Combined pedal haptics device**
-(`PedalHapticsCombinedDevice`; on for new installs, off for upgraders):
+**Options > S12 pedal haptics** picks what drives the unit:
+**Plugin S12 tab**, **ShakeIt per pedal** or **ShakeIt combined**
+(`PedalHapticsSource` + `PedalHapticsCombinedDevice`). ShakeIt is the default. Both sources
+write the same slots, so exactly one does: with the plugin tab chosen the
+ShakeIt devices read as disconnected and their posts and clears are dropped
+(`PedalHapticsRoutedToShakeIt`). On SimHub older than 9.12 ShakeIt can't host
+the device, so the plugin tab takes over whatever is stored.
+
+### Plugin S12 tab
+
+`PedalHapticsEffectWorker` (20 ms tick) renders one card per firmware channel,
+each sent to **its own named slot** on every pedal ticked on the card — the
+slot numbering in the table above is used as named here, unlike the ShakeIt
+path. Trigger, frequency and intensity are each a slider or a formula, as on
+the wheelbase LFE tab; a frequency formula's 0..100 output is rescaled into the
+card's band. Settings are per profile (`MozaProfile.PedalHaptics`).
+
+- **Level** trigger: streamed while non-zero, through the scheduler below.
+- **On-change** trigger: one burst of *Pulse length* per accepted edge
+  (neutral suppression and debounce as on the LFE tab). On a timed slot that is
+  **one enable frame carrying the pulse as its duration** — the unit stops it
+  by itself, so no disable follows (`PostBurst`). Engine (4) and Road Texture (8)
+  don't time out on duration, so those stream for the pulse length instead.
+- **Road Texture** carries a position. Its default is `AZOM.RoadPosition`:
+  vertical acceleration, high-passed and centred on 50, since SimHub has no
+  generic suspension-travel channel. The scale assumes m/s² and is unverified
+  against a live replay.
+- Default triggers use SimHub's `ABSActive` / `TCActive` / `Gear` / pedal
+  positions and the plugin's `AZOM.WheelLockup` / `AZOM.WheelSlip` (0/1, the
+  same per-wheel-speed heuristics as the mBooster effects; 0 when the game
+  reports no wheel speeds). Every card starts disabled.
+
+No SimHub device definition is deployed for the plugin tab; existing S12
+devices are left in place.
+
+### ShakeIt layouts
+
+Two SimHub device layouts:
 
 - **Per-pedal** — `MOZA S12 Throttle`, `MOZA S12 Brake`, `MOZA S12 Clutch`, each
   with its own ShakeIt profile and effect defaults. A user assigns an effect to
@@ -260,22 +322,23 @@ must return off for the oscillators, and the mixer creates the tick entries
 first. The marker keeps a user who unticks every pedal from being re-seeded.
 
 Road Texture (slot 8) is not one of the eight. It takes a suspension position
-rather than a tone, so it cannot serve as a general output;
-`BuildRoadTextureFrame` is kept for when there is a telemetry source worth
-wiring to it.
+rather than a tone, so it cannot serve as a general output; only the plugin
+tab drives it.
 
 ### Emission
 
-Three pedals x eight oscillators is 24 addressable outputs, but only live ones
-are sent. Effect output is latest-state, pulled by the connection's write loop
-through the 4 ms paced gate (`PedalHapticsEffectScheduler`, an
-`IPacedFrameSource` taking turns with the LED lane and the one-shot FIFO). Each
-frame is built from the newest ShakeIt value at the moment it can go out, so a
-busy link lowers the update rate rather than delaying anything.
+Three pedals x nine slots is 27 addressable outputs (ShakeIt uses 24 of them),
+but only live ones are sent. Effect output is latest-state, pulled by the
+connection's write loop through the 4 ms paced gate
+(`PedalHapticsEffectScheduler`, an `IPacedFrameSource` taking turns with the
+LED lane and the one-shot FIFO). Each frame is built from the newest posted
+value at the moment it can go out, so a busy link lowers the update rate rather
+than delaying anything. Staleness is tracked per slot, so a slot its producer
+stopped posting goes silent even while the same pedal's other slots stay fresh.
 
 Service order: disables first (a missed one leaves a motor buzzing for the rest
-of its duration), then live slots more than 250 ms unsent, then enables, then
-the longest-unsent live slot. A live slot is re-sent when its strength or
+of its duration), then live slots more than 250 ms unsent, then enables and
+firmware-timed bursts, then the longest-unsent live slot. A live slot is re-sent when its strength or
 frequency changes, at most every 20 ms, and otherwise every 100 ms against its
 500 ms duration.
 

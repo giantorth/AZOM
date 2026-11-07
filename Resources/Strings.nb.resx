@@ -177,8 +177,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Utløsernivå</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Vibrasjonsavklinging</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LES FRA ENHET</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · PEDALER</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// pedalport (pollet hvert 2. sekund)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALER</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Pedalport</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>TILBEHØR</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Port 1</value></data>
@@ -209,7 +208,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tittel</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sist endret</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>SLETT</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver CoAP SDK-server</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Aktiver iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Aktiver UDP-kontrollserver</value></data>
   <data name="Section_About" xml:space="preserve"><value>OM</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -258,7 +257,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Konfigurer SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Avvis</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Start SimHub på nytt</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Nyheter i v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Sjekk etter oppdateringer automatisk</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Utgivelseskanal</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Stabil</value></data>
@@ -317,7 +315,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>HVILE</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Hvilemodus</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Hvile-timeout</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA DASHBOARD</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Søker etter dashboard...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>INDIKATORMODUSER</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>RPM-indikatormodus</value></data>
@@ -505,13 +502,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Telemetrisender utilgjengelig (plugin ikke initialisert).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Velg en .mzdash-fil eller et biblioteksoppføring først.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(ingen configJson-tilstand mottatt ennå)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin ikke lastet</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Kan ikke hente rådata for «{0}» – velg en lokal fil i stedet.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Mappe: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Opplasting i kø – sender «{0}» til rattet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Opplasting ikke startet – rattet er ikke tilkoblet eller ingen administrasjonsøkt ennå.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (status 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Opplasting stoppet ved {0} % (status 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Avbryter opplasting…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Opplasting avbrutt ved {0} %</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>«{0}» ligger allerede uendret på rattet – ingenting lastet opp</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Velg en .mzdash-fil å laste opp</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-dashbord (*.mzdash)|*.mzdash|Alle filer (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Velg mappe som inneholder .mzdash-dashbordfiler</value></data>
@@ -713,7 +712,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Registrering av aktiv girspak (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Kombinert haptikkenhet for pedaler</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graf</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Båndbredde</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Dreiemoment</value></data>
@@ -850,4 +848,26 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Pastellmagenta</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse-forhåndsinnstilling (*.mzpreset;*.json)|*.mzpreset;*.json|Alle filer (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» brukt på den aktive profilen</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Globale innstillinger</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetrieffekter (motor-, ABS- og girskiftvibrasjon gjennom basen) krever basefastvare 1.2.10.10 eller nyere. Denne basen har {0}. Oppdater basefastvaren i Pit House for å bruke dem.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12-haptikk</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12-pedalhaptikk</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>S12-fanen i programtillegget</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt for hver pedal</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kombinert</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets S12-fane brukes.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Sanntidsutdata</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulslengde</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Port 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Ratt</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Dashbord</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Girspak</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Håndbrekk</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES-ratt</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Rattbase</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Enhet 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % tap</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standardfane</value></data>
 </root>

@@ -2,6 +2,34 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.3]
+
+## Added
+
+- **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
+- **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
+- **Cancel button for dashboard uploads** on the Files tab; stops the transfer and closes the wheel's upload session.
+- **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
+- **S12 Haptics tab drives the pedal shakers without ShakeIt;** one card per S12 channel, picked in Options alongside the ShakeIt layouts.
+- **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
+- **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
+- **Default tab setting in Options** picks which tab the plugin opens on.
+
+## Fixed
+
+- **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
+- **CM2 switches dashboards with its profile;** the selected dashboard is saved to the active profile and recalled on every switch.
+- **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.
+- **Device detection no longer writes to non-MOZA COM ports** (Bluetooth, motherboard serial, other adapters); on Windows only MOZA ports are probed.
+- **Pedals wired into an S12 pedal vibration unit are detected;** settings and live positions now come through the S12's USB port.
+- **Pedal bars no longer stick at a wheelbase's idle value** when the pedals are attached to another device.
+- **Re-uploading an edited dashboard sends the edit;** the file is re-read at upload time instead of reusing the copy from when it was picked.
+- **Hub tab shows the device on each port;** all four accessory ports plus the pedal port, with link loss.
+- **Options tab controls line up;** toggles and selectors in each column start at the same position.
+- **Dismissing an update notification sticks across restarts;** it reappears only when a newer version is published.
+- **Beta builds are no longer offered an older stable release;** only switching the channel back to Stable offers the downgrade.
+- **Base tab hides when no wheelbase is detected,** like the other device tabs.
+
 ## [1.7.2]
 
 ## Added

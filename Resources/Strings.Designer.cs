@@ -271,7 +271,6 @@ namespace MozaPlugin.Resources
         public static string DefaultName_CustomEffect => Get("DefaultName_CustomEffect");
         public static string Button_ReadFromDevice => Get("Button_ReadFromDevice");
         public static string Section_UniversalHubPedals => Get("Section_UniversalHubPedals");
-        public static string Subtitle_PedalsPort => Get("Subtitle_PedalsPort");
         public static string Label_PedalsPort => Get("Label_PedalsPort");
         public static string Section_Accessories => Get("Section_Accessories");
         public static string Label_Port1 => Get("Label_Port1");
@@ -356,7 +355,6 @@ namespace MozaPlugin.Resources
         public static string Button_ConfigureSdk => Get("Button_ConfigureSdk");
         public static string Button_Dismiss => Get("Button_Dismiss");
         public static string Button_RestartSimHub => Get("Button_RestartSimHub");
-        public static string Label_WhatsNew => Get("Label_WhatsNew");
         public static string Label_CheckForUpdates => Get("Label_CheckForUpdates");
         public static string Label_ReleaseChannel => Get("Label_ReleaseChannel");
         public static string Option_ReleaseChannelStable => Get("Option_ReleaseChannelStable");
@@ -423,7 +421,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_SleepTimeout => Get("SliderLabel_SleepTimeout");
 
         // ----- MozaDashSettingsControl
-        public static string Section_MozaDashboard => Get("Section_MozaDashboard");
         public static string Status_SearchingForDashboard => Get("Status_SearchingForDashboard");
         public static string Section_IndicatorModes => Get("Section_IndicatorModes");
         public static string SliderLabel_RpmIndicatorMode => Get("SliderLabel_RpmIndicatorMode");
@@ -611,13 +608,15 @@ namespace MozaPlugin.Resources
         public static string Status_TelemetrySenderUnavailableInit => Get("Status_TelemetrySenderUnavailableInit");
         public static string Status_PickMzdashFirst => Get("Status_PickMzdashFirst");
         public static string Status_NoConfigJsonState => Get("Status_NoConfigJsonState");
-        public static string Status_PluginNotLoaded => Get("Status_PluginNotLoaded");
         public static string Upload_CannotResolveBytes => Get("Upload_CannotResolveBytes");
         public static string Upload_FolderPrefix => Get("Upload_FolderPrefix");
         public static string Upload_Queued => Get("Upload_Queued");
         public static string Upload_NotStarted => Get("Upload_NotStarted");
         public static string Upload_Complete => Get("Upload_Complete");
         public static string Upload_Stopped => Get("Upload_Stopped");
+        public static string Upload_Cancelling => Get("Upload_Cancelling");
+        public static string Upload_Cancelled => Get("Upload_Cancelled");
+        public static string Upload_AlreadyOnWheel => Get("Upload_AlreadyOnWheel");
         public static string Upload_FileDialog_Title => Get("Upload_FileDialog_Title");
         public static string Upload_FileDialog_Filter => Get("Upload_FileDialog_Filter");
         public static string Upload_FolderDialog_Description => Get("Upload_FolderDialog_Description");
@@ -778,7 +777,6 @@ namespace MozaPlugin.Resources
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
         public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
         public static string SliderLabel_Ab9Detection => Get("SliderLabel_Ab9Detection");
-        public static string SliderLabel_PedalHapticsCombined => Get("SliderLabel_PedalHapticsCombined");
         public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
         public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
         public static string Option_GraphTorque => Get("Option_GraphTorque");
@@ -903,5 +901,27 @@ namespace MozaPlugin.Resources
         public static string Swatch_PastelMagenta => Get("Swatch_PastelMagenta");
         public static string FileFilter_PitHousePreset => Get("FileFilter_PitHousePreset");
         public static string Import_Footer_Applied => Get("Import_Footer_Applied");
+        public static string Label_GlobalSettings => Get("Label_GlobalSettings");
+        public static string Status_WheelbaseLfeFirmwareTooOldFmt => Get("Status_WheelbaseLfeFirmwareTooOldFmt");
+        public static string TabHeader_PedalHaptics => Get("TabHeader_PedalHaptics");
+        public static string SliderLabel_PedalHapticsSource => Get("SliderLabel_PedalHapticsSource");
+        public static string Option_PedalHapticsSourcePlugin => Get("Option_PedalHapticsSourcePlugin");
+        public static string Option_PedalHapticsSourceShakeIt => Get("Option_PedalHapticsSourceShakeIt");
+        public static string Option_PedalHapticsSourceCombined => Get("Option_PedalHapticsSourceCombined");
+        public static string Status_PedalHapticsShakeItUnavailable => Get("Status_PedalHapticsShakeItUnavailable");
+        public static string Section_PedalHapticsOutput => Get("Section_PedalHapticsOutput");
+        public static string SliderLabel_PulseLength => Get("SliderLabel_PulseLength");
+        public static string Label_Pedals => Get("Label_Pedals");
+        public static string Label_Port4 => Get("Label_Port4");
+        public static string HubDevice_Wheel => Get("HubDevice_Wheel");
+        public static string HubDevice_Dashboard => Get("HubDevice_Dashboard");
+        public static string HubDevice_Pedals => Get("HubDevice_Pedals");
+        public static string HubDevice_Shifter => Get("HubDevice_Shifter");
+        public static string HubDevice_Handbrake => Get("HubDevice_Handbrake");
+        public static string HubDevice_EsWheel => Get("HubDevice_EsWheel");
+        public static string HubDevice_Wheelbase => Get("HubDevice_Wheelbase");
+        public static string HubDevice_Unknown => Get("HubDevice_Unknown");
+        public static string HubPort_LossFormat => Get("HubPort_LossFormat");
+        public static string SliderLabel_DefaultTab => Get("SliderLabel_DefaultTab");
     }
 }

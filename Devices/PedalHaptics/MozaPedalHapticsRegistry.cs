@@ -29,6 +29,7 @@ namespace MozaPlugin.Devices.PedalHaptics
             new Dictionary<string, PedalHapticsDeviceController>(StringComparer.OrdinalIgnoreCase);
 
         private readonly Func<bool> _isShuttingDown;
+        private readonly Func<MozaSerialConnection, RelayedPedalsLane?>? _relayedPedalsFactory;
 
         // Copy-on-write snapshot so the ShakeIt post path never takes _lock.
         private PedalHapticsDeviceController[] _snapshot = Array.Empty<PedalHapticsDeviceController>();
@@ -53,9 +54,15 @@ namespace MozaPlugin.Devices.PedalHaptics
         /// <summary>Raised the first time any unit answers its presence query.</summary>
         public event Action<PedalHapticsDeviceController>? DeviceDetected;
 
-        internal MozaPedalHapticsRegistry(Func<bool>? isShuttingDown)
+        /// <param name="relayedPedalsFactory">Builds the relayed-pedals lane for each USB
+        /// unit's pipe. Must only be invoked once the hardware applier exists — a pedal
+        /// ACK runs the detection cascade, which applies the profile.</param>
+        internal MozaPedalHapticsRegistry(
+            Func<bool>? isShuttingDown,
+            Func<MozaSerialConnection, RelayedPedalsLane?>? relayedPedalsFactory = null)
         {
             _isShuttingDown = isShuttingDown ?? (() => false);
+            _relayedPedalsFactory = relayedPedalsFactory;
         }
 
         /// <summary>True once at least one unit has answered — gates device-definition deployment.</summary>
@@ -183,7 +190,7 @@ namespace MozaPlugin.Devices.PedalHaptics
                     if (_devices.ContainsKey(identity)) continue;
                     if (MozaSerialConnection.IsPortHeld(p.PortName)) continue;
 
-                    var c = new PedalHapticsDeviceController(identity, p.PortName, _isShuttingDown);
+                    var c = new PedalHapticsDeviceController(identity, p.PortName, _isShuttingDown, _relayedPedalsFactory);
                     c.DetectedRisingEdge += OnControllerDetected;
                     _devices[identity] = c;
                     newcomers.Add(c);
@@ -265,6 +272,22 @@ namespace MozaPlugin.Devices.PedalHaptics
 
                 try { c.SendPresenceProbe(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM] Pedal-haptics probe: {ex.Message}"); }
+
+                try { c.PollRelayedPedals(); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM] Pedal-haptics relayed pedals probe: {ex.Message}"); }
+            }
+        }
+
+        /// <summary>Retransmit each USB unit's relayed-pedal reads on its own pipe.
+        /// Called from the plugin's retry timer.</summary>
+        public void TickRetransmits()
+        {
+            var snap = System.Threading.Volatile.Read(ref _snapshot);
+            for (int i = 0; i < snap.Length; i++)
+            {
+                if (!snap[i].IsConnected) continue;
+                try { snap[i].TickRelayedPedalsRetransmits(); }
+                catch (Exception ex) { MozaLog.Warn($"[AZOM] Pedal-haptics relayed pedals retransmit tick failed: {ex.Message}"); }
             }
         }
 
@@ -284,6 +307,22 @@ namespace MozaPlugin.Devices.PedalHaptics
             var snap = System.Threading.Volatile.Read(ref _snapshot);
             for (int i = 0; i < snap.Length; i++)
                 snap[i].PostChannel(pedalIndex, channel, gain01, freqHz);
+        }
+
+        /// <summary>Fan one plugin-tab slot level out to every unit.</summary>
+        public void PostSlot(int pedalIndex, int slot, double gain01, double freqOrPosition)
+        {
+            var snap = System.Threading.Volatile.Read(ref _snapshot);
+            for (int i = 0; i < snap.Length; i++)
+                snap[i].PostSlot(pedalIndex, slot, gain01, freqOrPosition);
+        }
+
+        /// <summary>Fan one firmware-timed burst out to every unit.</summary>
+        public void PostBurst(int pedalIndex, int slot, double gain01, double freqHz, int durationMs)
+        {
+            var snap = System.Threading.Volatile.Read(ref _snapshot);
+            for (int i = 0; i < snap.Length; i++)
+                snap[i].PostBurst(pedalIndex, slot, gain01, freqHz, durationMs);
         }
 
         public void ClearPedal(int pedalIndex)

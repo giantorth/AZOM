@@ -138,28 +138,49 @@ Controls 2 LED strips (9 LEDs each) on the wheelbase body. Group 32 = write, gro
 
 ### Group `0x64` (100) — Connected Device Status (read-only)
 
-Two probe forms observed:
+Source of truth: PitHouse's command spec (JSON embedded in `FirmwareManager.exe`,
+deviceType 128, ids 7000–7011) and `usb-capture/rs21_parameter.json`
+(`HubGetState_Port{1..4}Connect`, `HubGetState_PedalConnect`). The older
+boxflat names (`base`, `port1..3`, `pedals1..3`) are wrong and are not used.
 
-**Form A — single-byte cmd ID** (SimHub plugin, also `sim/wheel_sim.py` `(0x64, 0x12, 03)` "hub-port1-power probe"):
+| Cmd | PitHouse name | Plugin name | Reply | Meaning |
+|-----|---------------|-------------|-------|---------|
+| `01 01`..`01 04` | `HubGetState_PortConnect_strip1..4` | `hub-port{1..4}-device` | 1 byte | `00` = empty; `04`–`0F` = the attached device's id |
+| `01 05` | `HubGetState_PortConnect_strip5` | `hub-pedal-port` | 1 byte | Pedal port. Enum unresolved, see below |
+| `02`..`05` | `HubGetState_Uart{1..4}LossRate` | `hub-port{1..4}-loss` | u16 BE | Average UART packet loss × 1000; `03 E8` (1000) = nothing on that port |
+| `06` / `07` / `08` | `HubGetState_Clutch/Brake/AccAdcValue` | `hub-clutch/brake/throttle-adc` | u16 BE | Raw pedal-port ADC |
 
-| Command | ID | Bytes | Type | Notes |
-|---------|----|-------|------|-------|
-| base | `02` | 2 | int | |
-| port1 | `03` | 2 | int | |
-| port2 | `04` | 2 | int | |
-| port3 | `05 01` | 1 | int | |
-| pedals1 | `06` | 2 | int | |
-| pedals2 | `07` | 2 | int | |
-| pedals3 | `08` | 2 | int | |
+Request: `7E 03 64 12 <cmd> <zero pad>`. Reply: `7E 03 E4 21 <cmd> <value>`.
+PitHouse's spec gives every read a 0-byte request body; the hub ignores the pad.
 
-**Form B — `01 NN 00` PitHouse probe** (observed in `usb-capture/ksp/gfdsgfd.pcapng` @ f54501, 5-frame burst):
+**`05` takes no sub-id.** boxflat sends `05 01` and expects a 1-byte reply. The
+hub actually answers `E4 21 05 HH LL`. Examples:
+- `usb-capture/displaybrightnessbug/bundle1/serial-capture.txt`: `e4 21 05 00 44`, with the wheel on port 4.
+- `05 03 e8` (1000) on rigs where the wheel is on another port.
 
-| Request | Response (`0xE4/0x21`) | Notes |
-|---------|------------------------|-------|
-| `7E 03 64 12 01 01 00` | `7E 03 E4 21 01 01 00` | Slot 1 — value `00` = empty/none |
-| `7E 03 64 12 01 02 00` | `7E 03 E4 21 01 02 07` | Slot 2 — `07` |
-| `7E 03 64 12 01 03 00` | `7E 03 E4 21 01 03 00` | Slot 3 |
-| `7E 03 64 12 01 04 00` | `7E 03 E4 21 01 04 00` | Slot 4 |
-| `7E 03 64 12 01 05 00` | `7E 03 E4 21 01 05 02` | Slot 5 — `02` |
+**Port device code = device bus id − 0x10.** Evidence from `usb-capture/ksp/gfdsgfd.pcapng` @ f54501:
+- PitHouse's startup burst `64 12 01 NN 00` for NN = 1..5 returns `00 07 00 00 02`.
+- The same pattern appears on KS Pro, FSR and W17 rigs.
+- `07` is the wheel (bus `0x17`). A KS Pro + bridged CM2 rig returned `04` (dash, bus `0x14`) on port 3.
+- On every rig, the non-zero slot is the one whose UART loss is below 1000.
 
-Sub-cmd `01 NN` enumerates 5 slots; response last byte = device-type/status code. Distinct from Form A — PitHouse uses Form B in startup probe. Per-slot semantics (which physical port maps to which NN) undecoded.
+| Code | Device | Status |
+|------|--------|--------|
+| `07` | Wheel (`0x17`) | observed |
+| `04` | Dashboard (`0x14`) | observed |
+| `03` / `08` / `09` / `0A` / `0B` | Base / ES wheel / pedals / shifter / handbrake | inferred from the bus-id rule |
+
+**Pedal port (`01 05`) enum is unresolved.** It read `02` on every capture, and
+none of those rigs had pedals on the hub. The spec text and the db range
+disagree:
+- FirmwareManager says `0` = connected, `1` = not connected.
+- `rs21_parameter.db` gives the range `[1, 2]`.
+
+The plugin therefore shows the pedal row from pedal detection on the hub pipe,
+and logs the raw byte on change (`Hub pedal-port connect byte = …`) so a rig
+with hub pedals can settle the enum.
+
+Plugin wiring:
+- `DeviceProber.HubReadCommands` holds all twelve reads. They are polled every 5 s, by `PollHubPeripherals` on the dedicated hub pipe or by `PollStatusCore` on a hub-bound primary.
+- `hub-port2-loss` (cmd `03`) is the hub-presence trigger, since any `0xE4` reply proves the hub.
+- The Hub tab reads `MozaData.HubPortDevice` / `HubPortLoss`.

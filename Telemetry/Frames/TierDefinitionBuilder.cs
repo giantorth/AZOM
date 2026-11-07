@@ -363,13 +363,13 @@ namespace MozaPlugin.Telemetry.Frames
         /// ALL chunks have a 4-byte CRC-32 trailer (verified by CRC computation against
         /// every chunk in moza-startup-1 and moza-startup-2 captures, including final chunks).
         ///
-        /// <paramref name="deviceId"/> stamps the device-id byte at frame[3]. Defaults
-        /// to <see cref="MozaProtocol.DeviceWheel"/> (0x17); pass
-        /// <see cref="MozaProtocol.DeviceMain"/> (0x12) for the CM2 standalone
-        /// dashboard target.
+        /// <paramref name="deviceId"/> stamps the device-id byte at frame[3]: the
+        /// device that owns the session (wheel 0x17, base-bridged CM2 0x14,
+        /// standalone CM2 0x12). Required — a defaulted wheel id sent CM2
+        /// upload chunks to an absent wheel.
         /// </summary>
         public static List<byte[]> ChunkMessage(byte[] message, byte session, ref int seq,
-            byte deviceId = MozaProtocol.DeviceWheel)
+            byte deviceId)
         {
             const int MaxNetPerChunk = 54;  // 58 total - 4 CRC
 

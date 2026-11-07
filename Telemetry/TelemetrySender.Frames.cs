@@ -27,13 +27,10 @@ namespace MozaPlugin.Telemetry
         /// <summary>
         /// Universal-Hub 5-slot enumeration burst. Sends `7E 03 64 12 01 NN 00 [chk]`
         /// for slots 1..5 in a tight burst (PitHouse fires all 5 in a single USB
-        /// packet). Hub answers with `7E 03 E4 21 01 NN VV [chk]` per slot, where
-        /// VV = device-type code on that port (0x00 = empty). Mirrors PitHouse's
-        /// wire pattern observed in `usb-capture/ksp/gfdsgfd.pcapng` at f54501.
-        ///
-        /// Distinct from the legacy <c>hub-port[1..3]-power</c> reads (group
-        /// 0x64, cmds 0x03/0x04/0x05) — those poll power level on individual
-        /// ports; this enumerates device-types across all 5 slots.
+        /// packet). Hub answers with `7E 03 E4 21 01 NN VV [chk]` per slot: slots
+        /// 1–4 = hub ports (VV = device bus id − 0x10, 0x00 = empty), slot 5 = pedal
+        /// port. Replies parse as <c>hub-port[1..4]-device</c> / <c>hub-pedal-port</c>.
+        /// Mirrors PitHouse's wire pattern in `usb-capture/ksp/gfdsgfd.pcapng` f54501.
         /// </summary>
         private void SendHubSlotEnumeration()
         {

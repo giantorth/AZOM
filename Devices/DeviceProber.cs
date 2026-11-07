@@ -304,8 +304,9 @@ namespace MozaPlugin.Devices
 
         internal static readonly string[] HubReadCommands = new[]
         {
-            "hub-base-power", "hub-port1-power", "hub-port2-power", "hub-port3-power",
-            "hub-pedals1-power", "hub-pedals2-power", "hub-pedals3-power",
+            "hub-port1-device", "hub-port2-device", "hub-port3-device", "hub-port4-device",
+            "hub-pedal-port",
+            "hub-port1-loss", "hub-port2-loss", "hub-port3-loss", "hub-port4-loss",
         };
 
         private readonly MozaPlugin _plugin;
@@ -322,6 +323,8 @@ namespace MozaPlugin.Devices
         // Per instance like MozaData, so a persistent-wire reload starts it false
         // while LastKnownWheelModel rides the bag — see RereadWheelAfterReload.
         private bool _wheelReadsIssued;
+        // Last logged hub pedal-port byte (-1 = none yet).
+        private int _lastHubPedalPortRaw = -1;
 
         public DeviceProber(
             MozaPlugin plugin,
@@ -396,7 +399,7 @@ namespace MozaPlugin.Devices
             // re-attach; the discriminator restores it if evidence says CM2.
             if (!_plugin.DashIsCm1 && DeviceDefinitionDeployer.DeployDashboard(_connection.DiscoveredPid))
                 _plugin.DeviceDefinitionDeployed = true;
-            _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            _plugin.HardwareApplier.ApplyDashToHardware();
             MozaLog.Info(bridgedDash
                 ? "[AZOM] Dashboard detected (bridged dash at 0x14 — provisionally deployed the CM2 profile, probing display identity)"
                 : "[AZOM] Dashboard detected");
@@ -941,7 +944,7 @@ namespace MozaPlugin.Devices
                     {
                         _detectionState.BaseAmbientLedSupported = true;
                         DeployBaseDefinition(ambientDetected: true);
-                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyBaseAmbientToHardware();
                         _deviceManager.ReadSettings(BaseAmbientReadCommands);
                         // Per-LED palettes, sized to the detected strip length so a
                         // 6-LED base never asks for LEDs 6..8.
@@ -1328,7 +1331,7 @@ namespace MozaPlugin.Devices
                             // never fires there. Without this re-apply the meter is never
                             // put into telemetry LED mode and its RPM/flag LEDs stay dark
                             // (KS+CM2 bundle 2026-06-06: zero group-0x32 frames on the wire).
-                            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+                            try { _plugin.HardwareApplier.ApplyDashToHardware(); }
                             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2-on-base ApplyDashToHardware skipped: {ex.Message}"); }
                         }
                         // Re-arm the wedge-recovery one-shot now that we know
@@ -1404,7 +1407,7 @@ namespace MozaPlugin.Devices
                         // and keeps both branches symmetric.
                         _plugin.NoteWheelDetected();
                         LockWheelId(deviceId);
-                        _plugin.HardwareApplier.ApplyWheelToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                        _plugin.HardwareApplier.ApplyWheelToHardware();
                         _deviceManager.ReadSetting("wheel-model-name");
                         _deviceManager.ReadSetting("wheel-sw-version");
                         _deviceManager.ReadSetting("wheel-hw-version");
@@ -1507,7 +1510,7 @@ namespace MozaPlugin.Devices
                             "(relayed lane; identical on HGP and SGP, evidence only)");
                     break;
 
-                case "hub-port1-power":
+                case "hub-port2-loss":
                     if (!_detectionState.HubDetected)
                     {
                         _detectionState.HubDetected = true;
@@ -1519,6 +1522,12 @@ namespace MozaPlugin.Devices
                         try { _connection.MarkHubDetected(); } catch { }
                         MozaLog.Info("[AZOM] Universal Hub detected");
                     }
+                    break;
+
+                // Pedal-port enum is unresolved; log changes so a bundle can pin it.
+                case "hub-pedal-port":
+                    if (System.Threading.Interlocked.Exchange(ref _lastHubPedalPortRaw, value) != value)
+                        MozaLog.Info($"[AZOM] Hub pedal-port connect byte = 0x{value:X2}");
                     break;
             }
         }

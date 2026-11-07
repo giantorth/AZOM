@@ -15,6 +15,15 @@ namespace MozaPlugin.Settings
         ShakeIt = 1,
     }
 
+    /// <summary>Which subsystem drives the S12 pedal vibration unit.</summary>
+    public enum PedalHapticsSource
+    {
+        /// <summary>SimHub ShakeIt, via the S12 device definitions (per-pedal or combined).</summary>
+        ShakeIt = 0,
+        /// <summary>The plugin's own S12 Haptics tab — one card per firmware channel.</summary>
+        PluginTab = 1,
+    }
+
     /// <summary>Which graph fills the right-hand slot of the Base tab's live
     /// telemetry pair. Torque additionally gates its own ~15 Hz wire poll, so
     /// this is not purely cosmetic.</summary>
@@ -58,6 +67,8 @@ namespace MozaPlugin.Settings
             WheelbaseLfeSource = WheelbaseLfeSource.ShakeIt,
             KnobColorAllBlackRepaired = true,
             PedalHapticsCombinedDevice = true,
+            DeviceProfilesSplit = true,
+            Cm2DashboardKeysReset = true,
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -138,9 +149,15 @@ namespace MozaPlugin.Settings
         private volatile int _negotiationLedColor = 0x0000FF;
         public int NegotiationLedColor { get => _negotiationLedColor; set => _negotiationLedColor = value; }
 
-        // CM2 dash (dual-screen): the dashboard the user selected for the CM2's
-        // own pipeline, independent of the wheel's selection. Empty = catalog default.
+        // CM2 dash (dual-screen): the dashboard last selected for the CM2's own
+        // pipeline, independent of the wheel's. The per-profile pick lives on the CM2
+        // dash profile (MozaPlugin.ActiveCm2DashboardName); this tracks it and seeds a
+        // profile that has none. Empty = catalog default.
         public string Cm2SelectedDashboard { get; set; } = "";
+
+        // One-shot: the CM2 dash profiles' dashboard keys were copied from the wheel's
+        // at the device-profile split; reset them to the CM2's own pick. True on new installs.
+        public bool Cm2DashboardKeysReset { get; set; } = false;
 
         // Wheelbase ambient LED settings (2 strips; strip length per base model,
         // see BaseModelInfo). Defaults match observed R25 capture (rainbow mode,
@@ -234,6 +251,10 @@ namespace MozaPlugin.Settings
 
         // Whether to automatically apply profile settings on launch
         public bool AutoApplyProfileOnLaunch { get; set; } = true;
+
+        // x:Name of the plugin-pane tab selected when the pane opens. Empty or
+        // unknown = Base. A hidden device tab is selected once its device appears.
+        public string DefaultTab { get; set; } = "";
 
         // Which graph occupies the right-hand slot of the Base tab's live
         // telemetry pair. Defaults to Bandwidth: it costs nothing on the wire,
@@ -361,6 +382,10 @@ namespace MozaPlugin.Settings
         // CreateForNewInstall.
         public bool PedalHapticsCombinedDevice { get; set; }
 
+        // What drives the S12: ShakeIt (layout above) or the plugin's S12 Haptics
+        // tab. The two would fight over the same slots, so exactly one owns them.
+        public PedalHapticsSource PedalHapticsSource { get; set; } = PedalHapticsSource.ShakeIt;
+
         // One-shot marker for the migration off the pre-1.6 "Wheelbase LFE haptics"
         // device (DeviceTypeID F208F60B-…), which was code-registered and vanished
         // when v1.6 replaced it with the per-model wheelbase device's Haptics
@@ -452,10 +477,15 @@ namespace MozaPlugin.Settings
         // when the tracked PR closes. See UpdateCheckService.ResolveBetaChannelId.
         public bool FollowBetaChannel { get; set; } = false;
 
-        // Version the user clicked "Skip this version" on — the banner stays
-        // hidden as long as the latest published version still equals this
-        // string. When a newer version appears the banner re-shows.
+        // Version the user skipped or dismissed — the banner stays hidden as
+        // long as the latest published version still equals this string. When
+        // a newer version appears the banner re-shows.
         public string LastSkippedVersion { get; set; } = "";
+
+        // Prerelease build the user was running when they explicitly picked
+        // the stable channel. Only that build is offered the (older) stable
+        // release; any other prerelease build on stable only moves forward.
+        public string StableDowngradeFromVersion { get; set; } = "";
 
         // UTC timestamp of the last successful (or failed) check; the
         // automatic check skips while less than 24h has passed. DateTime.MinValue
@@ -477,12 +507,6 @@ namespace MozaPlugin.Settings
         // no matching asset (manual hand-cut tags, or 404 on dev-latest) —
         // in which case the banner falls back to the release-notes link only.
         public string LastSeenAssetUrl { get; set; } = "";
-
-        // The GitHub release `body` (markdown changelog) from the last
-        // successful check, rendered as plain text in the About > Updates
-        // "What's new" panel so users see what they're updating to without
-        // leaving SimHub. Empty when LastSeenLatestVersion is empty.
-        public string LastSeenReleaseNotes { get; set; } = "";
 
         // ===== Third-party SDK emulation =====
         // Master toggle for the in-plugin CoAP/UDP server that mimics MOZA's
@@ -628,6 +652,25 @@ namespace MozaPlugin.Settings
         /// </summary>
         public MozaChannelDefaultsStore ChannelDefaultsStore { get; set; }
             = new MozaChannelDefaultsStore();
+
+        /// <summary>Each device page's own profile store (wheel / wheelbase / dash).
+        /// The device-page settings live here, not on <see cref="ProfileStore"/>.</summary>
+        public DeviceProfileRegistry DeviceProfiles { get; set; } = new DeviceProfileRegistry();
+
+        /// <summary>Per-wheel-page LED settings shared by every profile, for the RPM /
+        /// Buttons / Knobs tabs whose "Global settings" toggle is on (the toggles live
+        /// here too). Absent = every tab uses the active device profile.</summary>
+        public Dictionary<Guid, WheelGlobalLedSettings> WheelGlobalLedByPageGuid { get; set; }
+            = new Dictionary<Guid, WheelGlobalLedSettings>();
+
+        /// <summary>One-shot sentinel for <c>DeviceProfileMigration.Run</c>. True on new
+        /// installs (nothing to split); the initializer stays false for upgrades.</summary>
+        public bool DeviceProfilesSplit { get; set; } = false;
+
+        /// <summary>The device-scoped half of the main profile store at split time
+        /// (game-link state + per-profile identity and device fields). Seeds a device
+        /// first seen after the split. Null when there was nothing to split.</summary>
+        public Newtonsoft.Json.Linq.JObject? LegacyDeviceProfileSnapshot { get; set; }
 
         // Name of the active dashboard profile (empty = use first available)
         public string TelemetryProfileName { get; set; } = "";

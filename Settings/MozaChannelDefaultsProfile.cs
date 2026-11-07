@@ -17,7 +17,7 @@ namespace MozaPlugin.Settings
     /// with any device profile without the two having to line up.</para>
     ///
     /// <para>Resolution order for a channel URL: per-dashboard override
-    /// (<see cref="MozaProfile.TelemetryChannelMappings"/>) → THIS → Telemetry.json's
+    /// (<see cref="MozaWheelProfile.ChannelMappings"/>) → THIS → Telemetry.json's
     /// <c>simhub_property</c> → <c>StringChannelDefaults</c>.</para>
     /// </summary>
     public class MozaChannelDefaultsProfile

@@ -58,7 +58,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// still being stabilized.
         /// </summary>
         public bool Enabled { get; set; }
-        private readonly MozaSerialConnection _connection;
+        // Live reads of the owning sender's connection and target device: the
+        // sender can be rebound / retargeted after this downloader is built.
+        private readonly Func<MozaSerialConnection> _getConnection;
+        private readonly Func<byte> _getTargetDevice;
         private readonly DashboardCache _cache;
         private readonly DashboardProfileStore _store;
         private readonly SessionRetransmitter _retransmitter;
@@ -79,13 +82,15 @@ namespace MozaPlugin.Telemetry.Dashboard
         private volatile int _deviceInitSeq;
 
         public DashboardDownloader(
-            MozaSerialConnection connection,
+            Func<MozaSerialConnection> getConnection,
+            Func<byte> getTargetDevice,
             DashboardCache cache,
             DashboardProfileStore store,
             SessionRetransmitter retransmitter,
             SessionDispatcher dispatcher)
         {
-            _connection = connection;
+            _getConnection = getConnection;
+            _getTargetDevice = getTargetDevice;
             _cache = cache;
             _store = store;
             _retransmitter = retransmitter;
@@ -228,7 +233,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     byte[] raw = new byte[line.Length / 2];
                     for (int i = 0; i < raw.Length; i++)
                         raw[i] = Convert.ToByte(line.Substring(i * 2, 2), 16);
-                    _connection.Send(raw);
+                    _getConnection().Send(raw);
                 }
                 MozaLog.Debug($"[AZOM] DashboardDownloader: sent {lines.Length} replay frames");
                 // Wait for response
@@ -266,7 +271,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 // Fresh capture confirms gap=3 (init=11→data=14).
                 int seq = _deviceInitSeq + 3;
                 var frames = TierDefinitionBuilder.ChunkMessage(
-                    requestBody, _session, ref seq);
+                    requestBody, _session, ref seq, _getTargetDevice());
 
                 MozaLog.Debug(
                     $"[AZOM] DashboardDownloader: sending {frames.Count} chunks " +
@@ -284,8 +289,8 @@ namespace MozaPlugin.Telemetry.Dashboard
                     int windowLimit = Math.Min(frames.Count, ackedUpTo + WindowSize);
                     while (sent < windowLimit)
                     {
-                        _connection.Send(frames[sent]);
-                        _retransmitter.Track(frames[sent]);
+                        _getConnection().Send(frames[sent]);
+                        _retransmitter.Track(frames[sent], anyDevice: true);
                         sent++;
                     }
 
@@ -791,12 +796,14 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         private void SendFileTransferActivate(byte ftSession)
         {
+            byte dev = _getTargetDevice();
+            var conn = _getConnection();
             // Port-open command (7C 27 0F 80) — required before FT activate.
             // PitHouse uses port=5, session=3 for the paired management session.
             var portOpen = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, dev,
                 0x7C, 0x27, 0x0F, 0x80,
                 0x05, 0x00,  // port 5
                 0x03, 0x00,  // session 3
@@ -804,13 +811,13 @@ namespace MozaPlugin.Telemetry.Dashboard
                 0x00
             };
             portOpen[14] = MozaProtocol.CalculateWireChecksum(portOpen);
-            _connection.Send(portOpen);
+            conn.Send(portOpen);
 
             // FT activate command (7C 23 46 80)
             var ftActivate = new byte[]
             {
                 MozaProtocol.MessageStart, 0x0A,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, dev,
                 0x7C, 0x23, 0x46, 0x80,
                 0x0D, 0x00,       // port 0x0D
                 ftSession, 0x00,  // session (0x0B)
@@ -818,7 +825,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 0x00
             };
             ftActivate[14] = MozaProtocol.CalculateWireChecksum(ftActivate);
-            _connection.Send(ftActivate);
+            conn.Send(ftActivate);
         }
 
         private void SendSessionAck(byte session, ushort ackSeq)
@@ -826,7 +833,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x05,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _getTargetDevice(),
                 0xFC, 0x00,
                 session,
                 (byte)(ackSeq & 0xFF),
@@ -838,7 +845,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             // session acks are time-critical (wheel session timeouts ~1 s) and
             // must not get buried behind tier-def or upload-chunk bursts in the
             // one-shot FIFO. See MozaSerialConnection._priorityQueue.
-            _connection.SendPriority(frame);
+            _getConnection().SendPriority(frame);
         }
 
         /// <summary>
@@ -852,7 +859,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             var frame = new byte[]
             {
                 MozaProtocol.MessageStart, 0x06,
-                MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel,
+                MozaProtocol.TelemetrySendGroup, _getTargetDevice(),
                 0x7C, 0x00,
                 session,
                 0x00, // type = close
@@ -861,7 +868,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                 0x00
             };
             frame[10] = MozaProtocol.CalculateWireChecksum(frame);
-            _connection.Send(frame);
+            _getConnection().Send(frame);
         }
 
         // ── Response decompression ─────────────────────────────────────────

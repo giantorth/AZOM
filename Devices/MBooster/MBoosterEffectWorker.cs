@@ -58,7 +58,6 @@ namespace MozaPlugin.Devices.MBooster
         // Wheel Spin shares Engine's wire shape too (see
         // ProcessWheelSpinEffect) — same cap as ABS/Traction Control.
         private const double WheelSpinScaleMax = 0.10;
-        private const double WheelSpinMinSlipMs = 2.0;
         // Gear Shift shares Engine's wire shape too (see
         // ProcessGearShiftEffect) — same cap as the other Engine-slot
         // reusers.
@@ -978,11 +977,8 @@ namespace MozaPlugin.Devices.MBooster
             // Fastest wheel (the driven one) well above ground speed; the
             // absolute margin keeps normal launch slip near standstill out.
             // No wheel-speed data → no effect.
-            bool isSpinning = snap.HasWheelSpeeds
-                           && throttle > 0.8
-                           && groundSpeed < 40
-                           && snap.MaxWheelSpeedMs > groundSpeed * 1.3
-                           && snap.MaxWheelSpeedMs - groundSpeed > WheelSpinMinSlipMs;
+            bool isSpinning = Haptics.WheelSlipDetector.IsSpinning(
+                snap.HasWheelSpeeds, throttle, groundSpeed, snap.MaxWheelSpeedMs);
 
             if (!isSpinning)
             {
@@ -1136,10 +1132,8 @@ namespace MozaPlugin.Devices.MBooster
 
             // Any one wheel well below ground speed. No wheel-speed data → no
             // effect; guessing from pedal position alone fires on every hard stop.
-            bool isLocking = snap.HasWheelSpeeds
-                          && brake > 0.8
-                          && groundSpeed > 5
-                          && snap.MinWheelSpeedMs < groundSpeed * 0.3;
+            bool isLocking = Haptics.WheelSlipDetector.IsLocking(
+                snap.HasWheelSpeeds, brake, groundSpeed, snap.MinWheelSpeedMs);
 
             if (!isLocking)
             {

@@ -54,8 +54,8 @@
 
 ### On its own USB port the pedal set is `0x12`, not `0x19`
 
-`0x19` is the **bus** sub-device id, used when a wheelbase or Universal Hub
-relays the pedals. A set plugged straight into the PC gets its own CDC port
+`0x19` is the **bus** sub-device id, used when a wheelbase, Universal Hub or
+S12 pedal vibration unit relays the pedals. A set plugged straight into the PC gets its own CDC port
 (PID `0x0001` CRP/CRP2, `0x0011` CRP2 variant, `0x0003` SRP) and is the root
 device on that pipe, so every read/write is addressed to `main` (`0x12`) and
 answers as `0x21`. `StandalonePeripheralController` overrides its

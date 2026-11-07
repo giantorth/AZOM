@@ -172,8 +172,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Уровень срабатывания</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Затухание вибрации</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ПРОЧИТАТЬ С УСТРОЙСТВА</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>УНИВЕРСАЛЬНЫЙ ХАБ · ПЕДАЛИ</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// порт педалей (опрос каждые 2 секунды)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>ПЕДАЛИ</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Порт педалей</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>АКСЕССУАРЫ</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Порт 1</value></data>
@@ -204,7 +203,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Название</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Изменено</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>УДАЛИТЬ</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Включить сервер CoAP SDK</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Включить iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Включить сервер управления по UDP</value></data>
   <data name="Section_About" xml:space="preserve"><value>О ПРОГРАММЕ</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -253,7 +252,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Настроить SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Закрыть</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Перезапустить SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Что нового в v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Автоматически проверять обновления</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Канал выпусков</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Стабильный</value></data>
@@ -312,7 +310,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>СОН</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Режим сна</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Время до сна</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>ТАБЛО MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Поиск табло…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>РЕЖИМЫ ИНДИКАТОРА</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Режим индикатора RPM</value></data>
@@ -500,13 +497,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Отправитель телеметрии недоступен (плагин не инициализирован).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Сначала выберите файл .mzdash или запись из библиотеки.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(состояние configJson ещё не получено)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Плагин не загружен</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Не удаётся получить байты для «{0}» — выберите локальный файл.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Папка: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Загрузка в очереди — отправка «{0}» на руль…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Загрузка не начата — руль не подключён или сеанс управления ещё не установлен.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (статус 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Загрузка остановлена на {0}% (статус 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Отмена загрузки…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Загрузка отменена на {0}%</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>«{0}» уже есть на руле без изменений — ничего не загружено</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Выберите файл .mzdash для загрузки</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Панель Moza (*.mzdash)|*.mzdash|Все файлы (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Выберите папку с файлами панелей .mzdash</value></data>
@@ -708,7 +707,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Обнаружение активного переключателя передач (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Объединённое устройство тактильной отдачи педалей</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
@@ -845,4 +843,26 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Пастельный пурпурный</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Пресет PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Все файлы (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Глобальные настройки</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Телеметрические эффекты (вибрация двигателя, ABS и переключения передач через базу) требуют прошивку базы 1.2.10.10 или новее. На этой базе {0}. Обновите прошивку базы в Pit House, чтобы их использовать.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Тактильная отдача S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Тактильная отдача педалей S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Вкладка S12 плагина</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt для каждой педали</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt объединённый</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>Для ShakeIt требуется SimHub 9.12 или новее — используется вкладка S12 плагина.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Текущий вывод</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Длительность импульса</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Порт 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Руль</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Приборная панель</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Коробка передач</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Ручной тормоз</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Руль ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>База руля</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Устройство 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>потери {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Вкладка по умолчанию</value></data>
 </root>

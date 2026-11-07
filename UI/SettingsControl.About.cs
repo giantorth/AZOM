@@ -218,6 +218,9 @@ namespace MozaPlugin.UI
             sb.AppendLine("=== Plugin ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildPluginInfo());
             sb.AppendLine();
+            sb.AppendLine("=== Profiles ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildProfiles(_plugin));
+            sb.AppendLine();
             sb.AppendLine("=== Control Mapper ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildControlMapper(_plugin));
             sb.AppendLine();
@@ -229,6 +232,9 @@ namespace MozaPlugin.UI
             sb.AppendLine();
             sb.AppendLine("=== mBooster pedals ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data));
+            sb.AppendLine();
+            sb.AppendLine("=== S12 pedal vibration ===");
+            sb.AppendLine(DiagnosticsTextBuilder.BuildPedalHaptics(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Motion controller ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildMotionController(_plugin));

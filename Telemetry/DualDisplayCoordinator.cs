@@ -320,12 +320,12 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>
         /// PollStatus hook, once per CM2 (re)start, after the CM2 advertises its
-        /// dashboard list. The CM2 is authoritative: the slot it reports at session
-        /// open becomes the saved selection (<see cref="MozaPlugin.ActiveCm2DashboardName"/>)
-        /// and one kind=4 to that same slot binds it — the display latches value frames
-        /// only after a host-initiated switch (DashboardBindingCoordinator's
-        /// hostEverEngaged rule). Only when the CM2 reported no slot does the saved
-        /// name get re-asserted instead.
+        /// dashboard list. The active CM2 profile's saved pick
+        /// (<see cref="MozaPlugin.ActiveCm2DashboardName"/>) wins: one kind=4 switches to
+        /// it and binds it — the display latches value frames only after a host-initiated
+        /// switch (DashboardBindingCoordinator's hostEverEngaged rule). Only when the
+        /// profile has no pick on this CM2 is the boot slot adopted (saved to the
+        /// profile) and bound instead.
         /// </summary>
         internal void TickCm2DashboardReassert()
         {
@@ -340,8 +340,16 @@ namespace MozaPlugin.Telemetry
             var list = cm2.WheelState?.ConfigJsonList;
             if (list == null || list.Count == 0) return; // not advertised yet — keep waiting
 
+            // The active CM2 profile's saved pick wins: switch to it when it is on this
+            // CM2 (the kind=4 also binds it). Only without one is the boot slot adopted.
+            string saved = _plugin.ActiveCm2DashboardName;
+            int savedSlot = -1;
+            if (!string.IsNullOrEmpty(saved))
+                for (int i = 0; i < list.Count; i++)
+                    if (string.Equals(list[i], saved, StringComparison.OrdinalIgnoreCase)) { savedSlot = i; break; }
+
             int reported = cm2.WheelReportedSlot;
-            if (reported >= 0 && reported < list.Count && !string.IsNullOrEmpty(list[reported]))
+            if (savedSlot < 0 && reported >= 0 && reported < list.Count && !string.IsNullOrEmpty(list[reported]))
             {
                 string booted = list[reported];
                 if (!string.Equals(_plugin.ActiveCm2DashboardName, booted, StringComparison.OrdinalIgnoreCase))
@@ -365,18 +373,12 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
-            string saved = _plugin.ActiveCm2DashboardName;
-            if (string.IsNullOrEmpty(saved)) { _cm2ReassertAttempted = true; return; }
+            // No saved pick on this CM2, and no boot slot to adopt.
+            if (savedSlot < 0) { _cm2ReassertAttempted = true; return; }
+            int slot = savedSlot;
 
-            int slot = -1;
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (string.Equals(list[i], saved, StringComparison.OrdinalIgnoreCase)) { slot = i; break; }
-            }
-            if (slot < 0) { _cm2ReassertAttempted = true; return; } // saved dash not on this CM2
-
-            if (cm2.WheelReportedSlot == slot) { _cm2ReassertAttempted = true; return; } // already there
-
+            // Sent even when the CM2 booted on it: the display only latches value
+            // frames after a host-initiated kind=4.
             MozaLog.Info($"[AZOM] Re-asserting saved CM2 dashboard '{saved}' (slot {slot}) after pipeline start");
             // Claim the one-shot ONLY once the kind=4 is on the wire. SendDashboardSwitch
             // suppresses when the sender isn't Active or is inside the post-emit cooldown;
@@ -528,7 +530,7 @@ namespace MozaPlugin.Telemetry
             {
                 try { _plugin.DeviceManager.SendDisplayProbe(MozaProtocol.DeviceDash); } catch { }
             }
-            try { _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile); }
+            try { _plugin.HardwareApplier.ApplyDashToHardware(); }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] CM2 lane hygiene apply skipped: {ex.Message}"); }
         }
 

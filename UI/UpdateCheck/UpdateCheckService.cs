@@ -26,7 +26,6 @@ namespace MozaPlugin.UI.UpdateCheck
         public bool Success { get; }
         public string LatestVersion { get; }
         public string ReleaseUrl { get; }
-        public string ReleaseNotes { get; }
         // browser_download_url of the first MozaPlugin*.zip asset (empty if
         // the release has no matching asset — happens for hand-cut tags).
         // Used by the in-app installer to fetch the new DLL.
@@ -38,7 +37,6 @@ namespace MozaPlugin.UI.UpdateCheck
             bool success,
             string latestVersion,
             string releaseUrl,
-            string releaseNotes,
             string assetUrl,
             UpdateCheckErrorKind errorKind,
             string errorMessage)
@@ -46,20 +44,19 @@ namespace MozaPlugin.UI.UpdateCheck
             Success = success;
             LatestVersion = latestVersion ?? "";
             ReleaseUrl = releaseUrl ?? "";
-            ReleaseNotes = releaseNotes ?? "";
             AssetUrl = assetUrl ?? "";
             ErrorKind = errorKind;
             ErrorMessage = errorMessage ?? "";
         }
 
-        public static UpdateCheckResult Ok(string version, string url, string notes, string assetUrl)
-            => new UpdateCheckResult(true, version, url, notes, assetUrl, UpdateCheckErrorKind.None, "");
+        public static UpdateCheckResult Ok(string version, string url, string assetUrl)
+            => new UpdateCheckResult(true, version, url, assetUrl, UpdateCheckErrorKind.None, "");
 
         public static UpdateCheckResult NoReleaseAvailable()
-            => new UpdateCheckResult(true, "", "", "", "", UpdateCheckErrorKind.None, "");
+            => new UpdateCheckResult(true, "", "", "", UpdateCheckErrorKind.None, "");
 
         public static UpdateCheckResult Fail(UpdateCheckErrorKind kind, string message)
-            => new UpdateCheckResult(false, "", "", "", "", kind, message);
+            => new UpdateCheckResult(false, "", "", "", kind, message);
     }
 
     /// <summary>
@@ -255,9 +252,54 @@ namespace MozaPlugin.UI.UpdateCheck
             return new ReleaseEntry(
                 version,
                 (string?)rel["html_url"] ?? "",
-                (string?)rel["body"] ?? "",
                 ExtractAssetUrl(rel),
                 published);
+        }
+
+        // ----- Changelog fetch -----
+
+        private static readonly Regex s_prVersionShaRx =
+            new Regex(@"^\d+\.\d+\.\d+-pr\.\d+\.([0-9a-f]{7,40})$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// Git ref holding the CHANGELOG.md of the release <paramref name="version"/>
+        /// came from: its vX.Y.Z tag for stable, the built commit's sha for a PR
+        /// build (a fork PR's tag points at the base branch, so the sha carried
+        /// in the version is the reliable one). Empty when unrecognised.
+        /// </summary>
+        public static string ChangelogRefForVersion(string? version)
+        {
+            if (string.IsNullOrEmpty(version)) return "";
+            if (s_stableTagRx.IsMatch("v" + version)) return "v" + version;
+            var m = s_prVersionShaRx.Match(version);
+            return m.Success ? m.Groups[1].Value : "";
+        }
+
+        // Refs are tags or commit shas, so a fetched file never changes —
+        // cache for the process lifetime.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string>
+            s_changelogs = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// CHANGELOG.md at <paramref name="gitRef"/> (see
+        /// <see cref="ChangelogRefForVersion"/>), or null when it can't be
+        /// fetched. Read from raw.githubusercontent.com, which doesn't count
+        /// against the unauthenticated API rate limit.
+        /// </summary>
+        public static async Task<string?> FetchChangelogAsync(string gitRef, CancellationToken ct)
+        {
+            if (string.IsNullOrEmpty(gitRef)) return null;
+            if (s_changelogs.TryGetValue(gitRef, out var cached)) return cached;
+
+            string url = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/{Uri.EscapeDataString(gitRef)}/CHANGELOG.md";
+            var resp = await HttpGetAsync(url, ct).ConfigureAwait(false);
+            if (resp.Body == null)
+            {
+                MozaLog.Debug($"[UpdateCheck] changelog {gitRef} fetch failed: {resp.ErrorKind} {resp.ErrorMessage}");
+                return null;
+            }
+            s_changelogs[gitRef] = resp.Body;
+            return resp.Body;
         }
 
         /// <summary>
@@ -276,7 +318,7 @@ namespace MozaPlugin.UI.UpdateCheck
                 {
                     if (ch.Number != prNumber) continue;
                     var e = ch.Newest;
-                    return UpdateCheckResult.Ok(e.Version, e.HtmlUrl, e.Notes, e.AssetUrl);
+                    return UpdateCheckResult.Ok(e.Version, e.HtmlUrl, e.AssetUrl);
                 }
                 channelFound = false;
                 return UpdateCheckResult.NoReleaseAvailable();
@@ -285,7 +327,7 @@ namespace MozaPlugin.UI.UpdateCheck
             var st = snapshot.Stable;
             return st == null
                 ? UpdateCheckResult.NoReleaseAvailable()
-                : UpdateCheckResult.Ok(st.Version, st.HtmlUrl, st.Notes, st.AssetUrl);
+                : UpdateCheckResult.Ok(st.Version, st.HtmlUrl, st.AssetUrl);
         }
 
         /// <summary>
@@ -335,8 +377,8 @@ namespace MozaPlugin.UI.UpdateCheck
             s.LastSeenLatestVersion = "";
             s.LastSeenReleaseUrl = "";
             s.LastSeenAssetUrl = "";
-            s.LastSeenReleaseNotes = "";
             s.LastSkippedVersion = "";
+            s.StableDowngradeFromVersion = "";
             return true;
         }
 
@@ -465,16 +507,13 @@ namespace MozaPlugin.UI.UpdateCheck
         /// user should be offered over <paramref name="current"/> on the
         /// selected channel. A PR channel tracks a moving head, so any
         /// differing build is an update — a newer commit, or the target build
-        /// right after a channel switch. On stable, a running prerelease build
-        /// (a PR/dev build whose channel the user left) is offered the stable
-        /// release even though its numeric core is lower — that downgrade is
-        /// the point of switching back. Stable-on-stable only ever moves
-        /// forward, by spec-correct SemVer. With <paramref name="followBeta"/>
-        /// the stable fallback (no beta open right now) never downgrades a
-        /// running beta — only a newer stable is offered.
+        /// right after a channel switch. Stable only moves forward by SemVer,
+        /// so a running beta/PR build is never offered an older stable — except
+        /// the build the user explicitly switched to Stable from
+        /// (<paramref name="stableDowngradeFrom"/>), where going back is the point.
         /// </summary>
         public static bool IsUpdateAvailable(
-            string latest, string current, string? channelId, bool followBeta)
+            string latest, string current, string? channelId, string? stableDowngradeFrom)
         {
             if (string.IsNullOrEmpty(latest)) return false;
             if (string.IsNullOrEmpty(current)) return true;
@@ -482,7 +521,8 @@ namespace MozaPlugin.UI.UpdateCheck
             if (TryParsePrChannelId(channelId, out _))
                 return !string.Equals(latest, current, StringComparison.Ordinal);
 
-            if (HasPrereleaseTag(current) && !followBeta)
+            if (HasPrereleaseTag(current)
+                && string.Equals(current, stableDowngradeFrom, StringComparison.Ordinal))
                 return !string.Equals(latest, current, StringComparison.Ordinal);
 
             return CompareSemVer(latest, current) > 0;
