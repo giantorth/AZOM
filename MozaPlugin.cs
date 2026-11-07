@@ -372,6 +372,9 @@ namespace MozaPlugin
         // >= 1.2.10.10). See Devices/BaseLfeEffectWorker.cs.
         private BaseLfeEffectWorker? _baseLfeWorker;
 
+        // S12 tab worker (plugin-tab mode). See Devices/PedalHaptics/PedalHapticsEffectWorker.cs.
+        private Devices.PedalHaptics.PedalHapticsEffectWorker? _pedalHapticsWorker;
+
         // Keeps the process responsive in the background: opts out of EcoQoS
         // throttling during active gameplay, and holds the 1 ms timer during gameplay
         // (or whenever the FFB Lag Fix override is on). See ProcessResponsivenessManager.

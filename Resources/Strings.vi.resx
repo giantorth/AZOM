@@ -709,7 +709,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Phát hiện cần số chủ động (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Thiết bị rung bàn đạp kết hợp</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Biểu đồ</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Băng thông</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>
@@ -848,4 +847,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>đã áp dụng “{0}” cho hồ sơ đang hoạt động</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Cài đặt chung</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Hiệu ứng telemetry (rung động cơ, ABS và sang số qua đế vô lăng) cần firmware đế 1.2.10.10 trở lên. Đế này đang có {0}. Hãy cập nhật firmware đế trong Pit House để sử dụng.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Rung S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ S12 của plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt theo từng bàn đạp</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kết hợp</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ S12 của plugin.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Đầu ra trực tiếp</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Độ dài xung</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
 </root>

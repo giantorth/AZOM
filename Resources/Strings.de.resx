@@ -709,7 +709,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Gerätedefinition aktualisiert. SimHub zum Anwenden neu starten.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-Kompatibilität</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Aktivschalthebel-Erkennung (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Kombiniertes Pedal-Haptikgerät</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Diagramm</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandbreite</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Drehmoment</value></data>
@@ -848,4 +847,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>„{0}“ auf das aktive Profil angewendet</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Globale Einstellungen</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetrie-Effekte (Motor-, ABS- und Schaltvibration über die Basis) erfordern Basis-Firmware 1.2.10.10 oder neuer. Diese Basis hat {0}. Aktualisiere die Basis-Firmware in Pit House, um sie zu nutzen.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12-Haptik</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12-Pedalhaptik</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>S12-Tab des Plugins</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt pro Pedal</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kombiniert</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt erfordert SimHub 9.12 oder neuer — es wird der S12-Tab des Plugins verwendet.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Live-Ausgabe</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Impulsdauer</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Pedale</value></data>
 </root>

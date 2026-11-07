@@ -57,6 +57,13 @@ namespace MozaPlugin.Integration
             });
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
 
+            // Haptics trigger signals for effect formulas (S12 tab defaults use
+            // them). Lockup / slip: 0/1 from per-wheel speeds, 0 when the game
+            // reports none. RoadPosition: 0..100 stand-in for suspension travel.
+            _plugin.AttachDelegate("AZOM.WheelLockup", () => _plugin.HapticsWheelLockup);
+            _plugin.AttachDelegate("AZOM.WheelSlip", () => _plugin.HapticsWheelSlip);
+            _plugin.AttachDelegate("AZOM.RoadPosition", () => _plugin.HapticsRoadPosition);
+
             // Every wheelbase setting, in the same display units the Base-tab
             // sliders show (AZOM.FfbStrength is one of these — it kept its
             // historical percent scaling). Values track the device read-back,

@@ -186,12 +186,56 @@ namespace MozaPlugin.UI
             UpdateWheelbaseLfeSourceStatus();
         }
 
-        private void PedalHapticsCombinedCheck_Changed(object sender, RoutedEventArgs e)
+        // ===== S12 source: plugin tab | ShakeIt per pedal | ShakeIt combined =====
+
+        // Set once a source switch has deployed an S12 definition.
+        private bool _pedalHapticsRestartPending;
+
+        /// <summary>
+        /// Seed the S12 source selector. On a SimHub without device haptics
+        /// (pre-9.12) the ShakeIt items are disabled and the plugin tab is shown
+        /// as the effective source; the stored preference is left alone.
+        /// </summary>
+        private void SyncPedalHapticsSourceCombo()
+        {
+            bool supported = Devices.Haptics.MozaPedalHapticsBridge.IsSupported;
+            PedalHapticsSourceShakeItItem.IsEnabled = supported;
+            PedalHapticsSourceCombinedItem.IsEnabled = supported;
+
+            var s = _plugin.Settings;
+            int idx = !_plugin.PedalHapticsRoutedToShakeIt ? 0 : (s.PedalHapticsCombinedDevice ? 2 : 1);
+            PedalHapticsSourceCombo.SelectedIndex = idx;
+            UpdatePedalHapticsSourceStatus();
+        }
+
+        private void UpdatePedalHapticsSourceStatus()
+        {
+            string text;
+            if (!Devices.Haptics.MozaPedalHapticsBridge.IsSupported)
+                text = Strings.Status_PedalHapticsShakeItUnavailable;
+            else if (_pedalHapticsRestartPending)
+                text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+            else
+                text = "";
+            if (PedalHapticsSourceStatusText.Text != text)
+            {
+                PedalHapticsSourceStatusText.Text = text;
+                PedalHapticsSourceStatusText.Visibility = text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        private void PedalHapticsSource_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
+            int idx = PedalHapticsSourceCombo.SelectedIndex;
+            if (idx < 0) return;
 
-            if (_plugin.SetPedalHapticsCombined(PedalHapticsCombinedCheck.IsChecked == true))
-                PedalHapticsCombinedStatusText.Text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+            var source = idx == 0 ? PedalHapticsSource.PluginTab : PedalHapticsSource.ShakeIt;
+            // Picking the plugin tab keeps the remembered ShakeIt layout.
+            bool combined = idx == 0 ? _plugin.Settings.PedalHapticsCombinedDevice : idx == 2;
+            if (_plugin.SetPedalHapticsMode(source, combined))
+                _pedalHapticsRestartPending = true;
+            UpdatePedalHapticsSourceStatus();
         }
 
         private void ClearAllSettingsButton_Click(object sender, RoutedEventArgs e)
@@ -206,16 +250,18 @@ namespace MozaPlugin.UI
                 return;
 
             bool wasCombined = _plugin.PedalHapticsCombined;
+            bool wasShakeIt = _plugin.PedalHapticsRoutedToShakeIt;
             _plugin.ClearSettings();
-            if (_plugin.PedalHapticsCombined != wasCombined && _plugin.ApplyPedalHapticsLayout())
-                PedalHapticsCombinedStatusText.Text = Strings.Status_WheelbaseLfeSourceRestartRequired;
+            if ((_plugin.PedalHapticsCombined != wasCombined || _plugin.PedalHapticsRoutedToShakeIt != wasShakeIt)
+                && _plugin.ApplyPedalHapticsLayout())
+                _pedalHapticsRestartPending = true;
 
             using (_suppressor.Begin())
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
-                PedalHapticsCombinedCheck.IsChecked = _plugin.Settings.PedalHapticsCombinedDevice;
+                SyncPedalHapticsSourceCombo();
                 SyncWheelbaseLfeSourceCombo();
                 ConnectionToggle.IsChecked = _plugin.Settings.ConnectionEnabled;
                 ProfileListControl.DataContext = null;

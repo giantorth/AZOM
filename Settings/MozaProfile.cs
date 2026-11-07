@@ -450,6 +450,158 @@ namespace MozaPlugin.Settings
     }
 
     /// <summary>
+    /// One S12 channel card. Sent to its own firmware slot on every ticked pedal.
+    /// Trigger / frequency / intensity are each a slider or a formula, as on the
+    /// LFE tab. On the Road Texture card the frequency fields carry the
+    /// suspension position (0..100) instead of Hz. See PedalHapticsEffectWorker.
+    /// </summary>
+    public sealed class PedalHapticsEffect
+    {
+        public bool Enabled { get; set; } = false;
+
+        public bool Throttle { get; set; } = false;
+        public bool Brake { get; set; } = false;
+        public bool Clutch { get; set; } = false;
+
+        public BaseLfeTriggerMode TriggerMode { get; set; } = BaseLfeTriggerMode.Level;
+        public string TriggerFormula { get; set; } = "";
+
+        // Hz (10..100); Road Texture: position. A formula's 0..100 output is
+        // rescaled into [FrequencyMin, FrequencyMax].
+        public float Frequency { get; set; } = 50;
+        public string FrequencyFormula { get; set; } = "";
+        public float FrequencyMin { get; set; } = 10;
+        public float FrequencyMax { get; set; } = 100;
+
+        public int Intensity { get; set; } = 50;
+        public string IntensityFormula { get; set; } = "";
+
+        // On-change burst length. Timed slots get it as the firmware duration.
+        public int PulseMs { get; set; } = 120;
+        public bool VibrateOnNeutral { get; set; } = false;
+        public int DebounceMs { get; set; } = 50;
+
+        public bool OnPedal(int pedalIndex) => pedalIndex switch
+        {
+            0 => Throttle,
+            1 => Brake,
+            2 => Clutch,
+            _ => false,
+        };
+
+        /// <summary>Map a frequency formula's 0..100 output into the [min,max] band.</summary>
+        public double RescaleFreq(double rawEval)
+        {
+            double lo = System.Math.Min(FrequencyMin, FrequencyMax);
+            double hi = System.Math.Max(FrequencyMin, FrequencyMax);
+            double raw01 = rawEval / 100.0;
+            if (raw01 < 0) raw01 = 0; else if (raw01 > 1) raw01 = 1;
+            return lo + raw01 * (hi - lo);
+        }
+
+        public PedalHapticsEffect Clone() => new PedalHapticsEffect
+        {
+            Enabled = Enabled,
+            Throttle = Throttle,
+            Brake = Brake,
+            Clutch = Clutch,
+            TriggerMode = TriggerMode,
+            TriggerFormula = TriggerFormula,
+            Frequency = Frequency,
+            FrequencyFormula = FrequencyFormula,
+            FrequencyMin = FrequencyMin,
+            FrequencyMax = FrequencyMax,
+            Intensity = Intensity,
+            IntensityFormula = IntensityFormula,
+            PulseMs = PulseMs,
+            VibrateOnNeutral = VibrateOnNeutral,
+            DebounceMs = DebounceMs,
+        };
+    }
+
+    /// <summary>
+    /// S12 plugin-tab effects: one card per firmware channel (S12 vibration guide,
+    /// "Effect channels"). Used only when Options routes the S12 to the plugin tab.
+    /// </summary>
+    public sealed class PedalHapticsSettings
+    {
+        private const string G = "[DataCorePlugin.GameData.";
+        public const string TcTrigger = G + "TCActive]";
+        public const string AbsTrigger = G + "ABSActive]";
+        public const string LockupTrigger = "[MozaPlugin.AZOM.WheelLockup]";
+        public const string BrakeThresholdTrigger = "if(" + G + "Brake] >= 60, 1, 0)";
+        public const string EngineTrigger = G + "Rpms]";
+        public const string EngineFrequency = G + "Rpms] / " + G + "MaxRpm] * 100";
+        public const string ClutchBiteTrigger = "if(" + G + "Clutch] >= 30 && " + G + "Clutch] <= 60, 1, 0)";
+        public const string GearTrigger = G + "Gear]";
+        public const string WheelSlipTrigger = "[MozaPlugin.AZOM.WheelSlip]";
+        public const string RoadTrigger = G + "SpeedKmh]";
+        public const string RoadPosition = "[MozaPlugin.AZOM.RoadPosition]";
+
+        public PedalHapticsEffect TractionControl { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = TcTrigger, Frequency = 40 };
+        public PedalHapticsEffect Abs { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = AbsTrigger, Frequency = 30 };
+        public PedalHapticsEffect Lockup { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = LockupTrigger, Frequency = 50 };
+        public PedalHapticsEffect BrakeThreshold { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = BrakeThresholdTrigger, TriggerMode = BaseLfeTriggerMode.OnChange, Frequency = 60, PulseMs = 150 };
+        public PedalHapticsEffect Engine { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = EngineTrigger, FrequencyFormula = EngineFrequency, Frequency = 50, FrequencyMin = 20, FrequencyMax = 80, Intensity = 30 };
+        public PedalHapticsEffect ClutchBite { get; set; } = new PedalHapticsEffect
+        { Clutch = true, TriggerFormula = ClutchBiteTrigger, Frequency = 40 };
+        public PedalHapticsEffect GearShift { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = GearTrigger, TriggerMode = BaseLfeTriggerMode.OnChange, Frequency = 50, Intensity = 70, PulseMs = 100 };
+        public PedalHapticsEffect WheelSlip { get; set; } = new PedalHapticsEffect
+        { Throttle = true, TriggerFormula = WheelSlipTrigger, Frequency = 35 };
+        public PedalHapticsEffect RoadTexture { get; set; } = new PedalHapticsEffect
+        { Brake = true, TriggerFormula = RoadTrigger, FrequencyFormula = RoadPosition, Frequency = 50, FrequencyMin = 0, FrequencyMax = 100, Intensity = 30 };
+
+        private static readonly PedalHapticsEffect Disabled = new PedalHapticsEffect();
+
+        /// <summary>Read-only lookup for the worker and UI seeding — never mutates the profile.</summary>
+        public PedalHapticsEffect Get(Protocol.PedalHapticsEffectSlot slot) => slot switch
+        {
+            Protocol.PedalHapticsEffectSlot.TractionControl => TractionControl,
+            Protocol.PedalHapticsEffectSlot.Abs => Abs,
+            Protocol.PedalHapticsEffectSlot.Lockup => Lockup,
+            Protocol.PedalHapticsEffectSlot.BrakeThreshold => BrakeThreshold,
+            Protocol.PedalHapticsEffectSlot.EngineVibration => Engine,
+            Protocol.PedalHapticsEffectSlot.ClutchBitePoint => ClutchBite,
+            Protocol.PedalHapticsEffectSlot.GearShift => GearShift,
+            Protocol.PedalHapticsEffectSlot.WheelSlip => WheelSlip,
+            _ => RoadTexture,
+        } ?? Disabled;
+
+        /// <summary>Lookup for editing: a null card (hand-edited JSON) is replaced so it can be written.</summary>
+        public PedalHapticsEffect For(Protocol.PedalHapticsEffectSlot slot) => slot switch
+        {
+            Protocol.PedalHapticsEffectSlot.TractionControl => TractionControl ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.Abs => Abs ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.Lockup => Lockup ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.BrakeThreshold => BrakeThreshold ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.EngineVibration => Engine ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.ClutchBitePoint => ClutchBite ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.GearShift => GearShift ??= new PedalHapticsEffect(),
+            Protocol.PedalHapticsEffectSlot.WheelSlip => WheelSlip ??= new PedalHapticsEffect(),
+            _ => RoadTexture ??= new PedalHapticsEffect(),
+        };
+
+        public PedalHapticsSettings Clone() => new PedalHapticsSettings
+        {
+            TractionControl = TractionControl?.Clone() ?? new PedalHapticsEffect(),
+            Abs = Abs?.Clone() ?? new PedalHapticsEffect(),
+            Lockup = Lockup?.Clone() ?? new PedalHapticsEffect(),
+            BrakeThreshold = BrakeThreshold?.Clone() ?? new PedalHapticsEffect(),
+            Engine = Engine?.Clone() ?? new PedalHapticsEffect(),
+            ClutchBite = ClutchBite?.Clone() ?? new PedalHapticsEffect(),
+            GearShift = GearShift?.Clone() ?? new PedalHapticsEffect(),
+            WheelSlip = WheelSlip?.Clone() ?? new PedalHapticsEffect(),
+            RoadTexture = RoadTexture?.Clone() ?? new PedalHapticsEffect(),
+        };
+    }
+
+    /// <summary>
     /// A named profile snapshot of all Moza device configuration.
     /// Extends SimHub's ProfileBase for native per-game profile switching.
     /// All integer settings use -1 as sentinel for "not included in this profile".
@@ -629,6 +781,10 @@ namespace MozaPlugin.Settings
         // Name of the LFE preset last selected for this profile (drives the preset
         // dropdown; "" = none/custom). Persisted so the dropdown remembers its pick.
         public string BaseLfePresetName { get; set; } = "";
+
+        // ===== S12 pedal haptics (plugin-tab mode) =====
+        // Null until the user touches the S12 Haptics tab for this profile.
+        public PedalHapticsSettings? PedalHaptics { get; set; }
 
         // ===== HMA150 motion platform effects =====
         // Null until set from the HMA150 panel or a Motion Manager preset import; the
@@ -830,6 +986,7 @@ namespace MozaPlugin.Settings
             Ab9 = p.Ab9?.Clone();
             BaseLfe = p.BaseLfe?.Clone();
             BaseLfePresetName = p.BaseLfePresetName;
+            PedalHaptics = p.PedalHaptics?.Clone();
             MotionEffects = p.MotionEffects?.Clone();
 
             // mBooster — deep-copy each per-device settings entry.

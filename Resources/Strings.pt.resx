@@ -708,7 +708,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definição de dispositivo atualizada. Reinicie o SimHub para aplicar.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidade com Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Detecção da alavanca de câmbio ativa (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Dispositivo háptico de pedais combinado</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Largura de banda</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
@@ -847,4 +846,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>“{0}” aplicado ao perfil ativo</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Configurações globais</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Os efeitos de telemetria (vibração do motor, ABS e mudanças de velocidade através da base) requerem o firmware da base 1.2.10.10 ou mais recente. Esta base tem {0}. Atualize o firmware da base no Pit House para os usar.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Háptica S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Háptica de pedais S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Separador S12 do plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt por pedal</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combinado</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>O ShakeIt requer o SimHub 9.12 ou mais recente — está a ser usado o separador S12 do plugin.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Saída em direto</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Duração do impulso</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Pedais</value></data>
 </root>

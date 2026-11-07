@@ -176,6 +176,9 @@ namespace MozaPlugin
             // keeps shutdown deterministic.
             Teardown("AB9 worker", () => { _ab9Worker?.Stop(); _ab9Worker = null; });
             Teardown("base LFE worker", () => { _baseLfeWorker?.Stop(); _baseLfeWorker = null; });
+            // Before the registry: its Dispose queues the disables for whatever
+            // this worker left playing.
+            Teardown("pedal-haptics worker", () => { _pedalHapticsWorker?.Stop(); _pedalHapticsWorker = null; });
             // Drop the coalescing timer for flash-backed wheel writes. Anything still
             // parked is already in the profile, so the next connect's apply carries it.
             Teardown("hardware applier shutdown", () => _hardwareApplier?.Shutdown());

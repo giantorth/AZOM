@@ -716,7 +716,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Device definition updated. Restart SimHub to apply.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon compatibility</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Active shifter detection (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Combined pedal haptics device</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Graph</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Bandwidth</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Torque</value></data>
@@ -855,4 +854,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>applied “{0}” to the active profile</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Global settings</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetry effects (engine, ABS and gearshift vibration through the wheelbase) need wheelbase firmware 1.2.10.10 or newer. This base has {0}. Update the base firmware in Pit House to use them.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12 Haptics</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12 pedal haptics</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Plugin S12 tab</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt per pedal</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combined</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt requires SimHub 9.12 or newer — using the plugin's S12 tab.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Live Output</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulse length</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Pedals</value></data>
 </root>

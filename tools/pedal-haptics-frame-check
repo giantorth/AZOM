@@ -168,7 +168,22 @@ CAPTURE = [
      "7e0c4d1f1e01010107000000000000002b"),
 ]
 
-# --- Encoder spot checks ----------------------------------------------------
+# --- Plugin S12 tab frames (USB envelope) -----------------------------------
+# Expected bytes and checksums worked by hand from the guide's rules, not from
+# this file's builder. A firmware-timed burst is one enable frame carrying the
+# pulse length; Road Texture streams a position with the stream duration.
+GEARSHIFT = 6
+PLUGIN_TAB = [
+    ("Gear   throttle 50Hz 70% burst 100ms",
+     lambda: set_frame(False, THROTTLE, GEARSHIFT, True, 100, 50, 0.70),
+     "7e0b4d12010101060100640032b3327a"),
+    ("Road   brake  pos 73 30% stream",
+     lambda: road_frame(False, BRAKE, True, 73, 0.30),
+     "7e0b4d12010102080101f400494ccc58"),
+    ("Road   throttle stop",
+     lambda: road_frame(False, THROTTLE, False, 0, 0),
+     "7e0b4d12010101080000000000000000"),
+]
 
 # --- Channel model + emission budget ---------------------------------------
 # Keep in sync with MozaPedalHapticsProtocol. Each pedal is its own SimHub
@@ -258,7 +273,8 @@ def run_values(group, cases):
 def main():
     fails = total = 0
     for group, cases in (("reference frames", REFERENCE),
-                         ("moza.pcap frames", CAPTURE)):
+                         ("moza.pcap frames", CAPTURE),
+                         ("plugin S12 tab frames", PLUGIN_TAB)):
         f, n = run(group, cases)
         fails += f
         total += n

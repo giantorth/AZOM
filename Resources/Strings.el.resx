@@ -708,7 +708,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Ανίχνευση ενεργού επιλογέα ταχυτήτων (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Ενιαία συσκευή απτικής ανάδρασης πεντάλ</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Γράφημα</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Εύρος ζώνης</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>
@@ -847,4 +846,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>το «{0}» εφαρμόστηκε στο ενεργό προφίλ</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Καθολικές ρυθμίσεις</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Τα εφέ τηλεμετρίας (δόνηση κινητήρα, ABS και αλλαγής ταχυτήτων μέσω της βάσης) απαιτούν υλικολογισμικό βάσης 1.2.10.10 ή νεότερο. Αυτή η βάση έχει {0}. Ενημερώστε το υλικολογισμικό της βάσης στο Pit House για να τα χρησιμοποιήσετε.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Απτική S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Απτική πεντάλ S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Καρτέλα S12 του πρόσθετου</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt ανά πεντάλ</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt ενιαίο</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>Το ShakeIt απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα S12 του πρόσθετου.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Ζωντανή έξοδος</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Διάρκεια παλμού</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
 </root>

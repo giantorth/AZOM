@@ -10,6 +10,8 @@ All notable changes to the AZOM plugin are documented here.
 - **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
 - **Cancel button for dashboard uploads** on the Files tab; stops the transfer and closes the wheel's upload session.
 - **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
+- **S12 Haptics tab drives the pedal shakers without ShakeIt;** one card per S12 channel, picked in Options alongside the ShakeIt layouts.
+- **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
 
 ## Fixed
 

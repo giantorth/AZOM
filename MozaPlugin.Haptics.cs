@@ -49,9 +49,68 @@ namespace MozaPlugin
         // Cached FeedbackCapabilities.WheelsSpeed for the active game manager
         // (re-queried on manager change and at most once a second, since some
         // readers compute capabilities from live state).
-        private IGameManager? _mboosterCapsManager;
-        private int _mboosterCapsTick;
-        private bool _mboosterWheelsSpeedCap;
+        private IGameManager? _wheelSpeedCapsManager;
+        private int _wheelSpeedCapsTick;
+        private bool _wheelsSpeedCap;
+
+        // Exported haptics signals (AZOM.WheelLockup / WheelSlip / RoadPosition).
+        // Written on the data thread, read by SimHub's property poll and formulas.
+        private volatile bool _hapticsWheelLockup;
+        private volatile bool _hapticsWheelSlip;
+        private double _hapticsRoadPosition = 50;
+        private readonly Devices.Haptics.RoadPositionSignal _roadPositionSignal = new Devices.Haptics.RoadPositionSignal();
+
+        internal int HapticsWheelLockup => _hapticsWheelLockup ? 1 : 0;
+        internal int HapticsWheelSlip => _hapticsWheelSlip ? 1 : 0;
+        internal double HapticsRoadPosition => Volatile.Read(ref _hapticsRoadPosition);
+
+        /// <summary>
+        /// Per-wheel speeds for lockup / wheelspin. Only trusted when the game
+        /// reader declares WheelsSpeed (FeedbackData.WheelSpeed is km/h); otherwise
+        /// the arrays are just zeros and both stay silent. Slip is measured against
+        /// ground speed where the reader has it, since SpeedKmh can itself be
+        /// wheel-derived.
+        /// </summary>
+        private void SampleWheelSpeeds(PluginManager pluginManager, GameData data, double vehicleMs,
+            out bool hasWheelSpeeds, out double maxWheelMs, out double minWheelMs, out double groundMs)
+        {
+            hasWheelSpeeds = false;
+            maxWheelMs = 0.0; minWheelMs = 0.0; groundMs = vehicleMs;
+            var gameManager = pluginManager.GameManager;
+            int nowTick = Environment.TickCount;
+            if (!ReferenceEquals(gameManager, _wheelSpeedCapsManager) || unchecked(nowTick - _wheelSpeedCapsTick) >= 1000)
+            {
+                _wheelSpeedCapsManager = gameManager;
+                _wheelSpeedCapsTick = nowTick;
+                try { _wheelsSpeedCap = gameManager?.GetFeedbackCapabilities()?.WheelsSpeed == true; }
+                catch { _wheelsSpeedCap = false; }
+            }
+            var fb = data.NewData?.FeedbackData;
+            double[]? wheelKmh = fb?.WheelSpeed;
+            if (!_wheelsSpeedCap || !data.GameRunning || wheelKmh == null || wheelKmh.Length < 4) return;
+
+            maxWheelMs = double.MinValue;
+            minWheelMs = double.MaxValue;
+            for (int w = 0; w < 4; w++)
+            {
+                double ms = Math.Abs(wheelKmh[w]) / 3.6;
+                if (ms > maxWheelMs) maxWheelMs = ms;
+                if (ms < minWheelMs) minWheelMs = ms;
+            }
+            hasWheelSpeeds = !double.IsNaN(maxWheelMs) && !double.IsNaN(minWheelMs);
+            if (!hasWheelSpeeds) { maxWheelMs = 0.0; minWheelMs = 0.0; }
+            double? groundKmh = fb!.GroundSpeed;
+            if (groundKmh.HasValue && groundKmh.Value > 0) groundMs = groundKmh.Value / 3.6;
+        }
+
+        private void UpdateHapticsSignals(bool active, bool hasWheelSpeeds, double brake01, double throttle01,
+            double groundMs, double minWheelMs, double maxWheelMs, double heave)
+        {
+            _hapticsWheelLockup = active && Devices.Haptics.WheelSlipDetector.IsLocking(hasWheelSpeeds, brake01, groundMs, minWheelMs);
+            _hapticsWheelSlip = active && Devices.Haptics.WheelSlipDetector.IsSpinning(hasWheelSpeeds, throttle01, groundMs, maxWheelMs);
+            _roadPositionSignal.Update(active, heave);
+            Volatile.Write(ref _hapticsRoadPosition, _roadPositionSignal.Position);
+        }
 
         // Wheelbase LFE momentary test triggers (from the UI test buttons). No-op
         // when the firmware doesn't support LFE. Each plays a fixed pattern:

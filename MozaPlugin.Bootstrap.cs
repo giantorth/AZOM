@@ -609,6 +609,16 @@ namespace MozaPlugin
                         this, conn, _data, DetectionState, () => IsShuttingDown));
                 _pedalHapticsRegistry.DeviceDetected += OnPedalHapticsDeviceDetected;
 
+                // S12 tab worker — idles unless Options routes the unit to the
+                // plugin tab and a unit is ready.
+                _pedalHapticsWorker = new Devices.PedalHaptics.PedalHapticsEffectWorker(
+                    () => _pedalHapticsRegistry,
+                    () => _settings?.ProfileStore?.CurrentProfile?.PedalHaptics,
+                    CreateHapticsFormulaResolver(),
+                    () => PedalHapticsRoutedToPluginTab,
+                    () => IsShuttingDown);
+                _pedalHapticsWorker.Start();
+
                 // Standalone-peripheral registry — one dedicated connection per
                 // pedal set / handbrake plugged directly into the PC. Refresh()
                 // runs on the reconnect timer; the initial walk is deferred to

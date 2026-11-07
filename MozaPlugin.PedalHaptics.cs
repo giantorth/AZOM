@@ -1,19 +1,18 @@
 using System;
 using MozaPlugin.Devices.Extensions;
 using MozaPlugin.Devices.PedalHaptics;
+using MozaPlugin.Settings;
 
 namespace MozaPlugin
 {
     /// <summary>
     /// Pedal-haptics coordination: the registry that owns every unit, the
-    /// routed-lane registration, and the ShakeIt surface its channels provider
-    /// posts into.
+    /// routed-lane registration, the ShakeIt surface its channels provider posts
+    /// into, and the plugin's own S12 tab worker.
     ///
-    /// Deliberately thin. The wheelbase LFE equivalent in
-    /// <c>MozaPlugin.Haptics.cs</c> carries a source toggle, a firmware gate and
-    /// a scope feed because the plugin has its own LFE tab competing for the
-    /// same actuator. Here ShakeIt is the only way to drive the unit, so there
-    /// is nothing to arbitrate.
+    /// Exactly one source drives the unit (Options): ShakeIt, through the
+    /// per-pedal or combined device definitions, or the plugin's S12 tab. Both
+    /// would write the same slots, so the inactive one posts nothing.
     /// </summary>
     public partial class MozaPlugin
     {
@@ -34,37 +33,55 @@ namespace MozaPlugin
         internal bool PedalHapticsCombined => _settings?.PedalHapticsCombinedDevice == true;
 
         /// <summary>
-        /// Ready, and the given layout is the one selected. The other layout's
-        /// devices stay in SimHub (so their effects can be copied across) but
-        /// read as disconnected and post nothing.
+        /// True when ShakeIt drives the S12. Gated on the bridge: on a SimHub
+        /// without the device haptics feature (pre-9.12) the definitions can't
+        /// work, so the plugin tab takes over. The stored value stays a
+        /// preference and applies by itself once SimHub is updated.
         /// </summary>
-        internal bool IsPedalHapticsActive(bool combined) =>
-            IsPedalHapticsReady && PedalHapticsCombined == combined;
+        internal bool PedalHapticsRoutedToShakeIt =>
+            _settings?.PedalHapticsSource != PedalHapticsSource.PluginTab
+            && Devices.Haptics.MozaPedalHapticsBridge.IsSupported;
+
+        /// <summary>True when the plugin's S12 tab drives the unit.</summary>
+        internal bool PedalHapticsRoutedToPluginTab => _settings != null && !PedalHapticsRoutedToShakeIt;
 
         /// <summary>
-        /// Switch layouts: silence whatever the old one left playing, then deploy
-        /// the new one's definition if it is missing.
+        /// Ready, ShakeIt routed, and the given layout is the one selected. The
+        /// other layout's devices stay in SimHub (so their effects can be copied
+        /// across) but read as disconnected and post nothing.
+        /// </summary>
+        internal bool IsPedalHapticsActive(bool combined) =>
+            IsPedalHapticsReady && PedalHapticsRoutedToShakeIt && PedalHapticsCombined == combined;
+
+        /// <summary>
+        /// Switch source and/or ShakeIt layout: silence whatever the old one left
+        /// playing, then deploy the new layout's definition if it is missing.
         /// </summary>
         /// <returns>True when a definition was written and SimHub needs a restart.</returns>
-        internal bool SetPedalHapticsCombined(bool combined)
+        internal bool SetPedalHapticsMode(PedalHapticsSource source, bool combined)
         {
-            if (_settings == null || _settings.PedalHapticsCombinedDevice == combined) return false;
+            if (_settings == null) return false;
+            if (_settings.PedalHapticsSource == source && _settings.PedalHapticsCombinedDevice == combined) return false;
+            _settings.PedalHapticsSource = source;
             _settings.PedalHapticsCombinedDevice = combined;
             SaveSettings();
             return ApplyPedalHapticsLayout();
         }
 
-        /// <summary>The side effects of a layout change, for paths that already wrote the setting.</summary>
+        /// <summary>The side effects of a source/layout change, for paths that already wrote the setting.</summary>
         internal bool ApplyPedalHapticsLayout()
         {
             bool combined = PedalHapticsCombined;
 
             // The scheduler re-sends the latest state until told otherwise, and
-            // the old layout's devices stop posting the moment they go inactive.
+            // the old source's devices stop posting the moment they go inactive.
             var registry = _pedalHapticsRegistry;
             if (registry == null) return false;
             for (int p = 0; p < Protocol.MozaPedalHapticsProtocol.PedalCount; p++)
                 registry.ClearPedal(p);
+
+            // The plugin tab needs no definition; existing ones are left in place.
+            if (!PedalHapticsRoutedToShakeIt) return false;
 
             // Same rule as detection: no definition until a unit has answered.
             if (!registry.AnyDetected) return false;
@@ -123,6 +140,8 @@ namespace MozaPlugin
         /// </summary>
         private void OnPedalHapticsDeviceDetected(PedalHapticsDeviceController controller)
         {
+            // The plugin tab needs no SimHub device.
+            if (!PedalHapticsRoutedToShakeIt) return;
             try
             {
                 string? pid = controller.DiscoveredPid ?? _deviceManager?.Connection?.DiscoveredPid;
@@ -141,10 +160,33 @@ namespace MozaPlugin
         /// is the oscillator within that pedal.
         /// </summary>
         internal void PostShakeItPedalHapticsChannel(int pedalIndex, int channel, double gain01, double freqHz)
-            => _pedalHapticsRegistry?.PostChannel(pedalIndex, channel, gain01, freqHz);
+        {
+            // Hard gate: with the S12 routed to the plugin tab, a stray ShakeIt
+            // device must not overwrite the tab's slots.
+            if (!PedalHapticsRoutedToShakeIt) return;
+            _pedalHapticsRegistry?.PostChannel(pedalIndex, channel, gain01, freqHz);
+        }
 
         /// <summary>Drop every channel to silent, for the provider Stop path and the driver Clear.</summary>
         internal void ClearShakeItPedalHaptics(int pedalIndex)
-            => _pedalHapticsRegistry?.ClearPedal(pedalIndex);
+        {
+            if (!PedalHapticsRoutedToShakeIt) return;
+            _pedalHapticsRegistry?.ClearPedal(pedalIndex);
+        }
+
+        // ── S12 tab ───────────────────────────────────────────────────────────
+
+        /// <summary>Play one S12 tab card's test pattern on its ticked pedals.</summary>
+        public void TriggerPedalHapticsTest(Protocol.PedalHapticsEffectSlot slot)
+            => _pedalHapticsWorker?.PostTest(slot);
+
+        /// <summary>Latest (freq, amplitude 0..1) per pedal — throttle, brake, clutch — for the S12 tab scope.</summary>
+        public (double freq, double amp)[] GetPedalHapticsScopeSamples()
+        {
+            var w = _pedalHapticsWorker;
+            if (w == null || !PedalHapticsRoutedToPluginTab)
+                return new[] { (0.0, 0.0), (0.0, 0.0), (0.0, 0.0) };
+            return w.ScopeSamples();
+        }
     }
 }

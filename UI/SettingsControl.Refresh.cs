@@ -83,6 +83,7 @@ namespace MozaPlugin.UI
                     RefreshAb9Tab();
                     RefreshStalksTab();
                     RefreshMBoosterTab();
+                    RefreshPedalHapticsTab();
                     RefreshOptionsTab();
                     InitTelemetryTab();
                     RefreshSdkStatusTick();
@@ -114,7 +115,7 @@ namespace MozaPlugin.UI
         private TabItem[] HideableTabs => new[]
         {
             BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
-            HgpTab, SgpTab, MBoosterTab, HubTab, StalksTab,
+            HgpTab, SgpTab, MBoosterTab, PedalHapticsTab, HubTab, StalksTab,
         };
 
         private void ApplyShowAllTabs()

@@ -15,6 +15,15 @@ namespace MozaPlugin.Settings
         ShakeIt = 1,
     }
 
+    /// <summary>Which subsystem drives the S12 pedal vibration unit.</summary>
+    public enum PedalHapticsSource
+    {
+        /// <summary>SimHub ShakeIt, via the S12 device definitions (per-pedal or combined).</summary>
+        ShakeIt = 0,
+        /// <summary>The plugin's own S12 Haptics tab — one card per firmware channel.</summary>
+        PluginTab = 1,
+    }
+
     /// <summary>Which graph fills the right-hand slot of the Base tab's live
     /// telemetry pair. Torque additionally gates its own ~15 Hz wire poll, so
     /// this is not purely cosmetic.</summary>
@@ -368,6 +377,10 @@ namespace MozaPlugin.Settings
         // so upgraders keep their per-pedal devices; new installs get true via
         // CreateForNewInstall.
         public bool PedalHapticsCombinedDevice { get; set; }
+
+        // What drives the S12: ShakeIt (layout above) or the plugin's S12 Haptics
+        // tab. The two would fight over the same slots, so exactly one owns them.
+        public PedalHapticsSource PedalHapticsSource { get; set; } = PedalHapticsSource.ShakeIt;
 
         // One-shot marker for the migration off the pre-1.6 "Wheelbase LFE haptics"
         // device (DeviceTypeID F208F60B-…), which was code-registered and vanished

@@ -16,7 +16,9 @@ namespace MozaPlugin.Protocol
     /// one does not stop the rest. The names are the game events each slot is
     /// meant to represent; the firmware synthesizes nothing from them, it plays
     /// the duration / frequency / strength it is handed, so a slot is really
-    /// "one independent oscillator on that pedal's motor".
+    /// "one independent oscillator on that pedal's motor". The ShakeIt path uses
+    /// 0..7 as interchangeable oscillators; the plugin's S12 tab sends each
+    /// channel to its named slot.
     ///
     /// <see cref="EngineVibration"/> and <see cref="RoadTexture"/> are the two
     /// that behave differently. The other slots stop themselves once their
@@ -145,6 +147,15 @@ namespace MozaPlugin.Protocol
 
         /// <summary>The slot outside the tone set. Not driven from ShakeIt; see BuildRoadTextureFrame.</summary>
         public const byte RoadTextureSlot = (byte)PedalHapticsEffectSlot.RoadTexture;
+
+        /// <summary>
+        /// True for slots that stop themselves once their duration elapses. Engine
+        /// (4) and Road Texture (8) ignore duration and time out on update silence,
+        /// so a one-shot burst cannot be left to the firmware on those two.
+        /// </summary>
+        public static bool IsTimedSlot(byte slot)
+            => slot != (byte)PedalHapticsEffectSlot.EngineVibration
+            && slot != (byte)PedalHapticsEffectSlot.RoadTexture;
 
         /// <summary>Channel index to hardware slot — one to one, a channel IS an oscillator.</summary>
         public static byte SlotForChannel(int channel)

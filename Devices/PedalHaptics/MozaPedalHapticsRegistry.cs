@@ -309,6 +309,22 @@ namespace MozaPlugin.Devices.PedalHaptics
                 snap[i].PostChannel(pedalIndex, channel, gain01, freqHz);
         }
 
+        /// <summary>Fan one plugin-tab slot level out to every unit.</summary>
+        public void PostSlot(int pedalIndex, int slot, double gain01, double freqOrPosition)
+        {
+            var snap = System.Threading.Volatile.Read(ref _snapshot);
+            for (int i = 0; i < snap.Length; i++)
+                snap[i].PostSlot(pedalIndex, slot, gain01, freqOrPosition);
+        }
+
+        /// <summary>Fan one firmware-timed burst out to every unit.</summary>
+        public void PostBurst(int pedalIndex, int slot, double gain01, double freqHz, int durationMs)
+        {
+            var snap = System.Threading.Volatile.Read(ref _snapshot);
+            for (int i = 0; i < snap.Length; i++)
+                snap[i].PostBurst(pedalIndex, slot, gain01, freqHz, durationMs);
+        }
+
         public void ClearPedal(int pedalIndex)
         {
             var snap = System.Threading.Volatile.Read(ref _snapshot);

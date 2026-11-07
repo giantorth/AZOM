@@ -709,7 +709,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Определение устройства обновлено. Перезапустите SimHub для применения.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Совместимость с Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Обнаружение активного переключателя передач (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Объединённое устройство тактильной отдачи педалей</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>График</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Пропускная способность</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Крутящий момент</value></data>
@@ -848,4 +847,13 @@ Id: {2}</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» применён к активному профилю</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Глобальные настройки</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Телеметрические эффекты (вибрация двигателя, ABS и переключения передач через базу) требуют прошивку базы 1.2.10.10 или новее. На этой базе {0}. Обновите прошивку базы в Pit House, чтобы их использовать.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Тактильная отдача S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Тактильная отдача педалей S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Вкладка S12 плагина</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt для каждой педали</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt объединённый</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>Для ShakeIt требуется SimHub 9.12 или новее — используется вкладка S12 плагина.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Текущий вывод</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Длительность импульса</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Педали</value></data>
 </root>

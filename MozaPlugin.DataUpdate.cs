@@ -130,6 +130,7 @@ namespace MozaPlugin
             // All per-channel values (RPM, ABSActive, Gear, …) come from the
             // channels' own formulas, evaluated live via the property resolver.
             _baseLfeWorker?.PostFrame(engineOn);
+            _pedalHapticsWorker?.PostFrame(engineOn);
 
             // Control Mapper variant-provider bridge: drive wheel-change detection
             // each tick when registered; otherwise retry registration up to the
@@ -152,6 +153,20 @@ namespace MozaPlugin
                 }
             }
 
+            // Pedal/wheel-speed inputs, sampled once and shared by the mBooster
+            // snapshot below and the exported AZOM.WheelLockup / WheelSlip /
+            // RoadPosition properties, which any haptics formula may reference.
+            var nd = data.NewData;
+            double brake01 = (nd?.Brake ?? 0.0) / 100.0;
+            if (brake01 < 0) brake01 = 0; if (brake01 > 1) brake01 = 1;
+            double throttle01 = (nd?.Throttle ?? 0.0) / 100.0;
+            if (throttle01 < 0) throttle01 = 0; if (throttle01 > 1) throttle01 = 1;
+            double vehicleMs = (nd?.SpeedKmh ?? 0.0) / 3.6;
+            SampleWheelSpeeds(pluginManager, data, vehicleMs,
+                out bool hasWheelSpeeds, out double maxWheelMs, out double minWheelMs, out double groundMs);
+            UpdateHapticsSignals(engineOn, hasWheelSpeeds, brake01, throttle01, groundMs, minWheelMs, maxWheelMs,
+                                 nd?.AccelerationHeave ?? 0.0);
+
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
             // Lock-free fast path: when no mBoosters are registered (the
@@ -160,11 +175,6 @@ namespace MozaPlugin
             // volatile int updated only on Refresh().
             if (_mboosterRegistry != null && _mboosterRegistry.HasControllers)
             {
-                var nd = data.NewData;
-                double brake01 = (nd?.Brake ?? 0.0) / 100.0;
-                if (brake01 < 0) brake01 = 0; if (brake01 > 1) brake01 = 1;
-                double throttle01 = (nd?.Throttle ?? 0.0) / 100.0;
-                if (throttle01 < 0) throttle01 = 0; if (throttle01 > 1) throttle01 = 1;
                 // ABSActive/TCActive are SimHub's loosely-typed properties —
                 // games supply bool / int / sbyte / byte / short / long
                 // depending on backend. Pattern-match the common shapes to
@@ -195,40 +205,6 @@ namespace MozaPlugin
                     long lo  => lo != 0,
                     _ => false,
                 };
-                double vehicleMs = (nd?.SpeedKmh ?? 0.0) / 3.6;
-                // Per-wheel speeds for Wheel Spin / Lockup. Only trusted when the
-                // game reader declares WheelsSpeed (FeedbackData.WheelSpeed is
-                // km/h); otherwise the arrays are just zeros and both effects
-                // stay silent. Slip is measured against ground speed where the
-                // reader has it, since SpeedKmh can itself be wheel-derived.
-                bool hasWheelSpeeds = false;
-                double maxWheelMs = 0.0, minWheelMs = 0.0, groundMs = vehicleMs;
-                var gameManager = pluginManager.GameManager;
-                int nowTick = Environment.TickCount;
-                if (!ReferenceEquals(gameManager, _mboosterCapsManager) || unchecked(nowTick - _mboosterCapsTick) >= 1000)
-                {
-                    _mboosterCapsManager = gameManager;
-                    _mboosterCapsTick = nowTick;
-                    try { _mboosterWheelsSpeedCap = gameManager?.GetFeedbackCapabilities()?.WheelsSpeed == true; }
-                    catch { _mboosterWheelsSpeedCap = false; }
-                }
-                var fb = nd?.FeedbackData;
-                double[]? wheelKmh = fb?.WheelSpeed;
-                if (_mboosterWheelsSpeedCap && data.GameRunning && wheelKmh != null && wheelKmh.Length >= 4)
-                {
-                    maxWheelMs = double.MinValue;
-                    minWheelMs = double.MaxValue;
-                    for (int w = 0; w < 4; w++)
-                    {
-                        double ms = Math.Abs(wheelKmh[w]) / 3.6;
-                        if (ms > maxWheelMs) maxWheelMs = ms;
-                        if (ms < minWheelMs) minWheelMs = ms;
-                    }
-                    hasWheelSpeeds = !double.IsNaN(maxWheelMs) && !double.IsNaN(minWheelMs);
-                    if (!hasWheelSpeeds) { maxWheelMs = 0.0; minWheelMs = 0.0; }
-                    double? groundKmh = fb!.GroundSpeed;
-                    if (groundKmh.HasValue && groundKmh.Value > 0) groundMs = groundKmh.Value / 3.6;
-                }
                 double idleRpm = 800.0;
                 // No generic suspension-travel telemetry exists in SimHub;
                 // AccelerationHeave (vertical G) is the closest proxy for

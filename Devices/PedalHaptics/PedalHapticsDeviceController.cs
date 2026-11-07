@@ -188,6 +188,14 @@ namespace MozaPlugin.Devices.PedalHaptics
         public void PostChannel(int pedalIndex, int channel, double gain01, double freqHz)
             => _effects.PostChannel(pedalIndex, channel, gain01, freqHz);
 
+        /// <summary>Publish one slot's latest level from the plugin's S12 tab.</summary>
+        public void PostSlot(int pedalIndex, int slot, double gain01, double freqOrPosition)
+            => _effects.PostSlot(pedalIndex, slot, gain01, freqOrPosition);
+
+        /// <summary>Queue one firmware-timed burst on a timed slot.</summary>
+        public void PostBurst(int pedalIndex, int slot, double gain01, double freqHz, int durationMs)
+            => _effects.PostBurst(pedalIndex, slot, gain01, freqHz, durationMs);
+
         /// <summary>Drop one pedal to silent (that device's provider Stop path).</summary>
         public void ClearPedal(int pedalIndex) => _effects.ClearPedal(pedalIndex);
 

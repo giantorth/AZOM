@@ -1350,6 +1350,9 @@ namespace MozaPlugin.UI
                 return "(no S12 pedal vibration unit — USB lanes claim PID 0x002F; a routed lane is added per wheelbase pipe)";
 
             var sb = new StringBuilder();
+            sb.AppendLine(
+                $"  source={plugin.Settings?.PedalHapticsSource}  combined={plugin.PedalHapticsCombined}  " +
+                $"routed={(plugin.PedalHapticsRoutedToShakeIt ? "ShakeIt" : "plugin tab")}");
             for (int i = 0; i < devices.Count; i++)
             {
                 var c = devices[i];

@@ -8,7 +8,8 @@ using System.Windows.Media;
 namespace MozaControls
 {
     /// <summary>
-    /// Time-domain visualizer for the 3 wheelbase-LFE slots, one lane each. Rather
+    /// Time-domain visualizer for 3 lanes (the wheelbase-LFE slots, or the S12's
+    /// three pedals). Rather
     /// than synthesising the raw carrier (unresolvable at high Hz over a multi-second
     /// window), each slot is drawn as a RIBBON: vertical position = carrier frequency
     /// (0..200 Hz up the lane), thickness = amplitude (intensity × envelope). A steady
@@ -19,8 +20,10 @@ namespace MozaControls
     {
         public Func<(double freq, double amp)[]>? Poll { get; set; }
 
+        /// <summary>Frequency at the top of a lane (the S12 tab uses 100).</summary>
+        public double MaxHz { get; set; } = 200.0;
+
         private const double WindowSec = 8.0;
-        private const double MaxHz = 200.0;
         private static readonly Color[] SlotColors =
         {
             Color.FromRgb(0x3C, 0xE0, 0xE0),   // slot 1 — cyan

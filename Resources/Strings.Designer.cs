@@ -779,7 +779,6 @@ namespace MozaPlugin.Resources
         public static string Status_WheelbaseLfeSourceRestartRequired => Get("Status_WheelbaseLfeSourceRestartRequired");
         public static string SliderLabel_ForzaCompatMode => Get("SliderLabel_ForzaCompatMode");
         public static string SliderLabel_Ab9Detection => Get("SliderLabel_Ab9Detection");
-        public static string SliderLabel_PedalHapticsCombined => Get("SliderLabel_PedalHapticsCombined");
         public static string Label_BaseGraphMode => Get("Label_BaseGraphMode");
         public static string Option_GraphBandwidth => Get("Option_GraphBandwidth");
         public static string Option_GraphTorque => Get("Option_GraphTorque");
@@ -906,5 +905,14 @@ namespace MozaPlugin.Resources
         public static string Import_Footer_Applied => Get("Import_Footer_Applied");
         public static string Label_GlobalSettings => Get("Label_GlobalSettings");
         public static string Status_WheelbaseLfeFirmwareTooOldFmt => Get("Status_WheelbaseLfeFirmwareTooOldFmt");
+        public static string TabHeader_PedalHaptics => Get("TabHeader_PedalHaptics");
+        public static string SliderLabel_PedalHapticsSource => Get("SliderLabel_PedalHapticsSource");
+        public static string Option_PedalHapticsSourcePlugin => Get("Option_PedalHapticsSourcePlugin");
+        public static string Option_PedalHapticsSourceShakeIt => Get("Option_PedalHapticsSourceShakeIt");
+        public static string Option_PedalHapticsSourceCombined => Get("Option_PedalHapticsSourceCombined");
+        public static string Status_PedalHapticsShakeItUnavailable => Get("Status_PedalHapticsShakeItUnavailable");
+        public static string Section_PedalHapticsOutput => Get("Section_PedalHapticsOutput");
+        public static string SliderLabel_PulseLength => Get("SliderLabel_PulseLength");
+        public static string Label_Pedals => Get("Label_Pedals");
     }
 }
