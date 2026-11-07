@@ -551,6 +551,7 @@ namespace MozaPlugin
         }
 
         internal bool IsBaseAmbientLedSupported => DetectionState.BaseAmbientLedSupported;
+        internal bool IsBaseDetected => DetectionState.BaseDetected;
         internal bool IsHandbrakeDetected => DetectionState.HandbrakeDetected;
         internal bool IsPedalsDetected => DetectionState.PedalsDetected;
         // Independent per-model gates for the dedicated HGP / SGP tabs — both can be

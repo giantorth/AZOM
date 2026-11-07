@@ -26,6 +26,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Options tab controls line up;** toggles and selectors in each column start at the same position.
 - **Dismissing an update notification sticks across restarts;** it reappears only when a newer version is published.
 - **Beta builds are no longer offered an older stable release;** only switching the channel back to Stable offers the downgrade.
+- **Base tab hides when no wheelbase is detected,** like the other device tabs.
 
 ## [1.7.2]
 

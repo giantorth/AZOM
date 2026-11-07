@@ -93,6 +93,8 @@ namespace MozaPlugin.UI
                     // those same assignments re-collapse on the next tick.
                     ApplyShowAllTabs();
                 }
+                // Outside the suppressor: a switch re-enters via SelectionChanged.
+                EnsureVisibleTabSelected();
             }
             catch (Exception ex)
             {
@@ -107,14 +109,43 @@ namespace MozaPlugin.UI
         // SelectionChanged bubbles through MainTabs too — ignore those.
         private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (!ReferenceEquals(e.OriginalSource, MainTabs) || !_refreshTimer.IsEnabled) return;
+            if (!ReferenceEquals(e.OriginalSource, MainTabs)) return;
+            if (!_autoTabSwitch && MainTabs.SelectedItem is TabItem picked)
+                _preferredTab = picked;
+            if (!_refreshTimer.IsEnabled) return;
             RefreshDisplay(this, EventArgs.Empty);
+        }
+
+        // The tab to land on whenever it's visible: Base until the user picks one.
+        private TabItem? _preferredTab;
+        private bool _autoTabSwitch;
+
+        // A collapsed TabItem keeps showing its content while selected, so step
+        // off a tab whose device went away, and back once it returns.
+        private void EnsureVisibleTabSelected()
+        {
+            _preferredTab ??= BaseTab;
+            TabItem? target = null;
+            if (_preferredTab.Visibility == Visibility.Visible)
+                target = _preferredTab;
+            else if (!(MainTabs.SelectedItem is TabItem cur && cur.Visibility == Visibility.Visible))
+            {
+                foreach (var item in MainTabs.Items)
+                {
+                    if (item is TabItem t && t.Visibility == Visibility.Visible) { target = t; break; }
+                }
+            }
+            if (target == null || ReferenceEquals(MainTabs.SelectedItem, target)) return;
+
+            _autoTabSwitch = true;
+            try { MainTabs.SelectedItem = target; }
+            finally { _autoTabSwitch = false; }
         }
 
         // The detection-gated device tabs ShowAllTabs can force visible.
         private TabItem[] HideableTabs => new[]
         {
-            BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
+            BaseTab, BaseLfeTab, HandbrakeTab, PedalsTab, Ab9Tab,
             HgpTab, SgpTab, MBoosterTab, PedalHapticsTab, HubTab, StalksTab,
         };
 
@@ -259,6 +290,7 @@ namespace MozaPlugin.UI
 
         private void RefreshBaseTab()
         {
+            BaseTab.Visibility = _plugin.IsBaseDetected ? Visibility.Visible : Visibility.Collapsed;
             bool baseShown = BaseTab.IsSelected;
             UpdateRedesignLiveDisplays(baseShown);
 
