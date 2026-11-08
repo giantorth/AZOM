@@ -922,5 +922,6 @@ namespace MozaPlugin.Resources
         public static string Motion_Panel_Source => Get("Motion_Panel_Source");
         public static string Motion_Source_GameTelemetry => Get("Motion_Source_GameTelemetry");
         public static string Motion_Source_SimHubPose => Get("Motion_Source_SimHubPose");
+        public static string Motion_Panel_CornerHaptics => Get("Motion_Panel_CornerHaptics");
     }
 }

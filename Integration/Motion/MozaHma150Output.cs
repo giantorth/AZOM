@@ -25,6 +25,7 @@ namespace MozaPlugin.Integration.Motion
     public class MozaHma150OutputSettings : OutputSettingsBase
     {
         private MozaHma150Source _source;
+        private bool _includeCornerHaptics = true;
 
         public MozaHma150Source Source
         {
@@ -34,6 +35,21 @@ namespace MozaPlugin.Integration.Motion
                 if (_source == value) return;
                 _source = value;
                 // What the base properties' change hook does: re-clone the running settings.
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only: stream <c>FinalMotionState</c> (corner haptics folded in) rather than
+        /// <c>MotionState</c>. Haptics that write heave directly are in both.
+        /// </summary>
+        public bool IncludeCornerHaptics
+        {
+            get => _includeCornerHaptics;
+            set
+            {
+                if (_includeCornerHaptics == value) return;
+                _includeCornerHaptics = value;
                 Output?.ApplySettings();
             }
         }
@@ -166,7 +182,11 @@ namespace MozaPlugin.Integration.Motion
             var game = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
             if (currentSettings?.Source == MozaHma150Source.SimHubPose)
             {
-                var pose = geometryResult?.PrimaryGeometryResult?.MotionState;
+                // Final state: the bypass geometry folds corner haptics into it, as SimHub's <PoseAxis> token reads.
+                var primary = geometryResult?.PrimaryGeometryResult;
+                var pose = currentSettings!.IncludeCornerHaptics
+                    ? primary?.FinalMotionState ?? primary?.MotionState
+                    : primary?.MotionState;
                 if (pose != null)
                     lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game));
                 return;

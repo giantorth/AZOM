@@ -1604,7 +1604,8 @@ rotary crank) and report `PrimaryOverflowPercent = (1/LastScale − 1) × 100`.
 
 **Results**: `ActuatorPosition { Position (−1..+1, 0 = centre; belts/wind −1 = released/off),
 BoostedPosition?, Range (stroke mm / degrees / 100 %), Unit (None, Mm, Degrees, Percent),
-CrankLength, CanBeBoosted }`; `GeometryResult { Axis, UnscaledAxisCenter, MotionState (final pose),
+CrankLength, CanBeBoosted }`; `GeometryResult { Axis, UnscaledAxisCenter, MotionState (limited pose),
+FinalMotionState (pose bypass / Stewart: with corner haptics folded in; `<PoseAxis>` reads it),
 PrimaryOverflowPercent, PitchOverflowPercent, RollOverflowPercent, spike-limiter counters,
 MotionCompensation* fields, PrimaryAxisStates, BeltAxisStates }` with `SetAxisPosition`,
 `GetAxisValueOrDefault`, `GetBoostedAxisValueOrDefault`, `Mix`, `MergeWith`;
@@ -1944,9 +1945,13 @@ own kinematics"). What the decompile requires of such an output:
   when the settings are not `IActuatorOrderingSettings`, and then `.All(...)` on it — an
   `ArgumentNullException` on the first update. `YawVROutput` and `ControllersAggregatorOutput`
   override both with no-ops.
-- **Pose source:** `geometryResult.PrimaryGeometryResult.MotionState` (`PitchDegrees`,
-  `RollDegrees`, `HeaveMm`, …). The bypass geometry already folds corner haptics into
-  pitch/roll/heave (`SixDofInput.GetHapticsPose`). Signs: `MotionPlugin` builds
+- **Pose source:** `geometryResult.PrimaryGeometryResult.FinalMotionState` (`PitchDegrees`,
+  `RollDegrees`, `HeaveMm`, …). `Geometry6DOFsBypass.Update` sets `MotionState` to the
+  axis-limited pose and `FinalMotionState` to that plus the corner haptics fitted to
+  pitch/roll/heave (`SixDofInput.GetHapticsPose`: pitch −, roll +, heave +); the
+  `<PoseAxis>` token reads `FinalMotionState`. Haptic effects also write `HeaveMm` directly
+  (engine, flight touchdown) and are oscillators of 7–50 Hz (engine default 15–50 Hz, idle
+  7 Hz; wing load ~40 Hz). Signs: `MotionPlugin` builds
   `OrientationPitchDegrees = −GameData.OrientationPitch` and `OrientationRollDegrees =
   +GameData.OrientationRoll` (`PitchEffect` / `RollEffect` feed these into the pose as-is). By
   default the HMA150 output does **not** use the pose: its controller takes raw physics like

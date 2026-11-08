@@ -863,4 +863,5 @@ Id: {2}</value></data>
   <data name="Motion_Panel_Source" xml:space="preserve"><value>Fonte de movimento</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Telemetria do jogo</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Perfil do SimHub Motion</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Incluir hápticos de canto do SimHub</value></data>
 </root>

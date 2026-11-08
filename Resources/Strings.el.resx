@@ -863,4 +863,5 @@ Id: {2}</value></data>
   <data name="Motion_Panel_Source" xml:space="preserve"><value>Πηγή κίνησης</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Τηλεμετρία παιχνιδιού</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Προφίλ SimHub Motion</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Συμπερίληψη απτικών εφέ γωνιών του SimHub</value></data>
 </root>

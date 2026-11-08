@@ -107,12 +107,15 @@ profile (washout, limits, per-game tuning) does the cueing:
 
 | Field | Source |
 |-------|--------|
-| f0 / f1 | −pose `PitchDegrees` / −pose `RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
+| f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
 | f4–f6 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f8–f11 | rest − pose `HeaveMm`, the common-mode shock change the controller turns into heave (above). Sign and gain not yet checked on a rig, and the controller washes held offsets out in ~1 s |
+| f8–f11 | rest − `HeaveMm`, the common-mode shock change the controller turns into heave (above). Sign and gain not yet checked on a rig, and the controller washes held offsets out in ~1 s |
 
-The controller's Pitch / Roll / Heave intensity still scales what arrives.
+The pose is `FinalMotionState` (corner haptics folded in) while *Include SimHub corner haptics*
+is on (default), else `MotionState`; haptics that write heave directly (engine, touchdown) are
+in both. They run at 7–50 Hz against a ~33 Hz frame rate, so the fast ones alias. The
+controller's Pitch / Roll / Heave intensity still scales what arrives.
 
 Each live frame is followed by a `0x22/09` engine vibration frame (below) built from SimHub's
 `Rpms` and `Throttle`, scaled by the profile's Engine vibration and Tactile feedback values (else

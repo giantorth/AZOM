@@ -864,4 +864,5 @@ Id: {2}</value></data>
   <data name="Motion_Panel_Source" xml:space="preserve"><value>运动来源</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>游戏遥测</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion 配置文件</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>包含 SimHub 角部触觉效果</value></data>
 </root>

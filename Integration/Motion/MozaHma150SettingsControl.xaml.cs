@@ -150,13 +150,25 @@ namespace MozaPlugin.Integration.Motion
             var settings = _output?.Settings;
             SourceCombo.IsEnabled = settings != null;
             SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
+            UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
             {
                 var s = _output?.Settings;
                 if (s != null && SourceCombo.SelectedItem is ComboBoxItem item && item.Tag is MozaHma150Source source)
                     s.Source = source;
+                UpdateCornerHapticsEnabled();
+            };
+            CornerHapticsCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
             };
         }
+
+        /// <summary>The haptics choice only applies to the pose source.</summary>
+        private void UpdateCornerHapticsEnabled()
+            => CornerHapticsCheck.IsEnabled = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
 
         // ------------------------------------------------------------ motion effects
 
