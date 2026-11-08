@@ -870,4 +870,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Telemetría del juego</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Perfil de SimHub Motion</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Incluir hápticos de esquina de SimHub</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrado</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>Alternativo</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>RESTABLECER</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Inactivo</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Esperando</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Preparado</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Soltando</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Cancelado</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibración automática</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>Fijado</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} muestras</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Fuente del embrague</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pedal mBooster</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Punto de agarre del embrague</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Ancho</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Duración mínima (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Duración máxima (ms)</value></data>
 </root>

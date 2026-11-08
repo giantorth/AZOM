@@ -72,6 +72,31 @@ namespace MozaPlugin.Devices.MBooster
             }
         }
 
+        /// <summary>
+        /// Shaped position (0..1) of the first pedal holding <paramref name="role"/>
+        /// whose effect worker plays, in the same order and role resolution as
+        /// MergePositions. Lock-free.
+        /// </summary>
+        /// <returns>False when no connected, motorized pedal holds the role.</returns>
+        public bool TryGetEffectPedalPosition(MBoosterRole role, out double position01)
+        {
+            position01 = 0;
+            // One worker per motor device id, each gated on its own axis.
+            int workerAxes = MozaMBoosterProtocol.MotorDeviceIds.Length;
+            foreach (var c in _orderSnapshot)
+            {
+                if (!c.IsConnected) continue;
+                var s = c.CurrentSettings;
+                for (int a = 0; a < workerAxes; a++)
+                {
+                    if (!c.IsAxisEffectCapable(a) || c.AxisRole(a, s) != role) continue;
+                    position01 = c.AxisPedalPosition(a);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private readonly MozaData _data;
         private readonly Func<string, MBoosterDeviceSettings?> _settingsLookup;
         private readonly Func<bool> _isShuttingDown;

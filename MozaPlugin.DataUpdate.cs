@@ -167,6 +167,9 @@ namespace MozaPlugin
             UpdateHapticsSignals(engineOn, hasWheelSpeeds, brake01, throttle01, groundMs, minWheelMs, maxWheelMs,
                                  nd?.AccelerationHeave ?? 0.0);
 
+            // Before the snapshot, so a fresh capture reaches this tick's workers.
+            UpdateClutchBitePoint(pluginManager, ref data);
+
             // Slice F: DataUpdate hook re-enabled.
             // Fan-out fresh telemetry to every mBooster's effect worker.
             // Lock-free fast path: when no mBoosters are registered (the
@@ -274,7 +277,10 @@ namespace MozaPlugin
                     longitudinalG: longitudinalG,
                     brakeTempC: brakeTempC,
                     gearShiftSeq: _mboosterShiftSeq,
-                    gearIsNeutral: gearIsNeutral);
+                    gearIsNeutral: gearIsNeutral,
+                    clutchBitePointPct: _currentClutchBitePointPct,
+                    bitePointUsesOwnPedal: BitePointSource == MBoosterBitePointSource.MBoosterPedal,
+                    bitePointClutch01: BitePointSourceClutch01);
                 _mboosterRegistry.OnDataUpdate(snap);
             }
 

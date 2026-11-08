@@ -104,7 +104,11 @@ namespace MozaPlugin.UI
             // rows, role/passive visibility and seeding only while the tab is
             // shown (MainTabs_SelectionChanged repaints it on selection).
             bool tabShown = MBoosterTab.IsSelected;
-            if (tabShown) ApplyMBoosterEffectSourceVisibility();
+            if (tabShown)
+            {
+                ApplyMBoosterEffectSourceVisibility();
+                RefreshMBoosterBiteCal();
+            }
             if (devices.Count == 0)
             {
                 _mboosterUiSeeded = false;
@@ -769,8 +773,18 @@ namespace MozaPlugin.UI
             MBoosterThresholdDecay.Value = fx?.Threshold?.DecayPct ?? 20;
             SetValueText(MBoosterThresholdDecayValue, (fx?.Threshold?.DecayPct ?? 20).ToString());
             MBoosterBitePointEnable.IsChecked = fx?.BitePoint?.Enabled ?? false;
+            MBoosterBitePointSource.SelectedIndex = (fx?.BitePoint?.UseCalibratedBitePoint ?? true) ? 0 : 1;
             MBoosterBitePointTriggerLevel.Value = fx?.BitePoint?.TriggerLevelPct ?? 50;
             SetValueText(MBoosterBitePointTriggerLevelValue, (fx?.BitePoint?.TriggerLevelPct ?? 50).ToString());
+            int widthPct = fx?.BitePoint?.BitePointWidthPct ?? MBoosterUiConstants.BitePointWidthDefaultPct;
+            MBoosterBitePointWidth.Value = widthPct;
+            SetValueText(MBoosterBitePointWidthValue, widthPct.ToString());
+            int minMs = fx?.BitePoint?.BitePointMinLengthMs ?? MBoosterUiConstants.BitePointMinLengthDefaultMs;
+            MBoosterBitePointMinLength.Value = minMs;
+            SetValueText(MBoosterBitePointMinLengthValue, minMs.ToString());
+            int maxMs = fx?.BitePoint?.BitePointMaxLengthMs ?? MBoosterUiConstants.BitePointMaxLengthDefaultMs;
+            MBoosterBitePointMaxLength.Value = maxMs;
+            SetValueText(MBoosterBitePointMaxLengthValue, maxMs.ToString());
             MBoosterBitePointFrequencySlider.Value = fx?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz;
             SetValueText(MBoosterBitePointFrequencyValue, MBoosterBitePointFrequencySlider.Value.ToString("F0"));
             MBoosterBitePointSmoothness.Value = fx?.BitePoint?.SmoothnessPct ?? 100;

@@ -864,4 +864,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>게임 텔레메트리</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion 프로필</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>SimHub 코너 햅틱 포함</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>보정값</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>대체값</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>초기화</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>비활성</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>대기 중</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>준비됨</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>해제 중</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>취소됨</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>자동 보정</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>고정됨</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>샘플 {0}개</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>클러치 소스</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 페달</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>클러치 물림 지점</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>폭</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>최소 길이 (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>최대 길이 (ms)</value></data>
 </root>

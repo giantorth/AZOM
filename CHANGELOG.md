@@ -18,6 +18,8 @@ All notable changes to the AZOM plugin are documented here.
 - **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
 - **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
 - **Motion source setting for the motion platform;** stream the SimHub Motion profile instead of raw game telemetry, e.g. for flight sims.
+- **Clutch Bite Point ShakeIt effect** for the mBooster, PHF, and bass shakers.
+- **Clutch bite point calibration per game;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch or a formula.
 
 ## Changed
 
@@ -25,6 +27,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **mBooster Clutch Bite Point pulses only around the bite point** instead of buzzing whenever the clutch is up; Width and pulse length are adjustable.
 - **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
 - **CM2 switches dashboards with its profile;** the selected dashboard is saved to the active profile and recalled on every switch.
 - **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.

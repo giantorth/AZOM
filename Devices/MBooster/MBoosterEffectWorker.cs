@@ -24,7 +24,7 @@ namespace MozaPlugin.Devices.MBooster
     {
         // Motor loop @ 50 Hz (20 ms period — protocol note § 4).
         private const int TickPeriodMs = 20;
-        private const double TickPeriodSec = 0.020;
+        internal const double TickPeriodSec = 0.020;
         // Keepalive @ ~2 Hz — 25 ticks × 20 ms = 500 ms (protocol note § 3 / § 4).
         private const int KeepaliveTickInterval = 25;
 
@@ -108,11 +108,8 @@ namespace MozaPlugin.Devices.MBooster
         // Source seen by the last tick; an edge silences what the old source left playing.
         private bool _shakeItRouted;
         private bool _thresholdLatched; // hysteresis flag for the Threshold effect (doc § 4)
-        // Hysteresis flag for the Bite Point effect (Clutch-only) — same
-        // pattern as _thresholdLatched, but latches on a FALLING edge (the
-        // pedal releasing past the trigger, not pressing past it). See
-        // UpdateBitePointRequest.
-        private bool _bitePointLatched;
+        // Bite Point (Clutch-only) trigger around the bite point; see UpdateBitePointRequest.
+        private MBoosterBitePointTrigger _bitePointTrigger;
         // Debounce countdown for the Gear Shift effect, decremented each
         // tick by TickPeriodSec — separate from EffectState.ElapsedSec
         // (which resets every time the pulse (re)activates) since the
@@ -219,38 +216,14 @@ namespace MozaPlugin.Devices.MBooster
         private byte _targetDeviceCached;
 
         /// <summary>
-        /// Whether THIS worker's pedal axis can actually play an effect: wired,
-        /// and motorized. Wiring uses the same "ConnectedAxes null means assume
-        /// only axis 0 is real" convention the UI uses
-        /// (SettingsControl.xaml.cs). Guards the per-pedal effect portion of
-        /// <see cref="Tick"/>: without it, once TargetDevice above stopped
-        /// trusting axis index blindly, every phantom or motorless axis's worker
-        /// would ALSO resolve to the one real device and race the genuine
-        /// pedal's worker for it.
+        /// Whether THIS worker's pedal axis can actually play an effect (see
+        /// <see cref="MBoosterDeviceController.IsAxisEffectCapable"/>). Guards the
+        /// per-pedal effect portion of <see cref="Tick"/>: without it, once
+        /// TargetDevice above stopped trusting axis index blindly, every phantom
+        /// or motorless axis's worker would ALSO resolve to the one real device
+        /// and race the genuine pedal's worker for it.
         /// </summary>
-        private bool IsPedalAxisConnected()
-        {
-            // A passive pedal has no motor, so it can never play an effect. This
-            // is load-bearing, not merely tidy: a single-active-pedal lane now
-            // resolves EVERY axis's TargetDevice to the one real device id
-            // (MBoosterDeviceController.MotorDeviceForCurrentAxis), so without
-            // this gate the passive axes' workers would all stream at the active
-            // pedal's motor and race the genuine worker for it.
-            if (!_device.IsAxisMotorized(_pedalAxisIndex)) return false;
-            var connected = _device.ConnectedAxes;
-            if (connected != null)
-                return _pedalAxisIndex < connected.Length && connected[_pedalAxisIndex];
-            // PD-Linked connectivity not parsed yet (it arrives seconds after
-            // connect, sometimes first as an unparseable short form). Fall
-            // back to the chain size known at connect from the presence read:
-            // on a multi-motor chain run every HID-reported axis — each routes
-            // to its own role-based device id (see
-            // MBoosterDeviceController.MotorDeviceForCurrentAxis) — otherwise
-            // only axis 0.
-            if (_device.SubDeviceCount > 1)
-                return _pedalAxisIndex < Math.Max(1, _device.AxisCount);
-            return _pedalAxisIndex == 0;
-        }
+        private bool IsPedalAxisConnected() => _device.IsAxisEffectCapable(_pedalAxisIndex);
 
         /// <summary>This pedal's full config — the master's flat fields for
         /// axis 0, else the per-pedal entry (both implement
@@ -288,9 +261,7 @@ namespace MozaPlugin.Devices.MBooster
             _device.AxisRole(_pedalAxisIndex, lane);
 
         /// <summary>This pedal's own shaped HID position (0..1).</summary>
-        private double PedalHid() =>
-            _pedalAxisIndex == 0 ? _device.LastHidPosition
-            : (_pedalAxisIndex < _device.LastAxisPositions.Length ? _device.LastAxisPositions[_pedalAxisIndex] : 0.0);
+        private double PedalHid() => _device.AxisPedalPosition(_pedalAxisIndex);
 
         /// <summary>
         /// Emit a motor frame (already addressed to this pedal's device id) for
@@ -1276,60 +1247,60 @@ namespace MozaPlugin.Devices.MBooster
             return hz;
         }
 
-        // Bite Point (Clutch-only) — tactile feedback at the pedal position
-        // where clutch engagement begins. Modeled on UpdateThresholdRequest's
-        // trigger/hysteresis shape, with three deliberate differences:
-        // (1) the trigger compares against THIS pedal's own raw HID
-        // position (PedalHid()), not game telemetry — there's no reliable
-        // SimHub clutch channel, and a bite point is a physical pedal
-        // characteristic anyway, confirmed with the user; (2) it's a
-        // FALLING-edge trigger (fires as the pedal RELEASES past the
-        // trigger level, the opposite direction from Threshold's rising-
-        // brake-pressure trigger — a bite point is encountered letting the
-        // clutch up, not pressing it down); (3) it's hard-gated to the
-        // Clutch role right here in the request function, so the effect is
-        // genuinely inert on any other role even if a saved profile
-        // somehow has it configured — stronger than Threshold/ABS/Lockup's
-        // own UI-only role hiding (see UI/SettingsControl.xaml.cs's
-        // UpdateMBoosterConfigVisibilityForRole), matching Brake Fade's
-        // worker-level role restriction instead (see the PedalRole check
-        // in Tick()).
+        // Bite Point (Clutch-only) — tactile feedback while the clutch is
+        // within BitePointWidthPct of the bite point, for at least/most the
+        // configured pulse lengths (MBoosterBitePointTrigger).
+        // The bite point is the current game's calibration or the Trigger
+        // Input Level fallback; the clutch position comes from the configured
+        // source (this pedal's own HID, game telemetry or a formula — see
+        // MozaPlugin.MBoosterBitePoint.cs). Hard-gated to the Clutch role here,
+        // so the effect is inert on any other role even if a saved profile has
+        // it configured — stronger than Threshold/ABS/Lockup's UI-only role
+        // hiding (UpdateMBoosterConfigVisibilityForRole), matching Brake Fade's
+        // worker-level role restriction (the PedalRole check in Tick()).
         private void UpdateBitePointRequest(IMBoosterEffects? effects, in MBoosterTelemetrySnapshot snap, MBoosterRole role, ref EffectState st)
         {
             if (role != MBoosterRole.Clutch)
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;
-                _bitePointLatched = false;
+                _bitePointTrigger.Reset();
                 return;
             }
 
             double freqHz = ClampBitePointFreq(effects?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz);
             double smoothness01 = Clamp01((effects?.BitePoint?.SmoothnessPct ?? 100) / 100.0);
             st.SmoothnessRequest01 = smoothness01;
-            double triggerLevel = Clamp01((effects?.BitePoint?.TriggerLevelPct ?? MBoosterUiConstants.BitePointTriggerMinPct) / 100.0);
-            // Release (re-arm) level sits ABOVE the trigger, not below —
-            // this is a falling-edge trigger, so re-arming requires the
-            // pedal to be pressed back down past the same 30-point gap
-            // Threshold uses, just in the opposite direction.
-            double releaseLevel = Math.Min(1, triggerLevel + 0.3);
+            int triggerPct = (effects?.BitePoint?.UseCalibratedBitePoint ?? true) && snap.ClutchBitePointPct >= 0
+                ? snap.ClutchBitePointPct
+                : effects?.BitePoint?.TriggerLevelPct ?? (int)MBoosterUiConstants.BitePointTriggerMinPct;
+            double triggerLevel = Clamp01(triggerPct / 100.0);
+            int widthPct = Math.Max(MBoosterUiConstants.BitePointWidthMinPct, Math.Min(MBoosterUiConstants.BitePointWidthMaxPct,
+                effects?.BitePoint?.BitePointWidthPct ?? MBoosterUiConstants.BitePointWidthDefaultPct));
+            double width01 = widthPct / 100.0;
+            int minMs = Math.Max(MBoosterUiConstants.BitePointMinLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMinLengthMaxMs,
+                effects?.BitePoint?.BitePointMinLengthMs ?? MBoosterUiConstants.BitePointMinLengthDefaultMs));
+            int maxMs = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs,
+                effects?.BitePoint?.BitePointMaxLengthMs ?? MBoosterUiConstants.BitePointMaxLengthDefaultMs));
+            long now = Stopwatch.GetTimestamp();
 
-            double pedalPos = Clamp01(PedalHid());
+            double sourcePos = snap.BitePointUsesOwnPedal ? PedalHid() : snap.BitePointClutch01;
+            if (double.IsNaN(sourcePos))
+            {
+                // The configured clutch source has no value (no game, empty formula).
+                st.IntensityRequest = 0;
+                st.FreqHz = 0;
+                _bitePointTrigger.Reset();
+                return;
+            }
+            double pedalPos = Clamp01(sourcePos);
 
-            // Sustained test toggle shares the same falling-edge hysteresis
-            // as real gameplay — see UpdateThresholdRequest's identical
-            // rationale. Only Frequency/Intensity/Smoothness are
-            // live-tracked from settings; the hysteresis logic itself (and
-            // _bitePointLatched) is shared with the real path below since
-            // only one of the two runs per tick.
+            // Sustained test toggle uses the same trigger as real gameplay, so
+            // moving the pedal through the bite point previews it. The trigger is
+            // shared with the real path below since only one runs per tick.
             if (TestOn(MBoosterTestEffect.BitePoint))
             {
-                if (!_bitePointLatched && pedalPos <= triggerLevel)
-                    _bitePointLatched = true;
-                else if (_bitePointLatched && pedalPos > releaseLevel)
-                    _bitePointLatched = false;
-
-                if (!_bitePointLatched)
+                if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, now))
                 {
                     st.IntensityRequest = 0;
                     st.FreqHz = 0;
@@ -1345,7 +1316,7 @@ namespace MozaPlugin.Devices.MBooster
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;
-                _bitePointLatched = false;
+                _bitePointTrigger.Reset();
                 return;
             }
 
@@ -1357,16 +1328,11 @@ namespace MozaPlugin.Devices.MBooster
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;
-                _bitePointLatched = false;
+                _bitePointTrigger.Reset();
                 return;
             }
 
-            if (!_bitePointLatched && pedalPos <= triggerLevel)
-                _bitePointLatched = true;
-            else if (_bitePointLatched && pedalPos > releaseLevel)
-                _bitePointLatched = false;
-
-            if (!_bitePointLatched)
+            if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, now))
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;

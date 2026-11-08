@@ -834,6 +834,15 @@ Per-frame flow (`ShakeITV3PluginBase.DataUpdate`, SimHub data thread, once per g
 
 The 10 Hz `DispatcherTimer` in the base is **UI preview only** (runs while the settings control is visible); all real output happens on the data-update tick. Effect *containers* are discovered by assembly scanning (`PluginFinder.GetResolver(…, typeof(EffectsContainerBase))`, filtered by `[ShakeItContainerMetadata]` + `OutputMode`/`DeviceTarget`), so custom effect types are third-party-extensible — that is the effect side, distinct from the output-device side below.
 
+**Plugin-supplied effect types** (verified 9.13.3; the MOZA plugin ships `MozaClutchBitePointContainer`):
+
+- The scan covers every root-folder DLL (`AssemblyHelper.GetDlls`), so a plugin assembly is included. Subclass `EffectsContainerBase<SingleToneOutput>` with a public parameterless ctor and `[ShakeItContainerMetadata]`; the add-effect list keeps it when `EffectPlatform` is `Any` or matches the output manager's `OutputMode`.
+- Saved profiles store `ContainerType = GetType().Name`, and `EffectsContainerJsonConverter` resolves it by **short** type name — renaming the class orphans saved effects, and the name must not collide with any other loaded container.
+- Settings are plain public properties (default Newtonsoft serialization, restored via `Populate`); mark effect instances `[JsonIgnore]`. `GetEditControl()` supplies the editor; SimHub's public `SimHub.Plugins.UI.TitledSlider` (`Value` binds two-way by default) matches the stock look.
+- `ProcessEffects` runs every data tick, in game or not; with `Filter == null` the effect value 0..1 becomes `LastOutput` ×100. Unless `IsAllowedOutOfGame`, the base zeroes effects when not `GameRunning && !GamePaused && !GameInMenu && !Spectating`. Disabled containers return early without calling the effect, so effect-held state must be reset in an override.
+- `ShakeItProfile.AddEffect` runs `SetDefaults` → `LoadDefaultSettings` → `LoadDefaultPlatformSettings`, the last one ending in the channels provider's hook (also on Reset effect), which can seed per-channel activations through the public `SettingsStore.GetSettings<DeviceChannelActivationSettings>().Channels` dictionaries.
+- A `MotorsWithFrequency` channel's gain is `globalGain/100 × LastOutput/100 × effectiveGain/100`, maxed across effects; its frequency is the gain²-weighted mean of the effects' `SingleToneOutput.Frequency`.
+
 Two output-layer concepts that are easy to confuse:
 
 - **`OutputBase`** (public abstract) — the *per-effect-container* output config: channel mapping, `ExportProperty`, `PropertyName`, `DisableOutput`. Not a device.

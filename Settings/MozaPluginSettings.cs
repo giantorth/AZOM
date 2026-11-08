@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Devices.StalksTruckSim;
 using MozaPlugin.Telemetry;
 using MozaPlugin.UI.UpdateCheck;
@@ -220,6 +221,21 @@ namespace MozaPlugin.Settings
         // diagnostic takes ~30s after connect.
         public Dictionary<string, int[]> MBoosterKnownPedalTypes { get; set; }
             = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
+
+        // Clutch bite point calibration per SimHub game code and clutch source
+        // (key: game, "game:"+game or "formula:"+game). Absent = uncalibrated.
+        // See MBoosterBitePointCalibration / MozaPlugin.MBoosterBitePoint.cs.
+        public Dictionary<string, MBoosterBitePointCalibration> MBoosterClutchBitePointCalibrations { get; set; }
+            = new Dictionary<string, MBoosterBitePointCalibration>(StringComparer.OrdinalIgnoreCase);
+
+        // Learn and refine the bite point from every clean standing start.
+        public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
+
+        // Clutch position the Bite Point trigger and calibration read.
+        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.MBoosterPedal;
+
+        // Formula for MBoosterBitePointSource.Formula: a property path, NCalc, or js:-prefixed, 0..100.
+        public string MBoosterBitePointSourceFormula { get; set; } = "";
 
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by

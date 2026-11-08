@@ -865,4 +865,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Spieltelemetrie</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub-Motion-Profil</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>SimHub-Eckhaptik einbeziehen</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibriert</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>Ersatzwert</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Wartet</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Bereit</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Loslassen</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Abgebrochen</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisch kalibrieren</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>Fixiert</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} Messungen</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Kupplungsquelle</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-Pedal</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Kupplungs-Schleifpunkt</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Breite</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Mindestdauer (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Höchstdauer (ms)</value></data>
 </root>

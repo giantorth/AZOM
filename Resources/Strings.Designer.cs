@@ -923,5 +923,22 @@ namespace MozaPlugin.Resources
         public static string Motion_Source_GameTelemetry => Get("Motion_Source_GameTelemetry");
         public static string Motion_Source_SimHubPose => Get("Motion_Source_SimHubPose");
         public static string Motion_Panel_CornerHaptics => Get("Motion_Panel_CornerHaptics");
+        public static string Option_BitePointCalibrated => Get("Option_BitePointCalibrated");
+        public static string Option_BitePointFallback => Get("Option_BitePointFallback");
+        public static string Button_ResetCalibration => Get("Button_ResetCalibration");
+        public static string BiteCal_Idle => Get("BiteCal_Idle");
+        public static string BiteCal_Waiting => Get("BiteCal_Waiting");
+        public static string BiteCal_Armed => Get("BiteCal_Armed");
+        public static string BiteCal_Releasing => Get("BiteCal_Releasing");
+        public static string BiteCal_Cancelled => Get("BiteCal_Cancelled");
+        public static string Label_AutoCalibrate => Get("Label_AutoCalibrate");
+        public static string BiteCal_Pinned => Get("BiteCal_Pinned");
+        public static string BiteCal_Samples => Get("BiteCal_Samples");
+        public static string Label_ClutchSource => Get("Label_ClutchSource");
+        public static string Option_ClutchSourceMBooster => Get("Option_ClutchSourceMBooster");
+        public static string Section_ClutchBitePoint => Get("Section_ClutchBitePoint");
+        public static string SliderLabel_BiteWidth => Get("SliderLabel_BiteWidth");
+        public static string SliderLabel_BiteMinLength => Get("SliderLabel_BiteMinLength");
+        public static string SliderLabel_BiteMaxLength => Get("SliderLabel_BiteMaxLength");
     }
 }

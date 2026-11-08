@@ -100,6 +100,10 @@ namespace MozaPlugin.Integration
             // Clutch split point (issue #125) — the wheel overlay is the source
             // of truth; newer KS-family firmware drops the cmd-9 read-back.
             _plugin.AttachDelegate("AZOM.ClutchSplitPoint", () => CurrentClutchSplitPoint());
+            // mBooster clutch bite point for the current game (0..100, -1 when
+            // uncalibrated) and the calibration run's state name.
+            _plugin.AttachDelegate("AZOM.ClutchBitePoint", () => _plugin.CurrentClutchBitePointPct);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointCalibration", () => _plugin.BitePointCalibrationState.ToString());
             // Telemetry pipeline health, so users can show a degraded/parked state on
             // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
             // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
@@ -213,6 +217,11 @@ namespace MozaPlugin.Integration
                 var target = layout.Mode; // capture per iteration
                 _plugin.AddAction("AZOM.Ab9Layout" + layout.Suffix, (a, b) => SetAb9Layout(target));
             }
+
+            // mBooster clutch bite point for the current game: start/cancel a
+            // standing-start calibration, or clear the stored value.
+            _plugin.AddAction("AZOM.ClutchBitePointCalibrate", (a, b) => _plugin.ToggleBitePointCalibration());
+            _plugin.AddAction("AZOM.ClutchBitePointReset", (a, b) => _plugin.ResetClutchBitePoint());
 
             // Cycle the wheel's displayed dashboard (wraparound).
             _plugin.AddAction("AZOM.DashboardNext", (a, b) => CycleDashboard(+1));

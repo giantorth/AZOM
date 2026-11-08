@@ -6,6 +6,7 @@ using SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency;
 using SimHub.Plugins.DataPlugins.ShakeItV3.EffectsContainers;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Settings;
 using SimHub.Plugins.Devices;
+using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Integration
@@ -50,6 +51,22 @@ namespace MozaPlugin.Integration
             // Corner placements mean nothing on a pedal motor.
             if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
                 effectsContainerBase.AggregationMode = "Mono";
+
+            // Bite Point is a clutch effect, as on the plugin tab.
+            if (effectsContainerBase is MozaClutchBitePointContainer)
+                SeedSingleChannel(effectsContainerBase, MBoosterDeviceController.RoleIndexOf(MBoosterRole.Clutch));
+        }
+
+        private static void SeedSingleChannel(EffectsContainerBase container, int channel)
+        {
+            var activation = container.SettingsStore.GetSettings<DeviceChannelActivationSettings>();
+            foreach (var effect in container.Effects)
+            {
+                if (!activation.Channels.TryGetValue(effect.Placement, out var placement))
+                    activation.Channels[effect.Placement] = placement = new PlacementChannelsActivation();
+                for (int ch = 0; ch < ChannelCount; ch++)
+                    placement.Channels[ch] = new ChannelActivation { IsEnabled = ch == channel };
+            }
         }
 
         public void UpdateOutput(Dictionary<int, ChannelValue> values)

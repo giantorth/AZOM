@@ -752,10 +752,9 @@ namespace MozaPlugin.UI
             CurrentMBoosterController()?.SetThresholdTestActive(MBoosterThresholdTestToggle.IsChecked == true, _mboosterEffectPedalIndex);
         }
 
-        // Bite Point (Clutch-only) — tactile feedback at the pedal position
-        // where clutch engagement begins. See MBoosterEffectWorker
-        // .UpdateBitePointRequest for the falling-edge trigger/hysteresis
-        // logic and the hard Clutch-role gate.
+        // Bite Point (Clutch-only) — tactile feedback while the clutch is
+        // near its bite point. See MBoosterEffectWorker.UpdateBitePointRequest
+        // for the zone logic and the hard Clutch-role gate.
         private void MBoosterBitePointEnable_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -764,19 +763,55 @@ namespace MozaPlugin.UI
             (s.BitePoint ??= new MBoosterEffectSettings()).Enabled = MBoosterBitePointEnable.IsChecked == true;
             _plugin.SaveSettings();
         }
-        // Pedal position (%) at which the falling-edge trigger fires —
-        // fires as the pedal RELEASES past this level (opposite direction
-        // from Threshold's rising-brake trigger). The rearm level stays a
-        // fixed 30 points ABOVE this. See MBoosterEffectSettings
-        // .TriggerLevelPct and MBoosterEffectWorker.UpdateBitePointRequest.
+        // The bite point (%): while the calibration is in use this edits (and
+        // pins) the current game's calibration, else the fallback
+        // MBoosterEffectSettings.TriggerLevelPct. See RefreshMBoosterBiteCal.
         private void MBoosterBitePointTriggerLevel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
             int v = Math.Max((int)MBoosterUiConstants.BitePointTriggerMinPct, Math.Min((int)MBoosterUiConstants.BitePointTriggerMaxPct, (int)Math.Round(e.NewValue)));
             MBoosterBitePointTriggerLevelValue.Text = v.ToString();
             var s = CurrentMBoosterEffectTarget();
+            if (BiteTriggerShowsCalibration(s, out string game))
+            {
+                _plugin.PinClutchBitePoint(game, v);
+                return;
+            }
             if (s == null) return;
             (s.BitePoint ??= new MBoosterEffectSettings()).TriggerLevelPct = v;
+            _plugin.SaveSettings();
+        }
+        // Clutch travel (%) either side of the bite point that triggers the
+        // pulse. See MBoosterEffectSettings.BitePointWidthPct.
+        private void MBoosterBitePointWidth_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(MBoosterUiConstants.BitePointWidthMinPct, Math.Min(MBoosterUiConstants.BitePointWidthMaxPct, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointWidthValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointWidthPct = v;
+            _plugin.SaveSettings();
+        }
+        // Shortest and longest pulse (ms). See MBoosterBitePointTrigger.
+        private void MBoosterBitePointMinLength_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(MBoosterUiConstants.BitePointMinLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMinLengthMaxMs, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointMinLengthValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointMinLengthMs = v;
+            _plugin.SaveSettings();
+        }
+        private void MBoosterBitePointMaxLength_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointMaxLengthValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointMaxLengthMs = v;
             _plugin.SaveSettings();
         }
         // Fixed vibration frequency (2-100Hz). See MBoosterEffectSettings
@@ -816,10 +851,9 @@ namespace MozaPlugin.UI
         }
         // Sustained test toggle — skips the Enabled/GameRunning gates
         // (there's no live game session needed to test a pedal-position
-        // trigger), but shares the SAME falling-edge hysteresis latch and
-        // Clutch-role gate as the real path, vibrating continuously at the
-        // live Frequency/Intensity/Smoothness slider values once the pedal
-        // crosses the Trigger Input Level. See
+        // trigger), but shares the SAME zone and Clutch-role gate as the real
+        // path, vibrating at the live Frequency/Intensity/Smoothness slider
+        // values while the clutch is near the bite point. See
         // MBoosterDeviceController.SetBitePointTestActive and
         // MBoosterTestEffect.BitePoint.
         private void MBoosterBitePointTestToggle_Changed(object sender, RoutedEventArgs e)

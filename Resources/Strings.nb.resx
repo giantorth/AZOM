@@ -870,4 +870,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Spilltelemetri</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion-profil</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Ta med SimHub-hjørnehaptikk</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibrert</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>Reserve</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>TILBAKESTILL</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Venter</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Klar</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Slipper</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Avbrutt</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisk kalibrering</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>Låst</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} målinger</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Clutchkilde</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-pedal</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Clutch-klopunkt</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Bredde</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Minste varighet (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Lengste varighet (ms)</value></data>
 </root>

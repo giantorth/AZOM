@@ -864,4 +864,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Τηλεμετρία παιχνιδιού</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Προφίλ SimHub Motion</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Συμπερίληψη απτικών εφέ γωνιών του SimHub</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Βαθμονομημένο</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>Εφεδρικό</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Αδράνεια</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Έτοιμο</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Απελευθέρωση</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Ακυρώθηκε</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Αυτόματη βαθμονόμηση</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>Κλειδωμένο</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} δείγματα</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Πηγή συμπλέκτη</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Πεντάλ mBooster</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Σημείο εμπλοκής συμπλέκτη</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Εύρος</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Ελάχιστη διάρκεια (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Μέγιστη διάρκεια (ms)</value></data>
 </root>

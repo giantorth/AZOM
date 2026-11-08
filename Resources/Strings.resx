@@ -872,4 +872,21 @@ Id: {2}</value></data>
   <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Game telemetry</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion profile</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Include SimHub corner haptics</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrated</value></data>
+  <data name="Option_BitePointFallback" xml:space="preserve"><value>Fallback</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>RESET</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Idle</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Armed</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Releasing</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Auto-calibrate</value></data>
+  <data name="BiteCal_Pinned" xml:space="preserve"><value>Pinned</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} samples</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Clutch source</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster pedal</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Clutch Bite Point</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Width</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Minimum length (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Maximum length (ms)</value></data>
 </root>

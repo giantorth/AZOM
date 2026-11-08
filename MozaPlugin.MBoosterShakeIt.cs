@@ -109,6 +109,15 @@ namespace MozaPlugin
             _mboosterShakeItSink?.Clear();
         }
 
+        /// <summary>The clutch-role mBooster pedal's position (0..1), for the ShakeIt Bite Point effect.</summary>
+        /// <returns>False when no motorized pedal holds the Clutch role.</returns>
+        internal bool TryGetMBoosterClutchPosition(out double position01)
+        {
+            position01 = 0;
+            var registry = _mboosterRegistry;
+            return registry != null && registry.TryGetEffectPedalPosition(MBoosterRole.Clutch, out position01);
+        }
+
         /// <summary>Latest fresh ShakeIt gain per role, for diagnostics; 0 when stale.</summary>
         internal double[] MBoosterShakeItGains()
         {
