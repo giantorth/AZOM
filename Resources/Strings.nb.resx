@@ -866,4 +866,7 @@ Id: {2}</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster-pedalene er tilkoblet og satt til ShakeIt, men mBooster-enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>Område</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>KALIBRER</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Bevegelseskilde</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Spilltelemetri</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion-profil</value></data>
 </root>

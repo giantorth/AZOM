@@ -861,4 +861,7 @@ Id: {2}</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Педали mBooster подключены и настроены на ShakeIt, но устройство mBooster не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>Диапазон</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>КАЛИБРОВКА</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Источник движения</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Телеметрия игры</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Профиль SimHub Motion</value></data>
 </root>

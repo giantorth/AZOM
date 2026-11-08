@@ -919,5 +919,8 @@ namespace MozaPlugin.Resources
         public static string Banner_ProfileNotAddedMBooster_Body => Get("Banner_ProfileNotAddedMBooster_Body");
         public static string SliderLabel_Range => Get("SliderLabel_Range");
         public static string Button_Calibrate => Get("Button_Calibrate");
+        public static string Motion_Panel_Source => Get("Motion_Panel_Source");
+        public static string Motion_Source_GameTelemetry => Get("Motion_Source_GameTelemetry");
+        public static string Motion_Source_SimHubPose => Get("Motion_Source_SimHubPose");
     }
 }

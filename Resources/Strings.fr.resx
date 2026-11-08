@@ -861,4 +861,7 @@ Id : {2}</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Les pédales mBooster sont connectées et réglées sur ShakeIt, mais le périphérique mBooster n'a pas été ajouté dans SimHub. Ouvrez Périphériques &gt; Ajouter un périphérique &gt; {0}.</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>Plage</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRER</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Source du mouvement</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Télémétrie du jeu</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Profil SimHub Motion</value></data>
 </root>

@@ -1948,9 +1948,17 @@ own kinematics"). What the decompile requires of such an output:
   `RollDegrees`, `HeaveMm`, …). The bypass geometry already folds corner haptics into
   pitch/roll/heave (`SixDofInput.GetHapticsPose`). Signs: `MotionPlugin` builds
   `OrientationPitchDegrees = −GameData.OrientationPitch` and `OrientationRollDegrees =
-  +GameData.OrientationRoll`. The HMA150 output does **not** use it: its controller wants raw
-  physics like Motion Manager sends, so it streams `GameData` from the plugin's own
-  `DataUpdate` (`MotionInputData` is `internal`). `StatusDataBase.Acceleration{Surge,Sway,Heave}`
+  +GameData.OrientationRoll` (`PitchEffect` / `RollEffect` feed these into the pose as-is). By
+  default the HMA150 output does **not** use the pose: its controller takes raw physics like
+  Motion Manager sends, so it streams `GameData` from the plugin's own `DataUpdate`
+  (`MotionInputData` is `internal`). Its *Motion source* setting
+  (`MozaHma150OutputSettings.Source`) can switch it to the pose
+  ([`protocol/motion/game-stream-0x22.md`](protocol/motion/game-stream-0x22.md) § Plugin mapping).
+- **Output settings changes:** the base settings' `PropertyChanged` calls
+  `Output.ApplySettings()`, which drops the JSON-cloned running settings so the next update
+  re-clones them. A derived settings class cannot raise that event (Fody-generated), so its
+  setters call `Output?.ApplySettings()` themselves. SimHub saves the settings when the platform
+  configuration dialog closes (`MotionDevice.ConfigurePlatform` → `MotionPlugin.SaveSettings`). `StatusDataBase.Acceleration{Surge,Sway,Heave}`
   are m/s² with surge positive when braking — `GameManagerBase`'s fallback sets
   `GlobalAccelerationG = −AccelerationSurge` and derives it from Δspeed(m/s)/Δt.
 - **Configuration errors gate enabling, not running.** `MotionDevice.Enable` runs

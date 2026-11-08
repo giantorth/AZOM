@@ -17,6 +17,7 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster pedals as a SimHub ShakeIt device;** pick plugin tab or ShakeIt in Options, one channel per pedal role.
 - **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
 - **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
+- **Motion source setting for the motion platform;** stream the SimHub Motion profile instead of raw game telemetry, e.g. for flight sims.
 
 ## Changed
 

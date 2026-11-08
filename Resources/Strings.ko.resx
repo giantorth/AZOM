@@ -860,4 +860,7 @@ Id: {2}</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 페달이 연결되어 ShakeIt으로 설정되어 있지만 SimHub에 mBooster 장치가 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>범위</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>보정</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>모션 소스</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>게임 텔레메트리</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion 프로필</value></data>
 </root>

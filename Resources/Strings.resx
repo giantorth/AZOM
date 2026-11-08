@@ -868,4 +868,7 @@ Id: {2}</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster pedals are connected and set to ShakeIt, but the mBooster device has not been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>Range</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRATE</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Motion source</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Game telemetry</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion profile</value></data>
 </root>

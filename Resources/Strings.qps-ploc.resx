@@ -851,4 +851,7 @@
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Boof Snarf Grr Rrrf Barff Yip Bark Grrowl Howl Arf {0}!</value></data>
   <data name="SliderLabel_Range" xml:space="preserve"><value>Wuff!</value></data>
   <data name="Button_Calibrate" xml:space="preserve"><value>BORK!!</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Woof Bark</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Arf Grr</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Boof Woof Arf</value></data>
 </root>

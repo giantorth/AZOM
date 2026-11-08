@@ -105,6 +105,38 @@ namespace MozaPlugin.Devices.Motion
             Interlocked.Exchange(ref _stampMs, now);
         }
 
+        /// <summary>
+        /// A frame that carries a SimHub Motion pose instead of raw physics: pitch/roll in f0/f1,
+        /// which the controller applies as platform attitude; heave as a common-mode shock offset,
+        /// the controller's heave source; f4–f6 zero so its acceleration effects stay idle. Heading,
+        /// yaw rate, speed, pedals, engine and flags come from <paramref name="game"/> when a game runs.
+        /// Pose signs: SimHub's pitch is −GameData pitch and its roll +GameData roll (MotionPlugin),
+        /// so both flip to match <see cref="Update"/>. Heave sign untested on the rig.
+        /// </summary>
+        public static MotionTelemetryFrame PoseFrame(double pitchDegrees, double rollDegrees, double heaveMm,
+            MotionTelemetryFrame? game)
+        {
+            var f = new MotionTelemetryFrame();
+            f.Fields[0] = (float)(-pitchDegrees * DegToRad);
+            f.Fields[1] = (float)(-rollDegrees * DegToRad);
+            if (game != null)
+            {
+                f.Fields[2] = game.Fields[2];
+                f.Fields[3] = game.Fields[3];
+                f.Fields[7] = game.Fields[7];
+                f.BrakePercent = game.BrakePercent;
+                f.ThrottlePercent = game.ThrottlePercent;
+                f.EngineRpm = game.EngineRpm;
+                f.Throttle = game.Throttle;
+                f.Flags = game.Flags;
+            }
+            else
+                f.Flags = MozaMotionProtocol.FlagInGame;
+            for (int k = 0; k < 4; k++)
+                f.Fields[8 + k] = (float)(MotionTelemetryFrame.ShockRestMm[k] - heaveMm);
+            return f;
+        }
+
         private static bool ReadIRacingShocks(PluginManager pluginManager, MotionTelemetryFrame f)
         {
             if (!string.Equals(pluginManager.GameName, "IRacing", StringComparison.OrdinalIgnoreCase)) return false;

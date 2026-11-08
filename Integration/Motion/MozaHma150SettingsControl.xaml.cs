@@ -16,7 +16,7 @@ namespace MozaPlugin.Integration.Motion
     /// HMA150 controller setup, shown inside SimHub Motion's controller settings: live
     /// status, port → corner assignment with identify and the port self-test, travel
     /// self-check, Max Available Stroke, rig dimensions, the Motion Effects sliders and
-    /// lighting. Everything here is stored on the controller, not in SimHub. Holds the
+    /// lighting, all stored on the controller; the motion source is the one SimHub output setting. Holds the
     /// lane's port open while loaded; refreshes every 500 ms.
     /// </summary>
     public partial class MozaHma150SettingsControl : UserControl
@@ -41,10 +41,13 @@ namespace MozaPlugin.Integration.Motion
         private bool _effectsLoaded;
         private bool _readsRequested;
         private MozaMotionController? _held;
+        private readonly MozaHma150Output? _output;
 
-        public MozaHma150SettingsControl()
+        public MozaHma150SettingsControl(MozaHma150Output? output = null)
         {
+            _output = output;
             InitializeComponent();
+            BuildSourceItems();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _timer.Tick += (_, __) => Refresh();
             Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); Refresh(); _timer.Start(); };
@@ -136,6 +139,23 @@ namespace MozaPlugin.Integration.Motion
                     : s.HapticIntensity.HasValue ? (s.HapticIntensity.Value * 100).ToString("0", CultureInfo.CurrentCulture) : "";
             }
             RefreshLighting(lane);
+        }
+
+        // ------------------------------------------------------------ source
+
+        private void BuildSourceItems()
+        {
+            SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_GameTelemetry, Tag = MozaHma150Source.GameTelemetry });
+            SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_SimHubPose, Tag = MozaHma150Source.SimHubPose });
+            var settings = _output?.Settings;
+            SourceCombo.IsEnabled = settings != null;
+            SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            SourceCombo.SelectionChanged += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null && SourceCombo.SelectedItem is ComboBoxItem item && item.Tag is MozaHma150Source source)
+                    s.Source = source;
+            };
         }
 
         // ------------------------------------------------------------ motion effects
