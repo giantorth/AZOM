@@ -23,6 +23,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Changed
 
+- **SimHub Motion no longer lifts the HMA150 when SimHub starts;** the motion setup's start mode is switched once from "Last" to "Off", so motion waits for Enable. Set it back in SimHub's Motion power settings if you prefer.
 - **Pedals tab shows all three pedals side by side;** each column has its live input, curve, direction and range slider, with calibrate in the card header.
 
 ## Fixed

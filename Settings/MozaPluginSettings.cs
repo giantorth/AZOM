@@ -269,6 +269,11 @@ namespace MozaPlugin.Settings
         public string LastBaseAuxDeviceId { get; set; } = "";
         public string LastMotionDeviceId { get; set; } = "";
 
+        // SimHub Motion setups (MotionDevice.DeviceId) whose "start mode" AZOM has already
+        // switched from SimHub's default "Last" to "Off" for the HMA150. Recorded so it
+        // happens once per setup: a user who sets it back to Last or Always on keeps it.
+        public List<string> MotionStartModeDefaultedSetups { get; set; } = new List<string>();
+
         // Active-shifter (AB9 / AB6) lane. Off = the plugin never opens the
         // shifter's port, and switching it off releases a port already held.
         // Not the pre-1.6 DisableAb9Detection key, so a stale value from that
