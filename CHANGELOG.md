@@ -4,9 +4,15 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.3]
 
+## Highlights
+
+- **mBooster pedals as a SimHub ShakeIt device;** pick the plugin tab or ShakeIt in Options, one channel per pedal role.
+- **New Clutch Bite Point ShakeIt effect for every ShakeIt Motors and Bass Shakers device** (mBooster, PHF, bass shakers and more); pulses as the clutch crosses its bite point, with adjustable width, pulse length, pulse rate and press/release direction.
+- **Clutch bite point calibration per game and vehicle;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch, a formula or any HID axis.
+- **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
+
 ## Added
 
-- **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
 - **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
 - **Cancel button for dashboard uploads** on the Files tab; stops the transfer and closes the wheel's upload session.
 - **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
@@ -14,13 +20,10 @@ All notable changes to the AZOM plugin are documented here.
 - **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
 - **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
 - **Default tab setting in Options** picks which tab the plugin opens on.
-- **mBooster pedals as a SimHub ShakeIt device;** pick plugin tab or ShakeIt in Options, one channel per pedal role.
 - **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
 - **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
 - **Motion source setting for the motion platform;** stream the SimHub Motion profile instead of raw game telemetry, e.g. for flight sims.
-- **Clutch Bite Point ShakeIt effect** for the mBooster, PHF, and bass shakers.
-- **Clutch bite point calibration per game and vehicle;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch, a formula or any HID axis.
-- **Pulse rate setting for Clutch Bite Point;** sets how fast the Smoothness ripple throbs, and existing setups keep their current feel.
+- **Pulse rate setting for the mBooster tab's Bite Point;** sets how fast the Smoothness ripple throbs, and existing setups keep their current feel.
 
 ## Changed
 
