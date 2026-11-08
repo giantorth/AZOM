@@ -144,6 +144,12 @@ namespace MozaPlugin.Telemetry.Lifecycle
         // are losses the wheel's dup-ack ARQ heals within ~2 s, so escalation
         // keys on the episode staying unhealed, never on the event count.
         private long _configJsonGapEpisodeStartUtcTicks;
+        // One library-sync reconnect per unhealed episode.
+        private int _configJsonGapStallEscalated;
+        // Gap-warn rate limit: a stalled stream re-bursts at ~230 chunks/s.
+        private long _configJsonGapLastWarnUtcTicks;
+        private int _configJsonGapWarnsSuppressed;
+        private const int ConfigJsonGapWarnIntervalMs = 5_000;
         private const int ConfigJsonGapStallEscalateMs = 10_000;
         private const int ConfigJsonGapTickEscalationCap = 3;
         private const int ConfigJsonGapPassiveWaitMs = 5_000;
@@ -243,7 +249,21 @@ namespace MozaPlugin.Telemetry.Lifecycle
             Interlocked.Exchange(ref _configJsonGapEpisodeStartUtcTicks, 0);
             Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, 0);
             _configJsonGapTickEscalations = 0;
+            ResetConfigJsonGapEpisodeExtras();
         }
+
+        private void ResetConfigJsonGapEpisodeExtras()
+        {
+            Interlocked.Exchange(ref _configJsonGapStallEscalated, 0);
+            Interlocked.Exchange(ref _configJsonGapLastWarnUtcTicks, 0);
+            Interlocked.Exchange(ref _configJsonGapWarnsSuppressed, 0);
+        }
+
+        /// <summary>A configJson gap hasn't healed into a state yet: the wheel is
+        /// mid-push of newer state, so the cached state is stale. Cleared on
+        /// StateReady and at Start/Stop.</summary>
+        public bool ConfigJsonGapUnhealed =>
+            Interlocked.Read(ref _configJsonGapEpisodeStartUtcTicks) != 0;
 
         public void NoteActiveStateEntered() => _activeStateEnteredTickCount = Environment.TickCount;
 
@@ -347,6 +367,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             Interlocked.Exchange(ref _configJsonLastChunkUtcTicks, 0);
             Interlocked.Exchange(ref _configJsonLastPrimeRetryUtcTicks, 0);
             _configJsonGapTickEscalations = 0;
+            ResetConfigJsonGapEpisodeExtras();
 
             for (int s = 0; s < CloseStormSessionMax; s++)
             {
@@ -381,6 +402,7 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // self-gates on its own conditions (incl. HotSwitchBurstPending).
             RetryS09IfNotEstablished();
             DriveConfigJsonGapRetransmit();
+            EscalateConfigJsonGapStall();
 
             // The verdict must never fire mid hot-switch burst (documented
             // hazard: a restart's teardown clobbers the burst's catalog-END
@@ -755,6 +777,23 @@ namespace MozaPlugin.Telemetry.Lifecycle
         }
 
         /// <summary>
+        /// Library-sync reconnect, once per episode, when a gap stays unhealed
+        /// past the stall window with cached state. Tick-driven so it fires
+        /// whether the wheel keeps re-bursting past the hole (bundle CJVSVFSR:
+        /// 904–913 looped for 2.5 min, 903 never resent) or goes quiet.
+        /// </summary>
+        private void EscalateConfigJsonGapStall()
+        {
+            long start = Interlocked.Read(ref _configJsonGapEpisodeStartUtcTicks);
+            if (start == 0 || !_sender.ConfigJsonHasLastState) return;
+            long episodeMs = (DateTime.UtcNow.Ticks - start) / TimeSpan.TicksPerMillisecond;
+            if (episodeMs < ConfigJsonGapStallEscalateMs) return;
+            if (Interlocked.Exchange(ref _configJsonGapStallEscalated, 1) != 0) return;
+            _sender.ScheduleLibrarySyncRestart(
+                $"configJson stream stalled (gap #{_configJsonGapCount}, {episodeMs}ms unhealed)");
+        }
+
+        /// <summary>
         /// Three-tier gap recovery from inbound dispatch on a forward gap:
         /// passive wait (wheel auto-retransmits) -> prime+open nudge. Restart
         /// is no longer a tier here — the unified verdict owns it.
@@ -773,24 +812,25 @@ namespace MozaPlugin.Telemetry.Lifecycle
 
             if (haveCachedState)
             {
-                long episodeMs = (nowTicks - episodeStart) / TimeSpan.TicksPerMillisecond;
-                MozaLog.Warn(
-                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    $"buffer preserved, keeping cached state (episode {episodeMs}ms)");
-                // The wheel retransmits the missing chunks on our dup-acks and
-                // the episode heals within ~2 s (StateReady resets tracking).
-                // Escalate only when it stays unhealed past the stall window.
-                if (episodeMs >= ConfigJsonGapStallEscalateMs)
-                    _sender.ScheduleLibrarySyncRestart(
-                        $"configJson stream stalled (gap #{_configJsonGapCount}, {episodeMs}ms unhealed)");
+                // The wheel normally retransmits on our dup-acks and the episode
+                // heals within ~2 s (StateReady resets tracking); the tick's
+                // EscalateConfigJsonGapStall handles the ones that don't.
+                if (GapLogDue(nowTicks, out string sup))
+                {
+                    long episodeMs = (nowTicks - episodeStart) / TimeSpan.TicksPerMillisecond;
+                    MozaLog.Warn(
+                        $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"buffer preserved, keeping cached state (episode {episodeMs}ms){sup}");
+                }
                 return;
             }
 
             if (_sender.HotSwitchBurstPending)
             {
-                MozaLog.Debug(
-                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    "deferring recovery — hot-switch burst in flight");
+                if (GapLogDue(nowTicks, out string sup))
+                    MozaLog.Debug(
+                        $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"deferring recovery — hot-switch burst in flight{sup}");
                 return;
             }
 
@@ -800,10 +840,11 @@ namespace MozaPlugin.Telemetry.Lifecycle
             long passiveWaitTicks = ConfigJsonGapPassiveWaitMs * TimeSpan.TicksPerMillisecond;
             if (_sender.ConfigJsonLastForwardGapUtcTicks != 0 && gapAgeTicks < passiveWaitTicks)
             {
-                MozaLog.Debug(
-                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    $"waiting up to {ConfigJsonGapPassiveWaitMs}ms for wheel auto-retransmit " +
-                    $"(gap age={gapAgeTicks / TimeSpan.TicksPerMillisecond}ms)");
+                if (GapLogDue(nowTicks, out string sup))
+                    MozaLog.Debug(
+                        $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"waiting up to {ConfigJsonGapPassiveWaitMs}ms for wheel auto-retransmit " +
+                        $"(gap age={gapAgeTicks / TimeSpan.TicksPerMillisecond}ms){sup}");
                 return;
             }
 
@@ -812,9 +853,10 @@ namespace MozaPlugin.Telemetry.Lifecycle
                 && Interlocked.Read(ref _configJsonLastPrimeRetryUtcTicks) != 0
                 && primeAgeTicks < passiveWaitTicks)
             {
-                MozaLog.Debug(
-                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                    $"prior prime+open-request {primeAgeTicks / TimeSpan.TicksPerMillisecond}ms ago — deferring next");
+                if (GapLogDue(nowTicks, out string sup))
+                    MozaLog.Debug(
+                        $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                        $"prior prime+open-request {primeAgeTicks / TimeSpan.TicksPerMillisecond}ms ago — deferring next{sup}");
                 return;
             }
 
@@ -842,9 +884,29 @@ namespace MozaPlugin.Telemetry.Lifecycle
             // Past the nudge tier: log and wait for the next chunk; if state
             // never materialises, the unified verdict (no configJson state past
             // grace) restarts.
-            MozaLog.Warn(
-                $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
-                "nudge budget spent — waiting for chunk/state (display watchdog will restart if it never arrives)");
+            if (GapLogDue(nowTicks, out string sup2))
+                MozaLog.Warn(
+                    $"[AZOM] {tag} configJson gap #{_configJsonGapCount} ({cachedTag}): " +
+                    $"nudge budget spent — waiting for chunk/state (display watchdog will restart if it never arrives){sup2}");
+        }
+
+        /// <summary>Per-gap log rate limit: first gap of an episode, then one
+        /// line per <see cref="ConfigJsonGapWarnIntervalMs"/>.
+        /// <paramref name="suffix"/> carries the suppressed count.</summary>
+        private bool GapLogDue(long nowTicks, out string suffix)
+        {
+            suffix = "";
+            long last = Interlocked.Read(ref _configJsonGapLastWarnUtcTicks);
+            if (last != 0
+                && (nowTicks - last) / TimeSpan.TicksPerMillisecond < ConfigJsonGapWarnIntervalMs)
+            {
+                Interlocked.Increment(ref _configJsonGapWarnsSuppressed);
+                return false;
+            }
+            Interlocked.Exchange(ref _configJsonGapLastWarnUtcTicks, nowTicks);
+            int suppressed = Interlocked.Exchange(ref _configJsonGapWarnsSuppressed, 0);
+            if (suppressed > 0) suffix = $" [{suppressed} repeat(s) suppressed]";
+            return true;
         }
 
         // ───── Diagnostics surface ────────────────────────────────────────

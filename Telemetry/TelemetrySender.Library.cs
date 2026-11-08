@@ -156,14 +156,28 @@ namespace MozaPlugin.Telemetry
         /// usb-capture/ksp/mozahubstartup.pcapng OUT seq=0x0010..0x0017,
         /// decompressed: <c>{"configJson()":{"dashboards":[...]},"id":11}</c>).
         /// </summary>
-        private void MaybeSendConfigJsonReply(WheelDashboardState state, byte session)
+        /// <returns>True when the reply went out; false when skipped or deferred.</returns>
+        private bool MaybeSendConfigJsonReply(WheelDashboardState state, byte session)
         {
             _lastConfigJsonReplySession = session;
             if (_session09ReplySent)
             {
                 MozaLog.Info(
                     $"[AZOM] configJson reply skipped (already sent this cycle) sess=0x{session:X2}");
-                return;
+                return false;
+            }
+
+            // The list sweeps every dash it doesn't name, so never build it from
+            // state older than a push the wheel is stuck mid-way through (bundle
+            // CJVSVFSR: list of one, the wheel dropped every other dash). The
+            // latch stays clear, so the StateReady that heals the gap — or the
+            // post-reconnect push — sends it with the pending intents.
+            if (_watchdog.ConfigJsonGapUnhealed)
+            {
+                MozaLog.Info(
+                    $"[AZOM] configJson reply deferred sess=0x{session:X2} — configJson stream has an " +
+                    "unhealed gap; cached state is stale. Sends on the next state push");
+                return false;
             }
 
             var wireList = BuildWireLibraryList(state ?? _configJson.LastState);
@@ -176,7 +190,7 @@ namespace MozaPlugin.Telemetry
                 {
                     MozaLog.Info(
                         $"[AZOM] configJson reply skipped (no library names and no wheel list) sess=0x{session:X2}");
-                    return;
+                    return false;
                 }
                 wireList = new System.Collections.Generic.List<string>(state.ConfigJsonList);
             }
@@ -219,7 +233,7 @@ namespace MozaPlugin.Telemetry
                                 $"[AZOM] configJson reply ABORTED mid-send sess=0x{session:X2} " +
                                 $"(state={_state}, connected={_connection.IsConnected}) — " +
                                 "connect-window sweep will not happen this cycle");
-                            return;
+                            return false;
                         }
                         // Ack-tracked: the wheel fc-acks config-session chunks
                         // (lazily) and retransmits on dup-acks.
@@ -243,6 +257,7 @@ namespace MozaPlugin.Telemetry
             MozaLog.Info(
                 $"[AZOM] Sent configJson() reply on session 0x{session:X2}: " +
                 $"{CanonicalDashboardList.Count} dashboards, {chunkCount} chunks");
+            return true;
         }
 
         /// <summary>
@@ -284,7 +299,7 @@ namespace MozaPlugin.Telemetry
             // Re-send even when the name was already present — the reply
             // itself is part of the enable exchange.
             _session09ReplySent = false;
-            MaybeSendConfigJsonReply(state!, _lastConfigJsonReplySession);
+            if (!MaybeSendConfigJsonReply(state!, _lastConfigJsonReplySession)) return;
             // Predict the wheel's slot table: an accepted list enables the
             // declared name, and the wheel updates its own ordinal-sorted
             // table live but does NOT re-push it mid-session — so the host
@@ -308,9 +323,11 @@ namespace MozaPlugin.Telemetry
 
         internal void ScheduleLibrarySyncRestart(string reason)
         {
+            // Arm the due time once per schedule — a repeating caller must not
+            // keep pushing it out.
+            if (Interlocked.CompareExchange(ref _librarySyncRestartScheduled, 1, 0) != 0) return;
             Interlocked.Exchange(ref _librarySyncRestartDueTicks,
                 DateTime.UtcNow.Ticks + TimeSpan.TicksPerSecond * 4);
-            if (Interlocked.CompareExchange(ref _librarySyncRestartScheduled, 1, 0) != 0) return;
             MozaLog.Info(
                 $"[AZOM] Library-sync restart scheduled ({reason}) — reconnect rebuilds the " +
                 "wheel's registry/configJsonList (the render table needs an accepted list)");
@@ -337,7 +354,10 @@ namespace MozaPlugin.Telemetry
                             // pending enable strands the dash disabled
                             // (observed 2026-08-16 evening). Cap the hold so a
                             // lost confirm can't block the reconcile forever.
+                            // No hold on a stalled configJson stream: the
+                            // confirm can't get through it.
                             if (!_intentionalEnables.IsEmpty
+                                && !_watchdog.ConfigJsonGapUnhealed
                                 && now - due < TimeSpan.TicksPerSecond * 20)
                             {
                                 Thread.Sleep(500);

@@ -250,27 +250,25 @@ namespace MozaPlugin.Devices.Extensions
         public override void LoadDefaultSettings()
         {
             _settings = new MozaWheelExtensionSettings();
-
-            var plugin = MozaPlugin.Instance;
-            var settings = plugin?.Settings;
-            if (plugin != null && settings != null)
-            {
-                var profile = settings.ProfileStore?.CurrentProfile;
-                _settings.CaptureFromCurrent(settings, plugin.Data, profile, _expectedModelPrefix);
-            }
+            CaptureFromPlugin();
         }
 
         public override JToken GetSettings()
         {
+            CaptureFromPlugin();
+            return JToken.FromObject(_settings);
+        }
+
+        // Mirror this page's own wheel profile into the device JSON.
+        private void CaptureFromPlugin()
+        {
             var plugin = MozaPlugin.Instance;
             var settings = plugin?.Settings;
-            if (plugin != null && settings != null)
-            {
-                var profile = settings.ProfileStore?.CurrentProfile;
-                _settings.CaptureFromCurrent(settings, plugin.Data, profile, _expectedModelPrefix);
-            }
-
-            return JToken.FromObject(_settings);
+            if (plugin == null || settings == null) return;
+            var dp = plugin.DeviceProfiles;
+            var g = dp?.WheelPageGuidFor(_expectedModelPrefix);
+            var profile = g.HasValue ? dp!.WheelStore(g.Value, seed: false)?.CurrentProfile : null;
+            _settings.CaptureFromCurrent(settings, plugin.Data, profile, _expectedModelPrefix);
         }
 
         public override void SetSettings(JToken settings, bool isDefault)

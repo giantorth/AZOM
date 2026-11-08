@@ -214,6 +214,10 @@ namespace MozaPlugin.Devices.Extensions
             written += pedalHaptics.Written;
             total += pedalHaptics.Total;
 
+            var mbooster = RedeployAllMBooster(wheelbasePid);
+            written += mbooster.Written;
+            total += mbooster.Total;
+
             MozaLog.Info(
                 $"[AZOM] Redeployed all device definitions: {written}/{total} written " +
                 $"(wheelbase pid={wheelbasePid}, dash pid={dashboardPid}; restart SimHub to pick them up)");

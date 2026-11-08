@@ -256,7 +256,7 @@ namespace MozaPlugin.UI
             // leaving out a pedal with no motor is a valid setup.
             if (elapsed >= ProfileNotAddedSettling
                 && !plugin.DeviceDefinitionDeployed
-                && Devices.Haptics.MozaPedalHapticsBridge.IsSupported
+                && plugin.PedalHapticsRoutedToShakeIt
                 && plugin.PedalHapticsRegistry?.AnyDetected == true
                 && !plugin.PedalHapticsDeviceExtensionActive)
             {
@@ -269,6 +269,20 @@ namespace MozaPlugin.UI
                             : "MOZA S12 " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Throttle)
                               + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Brake)
                               + " / " + MozaPedalHapticsProtocol.PedalLabel((byte)PedalHapticsPedal.Clutch))));
+            }
+
+            // Rule 6b: ProfileNotAddedMBooster. Same shape as rule 6.
+            if (elapsed >= ProfileNotAddedSettling
+                && !plugin.DeviceDefinitionDeployed
+                && plugin.MBoosterRoutedToShakeIt
+                && plugin.IsMBoosterDetected
+                && !plugin.MBoosterDeviceExtensionActive)
+            {
+                list.Add(new StatusHint(
+                    StatusHintKind.ProfileNotAddedMBooster,
+                    Strings.Banner_ProfileNotAddedMBooster_Title,
+                    string.Format(Strings.Banner_ProfileNotAddedMBooster_Body,
+                        Devices.Extensions.DeviceDefinitionDeployer.MBoosterShakeItDeviceName)));
             }
 
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —

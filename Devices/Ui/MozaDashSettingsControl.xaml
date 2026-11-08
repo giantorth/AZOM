@@ -4,6 +4,7 @@
              xmlns:ctrl="clr-namespace:MozaControls"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
+             xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              Padding="14"
              TextElement.Foreground="{DynamicResource TextBrush}"
              TextElement.FontFamily="{DynamicResource FontUi}"
@@ -65,21 +66,11 @@
                  users who only visit the device page still see them. -->
             <ui:PluginBanners/>
 
-            <!-- Device header -->
-            <Border Background="{StaticResource BgCardBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    BorderThickness="1" CornerRadius="8"
-                    Padding="18,14" Margin="0,0,0,14">
-                <StackPanel Orientation="Horizontal">
-                    <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="Gray"
-                             VerticalAlignment="Center" Margin="0,0,12,0"/>
-                    <TextBlock Text="{x:Static res:Strings.Section_MozaDashboard}"
-                               FontWeight="SemiBold" FontSize="14"
-                               VerticalAlignment="Center" Margin="0,0,18,0"/>
-                    <TextBlock x:Name="StatusText" Style="{StaticResource MutedHintText}"
-                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
+            <!-- This dash's own profile list (bound in code-behind). -->
+            <StackPanel x:Name="DeviceProfileRow" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,4,0,8" Visibility="Collapsed">
+                <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
+            </StackPanel>
 
             <TabControl x:Name="DashTabs" Style="{StaticResource MozaTabControl}" Margin="0,4,0,0">
 

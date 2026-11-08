@@ -110,6 +110,11 @@ namespace MozaPlugin.Protocol
         public const double ParamKThreshold = 3080.0;
         public const double ParamKEngine    = 1000.0;
 
+        // ShakeIt band: the wire field saturates at 200 Hz; 5 Hz matches the
+        // lowest plugin effect slider (CustomEffectFreqMinHz).
+        public const int ShakeItMinFrequencyHz = 5;
+        public const int ShakeItMaxFrequencyHz = 200;
+
         /// <summary>
         /// Build the motor-write frame for a given effect. Wire layout (14 bytes total,
         /// pre-stuffing, with the checksum byte assumed appended by caller of <see cref="MozaProtocol"/> stuffing):

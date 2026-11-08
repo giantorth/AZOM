@@ -8,7 +8,7 @@ namespace MozaPlugin.Devices
     /// Hub (PID 0x0020) on its own COM port. Used when a wheelbase is ALSO
     /// present: the base stays the telemetry-driving primary connection, and
     /// this manager enumerates the peripherals attached to the hub (pedals,
-    /// handbrake, hub port-power status) on the hub's separate pipe.
+    /// handbrake, hub port status) on the hub's separate pipe.
     ///
     /// The hub-ONLY case (no base) is handled by the primary BaseAndHub
     /// connection, which falls back to the hub when no wheelbase port exists and

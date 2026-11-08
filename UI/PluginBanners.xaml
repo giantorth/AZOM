@@ -62,7 +62,7 @@
         </ItemsControl>
 
         <!-- 2. Update notification banner: newer release available (or an
-             install pending a restart). Dismissable for the session; the full
+             install pending a restart). Dismiss hides that version; the full
              controls (channel, skip, check-now, notes) live in About > Updates
              on the plugin pane. Driven by PluginBanners.xaml.cs. -->
         <Border x:Name="HeaderUpdateBanner"

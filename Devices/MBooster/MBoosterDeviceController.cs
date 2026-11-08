@@ -310,6 +310,38 @@ namespace MozaPlugin.Devices.MBooster
             return axisIndex >= 0 && axisIndex < types.Length && types[axisIndex] == 1;
         }
 
+        /// <summary>
+        /// Whether axis <paramref name="axisIndex"/>'s effect worker plays: wired
+        /// and motorized. Wiring uses the same "ConnectedAxes null means assume
+        /// only axis 0 is real" convention the UI uses (SettingsControl.xaml.cs).
+        /// </summary>
+        public bool IsAxisEffectCapable(int axisIndex)
+        {
+            // A passive pedal has no motor, so it can never play an effect. This
+            // is load-bearing, not merely tidy: a single-active-pedal lane
+            // resolves EVERY axis's target device to the one real device id
+            // (MotorDeviceForCurrentAxis), so without this gate the passive axes'
+            // workers would all stream at the active pedal's motor and race the
+            // genuine worker for it.
+            if (!IsAxisMotorized(axisIndex)) return false;
+            var connected = ConnectedAxes;
+            if (connected != null)
+                return axisIndex < connected.Length && connected[axisIndex];
+            // PD-Linked connectivity not parsed yet (it arrives seconds after
+            // connect, sometimes first as an unparseable short form). Fall back
+            // to the chain size known at connect from the presence read: on a
+            // multi-motor chain run every HID-reported axis — each routes to its
+            // own role-based device id — otherwise only axis 0.
+            if (SubDeviceCount > 1)
+                return axisIndex < Math.Max(1, AxisCount);
+            return axisIndex == 0;
+        }
+
+        /// <summary>Axis <paramref name="axisIndex"/>'s shaped HID position (0..1).</summary>
+        public double AxisPedalPosition(int axisIndex) =>
+            axisIndex == 0 ? LastHidPosition
+            : (axisIndex < LastAxisPositions.Length ? LastAxisPositions[axisIndex] : 0.0);
+
         /// <summary>Axis index of this lane's SOLE active (motorized) pedal, or
         /// -1 when the type diagnostic is missing or more than one axis is
         /// active. The counterpart to <see cref="SoleConnectedAxis"/> for the
@@ -333,6 +365,10 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>When the latest detection edge fired (see <see cref="MarkDetected"/>).</summary>
         public DateTime DetectedAtUtc { get; private set; }
         public bool IsConnected => _connection.IsConnected;
+
+        /// <summary>USB PID SimHub detects this lane on: the unit's own on USB, the
+        /// host base's on a routed lane (the shared pipe).</summary>
+        public string? DiscoveredPid => _connection.DiscoveredPid;
         public MozaSerialConnection Connection => _connection;
 
         // Latest HID axis value (0..1), AFTER Pedal Feel shaping (deadzone,
@@ -517,7 +553,8 @@ namespace MozaPlugin.Devices.MBooster
             Func<bool> isShuttingDown,
             Func<bool>? disableProbeFallback = null,
             Func<string, double>? customEffectFormulaEvaluator = null,
-            string containerId = "")
+            string containerId = "",
+            MBoosterShakeItSink? shakeItSink = null)
         {
             Identity = identity ?? throw new ArgumentNullException(nameof(identity));
             PortName = portName ?? throw new ArgumentNullException(nameof(portName));
@@ -560,7 +597,7 @@ namespace MozaPlugin.Devices.MBooster
             for (int i = 0; i < motorIds.Length; i++)
                 _workers[i] = new MBoosterEffectWorker(
                     this, () => CurrentSettings, _isShuttingDown, customEffectFormulaEvaluator,
-                    pedalAxisIndex: i, isPrimary: i == 0);
+                    pedalAxisIndex: i, isPrimary: i == 0, shakeItSink: shakeItSink);
         }
 
         /// <summary>
@@ -583,7 +620,8 @@ namespace MozaPlugin.Devices.MBooster
             string portLabel,
             Func<MBoosterDeviceSettings?> settingsLookup,
             Func<bool> isShuttingDown,
-            Func<string, double>? customEffectFormulaEvaluator = null)
+            Func<string, double>? customEffectFormulaEvaluator = null,
+            MBoosterShakeItSink? shakeItSink = null)
         {
             Identity = identity ?? throw new ArgumentNullException(nameof(identity));
             _connection = sharedConnection ?? throw new ArgumentNullException(nameof(sharedConnection));
@@ -606,7 +644,7 @@ namespace MozaPlugin.Devices.MBooster
             for (int i = 0; i < _workers.Length; i++)
                 _workers[i] = new MBoosterEffectWorker(
                     this, () => CurrentSettings, _isShuttingDown, customEffectFormulaEvaluator,
-                    pedalAxisIndex: i, isPrimary: i == 0);
+                    pedalAxisIndex: i, isPrimary: i == 0, shakeItSink: shakeItSink);
         }
 
         /// <summary>Start the per-axis effect workers — the registry calls this

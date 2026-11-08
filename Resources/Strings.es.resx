@@ -104,18 +104,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>ACELERADOR</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>FRENO</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>EMBRAGUE</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>ACELERADOR · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>FRENO · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>EMBRAGUE · DIRECCIÓN Y RANGO</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL ACELERADOR</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL FRENO</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA DEL EMBRAGUE</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// mapea la posición física a la entrada del juego</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// modela la respuesta del freno</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// modela la respuesta del embrague</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ACELERADOR · CALIBRACIÓN</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>FRENO · CALIBRACIÓN</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>EMBRAGUE · CALIBRACIÓN</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Relación de sensores</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>DISPOSICIÓN MECÁNICA</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>Disposición 5+R 1</value></data>
@@ -177,8 +165,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Nivel de activación</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Decaimiento de la vibración</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>LEER DEL DISPOSITIVO</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>HUB UNIVERSAL · PEDALES</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// puerto de pedales (sondeado cada 2 segundos)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>PEDALES</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Puerto de pedales</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ACCESORIOS</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Puerto 1</value></data>
@@ -209,7 +196,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Título</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Última modificación</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ELIMINAR</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activar servidor SDK CoAP</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Activar SDK de iRacing</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Activar servidor de control UDP</value></data>
   <data name="Section_About" xml:space="preserve"><value>ACERCA DE</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -258,7 +245,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Configurar SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Descartar</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Reiniciar SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Novedades en v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Buscar actualizaciones automáticamente</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Canal de versiones</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Estable</value></data>
@@ -317,7 +303,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>SUSPENSIÓN</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Modo de suspensión</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Tiempo de suspensión</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>TABLERO MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Buscando tablero…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>MODOS DE INDICADOR</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Modo indicador de RPM</value></data>
@@ -505,13 +490,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Emisor de telemetría no disponible (complemento no inicializado).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Primero seleccione un archivo .mzdash o una entrada de la biblioteca.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(aún no se ha recibido el estado configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Complemento no cargado</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>No se pueden obtener los bytes sin procesar de «{0}»; seleccione un archivo local en su lugar.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Carpeta: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Carga en cola: enviando «{0}» al volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Carga no iniciada: el volante no está conectado o aún no hay sesión de gestión.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Carga completada (estado 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Carga detenida al {0} % (estado 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Cancelando la carga…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Carga cancelada al {0} %</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>«{0}» ya está en el volante sin cambios: no se ha cargado nada</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleccione un archivo .mzdash para subir</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Panel Moza (*.mzdash)|*.mzdash|Todos los archivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleccione la carpeta con archivos de panel .mzdash</value></data>
@@ -713,7 +700,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definición de dispositivo actualizada. Reinicia SimHub para aplicarla.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidad con Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Detección de la palanca activa (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Dispositivo háptico de pedales combinado</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Gráfico</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Ancho de banda</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Par</value></data>
@@ -850,4 +836,67 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Magenta pastel</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset de PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Todos los archivos (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>«{0}» aplicado al perfil activo</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Ajustes globales</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Los efectos de telemetría (vibración de motor, ABS y cambio de marcha a través de la base) requieren firmware de la base 1.2.10.10 o posterior. Esta base tiene {0}. Actualiza el firmware de la base en Pit House para usarlos.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Háptica S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Háptica de pedales S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Pestaña S12 del plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt por pedal</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combinado</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt requiere SimHub 9.12 o posterior: se usa la pestaña S12 del plugin.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Salida en vivo</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Duración del pulso</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Puerto 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Volante</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Panel</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Palanca de cambios</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Freno de mano</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Volante ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Base del volante</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % de pérdida</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Pestaña predeterminada</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Vibración mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Pestaña mBooster del plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt requiere SimHub 9.12 o posterior: se usa la pestaña mBooster del plugin.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster no añadido en SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Los pedales mBooster están conectados y configurados para ShakeIt, pero el dispositivo mBooster no se ha añadido en SimHub. Abra Dispositivos &gt; Añadir dispositivo &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Rango</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>CALIBRAR</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Fuente de movimiento</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Telemetría del juego</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Perfil de SimHub Motion</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Incluir hápticos de esquina de SimHub</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrado</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Manual</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>RESTABLECER</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Inactivo</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Esperando</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Preparado</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Soltando</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Cancelado</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibración automática</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} muestras</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Fuente del embrague</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pedal mBooster</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Punto de agarre del embrague</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Ancho</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Duración mínima (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Duración máxima (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Frecuencia de pulso (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Activar al</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Pisar</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Soltar</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Ambos</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Valor del juego</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Eje HID</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Dispositivo</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>FIJAR RANGO</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>LISTO</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Deslizador</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Dial</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Rueda</value></data>
 </root>

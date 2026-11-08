@@ -176,6 +176,9 @@ namespace MozaPlugin
             // keeps shutdown deterministic.
             Teardown("AB9 worker", () => { _ab9Worker?.Stop(); _ab9Worker = null; });
             Teardown("base LFE worker", () => { _baseLfeWorker?.Stop(); _baseLfeWorker = null; });
+            // Before the registry: its Dispose queues the disables for whatever
+            // this worker left playing.
+            Teardown("pedal-haptics worker", () => { _pedalHapticsWorker?.Stop(); _pedalHapticsWorker = null; });
             // Drop the coalescing timer for flash-backed wheel writes. Anything still
             // parked is already in the profile, so the next connect's apply carries it.
             Teardown("hardware applier shutdown", () => _hardwareApplier?.Shutdown());
@@ -197,6 +200,7 @@ namespace MozaPlugin
             // each connection. Must happen before MozaData is torn down so the
             // position-merge path (which writes to _data) doesn't race.
             Teardown("mBooster registry", () => { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; });
+            Teardown("clutch HID axis reader", DisposeBitePointHidReader);
             Teardown("routed mBooster probes", DisposeRoutedMBoosterProbes);
             // Pedal-haptics units — Dispose stops each unit's effect output, which queues
             // the disable frames before the pipe goes away, releases USB lanes' ports and

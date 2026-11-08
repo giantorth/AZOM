@@ -44,6 +44,9 @@ namespace MozaPlugin.UI
         // A pedal-haptics unit answered but none of its per-pedal devices has
         // been added under SimHub > Devices.
         ProfileNotAddedPedalHaptics,
+        // An mBooster answered with ShakeIt selected, but the mBooster device has
+        // not been added under SimHub > Devices.
+        ProfileNotAddedMBooster,
         // The motion controller is connected but SimHub's Motion plugin is off.
         MotionPluginDisabled,
         // The motion controller is connected but the active SimHub Motion setup has

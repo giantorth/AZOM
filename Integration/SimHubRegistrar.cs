@@ -57,6 +57,13 @@ namespace MozaPlugin.Integration
             });
             _plugin.AttachDelegate("AZOM.MaxAngle", () => (_plugin.Data?.MaxAngle ?? 0) * 2);
 
+            // Haptics trigger signals for effect formulas (S12 tab defaults use
+            // them). Lockup / slip: 0/1 from per-wheel speeds, 0 when the game
+            // reports none. RoadPosition: 0..100 stand-in for suspension travel.
+            _plugin.AttachDelegate("AZOM.WheelLockup", () => _plugin.HapticsWheelLockup);
+            _plugin.AttachDelegate("AZOM.WheelSlip", () => _plugin.HapticsWheelSlip);
+            _plugin.AttachDelegate("AZOM.RoadPosition", () => _plugin.HapticsRoadPosition);
+
             // Every wheelbase setting, in the same display units the Base-tab
             // sliders show (AZOM.FfbStrength is one of these — it kept its
             // historical percent scaling). Values track the device read-back,
@@ -93,6 +100,10 @@ namespace MozaPlugin.Integration
             // Clutch split point (issue #125) — the wheel overlay is the source
             // of truth; newer KS-family firmware drops the cmd-9 read-back.
             _plugin.AttachDelegate("AZOM.ClutchSplitPoint", () => CurrentClutchSplitPoint());
+            // mBooster clutch bite point for the current game (0..100, -1 when
+            // uncalibrated) and the calibration run's state name.
+            _plugin.AttachDelegate("AZOM.ClutchBitePoint", () => _plugin.CurrentClutchBitePointPct);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointCalibration", () => _plugin.BitePointCalibrationState.ToString());
             // Telemetry pipeline health, so users can show a degraded/parked state on
             // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
             // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
@@ -207,6 +218,11 @@ namespace MozaPlugin.Integration
                 _plugin.AddAction("AZOM.Ab9Layout" + layout.Suffix, (a, b) => SetAb9Layout(target));
             }
 
+            // mBooster clutch bite point for the current game: start/cancel a
+            // standing-start calibration, or clear the stored value.
+            _plugin.AddAction("AZOM.ClutchBitePointCalibrate", (a, b) => _plugin.ToggleBitePointCalibration());
+            _plugin.AddAction("AZOM.ClutchBitePointReset", (a, b) => _plugin.ResetClutchBitePoint());
+
             // Cycle the wheel's displayed dashboard (wraparound).
             _plugin.AddAction("AZOM.DashboardNext", (a, b) => CycleDashboard(+1));
             _plugin.AddAction("AZOM.DashboardPrev", (a, b) => CycleDashboard(-1));
@@ -249,8 +265,7 @@ namespace MozaPlugin.Integration
             // is what "work mode off" means for the base.
             _plugin.AddAction("AZOM.WorkModeOff", (a, b) =>
             {
-                if (_plugin.Data != null) _plugin.Data.WorkMode = 1;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 1);
+                _plugin.SetWorkMode(1);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode off (standby) via action");
             });
@@ -258,8 +273,7 @@ namespace MozaPlugin.Integration
             // normal active state.
             _plugin.AddAction("AZOM.WorkModeOn", (a, b) =>
             {
-                if (_plugin.Data != null) _plugin.Data.WorkMode = 0;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
+                _plugin.SetWorkMode(0);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode on via action");
             });
@@ -270,8 +284,7 @@ namespace MozaPlugin.Integration
                 var data = _plugin.Data;
                 if (data == null) return;
                 int val = data.WorkMode > 0 ? 0 : 1;
-                data.WorkMode = val;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
+                _plugin.SetWorkMode(val);
                 _plugin.SaveSettings();
                 MozaLog.Debug($"[AZOM] Work mode {(val == 0 ? "on" : "off (standby)")} via action");
             });
@@ -346,12 +359,17 @@ namespace MozaPlugin.Integration
             int b = _plugin.Data?.DashDisplayBrightness ?? -1;
             if (b < 0)
             {
-                var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-                b = profile?.DashDisplayBrightness ?? -1;
+                b = TargetsCm2Screen
+                    ? _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm2PageGuid)?.DashDisplayBrightness ?? -1
+                    : _plugin.ActiveWheelProfile?.DashDisplayBrightness ?? -1;
                 if (b < 0) b = _plugin.Settings?.DashDisplayBrightness ?? 100;
             }
             return b < 0 ? 0 : (b > 100 ? 100 : b);
         }
+
+        // Same screen choice as the push below: the CM2 when it has its own sender,
+        // else the wheel's screen.
+        private bool TargetsCm2Screen => _plugin.ActiveCm2Sender != null;
 
         // Apply an absolute display brightness, mirroring the slider's commit
         // path: update _data + active profile, push on session 0x02, persist.
@@ -361,7 +379,8 @@ namespace MozaPlugin.Integration
         {
             val = val < 0 ? 0 : (val > 100 ? 100 : val);
             if (_plugin.Data != null) _plugin.Data.DashDisplayBrightness = val;
-            _plugin.UpdateActiveProfile(p => p.DashDisplayBrightness = val);
+            if (TargetsCm2Screen) _plugin.UpdateDashProfile(MozaPlugin.Cm2PageGuid, p => p.DashDisplayBrightness = val);
+            else _plugin.UpdateActiveWheelProfile(p => p.DashDisplayBrightness = val);
             // FSR1 wheel display: brightness is a group-0x32 EEPROM param write.
             if (_plugin.IsFsr1DisplayWheel && _plugin.ActiveCm2Sender == null)
                 _plugin.SendFsr1DisplayBrightness(val);
@@ -454,7 +473,7 @@ namespace MozaPlugin.Integration
         }
 
         // Road sensitivity: step the 0..10 preset index (cf. the Base tab's
-        // sensitivity buttons / EqSensitivity_Click). There is no dedicated
+        // sensitivity selector / EqSensitivity_Changed). There is no dedicated
         // sensitivity register — a preset is the 0x0C value plus a canned EQ
         // curve, so both move together or the base ends up in a state the Base
         // tab can't represent. Legacy firmware gets only the six old registers.
@@ -500,13 +519,13 @@ namespace MozaPlugin.Integration
         // ===== Clutch split point (issue #125) =====
 
         // Current split point using the same source of truth as the wheel device
-        // page: the per-(profile x wheel-page) overlay first, because newer
+        // page: the wheel's own profile first, because newer
         // KS-family firmware silently drops the cmd-9 read-back, then the live
         // _data mirror, then the slider's 50 % default. Never returns a
         // sentinel, so the first nudge always moves from a real value.
         private int CurrentClutchSplitPoint()
         {
-            var overlay = _plugin.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            var overlay = _plugin.ActiveWheelProfile;
             int v = overlay?.WheelClutchPoint ?? -1;
             if (v < 0) v = _plugin.Data?.WheelClutchPoint ?? -1;
             if (v < 0) v = 50;
@@ -522,7 +541,7 @@ namespace MozaPlugin.Integration
             int val = ClampStep(current, delta, 0, 100);
             if (val == current) return; // saturated — skip the redundant flash write
             if (_plugin.Data != null) _plugin.Data.WheelClutchPoint = val;
-            _plugin.UpdateActiveWheelOverlay(o => o.WheelClutchPoint = val);
+            _plugin.UpdateActiveWheelProfile(o => o.WheelClutchPoint = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-clutch-point", val);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] Clutch split point → {val}% via action");

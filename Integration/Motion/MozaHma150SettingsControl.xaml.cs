@@ -16,7 +16,7 @@ namespace MozaPlugin.Integration.Motion
     /// HMA150 controller setup, shown inside SimHub Motion's controller settings: live
     /// status, port → corner assignment with identify and the port self-test, travel
     /// self-check, Max Available Stroke, rig dimensions, the Motion Effects sliders and
-    /// lighting. Everything here is stored on the controller, not in SimHub. Holds the
+    /// lighting, all stored on the controller; the motion source is the one SimHub output setting. Holds the
     /// lane's port open while loaded; refreshes every 500 ms.
     /// </summary>
     public partial class MozaHma150SettingsControl : UserControl
@@ -41,10 +41,13 @@ namespace MozaPlugin.Integration.Motion
         private bool _effectsLoaded;
         private bool _readsRequested;
         private MozaMotionController? _held;
+        private readonly MozaHma150Output? _output;
 
-        public MozaHma150SettingsControl()
+        public MozaHma150SettingsControl(MozaHma150Output? output = null)
         {
+            _output = output;
             InitializeComponent();
+            BuildSourceItems();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _timer.Tick += (_, __) => Refresh();
             Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); Refresh(); _timer.Start(); };
@@ -115,16 +118,18 @@ namespace MozaPlugin.Integration.Motion
                 if (s.RigLengthMm.HasValue) RigLengthBox.Text = s.RigLengthMm.Value.ToString("0", CultureInfo.CurrentCulture);
                 if (s.RigWidthMm.HasValue) RigWidthBox.Text = s.RigWidthMm.Value.ToString("0", CultureInfo.CurrentCulture);
             }
-            if (s != null && connected && !_effectsLoaded && s.RoadDetail.HasValue && s.Effects.All(e => e.HasValue))
+            // After the enrol: it decides whether defaults replace an all-zero controller.
+            if (s != null && connected && !_effectsLoaded && s.Phase != MotionLanePhase.Enrolling
+                && s.RoadDetail.HasValue && s.Effects.All(e => e.HasValue))
             {
-                // The active profile's values where it has them, else what the controller holds.
+                // The active profile's values where it has them, else the lane's defaults, else what the controller holds.
                 _effectsLoaded = true;
                 var profileEffects = MozaPlugin.Instance?.Settings?.ProfileStore?.CurrentProfile?.MotionEffects;
                 var desired = MozaPlugin.ToDesiredEffects(profileEffects);
                 for (int i = 0; i < _effectBoxes.Count; i++)
                 {
                     var held = i < s.Effects.Length ? s.Effects[i]!.Value : s.RoadDetail.Value;
-                    ShowEffect(_effectBoxes[i], desired[i] ?? held);
+                    ShowEffect(_effectBoxes[i], desired[i] ?? lane!.SeededEffect(i) ?? held);
                 }
                 int engine = profileEffects?.EngineVibrationStrength ?? -1;
                 int tactile = profileEffects?.TactileIntensity ?? -1;
@@ -135,6 +140,35 @@ namespace MozaPlugin.Integration.Motion
             }
             RefreshLighting(lane);
         }
+
+        // ------------------------------------------------------------ source
+
+        private void BuildSourceItems()
+        {
+            SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_GameTelemetry, Tag = MozaHma150Source.GameTelemetry });
+            SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_SimHubPose, Tag = MozaHma150Source.SimHubPose });
+            var settings = _output?.Settings;
+            SourceCombo.IsEnabled = settings != null;
+            SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
+            UpdateCornerHapticsEnabled();
+            SourceCombo.SelectionChanged += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null && SourceCombo.SelectedItem is ComboBoxItem item && item.Tag is MozaHma150Source source)
+                    s.Source = source;
+                UpdateCornerHapticsEnabled();
+            };
+            CornerHapticsCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
+            };
+        }
+
+        /// <summary>The haptics choice only applies to the pose source.</summary>
+        private void UpdateCornerHapticsEnabled()
+            => CornerHapticsCheck.IsEnabled = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
 
         // ------------------------------------------------------------ motion effects
 

@@ -34,6 +34,17 @@ namespace MozaPlugin.Devices
         private volatile int _applied = -1;       // -1 unknown / 0 active / 1 standby
         private const long FeedStaleMs = 3000;
 
+        // Write verification for every work-mode write (auto, UI, actions): the
+        // base can ignore a wake and stay in standby, so the value is read back
+        // on later PollStatus ticks and re-sent until it sticks or the budget
+        // runs out. Guarded by _applyLock.
+        private int _verifyTarget = -1;           // value awaiting confirmation; -1 = none
+        private int _verifyReadSeq = -1;          // WorkModeReadSeq when the verify read went out; -1 = not sent
+        private long _verifyWriteTicks;
+        private int _verifyAttempts;
+        private const int VerifyMaxAttempts = 6;
+        private const long VerifySettleMs = 2000; // let the base switch modes before reading back
+
         // Apply runs from DataUpdate, PollStatus and the UI: serialises the
         // check-then-write on _applied and the HID baseline. Leaf lock; the
         // write under it only enqueues.
@@ -106,10 +117,102 @@ namespace MozaPlugin.Devices
                 bool weStandbyed = _applied == 1;
                 _applied = -1;
                 if (!weStandbyed || !_detectionState.BaseDetected) return;
-                if (_data != null) _data.WorkMode = 0;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
+                WriteWorkModeLocked(0);
             }
             MozaLog.Info("[AZOM] Auto-standby disabled — waking base");
+        }
+
+        /// <summary>
+        /// Manual work-mode write (UI toggle, SimHub actions). Goes through the
+        /// coordinator so the write is read back and re-sent if the base ignores it.
+        /// </summary>
+        internal void SetWorkMode(int value)
+        {
+            lock (_applyLock)
+                WriteWorkModeLocked(value);
+        }
+
+        // Caller holds _applyLock. Arms readback verification when the write
+        // was actually dispatched.
+        private void WriteWorkModeLocked(int value)
+        {
+            if (_data != null) _data.WorkMode = value; // keep the UI toggle in sync
+            bool sent = _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", value);
+            _verifyTarget = sent ? value : -1;
+            _verifyReadSeq = -1;
+            _verifyAttempts = 0;
+            _verifyWriteTicks = DateTime.UtcNow.Ticks;
+        }
+
+        /// <summary>
+        /// Confirm the last work-mode write took. Called from PollStatus: one tick
+        /// sends <c>main-get-work-mode</c>, a later tick compares the reply with the
+        /// written value and re-sends on mismatch. Gives up after
+        /// <see cref="VerifyMaxAttempts"/> reads/re-sends, leaving
+        /// <see cref="MozaData.WorkMode"/> at the base's reported value.
+        /// </summary>
+        internal void VerifyWorkMode()
+        {
+            if (MozaPlugin.IsShuttingDown) return;
+            string? info = null, warn = null;
+            lock (_applyLock)
+            {
+                if (_verifyTarget < 0 || _data == null) return;
+                if (!_detectionState.BaseDetected) { _verifyTarget = -1; return; }
+
+                long now = DateTime.UtcNow.Ticks;
+                int seq = _data.WorkModeReadSeq;
+
+                if (_verifyReadSeq < 0)
+                {
+                    if ((now - _verifyWriteTicks) / TimeSpan.TicksPerMillisecond < VerifySettleMs) return;
+                    _verifyReadSeq = seq;
+                    _plugin.HardwareApplier.ReadIfBaseConnected("main-get-work-mode");
+                    return;
+                }
+
+                if (seq == _verifyReadSeq)
+                {
+                    // No reply yet — re-read within the same budget.
+                    if (++_verifyAttempts >= VerifyMaxAttempts)
+                    {
+                        warn = $"[AZOM] Work mode {_verifyTarget}: no readback from base after {_verifyAttempts} attempts — giving up";
+                        _verifyTarget = -1;
+                    }
+                    else
+                    {
+                        _plugin.HardwareApplier.ReadIfBaseConnected("main-get-work-mode");
+                    }
+                }
+                else
+                {
+                    int actual = _data.WorkMode;
+                    int target = _verifyTarget;
+                    if (actual == target) { _verifyTarget = -1; return; }
+
+                    if (++_verifyAttempts >= VerifyMaxAttempts)
+                    {
+                        warn = $"[AZOM] Work mode {target} not taken by base (still reports {actual}) after {_verifyAttempts} attempts — giving up";
+                        _verifyTarget = -1;
+                    }
+                    else
+                    {
+                        _data.WorkMode = target;
+                        if (_plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", target))
+                        {
+                            _verifyReadSeq = -1;
+                            _verifyWriteTicks = now;
+                            info = $"[AZOM] Work mode readback {actual} ≠ written {target} — re-sending ({_verifyAttempts}/{VerifyMaxAttempts - 1})";
+                        }
+                        else
+                        {
+                            _verifyTarget = -1;
+                        }
+                    }
+                }
+            }
+            if (info != null) MozaLog.Info(info);
+            if (warn != null) MozaLog.Warn(warn);
         }
 
         /// <summary>
@@ -165,8 +268,7 @@ namespace MozaPlugin.Devices
             if (_applied == desired) return null; // write only on change
 
             _applied = desired;
-            if (_data != null) _data.WorkMode = desired; // keep the UI toggle in sync
-            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", desired);
+            WriteWorkModeLocked(desired);
             return $"[AZOM] Auto-standby: {(desired == 1 ? $"standby (idle {idleMs / 1000}s >= {timeoutMin}m)" : "wake (active)")}";
         }
 

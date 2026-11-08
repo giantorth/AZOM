@@ -647,6 +647,24 @@ namespace MozaControls
         private bool _dragEndAnchor;
         private Canvas? _canvas;
 
+        // Drag modifiers: Ctrl scales pointer motion by FineDragFactor, Shift
+        // snaps the dragged value to multiples of SnapStep.
+        private const double FineDragFactor = 0.25;
+        private const double SnapStep = 5.0;
+        private Point _lastPointer;
+        // Dragged point minus pointer; only changes while Ctrl is held.
+        private Vector _fineOffset;
+
+        private static bool FineModifier => (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        private static bool SnapModifier => (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
+        private static double Snap(double v) => Math.Round(v / SnapStep) * SnapStep;
+
+        private Point DraggedPointCentre() => _dragEndAnchor
+            ? new Point(AnchorEndLeft + NodeHalf, AnchorEndTop + NodeHalf)
+            : new Point((double)GetValue(NodeXProperties[_dragNode]) + NodeHalf,
+                        (double)GetValue(NodeYProperties[_dragNode]) + NodeHalf);
+
         private void HookCanvas()
         {
             _canvas = GetTemplateChild("PART_Canvas") as Canvas;
@@ -671,7 +689,18 @@ namespace MozaControls
             if (_dragNode >= 0 || _dragEndAnchor)
             {
                 _canvas.CaptureMouse();
-                ApplyDrag(p);
+                _lastPointer = p;
+                if (FineModifier)
+                {
+                    // Fine drags start from the node itself rather than jumping
+                    // it to the pointer.
+                    _fineOffset = DraggedPointCentre() - p;
+                }
+                else
+                {
+                    _fineOffset = new Vector();
+                    ApplyDrag(p);
+                }
                 e.Handled = true;
             }
         }
@@ -680,7 +709,10 @@ namespace MozaControls
         {
             if ((_dragNode < 0 && !_dragEndAnchor) || _canvas == null) return;
             if (e.LeftButton != MouseButtonState.Pressed) { _canvas.ReleaseMouseCapture(); EndDrag(); return; }
-            ApplyDrag(e.GetPosition(_canvas));
+            var p = e.GetPosition(_canvas);
+            if (FineModifier) _fineOffset -= (p - _lastPointer) * (1 - FineDragFactor);
+            _lastPointer = p;
+            ApplyDrag(p + _fineOffset);
         }
 
         private void OnMouseUp(object sender, MouseButtonEventArgs e)
@@ -749,13 +781,17 @@ namespace MozaControls
 
         private void ApplyDrag(Point p)
         {
+            bool snap = SnapModifier;
+
             // Top-right anchor: vertical only, and it moves SpanHigh rather
             // than any node (see AnchorEndDraggableInY). Never below SpanLow,
             // the curve's own start point.
             if (_dragEndAnchor)
             {
                 double lo = double.IsNaN(SpanLow) ? YMin : SpanLow;
-                SpanHigh = Math.Round(Math.Max(lo, Math.Min(YMax, PointerToAxisValue(p))));
+                double a = PointerToAxisValue(p);
+                if (snap) a = Snap(a);
+                SpanHigh = Math.Round(Math.Max(lo, Math.Min(YMax, a)));
                 return;
             }
 
@@ -773,7 +809,9 @@ namespace MozaControls
                 // Node values are stored in axis units, or as a percentage of
                 // SpanLow..SpanHigh when that's in use — convert the pointer
                 // back into whichever, then clamp in that same space.
+                // Snap acts on the axis value shown in the node.
                 double axisValue = PointerToAxisValue(p);
+                if (snap) axisValue = Snap(axisValue);
                 double storedMin = span ? 0.0 : YMin;
                 double storedMax = span ? 100.0 : YMax;
                 double v = span
@@ -806,6 +844,7 @@ namespace MozaControls
                 double plotW = Math.Max(1, w - PadLeft - PadRight);
                 double x01 = (p.X - PadLeft) / (0.98 * plotW);
                 double dataX = x01 * 100.0;
+                if (snap) dataX = Snap(dataX);
 
                 double lo, hi;
                 if (EndpointRangeMode)

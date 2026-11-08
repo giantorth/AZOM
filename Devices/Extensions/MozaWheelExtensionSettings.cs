@@ -68,23 +68,18 @@ namespace MozaPlugin.Devices.Extensions
 
         /// <summary>
         /// Capture current wheel state from the plugin. When <paramref name="profile"/>
-        /// and <paramref name="pageModelPrefix"/> are provided, capture from the
-        /// profile's overlay for that page GUID instead of the flat-field path —
-        /// the new R5 source of truth.
+        /// (this page's current wheel profile) and <paramref name="pageModelPrefix"/>
+        /// are provided, capture from that profile instead of the flat-field path.
         /// </summary>
         public void CaptureFromCurrent(MozaPluginSettings settings, MozaData data,
-            MozaProfile? profile = null, string? pageModelPrefix = null)
+            MozaWheelProfile? profile = null, string? pageModelPrefix = null)
         {
             if (!data.BaseSettingsRead) return;
 
-            // If we have a profile + page identity, capture from the overlay
-            // rather than flat fields. The overlay is the new source of truth.
             if (profile != null && !string.IsNullOrEmpty(pageModelPrefix)
-                && TryGetPageGuid(pageModelPrefix!, out var pageGuid)
-                && profile.WheelOverridesByPageGuid != null
-                && profile.WheelOverridesByPageGuid.TryGetValue(pageGuid, out var ov)
-                && ov != null)
+                && TryGetPageGuid(pageModelPrefix!, out var pageGuid))
             {
+                var ov = profile;
                 // Sleep-light + idle-effect/speed bundles are keyed by the same
                 // page GUID on the shared MozaPluginSettings dicts (per-wheel-page,
                 // not per-game).
@@ -94,7 +89,7 @@ namespace MozaPlugin.Devices.Extensions
                 WheelIdleSettings? idle = null;
                 if (settings.WheelIdleByPageGuid != null)
                     settings.WheelIdleByPageGuid.TryGetValue(pageGuid, out idle);
-                CaptureFromOverlay(ov, data, sleep, idle);
+                CaptureFromProfile(ov, data, sleep, idle);
                 return;
             }
 
@@ -142,13 +137,13 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Apply these settings into the profile's wheel-page overlay (single
+        /// Apply these settings into this page's current wheel profile (single
         /// source of truth) and mirror colors into <paramref name="data"/> so the
         /// UI sees them immediately. Does NOT write to hardware — caller routes
         /// through <c>ApplyWheelToHardware</c> after this.
         /// </summary>
         public void ApplyTo(MozaPluginSettings settings, MozaData data,
-            MozaProfile? profile = null, string? pageModelPrefix = null)
+            MozaWheelProfile? profile = null, string? pageModelPrefix = null)
         {
             // Migration is one-shot. The plugin settings file (bundle + overlay)
             // is the authoritative source for the user's wheel-LED / sleep /
@@ -167,26 +162,14 @@ namespace MozaPlugin.Devices.Extensions
             MozaLog.Info($"[AZOM] APPLYTO: prefix='{pageModelPrefix ?? "(null)"}' Drained={(settings?.WheelExtensionDrained == true)} dtoSleepTimeoutMin={WheelSleepTimeoutMin}");
             if (settings != null && settings.WheelExtensionDrained) return;
 
-            // Write into the profile's overlay for this page GUID. No-op when the
-            // profile or page GUID can't be resolved (extension's SetSettings
-            // arrived before profile system initialized — the extension JSON on
-            // disk still has the values, so they'll re-apply on next call).
+            // Write into this page's wheel profile. No-op when the profile or page
+            // GUID can't be resolved (extension's SetSettings arrived before the
+            // profile system initialized — the extension JSON on disk still has the
+            // values, so they'll re-apply on next call).
             if (profile != null && !string.IsNullOrEmpty(pageModelPrefix)
                 && TryGetPageGuid(pageModelPrefix!, out var pageGuid))
             {
-                var overrides = profile.WheelOverridesByPageGuid;
-                if (overrides == null || !overrides.TryGetValue(pageGuid, out var ov) || ov == null)
-                {
-                    // COW swap — the profile store serializes this dict concurrently;
-                    // never Add in place (same rule as the sleep bundle below).
-                    ov = new WheelOverride();
-                    var next = overrides == null
-                        ? new Dictionary<Guid, WheelOverride>()
-                        : new Dictionary<Guid, WheelOverride>(overrides);
-                    next[pageGuid] = ov;
-                    profile.WheelOverridesByPageGuid = next;
-                }
-                MergeIntoOverlay(ov);
+                MergeIntoProfile(profile);
 
                 // Sleep-light bundle is per-wheel-page (NOT per-game), so it
                 // lives on MozaPluginSettings.WheelSleepByPageGuid. The plugin
@@ -283,7 +266,7 @@ namespace MozaPlugin.Devices.Extensions
         /// the generic wheel page). Returns false for unknown / unresolvable
         /// prefixes; callers should fall back to the legacy slot/flat path.
         /// </summary>
-        private static bool TryGetPageGuid(string modelPrefix, out Guid guid)
+        internal static bool TryGetPageGuid(string modelPrefix, out Guid guid)
         {
             guid = Guid.Empty;
             if (modelPrefix == null) return false;
@@ -297,9 +280,9 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Copy non-sentinel fields from this DTO into the given overlay.
-        /// FILL-ONLY: a DTO value only writes into the overlay when the overlay
-        /// field is still at its sentinel. The overlay (under the profile in
+        /// Copy non-sentinel fields from this DTO into the given wheel profile.
+        /// FILL-ONLY: a DTO value only writes into the profile when the profile
+        /// field is still at its sentinel. The profile (in
         /// MozaPluginSettings) is loaded before SetSettings fires, so the
         /// user's most recent value is already in place when this runs — and
         /// the device JSON can lag behind (SimHub doesn't always call
@@ -307,7 +290,7 @@ namespace MozaPlugin.Devices.Extensions
         /// the cause of user picks (sleep timeout, RPM colors, etc.) randomly
         /// vanishing across restarts.
         /// </summary>
-        private void MergeIntoOverlay(WheelOverride ov)
+        private void MergeIntoProfile(MozaWheelProfile ov)
         {
             if (ov.WheelTelemetryMode      < 0 && WheelTelemetryMode      >= 0) ov.WheelTelemetryMode      = WheelTelemetryMode;
             if (ov.WheelKnobLedMode        < 0 && WheelKnobLedMode        >= 0) ov.WheelKnobLedMode        = WheelKnobLedMode;
@@ -344,12 +327,12 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Populate this DTO from an overlay + per-page sleep bundle — the
-        /// reverse of MergeIntoOverlay (plus the per-page dict write). Used
+        /// Populate this DTO from a wheel profile + per-page sleep bundle — the
+        /// reverse of MergeIntoProfile (plus the per-page dict write). Used
         /// by GetSettings so SimHub's persisted device-page JSON reflects
         /// the live state.
         /// </summary>
-        internal void CaptureFromOverlay(WheelOverride ov, MozaData data,
+        internal void CaptureFromProfile(MozaWheelProfile ov, MozaData data,
             WheelSleepSettings? sleep = null, WheelIdleSettings? idle = null)
         {
             WheelModelName = data.WheelModelName ?? "";

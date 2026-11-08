@@ -4,6 +4,7 @@
              xmlns:ctrl="clr-namespace:MozaControls"
              xmlns:res="clr-namespace:MozaPlugin.Resources"
              xmlns:ui="clr-namespace:MozaPlugin.UI"
+             xmlns:profilescommon="clr-namespace:SimHub.Plugins.ProfilesCommon;assembly=SimHub.Plugins"
              Padding="14"
              TextElement.Foreground="{DynamicResource TextBrush}"
              TextElement.FontFamily="{DynamicResource FontUi}"
@@ -56,6 +57,12 @@
                  profile-not-added, telemetry parked/degraded) — surfaced here so
                  users who only visit the device page still see them. -->
             <ui:PluginBanners/>
+
+            <!-- This wheelbase's own profile list (bound in code-behind). -->
+            <StackPanel x:Name="DeviceProfileRow" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Margin="0,4,0,8" Visibility="Collapsed">
+                <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
+            </StackPanel>
 
             <!-- Detection status -->
             <StackPanel x:Name="BaseAmbientNotDetectedPanel">

@@ -2,6 +2,74 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.3]
+
+## Highlights
+
+- **mBooster pedals as a SimHub ShakeIt device;** pick the plugin tab or ShakeIt in Options, one channel per pedal role.
+- **New Clutch Bite Point ShakeIt effect for every ShakeIt Motors and Bass Shakers device** (mBooster, PHF, bass shakers and more); pulses as the clutch crosses its bite point, with adjustable width, pulse length, pulse rate and press/release direction.
+- **Clutch bite point calibration per game and vehicle;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch, a formula or any HID axis.
+- **Each device page has its own profile selector** (wheel, wheelbase, CM2/CM1 dash); existing profiles are copied to every device on first launch.
+
+## Added
+
+### Haptics and motion
+
+- **S12 Haptics tab drives the pedal shakers without ShakeIt;** one card per S12 channel, picked in Options alongside the ShakeIt layouts.
+- **Pulse rate setting for the mBooster tab's Bite Point;** sets how fast the Smoothness ripple throbs, and existing setups keep their current feel.
+- **`AZOM.WheelLockup`, `AZOM.WheelSlip` and `AZOM.RoadPosition` properties** for haptics formulas.
+- **Options shows when wheelbase firmware is too old for telemetry effects** (needs 1.2.10.10+), next to the LFE source selector.
+- **Motion source setting for the motion platform;** stream the SimHub Motion profile instead of raw game telemetry, e.g. for flight sims.
+
+### Wheel, wheelbase and dashboards
+
+- **"Global settings" toggle on the wheel's RPM, Buttons and Knobs tabs** stores that tab's LED settings for the wheel instead of per profile.
+- **Cancel button for dashboard uploads** on the Files tab; stops the transfer and closes the wheel's upload session.
+- **FFB EQ sensitivity selector highlights the active preset;** a custom position lights up once the EQ is edited.
+
+### Settings UI and updates
+
+- **Default tab setting in Options** picks which tab the plugin opens on.
+- **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
+- **Updates card shows the changelog of the selected release channel;** replaces the separate release-notes box.
+
+## Changed
+
+- **Pedals tab shows all three pedals side by side;** each column has its live input, curve, direction and range slider, with calibrate in the card header.
+- **SimHub Motion no longer lifts the HMA150 when SimHub starts;** the motion setup's start mode is switched once from "Last" to "Off", so motion waits for Enable. Set it back in SimHub's Motion power settings if you prefer.
+
+## Fixed
+
+### Dashboards and displays
+
+- **CM2 dashboard uploads no longer stall at 0%;** upload data now goes to the dash instead of the wheel.
+- **CM2 switches dashboards with its profile;** the selected dashboard is saved to the active profile and recalled on every switch.
+- **Uploading or deleting a dashboard no longer removes the wheel's other dashboards;** the dashboard list waits until the wheel's state has fully arrived, and a stalled transfer now reconnects within about 15 s.
+- **Re-uploading an edited dashboard sends the edit;** the file is re-read at upload time instead of reusing the copy from when it was picked.
+- **Dashboard preview image refreshes after the dashboard is edited;** a save in Studio re-renders it instead of showing the old picture.
+- **Wheel dashboard fields no longer show the wrong channel after the wheel reconnects;** the plugin re-reads the wheel's channel list instead of reusing the old one.
+
+### Pedals, haptics and motion
+
+- **mBooster Clutch Bite Point pulses only around the bite point** instead of buzzing whenever the clutch is up; Width, pulse length and press/release direction are adjustable.
+- **Pedals wired into an S12 pedal vibration unit are detected;** settings and live positions now come through the S12's USB port.
+- **Pedal bars no longer stick at a wheelbase's idle value** when the pedals are attached to another device.
+- **Motion platform moves when its effects are all at 0;** default Motion Effects are written unless the profile sets them.
+
+### Wheelbase, hub and detection
+
+- **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.
+- **Wheelbase standby/wake is read back and re-sent** if the base ignores it, so a base left in standby wakes on connect.
+- **Device detection no longer writes to non-MOZA COM ports** (Bluetooth, motherboard serial, other adapters); on Windows only MOZA ports are probed.
+- **Hub tab shows the device on each port;** all four accessory ports plus the pedal port, with link loss.
+- **Base tab hides when no wheelbase is detected,** like the other device tabs.
+
+### Settings UI and updates
+
+- **Options tab controls line up;** toggles and selectors in each column start at the same position.
+- **Dismissing an update notification sticks across restarts;** it reappears only when a newer version is published.
+- **Beta builds are no longer offered an older stable release;** only switching the channel back to Stable offers the downgrade.
+
 ## [1.7.2]
 
 ## Added

@@ -124,20 +124,26 @@ namespace MozaPlugin.Devices.Extensions
             _ledDriver?.UpdateConnectionState();
         }
 
+        /// <summary>This dash's own profile store (CM2 or CM1).</summary>
+        private Guid PageGuid =>
+            Settings.DeviceProfileCoordinator.DashPageGuidFor(LinkedDevice?.DeviceDescriptor?.DeviceTypeID);
+
         public override void LoadDefaultSettings()
         {
             _settings = new MozaDashExtensionSettings();
 
             var plugin = MozaPlugin.Instance;
             if (plugin != null)
-                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data, plugin.Settings?.ProfileStore?.CurrentProfile);
+                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data,
+                    plugin.DeviceProfiles?.DashProfileFor(PageGuid, seed: false));
         }
 
         public override JToken GetSettings()
         {
             var plugin = MozaPlugin.Instance;
             if (plugin != null)
-                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data, plugin.Settings?.ProfileStore?.CurrentProfile);
+                _settings.CaptureFromCurrent(plugin.Settings, plugin.Data,
+                    plugin.DeviceProfiles?.DashProfileFor(PageGuid, seed: false));
 
             return JToken.FromObject(_settings);
         }
@@ -150,13 +156,13 @@ namespace MozaPlugin.Devices.Extensions
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin != null)
-                    plugin.HardwareApplier.ApplyDashExtensionSettings(_settings);
+                    plugin.HardwareApplier.ApplyDashExtensionSettings(_settings, PageGuid);
             }
         }
 
         public override Control CreateSettingControl()
         {
-            return new MozaDashSettingsControl();
+            return new MozaDashSettingsControl { DashPageGuid = PageGuid };
         }
 
         public override IEnumerable<DynamicButtonAction> GetDynamicButtonActions()

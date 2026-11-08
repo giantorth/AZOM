@@ -50,6 +50,19 @@ namespace MozaPlugin.Devices.Motion
         /// <summary>Engine vibration strength used while the profile sets none (the "iRacing gt3" preset's).</summary>
         public const int DefaultEngineStrengthPercent = 50;
 
+        /// <summary>
+        /// Effect values written when the controller holds zero intensity on every motion slot and the
+        /// profile sets none (the "iRacing gt3" preset's), per <see cref="MozaMotionProtocol.EffectSlots"/>.
+        /// </summary>
+        private static readonly MotionEffect[] DefaultEffects =
+        {
+            new MotionEffect(0.28f, 0.90f),
+            new MotionEffect(0.72f, 0.84f),
+            new MotionEffect(0.54f, 0.80f),
+            new MotionEffect(0.53f, 1.00f),
+            new MotionEffect(0.39f, 1.00f),
+        };
+
         private readonly MozaSerialConnection _connection;
         private readonly Func<bool> _isShuttingDown;
         private readonly Thread _worker;
@@ -82,6 +95,7 @@ namespace MozaPlugin.Devices.Motion
         private readonly float[] _effectSmoothness = new float[MozaMotionProtocol.EffectSlots.Length];
         private float _roadIntensity = float.NaN, _roadSmoothness = float.NaN;
         private MotionEffect?[]? _desiredEffects;
+        private volatile bool _seedDefaultEffects;
         private float _desiredEngineStrength = float.NaN, _desiredTactile = float.NaN;
         private int _desiredPushes;
         private long _lastDesiredCheckMs;
@@ -259,7 +273,8 @@ namespace MozaPlugin.Devices.Motion
 
         /// <summary>
         /// The active profile's effect values, per <see cref="MozaMotionProtocol.EffectSlots"/>
-        /// entry then road detail; null entries are left as the controller holds them. Written
+        /// entry then road detail; null entries are left as the controller holds them, unless it
+        /// holds no motion at all (<see cref="SeededEffect"/>). Written
         /// now if enrolled, otherwise once the next enrol has read the current values.
         /// <paramref name="tactile"/> (0..1, null = leave) is also written as the controller's
         /// Haptic Feedback Intensity; with <paramref name="engineStrength"/> it scales the
@@ -293,16 +308,17 @@ namespace MozaPlugin.Devices.Motion
         /// </summary>
         private void PushDesiredEffects()
         {
-            var desired = Volatile.Read(ref _desiredEffects);
-            if (desired == null || !_connection.IsConnected) return;
+            if (!_connection.IsConnected) return;
             if (_phase == MotionLanePhase.Enrolling || _phase == MotionLanePhase.Disconnected) return;
             if (_desiredPushes >= DesiredPushAttempts) return;
+            var desired = Volatile.Read(ref _desiredEffects);
             int slots = MozaMotionProtocol.EffectSlots.Length;
             bool any = false;
             for (int i = 0; i <= slots; i++)
             {
-                if (!desired[i].HasValue) continue;
-                var want = desired[i]!.Value;
+                var target = desired?[i] ?? SeededEffect(i);
+                if (!target.HasValue) continue;
+                var want = target.Value;
                 float curI = i < slots ? Volatile.Read(ref _effectIntensity[i]) : Volatile.Read(ref _roadIntensity);
                 float curS = i < slots ? Volatile.Read(ref _effectSmoothness[i]) : Volatile.Read(ref _roadSmoothness);
                 if (Math.Abs(curI - want.Intensity) < 0.001f && Math.Abs(curS - want.Smoothness) < 0.001f) continue;
@@ -326,6 +342,21 @@ namespace MozaPlugin.Devices.Motion
                 _paced.Enqueue(MozaMotionProtocol.BuildGlobalRead(MozaMotionProtocol.GlobalHapticIntensity));
             }
             if (any) _desiredPushes++;
+        }
+
+        /// <summary>
+        /// The default for effect <paramref name="index"/> (road detail = last) when this enrol found
+        /// every motion slot at zero intensity; null otherwise. Road detail has no default: 0 is a
+        /// normal setting for it.
+        /// </summary>
+        public MotionEffect? SeededEffect(int index)
+            => _seedDefaultEffects && index >= 0 && index < DefaultEffects.Length ? DefaultEffects[index] : (MotionEffect?)null;
+
+        private bool MotionSlotsBlank()
+        {
+            for (int i = 0; i < MozaMotionProtocol.EffectSlots.Length; i++)
+                if (!(Volatile.Read(ref _effectIntensity[i]) == 0f)) return false;
+            return true;
         }
 
         /// <summary>Motion Effects slider pair (0..1 each); the controller keeps it across power cycles. Read back.</summary>
@@ -671,6 +702,7 @@ namespace MozaPlugin.Devices.Motion
                 Interlocked.Exchange(ref _portWord[p], 0);
             }
             ResetEffects();
+            _seedDefaultEffects = false;
             _desiredPushes = 0;
             _vibrating = false;
             while (_paced.TryDequeue(out _)) { }
@@ -747,9 +779,13 @@ namespace MozaPlugin.Devices.Motion
             SendRunState(MotionRunState.Stop);
             Send(MozaMotionProtocol.BuildDeviceType());
             _lastIssues = CurrentIssues();
+            // Zero intensity on every slot: the controller moves nothing.
+            _seedDefaultEffects = MotionSlotsBlank();
             _phase = MotionLanePhase.Ready;
             MozaLog.Info($"[AZOM/Motion] Enrolled {_model} fw {_fw}, mode {_modeCurrent}, "
                 + $"{CountPresent()} actuators");
+            if (_seedDefaultEffects)
+                MozaLog.Info("[AZOM/Motion] Controller holds no motion effects; defaults apply where the profile sets none");
             PushDesiredEffects();
         }
 

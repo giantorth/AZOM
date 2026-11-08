@@ -240,9 +240,6 @@ namespace MozaPlugin.UI
 
                 // Connection pill initial sync
                 UpdateConnectionPill();
-
-                // Pedal sub-selector starts on Throttle
-                SelectPedalGroup("throttle");
             }
             catch (Exception ex)
             {
@@ -645,30 +642,6 @@ namespace MozaPlugin.UI
             if (bps < 1024) return $"{bps:F0} B/s";
             if (bps < 1024 * 1024) return $"{bps / 1024:F1} KB/s";
             return $"{bps / (1024.0 * 1024):F2} MB/s";
-        }
-
-        // -------- Pedal sub-selector --------
-
-        private void PedalSelector_Throttle_Click(object sender, RoutedEventArgs e) => SelectPedalGroup("throttle");
-        private void PedalSelector_Brake_Click(object sender, RoutedEventArgs e) => SelectPedalGroup("brake");
-        private void PedalSelector_Clutch_Click(object sender, RoutedEventArgs e) => SelectPedalGroup("clutch");
-
-        private string _pedalGroup = "throttle";
-
-        private void SelectPedalGroup(string which)
-        {
-            if (ThrottlePedalGroup == null || BrakePedalGroup == null || ClutchPedalGroup == null) return;
-            _pedalGroup = which;
-            ThrottlePedalGroup.Visibility = which == "throttle" ? Visibility.Visible : Visibility.Collapsed;
-            BrakePedalGroup.Visibility    = which == "brake"    ? Visibility.Visible : Visibility.Collapsed;
-            ClutchPedalGroup.Visibility   = which == "clutch"   ? Visibility.Visible : Visibility.Collapsed;
-
-            // Restyle the chips — selected one gets the primary cyan, others ghost
-            var primary = (Style)FindResource("MozaButtonPrimary");
-            var ghost   = (Style)FindResource("MozaButtonGhost");
-            PedalSelectorThrottle.Style = which == "throttle" ? primary : ghost;
-            PedalSelectorBrake.Style    = which == "brake"    ? primary : ghost;
-            PedalSelectorClutch.Style   = which == "clutch"   ? primary : ghost;
         }
 
         // -------- Full Diagnostic Report expander handler --------

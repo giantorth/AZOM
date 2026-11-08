@@ -33,7 +33,7 @@ namespace MozaPlugin.Devices.Extensions
         /// rather than the flat-field path.
         /// </summary>
         public void CaptureFromCurrent(MozaPluginSettings settings, MozaData data,
-            MozaProfile? profile = null)
+            MozaDashProfile? profile = null)
         {
             if (!data.BaseSettingsRead) return;
 
@@ -72,7 +72,7 @@ namespace MozaPlugin.Devices.Extensions
         /// UI sees them immediately. Does NOT write to hardware — caller routes
         /// through <c>ApplyDashToHardware</c> after this.
         /// </summary>
-        public void ApplyTo(MozaPluginSettings settings, MozaData data, MozaProfile? profile = null)
+        public void ApplyTo(MozaPluginSettings settings, MozaData data, MozaDashProfile? profile = null)
         {
             // Indicator/display modes are device-read state — UI binds to _data.
             if (DashRpmIndicatorMode   >= 0) data.DashRpmIndicatorMode   = DashRpmIndicatorMode;

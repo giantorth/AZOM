@@ -2473,10 +2473,9 @@ namespace MozaPlugin.Protocol
             // narrowing further down can never fire and the sweep would run over
             // every COM symlink in the prefix.
             //
-            // The registry deliberately does NOT stop here. It lists only devices
-            // that bound usbser, so a MOZA behind a different driver is invisible
-            // to it and the probe still adds information; Windows keeps the
-            // existing per-port narrowing below.
+            // The registry does not stop here: Enumerate() lists only usbser
+            // ports, so a MOZA serial interface on another driver still needs
+            // the probe. The sweep below is scoped to exactly those ports.
             if (MozaPortDiscovery.Instance.Source == MozaDiscoverySource.Sysfs)
             {
                 MozaLog.DebugIfChanged($"probe-skip-enumerated:{laneLabel}",
@@ -2492,39 +2491,56 @@ namespace MozaPlugin.Protocol
                 return (null, null, false, null);
             }
 
-            // Probe-based discovery: try opening each COM port and sending a Moza read command.
-            // This works under Proton/Wine where COM ports are symlinked to /dev/ttyACM*.
-            // We probe high-numbered ports first since Wine maps ttyACM devices to COM33+.
-            var ports = SerialPort.GetPortNames();
+            // Probe-based discovery: open each candidate port and send a Moza read
+            // command. The probe writes MOZA frames into whatever it opens, so a
+            // port we can prove isn't ours must never be touched (bug reports
+            // A6N521CS / QR3760VJ: a DIY pedal seized; BFNAZB57: COM1/COM7 written
+            // every 5 min).
+            string[] ports;
+            bool registryScoped = MozaPortDiscovery.Instance.TryGetProbeCandidates(out var candidates);
+            if (registryScoped)
+            {
+                // Native Windows: only a MOZA serial interface on a non-usbser
+                // driver can be worth a probe; every other port is provably foreign.
+                var scoped = new List<string>(candidates.Count);
+                for (int i = 0; i < candidates.Count; i++)
+                    if (pidFilter == null || pidFilter(FormatPid(candidates[i].Pid)))
+                        scoped.Add(candidates[i].PortName);
+                if (scoped.Count == 0)
+                {
+                    MozaLog.DebugIfChanged($"probe-skip-registry:{laneLabel}",
+                        $"[AZOM] [{laneLabel}] No matching MOZA device in registry and no MOZA serial port on another driver — not probing");
+                    return (null, null, false, null);
+                }
+                ports = scoped.ToArray();
+            }
+            else
+            {
+                ports = SerialPort.GetPortNames();
+
+                // Drop ports the registry attributes to another vendor's usbser
+                // device. Empty under Wine, where the sweep keeps its full reach.
+                var foreignVids = MozaPortDiscovery.Instance.ForeignPortVids();
+                if (foreignVids.Count > 0)
+                {
+                    var mine = new List<string>(ports.Length);
+                    for (int i = 0; i < ports.Length; i++)
+                        if (!foreignVids.ContainsKey(ports[i])) mine.Add(ports[i]);
+                    if (mine.Count != ports.Length)
+                    {
+                        MozaLog.DebugIfChanged($"probe-skip-foreign:{laneLabel}",
+                            $"[AZOM] [{laneLabel}] Skipping {ports.Length - mine.Count} non-MOZA COM port(s); probing {mine.Count}");
+                        ports = mine.ToArray();
+                    }
+                }
+            }
+            // High-numbered ports first: Wine maps ttyACM devices to COM33+.
             Array.Sort(ports, (a, b) =>
             {
                 int na = ExtractPortNumber(a);
                 int nb = ExtractPortNumber(b);
-                return nb.CompareTo(na); // Descending - check high ports first
+                return nb.CompareTo(na);
             });
-
-            // Drop ports the registry attributes to ANOTHER vendor. The probe
-            // opens a port and writes MOZA frames into it, so a port we can prove
-            // isn't ours must never be touched: doing so holds the device away
-            // from SimHub's own scanner and injects foreign bytes into its stream
-            // (bug reports A6N521CS / QR3760VJ — a DIY pedal set among four ports
-            // seized in one sweep). Ports the registry cannot identify are still
-            // probed, which is what keeps the Wine/by-id path working: sysfs
-            // filters to the MOZA VID at the source, so ForeignPortVids is empty
-            // there and this is a no-op.
-            var foreignVids = MozaPortDiscovery.Instance.ForeignPortVids();
-            if (foreignVids.Count > 0)
-            {
-                var mine = new List<string>(ports.Length);
-                for (int i = 0; i < ports.Length; i++)
-                    if (!foreignVids.ContainsKey(ports[i])) mine.Add(ports[i]);
-                if (mine.Count != ports.Length)
-                {
-                    MozaLog.DebugIfChanged($"probe-skip-foreign:{laneLabel}",
-                        $"[AZOM] [{laneLabel}] Skipping {ports.Length - mine.Count} non-MOZA COM port(s); probing {mine.Count}");
-                    ports = mine.ToArray();
-                }
-            }
 
             // Reset blocked-probe backoff for ports that have left the
             // enumeration since the last sweep: an unplug/replug may be
@@ -2570,7 +2586,10 @@ namespace MozaPlugin.Protocol
                 return (null, null, false, null);
             }
 
-            if (allRegistryPorts.Count == 0)
+            if (registryScoped)
+                MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
+                    $"[AZOM] [{laneLabel}] Probing MOZA serial port(s) on a non-usbser driver: {string.Join(", ", ports)}");
+            else if (allRegistryPorts.Count == 0)
                 MozaLog.DebugIfChanged($"probe-fallback:{laneLabel}",
                     $"[AZOM] [{laneLabel}] No MOZA device in registry, falling back to serial probe");
             else

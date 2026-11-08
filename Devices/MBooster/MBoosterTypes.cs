@@ -119,6 +119,37 @@ namespace MozaPlugin.Devices.MBooster
         public const float BitePointTriggerMinPct = 0f;
         public const float BitePointTriggerMaxPct = 100f;
 
+        // Bite Point's Width slider bounds: clutch travel (%) either side of
+        // the bite point that triggers the pulse (MBoosterBitePointTrigger).
+        public const int BitePointWidthMinPct = 1;
+        public const int BitePointWidthMaxPct = 25;
+        public const int BitePointWidthDefaultPct = 5;
+
+        // Bite Point's pulse length bounds (MBoosterBitePointTrigger): at
+        // least Min even when the clutch passes straight through the zone, at
+        // most Max even when it rests there.
+        public const int BitePointMinLengthMinMs = 0;
+        public const int BitePointMinLengthMaxMs = 1000;
+        public const int BitePointMinLengthDefaultMs = 100;
+        public const int BitePointMaxLengthMinMs = 100;
+        public const int BitePointMaxLengthMaxMs = 10000;
+        public const int BitePointMaxLengthDefaultMs = 1500;
+
+        // Bite Point's Pulse rate slider bounds: how fast the Smoothness ripple
+        // throbs. 25 Hz is the most a 50 Hz motor stream can carry; 0 is steady.
+        public const int BitePointPulseRateMinHz = 0;
+        public const int BitePointPulseRateMaxHz = 25;
+        public const int BitePointPulseRateDefaultHz = 10;
+
+        /// <summary>
+        /// The ripple rate a Bite Point with no Pulse rate set plays: before the
+        /// setting existed the ripple ran at the tone frequency but was only
+        /// sampled every 20 ms, so it played the beat against 50 Hz (40 Hz → -10).
+        /// Signed, so untouched profiles reproduce that output exactly.
+        /// </summary>
+        public static double BitePointLegacyPulseRateHz(double toneHz) =>
+            toneHz - 50.0 * Math.Round(toneHz / 50.0);
+
         // Brake Fade's Onset Temperature slider bounds, in the same unit
         // BrakeTempC normalizes to (Celsius) — see
         // MBoosterEffectSettings.BrakeFadeOnsetC. Real fade onset varies
@@ -312,19 +343,37 @@ namespace MozaPlugin.Devices.MBooster
 
         // Threshold: 50..100 (MBoosterUiConstants.ThresholdTriggerMinPct/
         // MaxPct) — the brake position (%) at which the rising-edge trigger
-        // fires (fires as brake pressure INCREASES past this level). Bite
-        // Point (Clutch-only): 0..100 (BitePointTriggerMinPct/MaxPct,
-        // full range — a clutch's bite point can sit anywhere across the
-        // pedal's travel, unlike a brake threshold) — the pedal position at
-        // which the FALLING-edge trigger fires (fires as the pedal
-        // RELEASES past this level, the opposite direction from Threshold,
-        // since a bite point is encountered letting the clutch up, not
-        // pressing it down; see MBoosterEffectWorker.UpdateBitePointRequest).
-        // Both keep the same fixed 30-point hysteresis gap between trigger
-        // and release rather than being independently configurable.
-        // Default 60 exactly reproduces Threshold's original verified
-        // trigger point. See MBoosterEffectWorker.UpdateThresholdRequest.
+        // fires (fires as brake pressure INCREASES past this level), with a
+        // fixed 30-point hysteresis gap before it re-arms. Default 60 exactly
+        // reproduces Threshold's original verified trigger point. See
+        // MBoosterEffectWorker.UpdateThresholdRequest.
+        // Bite Point (Clutch-only): 0..100 (BitePointTriggerMinPct/MaxPct) —
+        // the fallback bite point when no calibration is used; the pulse plays
+        // within BitePointWidthPct of it (MBoosterBitePointTrigger).
         public int TriggerLevelPct { get; set; } = 60;
+
+        // Bite Point-only: trigger at the current game's calibrated bite point
+        // when one exists, else at TriggerLevelPct (the fallback).
+        public bool UseCalibratedBitePoint { get; set; } = true;
+
+        // Bite Point-only: clutch travel (%) either side of the bite point that
+        // triggers the pulse (MBoosterUiConstants.BitePointWidthMinPct/MaxPct).
+        public int BitePointWidthPct { get; set; } = MBoosterUiConstants.BitePointWidthDefaultPct;
+
+        // Bite Point-only: shortest and longest pulse, ms
+        // (MBoosterUiConstants.BitePointMin/MaxLength*; see MBoosterBitePointTrigger).
+        public int BitePointMinLengthMs { get; set; } = MBoosterUiConstants.BitePointMinLengthDefaultMs;
+        public int BitePointMaxLengthMs { get; set; } = MBoosterUiConstants.BitePointMaxLengthDefaultMs;
+
+        // Bite Point-only: Smoothness ripple rate, Hz (MBoosterUiConstants
+        // .BitePointPulseRateMinHz/MaxHz). Null = never set: derived from
+        // FrequencyHz the way the ripple always played
+        // (MBoosterUiConstants.BitePointLegacyPulseRateHz).
+        public float? BitePointPulseRateHz { get; set; }
+
+        // Bite Point-only: fire passing the bite point pressing, releasing or
+        // both (MBoosterBitePointTrigger).
+        public MBoosterBitePointDirection BitePointDirection { get; set; } = MBoosterBitePointDirection.Both;
 
         // Threshold-only, 0..100 — how much the pulse fades after its
         // initial burst. Generalizes MBoosterEffectSynthesizer
@@ -388,6 +437,12 @@ namespace MozaPlugin.Devices.MBooster
                 SmoothnessPct = SmoothnessPct,
                 GainPct = GainPct,
                 TriggerLevelPct = TriggerLevelPct,
+                UseCalibratedBitePoint = UseCalibratedBitePoint,
+                BitePointWidthPct = BitePointWidthPct,
+                BitePointMinLengthMs = BitePointMinLengthMs,
+                BitePointMaxLengthMs = BitePointMaxLengthMs,
+                BitePointPulseRateHz = BitePointPulseRateHz,
+                BitePointDirection = BitePointDirection,
                 DecayPct = DecayPct,
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
                 VibrateOnNeutral = VibrateOnNeutral,
@@ -1109,14 +1164,28 @@ namespace MozaPlugin.Devices.MBooster
         // to the shift edge, so the worker reads valid neutral-ness even when
         // it samples a tick or two after GearShiftSeq advanced.
         public readonly bool GearIsNeutral;
+        // The current game's calibrated clutch bite point, 0..100; -1 when uncalibrated.
+        public readonly int ClutchBitePointPct;
+        // Bite Point trigger input: true = the worker's own pedal position, else
+        // BitePointClutch01 (0..1, NaN when the configured source has no value).
+        public readonly bool BitePointUsesOwnPedal;
+        public readonly double BitePointClutch01;
+        // Live clutch reader (HID axis source), preferred over BitePointClutch01
+        // so the motor tick doesn't wait for SimHub's frame. Null otherwise.
+        public readonly Func<double>? BitePointLiveClutch01;
 
         public MBoosterTelemetrySnapshot(
             bool gameRunning, double rpm, double maxRpm, double idleRpm, double brake, double throttle,
             bool absActive, bool tcActive,
             double vehicleSpeedMs, bool hasWheelSpeeds, double maxWheelSpeedMs, double minWheelSpeedMs,
             double groundSpeedMs, double suspensionHeaveG, double longitudinalG,
-            double brakeTempC, int gearShiftSeq, bool gearIsNeutral)
+            double brakeTempC, int gearShiftSeq, bool gearIsNeutral, int clutchBitePointPct,
+            bool bitePointUsesOwnPedal, double bitePointClutch01, Func<double>? bitePointLiveClutch01)
         {
+            BitePointLiveClutch01 = bitePointLiveClutch01;
+            ClutchBitePointPct = clutchBitePointPct;
+            BitePointUsesOwnPedal = bitePointUsesOwnPedal;
+            BitePointClutch01 = bitePointClutch01;
             GameRunning = gameRunning;
             Rpm = rpm;
             MaxRpm = maxRpm;
@@ -1138,6 +1207,6 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         public static readonly MBoosterTelemetrySnapshot Empty =
-            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, false, 0, 0, 0, 0, 0, 0, 0, false);
+            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, false, 0, 0, 0, 0, 0, 0, 0, false, -1, true, double.NaN, null);
     }
 }

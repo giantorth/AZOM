@@ -63,11 +63,32 @@ namespace MozaPlugin
         /// screenless wheel, because the main sender drove the CM2 then.)</summary>
         internal TelemetrySender? ActiveCm2Sender => _cm2Sender;
 
-        /// <summary>The CM2's selected dashboard name (independent of the wheel's).</summary>
+        /// <summary>
+        /// The CM2's selected dashboard name (independent of the wheel's), held on the
+        /// CM2 page's current profile as a <c>wheel:&lt;name&gt;</c> key so every pick —
+        /// the CM2 page combo, a dash-side switch, an adopted boot slot — is saved to
+        /// the active profile and recalled on any profile switch. The plugin-wide
+        /// <c>Cm2SelectedDashboard</c> is kept in step as the fallback for a profile
+        /// that has no pick yet.
+        /// </summary>
         internal string ActiveCm2DashboardName
         {
-            get => _settings?.Cm2SelectedDashboard ?? "";
-            set { if (_settings != null) _settings.Cm2SelectedDashboard = value ?? ""; }
+            get
+            {
+                var key = _deviceProfiles?.DashProfileFor(Cm2PageGuid, seed: false)?.TelemetryDashboardKey;
+                if (Telemetry.Dashboard.WheelDashboardKey.IsWheelKey(key))
+                    return key!.Substring(Telemetry.Dashboard.WheelDashboardKey.Prefix.Length);
+                return _settings?.Cm2SelectedDashboard ?? "";
+            }
+            set
+            {
+                string name = value ?? "";
+                if (_settings != null) _settings.Cm2SelectedDashboard = name;
+                var profile = _deviceProfiles?.DashProfileFor(Cm2PageGuid);
+                if (profile != null)
+                    profile.TelemetryDashboardKey = name.Length > 0
+                        ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : null;
+            }
         }
 
         /// <summary>Switch the CM2 dash to a dashboard slot (FF kind=4 on the CM2

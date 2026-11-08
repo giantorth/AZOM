@@ -154,6 +154,12 @@ namespace MozaPlugin.Telemetry
         // on a warm restart; _coldStartReprovokeAttempts bounds the retry so a
         // genuinely-stuck wheel still proceeds instead of looping forever.
         private int _forceColdReprovoke;
+        // Wheel loss / hot-swap: the returning wheel may not re-advertise its catalog
+        // on a warm start (only END), leaving the old catalog's indices bound to the
+        // wrong widgets. Bumped per loss; the next start whose sessions open goes cold
+        // and records the generation it handled, so an abandoned start doesn't eat it.
+        private int _wheelLossGen;
+        private int _wheelLossGenHandled;
         private int _coldStartReprovokeAttempts;
         private const int MaxColdStartReprovokes = 3;
         // Set when the wedge branch queues its re-provoke: holds the preamble (no
@@ -265,6 +271,12 @@ namespace MozaPlugin.Telemetry
             // inheriting the prior wheel's exhausted budget.
             try { _recovery.Reset(); } catch { }
         }
+
+        /// <summary>The wheel went away (presence miss, rim detach, port loss,
+        /// hot-swap): the next start re-provokes cold — wide session close and a
+        /// fresh catalog — instead of reusing the departed wheel's catalog.</summary>
+        internal void RequestColdStartAfterWheelLoss()
+            => System.Threading.Interlocked.Increment(ref _wheelLossGen);
 
         /// <summary>
         /// Raised when the wheel hardware initiates a dashboard switch (user
@@ -696,7 +708,7 @@ namespace MozaPlugin.Telemetry
                 var prior = _dashboardDownloader;
                 if (value != null)
                     _dashboardDownloader = new DashboardDownloader(
-                        _connection, value,
+                        () => _connection, () => _targetDeviceId, value,
                         MozaPlugin.Instance?.DashProfileStore ?? new DashboardProfileStore(),
                         _retransmitter, _dispatcher);
                 else
@@ -909,12 +921,20 @@ namespace MozaPlugin.Telemetry
         /// <summary>True while a dashboard upload is mid-flight. Cleared on
         /// completion / abort.</summary>
         public bool IsUploadInFlight => _uploader?.IsUploadInFlight ?? false;
+        /// <summary>True while an upload attempt runs, including session acquisition.</summary>
+        public bool IsUploadAttemptActive => _uploader?.IsAttemptActive ?? false;
+        public bool IsUploadCancelRequested => _uploader?.IsCancelRequested ?? false;
+        /// <summary>Stop the running upload and close its session. False when none is running.</summary>
+        public bool CancelUpload() => _uploader?.RequestCancel() ?? false;
         /// <summary>Last <c>bytes_written:u32 BE</c> from a wheel ack sub-msg.</summary>
         public uint UploadLastBytesWritten => _uploader?.LastBytesWritten ?? 0;
         /// <summary>Last <c>total_size:u32 BE</c> from a wheel ack sub-msg.</summary>
         public uint UploadLastTotalSize => _uploader?.LastTotalSize ?? 0;
         /// <summary>Last XOR status byte from a wheel ack sub-msg.</summary>
         public byte UploadLastStatusByte => _uploader?.LastStatusByte ?? 0;
+        /// <summary>Outcome of the last finished upload attempt; null before
+        /// one finishes or once a new one is queued.</summary>
+        internal WheelUploadCoordinator.UploadOutcome? UploadLastOutcome => _uploader?.LastOutcome;
         /// <summary>0..1 progress of the in-flight upload; 0 when idle. See
         /// <see cref="Dashboard.WheelUploadCoordinator.UploadProgress"/>.</summary>
         public double UploadProgress => _uploader?.UploadProgress ?? 0.0;
@@ -947,6 +967,7 @@ namespace MozaPlugin.Telemetry
             _uploader.MzdashContent = content;
             _uploader.MzdashName = name ?? "";
             _uploader.MzdashSourceDirectory = sourceDirectory ?? "";
+            _uploader.ClearLastAttempt();
             ThreadPool.QueueUserWorkItem(_ => _uploader.RunBackgroundUpload());
             return true;
         }
@@ -1000,16 +1021,18 @@ namespace MozaPlugin.Telemetry
             _sessionLife = new Sessions.SessionLifecycle(this);
             _rpc = new RpcCallChannel(
                 connection,
-                shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected);
+                shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected,
+                getTargetDevice: () => _targetDeviceId);
             _uploader = new WheelUploadCoordinator(
                 connection,
                 shouldAbort: () => _state == TelemetryState.Idle || !_connection.IsConnected,
+                getTargetDevice: () => _targetDeviceId,
                 getPolicy: () => _policy,
                 getConfigJsonState: () => _configJson.LastState,
                 sendSessionAck: _sessionLife.SendSessionAck,
                 sendSessionEnd: _sessionLife.SendSessionEnd,
                 sendStaleSessionClose: _sessionLife.SendSessionClose,
-                sendAndTrackChunk: SendAndTrackChunk,
+                sendAndTrackChunk: SendAndTrackTransferChunk,
                 sendSessionOpen: _sessionLife.SendSessionOpen,
                 sendFileTransferActivate: _sessionLife.SendFileTransferActivate,
                 getRetransmitBacklog: () => Retransmitter.QueueSize,
@@ -1059,6 +1082,9 @@ namespace MozaPlugin.Telemetry
                         break;
                     case WheelUploadCoordinator.UploadOutcome.Aborted:
                         MozaLog.Debug($"[AZOM] Dashboard upload \"{name}\": Aborted");
+                        break;
+                    case WheelUploadCoordinator.UploadOutcome.Cancelled:
+                        MozaLog.Info($"[AZOM] Dashboard upload \"{name}\": Cancelled");
                         break;
                     default:
                         MozaLog.Warn($"[AZOM] Dashboard upload \"{name}\": {outcome}");

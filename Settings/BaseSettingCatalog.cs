@@ -366,6 +366,56 @@ namespace MozaPlugin.Settings
 
         internal static int RoadSensitivityRawFromPreset(int preset) => 10 + 4 * preset;
 
+        /// <summary>Selector position after presets 0..10: values match no preset.</summary>
+        internal const int EqSensitivityCustom = 11;
+
+        /// <summary>
+        /// Sensitivity selector position derived like PitHouse's: preset N only
+        /// when 0x0C and every EQ band match row N, else
+        /// <see cref="EqSensitivityCustom"/>; -1 while 0x0C is unread. Legacy
+        /// firmware compares just the six old registers.
+        /// </summary>
+        internal static int EqSensitivitySelection(MozaData d)
+        {
+            int raw = d.RoadSensitivity;
+            if (raw < 0) return -1;
+            int n = (raw - 10) / 4;
+            if (raw < 10 || RoadSensitivityRawFromPreset(n) != raw || n > RoadSensitivityMaxPreset)
+                return EqSensitivityCustom;
+
+            int[] p = EqSensitivityPresets[n];
+            if (d.BaseSupportsEq10)
+            {
+                for (int i = 0; i < 10; i++)
+                    if (GetEqRegister(d, Eq10FreqOrderRegisters[i]) != p[i]) return EqSensitivityCustom;
+            }
+            else
+            {
+                for (int i = 0; i < 6; i++)
+                    if (GetEqRegister(d, i) != p[Eq6FreqColumns[i]]) return EqSensitivityCustom;
+            }
+            return n;
+        }
+
+        /// <summary>Read one EQ register's value from <paramref name="d"/> by 0-based register index.</summary>
+        internal static int GetEqRegister(MozaData d, int index0)
+        {
+            switch (index0)
+            {
+                case 0: return d.Equalizer1;
+                case 1: return d.Equalizer2;
+                case 2: return d.Equalizer3;
+                case 3: return d.Equalizer4;
+                case 4: return d.Equalizer5;
+                case 5: return d.Equalizer6;
+                case 6: return d.Equalizer7;
+                case 7: return d.Equalizer8;
+                case 8: return d.Equalizer9;
+                case 9: return d.Equalizer10;
+                default: return -1;
+            }
+        }
+
         /// <summary>Write one EQ register's value into <paramref name="d"/> by 0-based register index.</summary>
         internal static void SetEqRegister(MozaData d, int index0, int value)
         {

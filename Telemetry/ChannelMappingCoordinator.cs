@@ -162,14 +162,12 @@ namespace MozaPlugin.Telemetry
                 dashKey = candidates[0]; // write to the highest-priority key
             }
 
-            // Profile × page × dashboard × channel → SimHub property path.
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile == null) return;
-            var g = pageGuid ?? _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return; // no profile/page resolvable yet
+            // Device profile × dashboard × channel → SimHub property path.
+            var owner = MappingOwner(pageGuid);
+            if (owner == null) return; // no profile/page resolvable yet
 
-            var outer = profile.TelemetryChannelMappings;
-            var newMiddle = (outer != null && outer.TryGetValue(g.Value, out var oldMiddle) && oldMiddle != null)
+            var oldMiddle = owner.Get();
+            var newMiddle = oldMiddle != null
                 ? new Dictionary<string, Dictionary<string, string>>(oldMiddle, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             var newInner = (newMiddle.TryGetValue(dashKey, out var oldInner) && oldInner != null)
@@ -191,11 +189,7 @@ namespace MozaPlugin.Telemetry
                 newMiddle[dashKey] = newInner;
             }
 
-            var newOuter = outer != null
-                ? new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>(outer)
-                : new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>();
-            newOuter[g.Value] = newMiddle;
-            profile.TelemetryChannelMappings = newOuter;
+            owner.Set(newMiddle);
 
             // Live-rewire the matching channel on the target sender's profile so the
             // next frame uses the new property. No tier-def restart.
@@ -211,11 +205,9 @@ namespace MozaPlugin.Telemetry
         internal void ClearCurrentDashboard(Guid? pageGuid = null, string? fixedDashKey = null)
         {
             MigrateLegacyWheelKeys();
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            var outer = profile?.TelemetryChannelMappings;
-            if (profile == null || outer == null) return;
-            var g = pageGuid ?? _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue || !outer.TryGetValue(g.Value, out var middle) || middle == null) return;
+            var owner = MappingOwner(pageGuid);
+            var middle = owner?.Get();
+            if (owner == null || middle == null) return;
 
             var newMiddle = new Dictionary<string, Dictionary<string, string>>(middle, StringComparer.OrdinalIgnoreCase);
             bool changed = false;
@@ -230,58 +222,77 @@ namespace MozaPlugin.Telemetry
             }
             if (!changed) return;
 
-            var newOuter = new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>(outer);
-            newOuter[g.Value] = newMiddle;
-            profile.TelemetryChannelMappings = newOuter;
+            owner.Set(newMiddle);
             _plugin.SaveSettings();
         }
 
+        /// <summary>Accessor pair over the device profile that owns a page's mappings.</summary>
+        private sealed class MappingStore
+        {
+            public readonly Func<Dictionary<string, Dictionary<string, string>>?> Get;
+            public readonly Action<Dictionary<string, Dictionary<string, string>>> Set;
+            public MappingStore(Func<Dictionary<string, Dictionary<string, string>>?> get,
+                Action<Dictionary<string, Dictionary<string, string>>> set) { Get = get; Set = set; }
+        }
+
+        /// <summary>The CM2 dash store's current profile for <see cref="MozaPlugin.Cm2PageGuid"/>,
+        /// else the wheel store's (the attached wheel when <paramref name="pageGuid"/> is null).</summary>
+        private MappingStore? MappingOwner(Guid? pageGuid)
+        {
+            var dp = _plugin.DeviceProfiles;
+            if (dp == null) return null;
+            if (pageGuid == MozaPlugin.Cm2PageGuid)
+            {
+                var dash = dp.DashProfileFor(MozaPlugin.Cm2PageGuid);
+                return dash == null ? null : new MappingStore(() => dash.ChannelMappings, d => dash.ChannelMappings = d);
+            }
+            var wheel = pageGuid.HasValue
+                ? dp.WheelStore(pageGuid.Value, seed: true)?.CurrentProfile
+                : dp.ActiveWheelProfile;
+            return wheel == null ? null : new MappingStore(() => wheel.ChannelMappings, d => wheel.ChannelMappings = d);
+        }
+
+        /// <summary>Read-only view of a page's mappings (see <see cref="MappingOwner"/>).</summary>
+        internal Dictionary<string, Dictionary<string, string>>? MappingsFor(Guid? pageGuid)
+            => MappingOwner(pageGuid)?.Get();
+
         /// <summary>
-        /// Rewrite legacy <c>wheel:&lt;id&gt;</c> mapping keys on the current profile to
-        /// <c>wheel:&lt;name&gt;</c> (see <see cref="WheelDashboardKey"/>). Needs the wheel's
-        /// configJson state to map id → name; a no-op until it arrives, and idempotent
-        /// after. Entries already under the name key win over legacy ones. COW like
-        /// <see cref="Set"/>. Returns true when anything changed.
+        /// Rewrite legacy <c>wheel:&lt;id&gt;</c> mapping keys on the attached wheel's
+        /// current profile to <c>wheel:&lt;name&gt;</c> (see <see cref="WheelDashboardKey"/>).
+        /// Needs the wheel's configJson state to map id → name; a no-op until it arrives,
+        /// and idempotent after. Entries already under the name key win over legacy ones.
+        /// COW like <see cref="Set"/>. Returns true when anything changed.
         /// </summary>
         internal bool MigrateLegacyWheelKeys()
         {
             var state = _plugin.WheelStateForDiagnostics;
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            var outer = profile?.TelemetryChannelMappings;
-            if (state == null || profile == null || outer == null || outer.Count == 0) return false;
+            var profile = _plugin.DeviceProfiles?.ActiveWheelProfile;
+            var middle = profile?.ChannelMappings;
+            if (state == null || profile == null || middle == null || middle.Count == 0) return false;
 
-            Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>? newOuter = null;
+            Dictionary<string, Dictionary<string, string>>? newMiddle = null;
             int migrated = 0;
-            foreach (var page in outer)
+            foreach (var kv in middle)
             {
-                var middle = page.Value;
-                if (middle == null) continue;
-                Dictionary<string, Dictionary<string, string>>? newMiddle = null;
-                foreach (var kv in middle)
-                {
-                    var match = WheelDashboardKey.Resolve(state, kv.Key, includeDisabled: true);
-                    if (match == null || match.SlotName.Length == 0) continue;
-                    string canonical = WheelDashboardKey.For(match);
-                    if (string.Equals(canonical, kv.Key, StringComparison.OrdinalIgnoreCase)) continue;
+                var match = WheelDashboardKey.Resolve(state, kv.Key, includeDisabled: true);
+                if (match == null || match.SlotName.Length == 0) continue;
+                string canonical = WheelDashboardKey.For(match);
+                if (string.Equals(canonical, kv.Key, StringComparison.OrdinalIgnoreCase)) continue;
 
-                    newMiddle ??= new Dictionary<string, Dictionary<string, string>>(middle, StringComparer.OrdinalIgnoreCase);
-                    var merged = newMiddle.TryGetValue(canonical, out var existing) && existing != null
-                        ? new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase)
-                        : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    if (kv.Value != null)
-                        foreach (var ch in kv.Value)
-                            if (!merged.ContainsKey(ch.Key)) merged[ch.Key] = ch.Value;
-                    newMiddle.Remove(kv.Key);
-                    newMiddle[canonical] = merged;
-                    migrated++;
-                }
-                if (newMiddle == null) continue;
-                newOuter ??= new Dictionary<Guid, Dictionary<string, Dictionary<string, string>>>(outer);
-                newOuter[page.Key] = newMiddle;
+                newMiddle ??= new Dictionary<string, Dictionary<string, string>>(middle, StringComparer.OrdinalIgnoreCase);
+                var merged = newMiddle.TryGetValue(canonical, out var existing) && existing != null
+                    ? new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase)
+                    : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (kv.Value != null)
+                    foreach (var ch in kv.Value)
+                        if (!merged.ContainsKey(ch.Key)) merged[ch.Key] = ch.Value;
+                newMiddle.Remove(kv.Key);
+                newMiddle[canonical] = merged;
+                migrated++;
             }
-            if (newOuter == null) return false;
+            if (newMiddle == null) return false;
 
-            profile.TelemetryChannelMappings = newOuter;
+            profile.ChannelMappings = newMiddle;
             MozaLog.Info($"[AZOM] Migrated {migrated} legacy wheel:<id> channel-mapping key(s) to wheel:<name>");
             _plugin.PersistSettings();
             return true;

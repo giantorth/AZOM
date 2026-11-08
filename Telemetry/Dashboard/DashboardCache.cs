@@ -50,7 +50,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             get { lock (_lock) return _nameToHash.Count + _folderProfiles.Count; }
         }
 
-        // --- User folder library (fallback after wheel cache) ---
+        // --- User folder library (wins over the wheel cache on a shared name) ---
         // Replaced wholesale under _lock by LoadFromFolders, never mutated after.
         private Dictionary<string, MultiStreamProfile> _folderProfiles =
             new Dictionary<string, MultiStreamProfile>(StringComparer.OrdinalIgnoreCase);
@@ -210,7 +210,10 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Look up a cached profile by dashboard name.
+        /// Look up a cached profile by dashboard name. The user's folder copy
+        /// wins over the wheel-download copy: it is what an upload sends and
+        /// what <see cref="TryGetFolderFilePath"/> resolves, and a download of
+        /// the wheel's pre-edit copy must not shadow a local edit.
         /// Returns null if no profile is cached for this name.
         /// </summary>
         public MultiStreamProfile? TryGetByName(string name)
@@ -218,13 +221,11 @@ namespace MozaPlugin.Telemetry.Dashboard
             if (string.IsNullOrEmpty(name)) return null;
             lock (_lock)
             {
-                if (_nameToHash.TryGetValue(name, out var hash))
-                {
-                    if (_byHash.TryGetValue(hash, out var profile))
-                        return profile;
-                }
                 if (TryGetNormalized(_folderProfiles, name, out var folderProfile))
                     return folderProfile;
+                if (_nameToHash.TryGetValue(name, out var hash)
+                    && _byHash.TryGetValue(hash, out var profile))
+                    return profile;
             }
             return null;
         }
@@ -244,19 +245,20 @@ namespace MozaPlugin.Telemetry.Dashboard
 
         /// <summary>
         /// Get the raw mzdash content bytes for a dashboard (for upload to wheel).
+        /// Folder copy first — see <see cref="TryGetByName"/>. This is the
+        /// snapshot from the last folder scan; an upload re-reads the file
+        /// itself (<c>DashboardLibraryResolver.ResolveBytes</c>).
         /// </summary>
         public byte[]? TryGetRawContent(string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
             lock (_lock)
             {
-                if (_nameToHash.TryGetValue(name, out var hash))
-                {
-                    if (_rawContent.TryGetValue(hash, out var content))
-                        return content;
-                }
                 if (TryGetNormalized(_folderRawContent, name, out var folderContent))
                     return folderContent;
+                if (_nameToHash.TryGetValue(name, out var hash)
+                    && _rawContent.TryGetValue(hash, out var content))
+                    return content;
             }
             return null;
         }
@@ -287,8 +289,8 @@ namespace MozaPlugin.Telemetry.Dashboard
         }
 
         /// <summary>
-        /// Scan several folders into the one folder-library, in order. These
-        /// act as a fallback library when wheel cache misses.
+        /// Scan several folders into the one folder-library, in order. On a
+        /// shared name these win over the wheel cache.
         /// Entries are keyed by profile name and LATER FOLDERS WIN, so callers
         /// pass least-authoritative first.
         ///

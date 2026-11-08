@@ -30,15 +30,9 @@ namespace MozaPlugin.Telemetry
         // fixed-schema dashboard fields (keyed by record-type + field id, value
         // carries scaling).
 
-        /// <summary>Active profile × current wheel page FSR1 field mappings, or null.</summary>
+        /// <summary>The attached wheel's current-profile FSR1 field mappings, or null.</summary>
         internal Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? GetActiveFsr1Mappings()
-        {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Fsr1DashboardMappings == null) return null;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return null;
-            return profile.Fsr1DashboardMappings.TryGetValue(g.Value, out var m) ? m : null;
-        }
+            => _plugin.ActiveWheelProfile?.Fsr1Mappings;
 
         /// <summary>Resolve one FSR1 field's user mapping, or null to use the catalog default.</summary>
         internal Fsr1FieldMapping? GetFsr1FieldMapping(string recordKey, string fieldId)
@@ -69,18 +63,14 @@ namespace MozaPlugin.Telemetry
         {
             if (string.IsNullOrEmpty(recordKey) || string.IsNullOrEmpty(fieldId)) return;
 
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+            var profile = _plugin.ActiveWheelProfile;
             if (profile == null) return;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return;
 
             // Copy-on-write at every level: the 20 ms display tick reads these dicts
             // (GetActiveFsr1Mappings) while the UI edits them, and the save debounce
             // serializes them — a published dict is never mutated in place.
-            var maps = profile.Fsr1DashboardMappings;
-            Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? mid = null;
+            var mid = profile.Fsr1Mappings;
             Dictionary<string, Fsr1FieldMapping>? inner = null;
-            if (maps != null && maps.TryGetValue(g.Value, out var mid0)) mid = mid0;
             if (mid != null && mid.TryGetValue(recordKey, out var inner0)) inner = inner0;
 
             if (IsDefaultFsr1Mapping(mapping))
@@ -91,9 +81,7 @@ namespace MozaPlugin.Telemetry
                 innerNext.Remove(fieldId);
                 var midNext = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid!, StringComparer.OrdinalIgnoreCase);
                 if (innerNext.Count == 0) midNext.Remove(recordKey); else midNext[recordKey] = innerNext;
-                var mapsNext = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps!);
-                if (midNext.Count == 0) mapsNext.Remove(g.Value); else mapsNext[g.Value] = midNext;
-                profile.Fsr1DashboardMappings = mapsNext;
+                profile.Fsr1Mappings = midNext;
                 _plugin.SaveSettings();
                 return;
             }
@@ -108,11 +96,7 @@ namespace MozaPlugin.Telemetry
                 ? new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid, StringComparer.OrdinalIgnoreCase);
             midSet[recordKey] = innerSet;
-            var mapsSet = maps == null
-                ? new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>()
-                : new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps);
-            mapsSet[g.Value] = midSet;
-            profile.Fsr1DashboardMappings = mapsSet;
+            profile.Fsr1Mappings = midSet;
             _plugin.SaveSettings();
         }
 
@@ -120,18 +104,13 @@ namespace MozaPlugin.Telemetry
         /// catalog defaults. Used by reset-to-defaults.</summary>
         internal void ClearFsr1FieldOverrides(string recordKey)
         {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            var maps = profile?.Fsr1DashboardMappings;
-            if (maps == null) return;
-            var g = _plugin.GetCurrentWheelPageGuid();
-            if (!g.HasValue) return;
-            if (!maps.TryGetValue(g.Value, out var mid) || mid == null || !mid.ContainsKey(recordKey)) return;
+            var profile = _plugin.ActiveWheelProfile;
+            var mid = profile?.Fsr1Mappings;
+            if (profile == null || mid == null || !mid.ContainsKey(recordKey)) return;
             // COW (see SetFsr1FieldMapping).
             var midNext = new Dictionary<string, Dictionary<string, Fsr1FieldMapping>>(mid, StringComparer.OrdinalIgnoreCase);
             midNext.Remove(recordKey);
-            var mapsNext = new Dictionary<Guid, Dictionary<string, Dictionary<string, Fsr1FieldMapping>>>(maps);
-            if (midNext.Count == 0) mapsNext.Remove(g.Value); else mapsNext[g.Value] = midNext;
-            profile!.Fsr1DashboardMappings = mapsNext;
+            profile.Fsr1Mappings = midNext;
             _plugin.SaveSettings();
         }
 
@@ -281,13 +260,9 @@ namespace MozaPlugin.Telemetry
         // (Cm1PageGuid), independent of any wheel. The dashboard-switch command and the
         // Param-6 page-report log are byte-identical to the FSR1's, just on dev 0x14/0x41.
 
-        /// <summary>Active profile's CM1 field mappings (copy-on-write snapshot), or null.</summary>
+        /// <summary>The CM1 dash's current-profile field mappings (copy-on-write snapshot), or null.</summary>
         internal Dictionary<string, Fsr1FieldMapping>? GetActiveCm1Mappings()
-        {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            if (profile?.Cm1FieldMappings == null) return null;
-            return profile.Cm1FieldMappings.TryGetValue(MozaPlugin.Cm1PageGuid, out var m) ? m : null;
-        }
+            => _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm1PageGuid)?.Cm1Mappings;
 
         /// <summary>Resolve one CM1 field's user mapping, or null to use the catalog default.</summary>
         internal Fsr1FieldMapping? GetCm1FieldMapping(string fieldId)
@@ -303,12 +278,10 @@ namespace MozaPlugin.Telemetry
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale)
         {
             if (string.IsNullOrEmpty(fieldId)) return;
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
+            var profile = _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm1PageGuid);
             if (profile == null) return;
             // COW (see SetFsr1FieldMapping): the 50 ms CM1 driver tick reads these.
-            var maps = profile.Cm1FieldMappings;
-            Dictionary<string, Fsr1FieldMapping>? inner = null;
-            if (maps != null && maps.TryGetValue(MozaPlugin.Cm1PageGuid, out var inner0)) inner = inner0;
+            var inner = profile.Cm1Mappings;
             string trimmed = (property ?? "").Trim();
             var innerNext = inner == null
                 ? new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase)
@@ -317,24 +290,16 @@ namespace MozaPlugin.Telemetry
                 innerNext.Remove(fieldId);
             else
                 innerNext[fieldId] = new Fsr1FieldMapping { Property = trimmed, Scale = scale };
-            var mapsNext = maps == null
-                ? new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>()
-                : new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>(maps);
-            if (innerNext.Count == 0) mapsNext.Remove(MozaPlugin.Cm1PageGuid);
-            else mapsNext[MozaPlugin.Cm1PageGuid] = innerNext;
-            profile.Cm1FieldMappings = mapsNext;
+            profile.Cm1Mappings = innerNext;
             _plugin.SaveSettings();
         }
 
         /// <summary>Clear ALL CM1 field mappings (reset-to-defaults).</summary>
         internal void ClearCm1Mappings()
         {
-            var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
-            var maps = profile?.Cm1FieldMappings;
-            if (maps == null || !maps.ContainsKey(MozaPlugin.Cm1PageGuid)) return;
-            var next = new Dictionary<Guid, Dictionary<string, Fsr1FieldMapping>>(maps);
-            next.Remove(MozaPlugin.Cm1PageGuid);
-            profile!.Cm1FieldMappings = next;
+            var profile = _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm1PageGuid, seed: false);
+            if (profile?.Cm1Mappings == null || profile.Cm1Mappings.Count == 0) return;
+            profile.Cm1Mappings = new Dictionary<string, Fsr1FieldMapping>(StringComparer.OrdinalIgnoreCase);
             _plugin.SaveSettings();
         }
 

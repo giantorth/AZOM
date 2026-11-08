@@ -49,6 +49,54 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>True iff at least one controller is registered. Lock-free; safe to call from DataUpdate.</summary>
         public bool HasControllers => Volatile.Read(ref _controllerCount) > 0;
 
+        /// <summary>True when a lane has answered and its pipe is up. Lock-free;
+        /// SimHub polls it every frame through the ShakeIt device's IsConnected.</summary>
+        public bool AnyReady
+        {
+            get
+            {
+                foreach (var c in _orderSnapshot)
+                    if (c.Detected && c.IsConnected) return true;
+                return false;
+            }
+        }
+
+        /// <summary>The first lane that has answered, or null. Lock-free.</summary>
+        public MBoosterDeviceController? FirstDetected
+        {
+            get
+            {
+                foreach (var c in _orderSnapshot)
+                    if (c.Detected) return c;
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Shaped position (0..1) of the first pedal holding <paramref name="role"/>
+        /// whose effect worker plays, in the same order and role resolution as
+        /// MergePositions. Lock-free.
+        /// </summary>
+        /// <returns>False when no connected, motorized pedal holds the role.</returns>
+        public bool TryGetEffectPedalPosition(MBoosterRole role, out double position01)
+        {
+            position01 = 0;
+            // One worker per motor device id, each gated on its own axis.
+            int workerAxes = MozaMBoosterProtocol.MotorDeviceIds.Length;
+            foreach (var c in _orderSnapshot)
+            {
+                if (!c.IsConnected) continue;
+                var s = c.CurrentSettings;
+                for (int a = 0; a < workerAxes; a++)
+                {
+                    if (!c.IsAxisEffectCapable(a) || c.AxisRole(a, s) != role) continue;
+                    position01 = c.AxisPedalPosition(a);
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private readonly MozaData _data;
         private readonly Func<string, MBoosterDeviceSettings?> _settingsLookup;
         private readonly Func<bool> _isShuttingDown;
@@ -63,6 +111,7 @@ namespace MozaPlugin.Devices.MBooster
         private readonly Action<string, byte[]>? _onAxisTypesResolved;
         private readonly Func<MBoosterDeviceController, bool>? _settingsReady;
         private readonly Action<string, string>? _onChainUnitSerialResolved;
+        private readonly MBoosterShakeItSink? _shakeItSink;
         private readonly Func<bool>? _pedalSlotDetected;
 
         // Highest merged position (0..100) each role has reached this session —
@@ -211,8 +260,10 @@ namespace MozaPlugin.Devices.MBooster
             Func<string, byte[]?>? axisTypesSeedLookup = null,
             Action<string, byte[]>? onAxisTypesResolved = null,
             Func<MBoosterDeviceController, bool>? settingsReady = null,
-            Action<string, string>? onChainUnitSerialResolved = null)
+            Action<string, string>? onChainUnitSerialResolved = null,
+            MBoosterShakeItSink? shakeItSink = null)
         {
+            _shakeItSink = shakeItSink;
             _data = data ?? throw new ArgumentNullException(nameof(data));
             _settingsLookup = settingsLookup ?? throw new ArgumentNullException(nameof(settingsLookup));
             _isShuttingDown = isShuttingDown ?? (() => false);
@@ -271,7 +322,8 @@ namespace MozaPlugin.Devices.MBooster
                         settingsLookup: () => _settingsLookup(kvp.Key),
                         isShuttingDown: _isShuttingDown,
                         customEffectFormulaEvaluator: _customEffectFormulaEvaluator,
-                        containerId: kvp.Value.ContainerId);
+                        containerId: kvp.Value.ContainerId,
+                        shakeItSink: _shakeItSink);
                     if (_settingsReady != null) c.SettingsGate = () => _settingsReady(c);
                     c.ChainUnitSerialResolved += ser =>
                     {

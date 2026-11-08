@@ -36,9 +36,9 @@ namespace MozaPlugin
         }
 
         /// <summary>
-        /// Queue a re-apply of the current profile's saved
-        /// <c>TelemetryDashboardKey</c> against the currently-attached
-        /// wheel. Called from the wheel-hot-swap path so the new wheel ends
+        /// Queue a re-apply of the attached wheel's saved
+        /// <c>TelemetryDashboardKey</c> (from its own profile store). Called from the
+        /// wheel-hot-swap path so the new wheel ends
         /// up bound to the user's saved choice instead of whatever slot it
         /// boots to. Tries the apply immediately; if the wheel state isn't
         /// ready yet (configJsonList empty), sets the dashboard-binding
@@ -48,7 +48,7 @@ namespace MozaPlugin
         {
             try
             {
-                var profile = _settings?.ProfileStore?.CurrentProfile;
+                var profile = _deviceProfiles?.WheelDashboardKeyProfile;
                 if (profile == null) return;
                 if (string.IsNullOrEmpty(profile.TelemetryDashboardKey)) return;
                 bool applied = false;
@@ -78,7 +78,7 @@ namespace MozaPlugin
             }
         }
         internal void RestartTelemetry() => _dashboardBindingCoordinator.RestartTelemetry();
-        internal bool ApplyTelemetryDashboardFromProfile(MozaProfile profile) => _dashboardBindingCoordinator.ApplyTelemetryDashboardFromProfile(profile);
+        internal bool ApplyTelemetryDashboardFromProfile(IDashboardKeyProfile profile) => _dashboardBindingCoordinator.ApplyTelemetryDashboardFromProfile(profile);
         internal void OnDashboardSwitched(uint slot) => _dashboardBindingCoordinator.OnDashboardSwitched(slot);
         internal void OnDashboardSwitched() => _dashboardBindingCoordinator.OnDashboardSwitched();
         internal void SetTelemetryEnabled(bool enabled) => _dashboardBindingCoordinator.SetTelemetryEnabled(enabled);
@@ -193,12 +193,22 @@ namespace MozaPlugin
         }
         private volatile PageGuidCache? _pageGuidCache;
 
-        // ===== ProfileCoordinator accessor shims (external API surface) =====
-        // Wheel overlay + per-wheel-page telemetry/sleep/idle/era accessors live
-        // in Settings/ProfileCoordinator.cs.
-        internal WheelOverride? GetCurrentWheelOverlay(MozaProfile? profile) => _profileCoordinator.GetCurrentWheelOverlay(profile);
-        internal WheelOverride? GetOrCreateCurrentWheelOverlay(MozaProfile? profile) => _profileCoordinator.GetOrCreateCurrentWheelOverlay(profile);
-        internal void UpdateActiveWheelOverlay(Action<WheelOverride> mutator) => _profileCoordinator.UpdateActiveWheelOverlay(mutator);
+        // ===== ProfileCoordinator / DeviceProfileCoordinator accessor shims =====
+        // Device-page profiles live in Settings/DeviceProfileCoordinator.cs; the
+        // per-wheel-page telemetry/sleep/idle accessors in Settings/ProfileCoordinator.cs.
+        /// <summary>The attached wheel's current profile in its own store; null until
+        /// the wheel identifies (or while its store is being seeded).</summary>
+        internal MozaWheelProfile? ActiveWheelProfile => _deviceProfiles?.ActiveWheelProfile;
+        /// <summary>The attached dash's (CM2 / CM1) current profile.</summary>
+        internal MozaDashProfile? ActiveDashProfile => _deviceProfiles?.ActiveDashProfile;
+        /// <summary>The attached wheelbase's ambient-LED profile.</summary>
+        internal MozaBaseDeviceProfile? ActiveBaseProfile => _deviceProfiles?.ActiveBaseProfile;
+        internal void UpdateActiveWheelProfile(Action<MozaWheelProfile> mutator) => _profileCoordinator.UpdateActiveWheelProfile(mutator);
+        /// <summary>The attached wheel's profile with its global LED tabs laid over it.</summary>
+        internal MozaWheelProfile? ActiveWheelLedProfile => _deviceProfiles?.ActiveWheelLedProfile;
+        internal void UpdateWheelLed(WheelLedGroup group, Action<IWheelLedFields> mutator) => _profileCoordinator.UpdateWheelLed(group, mutator);
+        internal void UpdateDashProfile(Guid dashPageGuid, Action<MozaDashProfile> mutator) => _profileCoordinator.UpdateDashProfile(dashPageGuid, mutator);
+        internal void UpdateBaseProfile(Guid? basePageGuid, Action<MozaBaseDeviceProfile> mutator) => _profileCoordinator.UpdateBaseProfile(basePageGuid, mutator);
         internal void UpdateActiveProfile(Action<MozaProfile> mutator) => _profileCoordinator.UpdateActiveProfile(mutator);
         internal bool ActiveTelemetryEnabled
         {
@@ -250,19 +260,14 @@ namespace MozaPlugin
         internal static readonly Guid Cm1PageGuid = Guid.Parse(Devices.MozaDeviceConstants.DashCm1Guid);
 
         /// <summary>
-        /// Channel-mapping dict for the active profile × wheel page (current wheel
-        /// page when <paramref name="pageGuid"/> is null). Null when no profile/wheel
-        /// is resolvable. Don't mutate the returned dict; write through
+        /// Channel-mapping dict (dashboard key → URL → property) from the device
+        /// profile that owns <paramref name="pageGuid"/>: the CM2 dash store for
+        /// <see cref="Cm2PageGuid"/>, else that wheel's store (current wheel when
+        /// null). Null when unresolvable. Don't mutate the returned dict; write through
         /// <see cref="ChannelMappingCoordinator"/>.
         /// </summary>
         internal Dictionary<string, Dictionary<string, string>>? GetActiveChannelMappings(Guid? pageGuid = null)
-        {
-            var profile = _settings?.ProfileStore?.CurrentProfile;
-            if (profile?.TelemetryChannelMappings == null) return null;
-            var g = pageGuid ?? GetCurrentWheelPageGuid();
-            if (!g.HasValue) return null;
-            return profile.TelemetryChannelMappings.TryGetValue(g.Value, out var m) ? m : null;
-        }
+            => _channelMapping?.MappingsFor(pageGuid);
 
         // ===== FSR1/CM1 field-mapping + index shims (external API surface) =====
         // FSR V1 (group-0x42) + CM1 (group-0x35) field mappings and the active
@@ -362,7 +367,7 @@ namespace MozaPlugin
 
         /// <summary>Apply a profile via the consolidated Apply*ToHardware methods —
         /// logic lives in Settings/ProfileCoordinator.cs.</summary>
-        internal void ApplyProfile(MozaProfile profile) => _profileCoordinator.ApplyProfile(profile);
+        internal void ApplyProfile(MozaProfile profile, bool includeDevices = true) => _profileCoordinator.ApplyProfile(profile, includeDevices);
         internal void ApplyProfileOnConnect(MozaProfile profile) => _profileCoordinator.ApplyProfileOnConnect(profile);
         internal bool ProfileHardwareWritesAllowed => _profileCoordinator?.ProfileHardwareWritesAllowed ?? false;
     }

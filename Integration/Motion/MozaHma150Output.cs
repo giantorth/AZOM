@@ -12,9 +12,47 @@ using Simhub.Plugins.Motion.Models;
 
 namespace MozaPlugin.Integration.Motion
 {
-    /// <summary>Persisted output settings. The controller stores its own setup, so nothing here yet.</summary>
+    /// <summary>What the output streams to the controller.</summary>
+    public enum MozaHma150Source
+    {
+        /// <summary>Raw game physics, as Motion Manager sends; the controller's effects do the cueing.</summary>
+        GameTelemetry = 0,
+        /// <summary>SimHub Motion's pose (its effects profile) as attitude and heave.</summary>
+        SimHubPose = 1,
+    }
+
+    /// <summary>Persisted output settings; the controller stores its own setup.</summary>
     public class MozaHma150OutputSettings : OutputSettingsBase
     {
+        private MozaHma150Source _source;
+        private bool _includeCornerHaptics = true;
+
+        public MozaHma150Source Source
+        {
+            get => _source;
+            set
+            {
+                if (_source == value) return;
+                _source = value;
+                // What the base properties' change hook does: re-clone the running settings.
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only: stream <c>FinalMotionState</c> (corner haptics folded in) rather than
+        /// <c>MotionState</c>. Haptics that write heave directly are in both.
+        /// </summary>
+        public bool IncludeCornerHaptics
+        {
+            get => _includeCornerHaptics;
+            set
+            {
+                if (_includeCornerHaptics == value) return;
+                _includeCornerHaptics = value;
+                Output?.ApplySettings();
+            }
+        }
     }
 
     /// <summary>
@@ -23,9 +61,11 @@ namespace MozaPlugin.Integration.Motion
     /// <c>TypeName</c> from this assembly). Pairs with the 6DOF pose-bypass geometry, which
     /// has no corner channels to map.
     ///
-    /// Like Motion Manager, it streams the game's raw telemetry (<see cref="MotionGameFeed"/>)
-    /// and leaves cueing and strength to the controller's own Motion Effects sliders; SimHub
-    /// Motion supplies the lifecycle: start, idle, stop and failure.
+    /// By default, like Motion Manager, it streams the game's raw telemetry (<see cref="MotionGameFeed"/>)
+    /// and leaves cueing and strength to the controller's own Motion Effects sliders; with
+    /// <see cref="MozaHma150Source.SimHubPose"/> it streams SimHub Motion's pose instead
+    /// (<see cref="MotionGameFeed.PoseFrame"/>). SimHub Motion supplies the lifecycle: start,
+    /// idle, stop and failure.
     ///
     /// The port belongs to the plugin's motion lane (<see cref="MozaMotionController"/>),
     /// which this output holds while started:
@@ -58,7 +98,7 @@ namespace MozaPlugin.Integration.Motion
 
         public override int RefreshRateMs => 10;
 
-        public override Control SettingsControl => new MozaHma150SettingsControl();
+        public override Control SettingsControl => new MozaHma150SettingsControl(this);
 
         private static MozaMotionController? Lane => MozaPlugin.Instance?.MotionController;
 
@@ -139,8 +179,19 @@ namespace MozaPlugin.Integration.Motion
         {
             var lane = Lane;
             if (!CheckLane(lane)) return;
-            var frame = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
-            if (frame != null) lane!.PostFrame(frame);
+            var game = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
+            if (currentSettings?.Source == MozaHma150Source.SimHubPose)
+            {
+                // Final state: the bypass geometry folds corner haptics into it, as SimHub's <PoseAxis> token reads.
+                var primary = geometryResult?.PrimaryGeometryResult;
+                var pose = currentSettings!.IncludeCornerHaptics
+                    ? primary?.FinalMotionState ?? primary?.MotionState
+                    : primary?.MotionState;
+                if (pose != null)
+                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game));
+                return;
+            }
+            if (game != null) lane!.PostFrame(game);
         }
 
         protected override void KeepAliveInternal(CompositeGeometryResult geometryResult)

@@ -124,10 +124,10 @@ namespace MozaPlugin.Devices
             // response. The AB9 identity probe (group 0x09 dev 0x12) only
             // accepts a 0x89 response and runs a base-disambiguation
             // pre-check first, so it cannot mis-claim a wheelbase tty
-            // even when admitted to the candidate set. When the registry
-            // returns zero MOZA devices (Wine/Proton, missing driver) the
-            // legacy serial-probe path runs as a last resort and honours
-            // the same filter. See Protocol/MozaUsbIds.cs and
+            // even when admitted to the candidate set. With no registry match
+            // the serial probe runs, on native Windows only against MOZA serial
+            // ports on a non-usbser driver, and honours the same filter. See
+            // Protocol/MozaUsbIds.cs and
             // docs/protocol/devices/usb-ids.md.
             _connection = new MozaSerialConnection(
                 pid => MozaUsbIds.IsAb9Pid(pid) || !MozaUsbIds.IsKnownMozaPid(pid),

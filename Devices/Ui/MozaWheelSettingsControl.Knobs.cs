@@ -206,10 +206,10 @@ namespace MozaPlugin.Devices.Ui
             return container == null ? -1 : chip.ItemContainerGenerator.IndexFromContainer(container);
         }
 
-        // Per-knob signal mode as the UI must render it: the per-(profile × wheel-page)
-        // overlay wins, _data (the wheel's own readback) only fills an unset slot —
+        // Per-knob signal mode as the UI must render it: the wheel profile
+        // wins, _data (the wheel's own readback) only fills an unset slot —
         // the same overlay-first rule the other input modes follow.
-        private int ResolveKnobSignalMode(WheelOverride? ov, int logicalKnob)
+        private int ResolveKnobSignalMode(MozaWheelProfile? ov, int logicalKnob)
         {
             if (_data == null || logicalKnob < 0 || logicalKnob >= MozaData.WheelKnobMax) return -1;
             var sig = ov?.WheelKnobSignalModes;
@@ -239,7 +239,7 @@ namespace MozaPlugin.Devices.Ui
                 WiSignalModeGrid.Visibility = (perKnob && encoderCount > 0)
                     ? Visibility.Visible : Visibility.Collapsed;
             }
-            var ov = _plugin?.GetCurrentWheelOverlay(_plugin.Settings?.ProfileStore?.CurrentProfile);
+            var ov = _plugin?.ActiveWheelProfile;
             using (_suppressor.Begin())
             {
                 for (int k = 0; k < _wiKnobSignalChips.Length; k++)

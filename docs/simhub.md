@@ -834,6 +834,15 @@ Per-frame flow (`ShakeITV3PluginBase.DataUpdate`, SimHub data thread, once per g
 
 The 10 Hz `DispatcherTimer` in the base is **UI preview only** (runs while the settings control is visible); all real output happens on the data-update tick. Effect *containers* are discovered by assembly scanning (`PluginFinder.GetResolver(…, typeof(EffectsContainerBase))`, filtered by `[ShakeItContainerMetadata]` + `OutputMode`/`DeviceTarget`), so custom effect types are third-party-extensible — that is the effect side, distinct from the output-device side below.
 
+**Plugin-supplied effect types** (verified 9.13.3; the MOZA plugin ships `MozaClutchBitePointContainer`):
+
+- The scan covers every root-folder DLL (`AssemblyHelper.GetDlls`), so a plugin assembly is included. Subclass `EffectsContainerBase<SingleToneOutput>` with a public parameterless ctor and `[ShakeItContainerMetadata]`; the add-effect list keeps it when `EffectPlatform` is `Any` or matches the output manager's `OutputMode`.
+- Saved profiles store `ContainerType = GetType().Name`, and `EffectsContainerJsonConverter` resolves it by **short** type name — renaming the class orphans saved effects, and the name must not collide with any other loaded container.
+- Settings are plain public properties (default Newtonsoft serialization, restored via `Populate`); mark effect instances `[JsonIgnore]`. `GetEditControl()` supplies the editor; SimHub's public `SimHub.Plugins.UI.TitledSlider` (`Value` binds two-way by default) matches the stock look.
+- `ProcessEffects` runs every data tick, in game or not; with `Filter == null` the effect value 0..1 becomes `LastOutput` ×100. Unless `IsAllowedOutOfGame`, the base zeroes effects when not `GameRunning && !GamePaused && !GameInMenu && !Spectating`. Disabled containers return early without calling the effect, so effect-held state must be reset in an override.
+- `ShakeItProfile.AddEffect` runs `SetDefaults` → `LoadDefaultSettings` → `LoadDefaultPlatformSettings`, the last one ending in the channels provider's hook (also on Reset effect), which can seed per-channel activations through the public `SettingsStore.GetSettings<DeviceChannelActivationSettings>().Channels` dictionaries.
+- A `MotorsWithFrequency` channel's gain is `globalGain/100 × LastOutput/100 × effectiveGain/100`, maxed across effects; its frequency is the gain²-weighted mean of the effects' `SingleToneOutput.Frequency`.
+
 Two output-layer concepts that are easy to confuse:
 
 - **`OutputBase`** (public abstract) — the *per-effect-container* output config: channel mapping, `ExportProperty`, `PropertyName`, `DisableOutput`. Not a device.
@@ -1604,7 +1613,8 @@ rotary crank) and report `PrimaryOverflowPercent = (1/LastScale − 1) × 100`.
 
 **Results**: `ActuatorPosition { Position (−1..+1, 0 = centre; belts/wind −1 = released/off),
 BoostedPosition?, Range (stroke mm / degrees / 100 %), Unit (None, Mm, Degrees, Percent),
-CrankLength, CanBeBoosted }`; `GeometryResult { Axis, UnscaledAxisCenter, MotionState (final pose),
+CrankLength, CanBeBoosted }`; `GeometryResult { Axis, UnscaledAxisCenter, MotionState (limited pose),
+FinalMotionState (pose bypass / Stewart: with corner haptics folded in; `<PoseAxis>` reads it),
 PrimaryOverflowPercent, PitchOverflowPercent, RollOverflowPercent, spike-limiter counters,
 MotionCompensation* fields, PrimaryAxisStates, BeltAxisStates }` with `SetAxisPosition`,
 `GetAxisValueOrDefault`, `GetBoostedAxisValueOrDefault`, `Mix`, `MergeWith`;
@@ -1944,13 +1954,25 @@ own kinematics"). What the decompile requires of such an output:
   when the settings are not `IActuatorOrderingSettings`, and then `.All(...)` on it — an
   `ArgumentNullException` on the first update. `YawVROutput` and `ControllersAggregatorOutput`
   override both with no-ops.
-- **Pose source:** `geometryResult.PrimaryGeometryResult.MotionState` (`PitchDegrees`,
-  `RollDegrees`, `HeaveMm`, …). The bypass geometry already folds corner haptics into
-  pitch/roll/heave (`SixDofInput.GetHapticsPose`). Signs: `MotionPlugin` builds
+- **Pose source:** `geometryResult.PrimaryGeometryResult.FinalMotionState` (`PitchDegrees`,
+  `RollDegrees`, `HeaveMm`, …). `Geometry6DOFsBypass.Update` sets `MotionState` to the
+  axis-limited pose and `FinalMotionState` to that plus the corner haptics fitted to
+  pitch/roll/heave (`SixDofInput.GetHapticsPose`: pitch −, roll +, heave +); the
+  `<PoseAxis>` token reads `FinalMotionState`. Haptic effects also write `HeaveMm` directly
+  (engine, flight touchdown) and are oscillators of 7–50 Hz (engine default 15–50 Hz, idle
+  7 Hz; wing load ~40 Hz). Signs: `MotionPlugin` builds
   `OrientationPitchDegrees = −GameData.OrientationPitch` and `OrientationRollDegrees =
-  +GameData.OrientationRoll`. The HMA150 output does **not** use it: its controller wants raw
-  physics like Motion Manager sends, so it streams `GameData` from the plugin's own
-  `DataUpdate` (`MotionInputData` is `internal`). `StatusDataBase.Acceleration{Surge,Sway,Heave}`
+  +GameData.OrientationRoll` (`PitchEffect` / `RollEffect` feed these into the pose as-is). By
+  default the HMA150 output does **not** use the pose: its controller takes raw physics like
+  Motion Manager sends, so it streams `GameData` from the plugin's own `DataUpdate`
+  (`MotionInputData` is `internal`). Its *Motion source* setting
+  (`MozaHma150OutputSettings.Source`) can switch it to the pose
+  ([`protocol/motion/game-stream-0x22.md`](protocol/motion/game-stream-0x22.md) § Plugin mapping).
+- **Output settings changes:** the base settings' `PropertyChanged` calls
+  `Output.ApplySettings()`, which drops the JSON-cloned running settings so the next update
+  re-clones them. A derived settings class cannot raise that event (Fody-generated), so its
+  setters call `Output?.ApplySettings()` themselves. SimHub saves the settings when the platform
+  configuration dialog closes (`MotionDevice.ConfigurePlatform` → `MotionPlugin.SaveSettings`). `StatusDataBase.Acceleration{Surge,Sway,Heave}`
   are m/s² with surge positive when braking — `GameManagerBase`'s fallback sets
   `GlobalAccelerationG = −AccelerationSurge` and derives it from Δspeed(m/s)/Δt.
 - **Configuration errors gate enabling, not running.** `MotionDevice.Enable` runs

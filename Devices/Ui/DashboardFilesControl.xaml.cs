@@ -618,6 +618,7 @@ namespace MozaPlugin.Devices.Ui
                     UploadStatusText.Text = Strings.Status_TelemetrySenderUnavailableInit;
                 return;
             }
+            if (!ReloadPickedContent()) return;
             if (_uploadPickedContent == null || _uploadPickedContent.Length == 0)
             {
                 if (UploadStatusText != null)
@@ -628,6 +629,7 @@ namespace MozaPlugin.Devices.Ui
             string? sourceDir = string.IsNullOrEmpty(_uploadPickedSourceDirectory)
                 ? null
                 : _uploadPickedSourceDirectory;
+            _lastUploadPct = 0;
             bool queued = ts.TriggerManualUpload(_uploadPickedContent, name, sourceDir);
             if (UploadStatusText != null)
             {
@@ -635,6 +637,45 @@ namespace MozaPlugin.Devices.Ui
                     ? string.Format(Strings.Upload_Queued, name)
                     : Strings.Upload_NotStarted;
             }
+        }
+
+        /// <summary>
+        /// Re-read the pick from disk at upload time. The bytes are captured
+        /// when the dashboard is picked, so an edit saved since (Studio,
+        /// PitHouse) would upload the old file, hash-match the wheel's copy and
+        /// be skipped. False when the re-read failed and the status says why.
+        /// </summary>
+        private bool ReloadPickedContent()
+        {
+            if (LibraryMode)
+            {
+                if (UploadLibraryCombo?.SelectedItem is not string name || string.IsNullOrEmpty(name))
+                    return true;
+                ApplyLibrarySelection(name);
+                return _uploadPickedContent != null;
+            }
+            // A file deleted since the pick still uploads what was picked.
+            if (!System.IO.File.Exists(_uploadPickedSourceLabel)) return true;
+            try
+            {
+                _uploadPickedContent = System.IO.File.ReadAllBytes(_uploadPickedSourceLabel);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Strings.Dialog_ReadMzdashFailed, ex.Message),
+                    "Moza", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        private void UploadCancel_Click(object sender, RoutedEventArgs e)
+        {
+            var ts = ActiveSender;
+            if (ts == null || !ts.CancelUpload()) return;
+            if (UploadStatusText != null)
+                UploadStatusText.Text = Strings.Upload_Cancelling;
+            RefreshDashboardUploadStatus();
         }
 
         // ── Wheel-side dashboard inventory ──────────────────────────────
@@ -819,6 +860,7 @@ namespace MozaPlugin.Devices.Ui
                 return;
             }
             string dir = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, row.DirName);
+            _lastUploadPct = 0;
             bool queued = ts.TriggerManualUpload(
                 bytes, row.DirName, string.IsNullOrEmpty(dir) ? null : dir);
             if (WheelFilesStatusBox != null)
@@ -970,6 +1012,11 @@ namespace MozaPlugin.Devices.Ui
             // complete-vs-stopped below — "does the wheel have all the bytes"
             // is exactly what it answers.
             int pct = (int)Math.Round((ts?.UploadProgress ?? 0.0) * 100.0);
+            // UploadProgress reads 0 once the transfer ends; a stopped or
+            // cancelled upload should report where it got to.
+            if (inFlight) _lastUploadPct = pct;
+            else pct = _lastUploadPct;
+            bool attemptActive = ts?.IsUploadAttemptActive ?? false;
 
             UploadInfoProgressText.Text =
                   inFlight    ? string.Format(Strings.Upload_StatusUploading, pct)
@@ -980,6 +1027,10 @@ namespace MozaPlugin.Devices.Ui
                 ? (Brush)(TryFindResource("AmberBrush") ?? Brushes.Goldenrod)
                 : (Brush)(TryFindResource("TextDimBrush") ?? Brushes.Gray);
 
+            if (UploadStatusText != null && !attemptActive
+                && ts?.UploadLastOutcome == WheelUploadCoordinator.UploadOutcome.SkippedHashMatch
+                && UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
+                UploadStatusText.Text = string.Format(Strings.Upload_AlreadyOnWheel, ts.MzdashName);
             if (UploadStatusText != null && !inFlight && total != 0)
             {
                 if (bw == total)
@@ -987,16 +1038,32 @@ namespace MozaPlugin.Devices.Ui
                 else if (UiHelpers.StatusMatchesFormatPrefix(UploadStatusText.Text, Strings.Upload_Queued))
                     UploadStatusText.Text = string.Format(Strings.Upload_Stopped, pct, status.ToString("X2"));
             }
+            // Outside the total != 0 gate: a cancel can land before the wheel
+            // has acked anything.
+            if (UploadStatusText != null && !attemptActive
+                && UploadStatusText.Text == Strings.Upload_Cancelling)
+                UploadStatusText.Text = string.Format(Strings.Upload_Cancelled, pct);
 
-            // Enable the upload button only when the wheel is connected and a
-            // management session has been negotiated — TriggerManualUpload
-            // rejects otherwise.
+            if (UploadCancelButton != null)
+            {
+                UploadCancelButton.Visibility = attemptActive ? Visibility.Visible : Visibility.Collapsed;
+                UploadCancelButton.IsEnabled = attemptActive && !(ts?.IsUploadCancelRequested ?? false);
+            }
+
+            // Enable the upload button only when the wheel is connected, a
+            // management session has been negotiated (TriggerManualUpload
+            // rejects otherwise) and no attempt is already running (the
+            // coordinator drops a second one).
             if (UploadNowButton != null)
                 UploadNowButton.IsEnabled = ts != null
                     && _uploadPickedContent != null
                     && _uploadPickedContent.Length > 0
-                    && _data.IsConnected;
+                    && _data.IsConnected
+                    && !attemptActive;
         }
+
+        // Last in-flight percentage, kept for the stopped/cancelled readouts.
+        private int _lastUploadPct;
 
         // Signature of the rows currently bound to the grid. Rebinding fresh
         // row objects on every 500 ms tick recreates the row buttons under the

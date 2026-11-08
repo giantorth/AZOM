@@ -106,8 +106,17 @@ and every later FT-ACT(6,4) went unanswered. Unlike the W17, the CM2 won't fresh
 a session it still holds. Plugin: on an unanswered FT-ACT while the target session shows
 device traffic, or a CLOSE the device doesn't echo, send the seq-0 stale-session close and
 re-activate (`WheelUploadCoordinator.ReclaimStaleFtSession`). Whether the CM2 honours the
-seq-0 close on sess 0x04 is unverified. Why the metadata went unacked is unknown: that
-window fell between the bundle's startup and rolling captures.
+seq-0 close on sess 0x04 is unverified.
+
+**Upload chunks must address the device that opened the FT session.** The FT-ACT, acks and
+CLOSE always followed the sender's target device, but until 1.7.3 the metadata/content
+chunks were stamped with the wheel id `0x17` (defaulted `ChunkMessage` device). On a CM2
+the device-init came from the CM2 and every upload chunk went to an absent wheel, so no
+ready-ack could arrive — bundle EXMJWF9B (base-bridged CM2 at `0x14`): FT-ACT answered by
+`0x14` (open-seq 5), 441+ `43 17 7c 00 04 01 …` chunks, zero to `0x14`, the CM2 re-sending
+its sess 0x04 open every ~1 s. GMGHEQND's unacked metadata predates the fix and is
+explained by the same misaddressing. Upload chunks are now stamped with the target device
+and retransmit-tracked for any device (the CM2 fc:00-acks data chunks cumulatively).
 
 Small-file flow (2025-11 firmware, `pithouse-switch-list-delete-upload-reupload.pcapng`, ~1.9KB mzdash):
 

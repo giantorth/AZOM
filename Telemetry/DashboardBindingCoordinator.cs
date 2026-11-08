@@ -135,6 +135,59 @@ namespace MozaPlugin.Telemetry
             lock (_stateLock) { _pending = null; }
         }
 
+        // CM2 lane's own deferred recall — never shares the wheel's _pending, so a
+        // profile switch can't make one screen cancel or replace the other's.
+        private PendingApply? _pendingCm2;
+
+        public void SetPendingCm2DashboardKey(string key)
+        {
+            var now = DateTime.UtcNow;
+            lock (_stateLock)
+            {
+                _pendingCm2 = new PendingApply(key, now.Add(PendingProfileKeyTimeout), 0, now);
+            }
+        }
+
+        public void ClearPendingCm2DashboardKey()
+        {
+            lock (_stateLock) { _pendingCm2 = null; }
+        }
+
+        /// <summary>PollStatus: retry a deferred CM2 recall until the CM2 lane takes it,
+        /// the CM2 profile's pick changes, or the deadline passes.</summary>
+        public void TickPendingCm2DashboardRetry()
+        {
+            PendingApply? snap;
+            lock (_stateLock) { snap = _pendingCm2; }
+            if (snap == null) return;
+
+            if (DateTime.UtcNow > snap.DeadlineUtc)
+            {
+                MozaLog.Warn("[AZOM] Pending CM2 dashboard recall timed out after " +
+                             $"{PendingProfileKeyTimeout.TotalMinutes:F0} min (key={snap.Key}); giving up");
+                lock (_stateLock) { if (ReferenceEquals(_pendingCm2, snap)) _pendingCm2 = null; }
+                return;
+            }
+
+            var profile = _plugin.DeviceProfiles?.DashProfileFor(MozaPlugin.Cm2PageGuid, seed: false);
+            if (profile == null
+                || !string.Equals(profile.TelemetryDashboardKey, snap.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                lock (_stateLock) { if (ReferenceEquals(_pendingCm2, snap)) _pendingCm2 = null; }
+                return;
+            }
+
+            bool applied;
+            try { applied = ApplyCm2DashboardFromProfile(profile); }
+            catch (Exception ex)
+            {
+                MozaLog.Warn("[AZOM] Pending CM2 dashboard recall threw: " + ex.Message);
+                applied = true;
+            }
+            if (applied)
+                lock (_stateLock) { if (ReferenceEquals(_pendingCm2, snap)) _pendingCm2 = null; }
+        }
+
         public void ClearLastAppliedDashboardKey()
         {
             lock (_stateLock) { _lastAppliedDashboardKey = null; }
@@ -424,11 +477,11 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// Apply <see cref="MozaProfile.TelemetryDashboardKey"/>: resolve to a slot,
+        /// Apply a device profile's <see cref="IDashboardKeyProfile.TelemetryDashboardKey"/>: resolve to a slot,
         /// route through OnDashboardSwitched to emit FF kind=4. Returns false to
         /// defer (PollStatus retries).
         /// </summary>
-        public bool ApplyTelemetryDashboardFromProfile(MozaProfile profile)
+        public bool ApplyTelemetryDashboardFromProfile(IDashboardKeyProfile profile)
         {
             if (profile == null) return true;
             string? key = profile.TelemetryDashboardKey;
@@ -460,14 +513,12 @@ namespace MozaPlugin.Telemetry
 
             // A wheel with no screen never activates the MAIN sender, so the
             // readiness gate below would defer forever ("sender=not-Active" retry
-            // loop). Apply the profile's dashboard to the CM2 lane instead
-            // (screenless wheel / no wheel + CM2 rigs).
+            // loop). The CM2 is not a fallback: it recalls its own pick from its
+            // dash profile (ApplyCm2DashboardFromProfile).
             if (!_plugin.ShouldDriveDashboard())
             {
-                if (_plugin.ActiveCm2Sender != null || _plugin.IsCm2Present)
-                    return ApplyProfileDashboardToCm2(profile, key!);
-                MozaLog.Info("[AZOM] Profile dashboard key " + key +
-                             " has no display lane (screenless wheel, no CM2) — leaving current selection");
+                MozaLog.Debug("[AZOM] Profile dashboard key " + key +
+                              " has no wheel display lane — leaving current selection");
                 return true;
             }
 
@@ -647,7 +698,7 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>Legacy <c>wheel:&lt;id&gt;</c> keys break on re-upload (the wheel
         /// reissues the id); once resolved, rewrite the profile's key to the name form.</summary>
-        private static string CanonicalizeWheelKey(MozaProfile profile, string key, WheelDashboardEntry match)
+        private static string CanonicalizeWheelKey(IDashboardKeyProfile profile, string key, WheelDashboardEntry match)
         {
             string canonical = WheelDashboardKey.For(match);
             if (string.Equals(canonical, key, StringComparison.OrdinalIgnoreCase)) return key;
@@ -658,13 +709,24 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// CM2-lane counterpart of <see cref="ApplyTelemetryDashboardFromProfile"/>
-        /// for rigs whose MAIN sender never runs (screenless wheel / no wheel).
+        /// Switch the CM2 to its dash profile's recorded dashboard. Returns false to defer
+        /// (PollStatus retries via <see cref="TickPendingCm2DashboardRetry"/>).
+        /// </summary>
+        public bool ApplyCm2DashboardFromProfile(IDashboardKeyProfile profile)
+        {
+            string? key = profile?.TelemetryDashboardKey;
+            if (profile == null || string.IsNullOrEmpty(key)) return true;
+            return ApplyProfileDashboardToCm2(profile, key!);
+        }
+
+        /// <summary>
+        /// CM2-lane counterpart of <see cref="ApplyTelemetryDashboardFromProfile"/>.
         /// Resolves the profile key against the CM2's own catalog and switches via
         /// OnCm2DashboardSwitched — the same path the CM2 UI combo uses. Never
-        /// touches the wheel-lane ActiveTelemetryProfileName/MzdashPath fields.
+        /// touches the wheel-lane ActiveTelemetryProfileName/MzdashPath fields or
+        /// the wheel's last-applied key.
         /// </summary>
-        private bool ApplyProfileDashboardToCm2(MozaProfile profile, string key)
+        private bool ApplyProfileDashboardToCm2(IDashboardKeyProfile profile, string key)
         {
             var cm2 = _plugin.ActiveCm2Sender;
             if (cm2 == null || !cm2.IsActive || cm2.IsInSilenceCooldown)
@@ -737,13 +799,15 @@ namespace MozaPlugin.Telemetry
                 return true;
             }
 
+            // What the CM2 shows now: its own report wins over our last kind=4, which a
+            // dash-side switch since then has made stale.
             bool hostEverEngaged = cm2.LastEmittedKind4Slot >= 0;
-            if ((cm2.WheelReportedSlot == slot || cm2.LastEmittedKind4Slot == slot) && hostEverEngaged)
+            int showing = cm2.WheelReportedSlot >= 0 ? cm2.WheelReportedSlot : cm2.LastEmittedKind4Slot;
+            if (showing == slot && hostEverEngaged)
             {
                 MozaLog.Info($"[AZOM] Profile dashboard '{targetName}' (CM2 slot {slot}) already bound; no wire action needed");
                 _plugin.ActiveCm2DashboardName = targetName;
                 _plugin.PersistSettings();
-                SetLastAppliedKey(key);
                 return true;
             }
             MozaLog.Info($"[AZOM] Applying profile dashboard '{targetName}' to CM2 lane (slot {slot}, key={key})");
@@ -751,7 +815,6 @@ namespace MozaPlugin.Telemetry
             _plugin.PersistSettings();
             _plugin.OnCm2DashboardSwitched((uint)slot);
             _plugin.RaiseDashboardSelectionChangedInternal();
-            SetLastAppliedKey(key);
             return true;
         }
 
@@ -1129,7 +1192,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
 
-            var profile = _plugin.Settings.ProfileStore?.CurrentProfile;
+            var profile = _plugin.DeviceProfiles?.WheelDashboardKeyProfile;
             if (profile == null ||
                 !string.Equals(profile.TelemetryDashboardKey, snap.Key, StringComparison.OrdinalIgnoreCase))
             {

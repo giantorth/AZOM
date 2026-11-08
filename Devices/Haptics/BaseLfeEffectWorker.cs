@@ -36,18 +36,8 @@ namespace MozaPlugin.Devices.Haptics
         // chosen by the slot's Mode (Engine sweep / ABS pulse / Gearshift bump /
         // Custom tone), not the slot's fixed wire id — see RenderTest.
         private const long EngineTestMs = 2000;                // engine test = 2 s frequency sweep
-        private const double SweepIdleFraction = 0.12;         // sweeps start ~12% up the band (idle ≈ 600 of ~5000 rpm), not at 0 rpm
         // A parked test has no live RPM, so the Engine/Custom sweep substitutes a
-        // synthetic RPM (idle→redline) into the real formulas and evaluates them —
-        // so the combined preset is coherent (every slot at the SAME rpm) and matches
-        // in-game exactly. Non-RPM property refs still read live telemetry.
-        private const double SynthRedlineRpm = EngineVibrationMath.DefaultRedlineRpm;
-        private const double SynthMaxSpeedKmh = 250.0;       // speed at the top of the sweep (for speed-scaled effects)
-        private const string RpmToken = "[DataCorePlugin.GameData.Rpms]";
-        private const string MaxRpmToken = "[DataCorePlugin.GameData.MaxRpm]";
-        private const string ThrottleToken = "[DataCorePlugin.GameData.Throttle]";
-        private const string BrakeToken = "[DataCorePlugin.GameData.Brake]";
-        private const string SpeedToken = "[DataCorePlugin.GameData.SpeedKmh]";
+        // synthetic RPM (idle→redline) into the real formulas (HapticsTestFormula).
         private const long AbsTestMs = 1000;                   // abs test = 1 s pulse burst
         private const double GsTestBump1EndMs = 70;            // gearshift test = two rapid bumps
         private const double GsTestBump2StartMs = 180;
@@ -82,10 +72,8 @@ namespace MozaPlugin.Devices.Haptics
         {
             public bool Active;
             public double Phase;
-            public double LastTrigger;   // OnChange edge detection
-            public bool Warm;
+            public HapticsEdgeDetector Edge;   // OnChange edge detection
             public long BurstUntil;
-            public long LastFireTicks;
             public double ScopeFreq;     // last carrier freq (Hz) sent — for the UI scope
             public double ScopeAmp;      // last amplitude (0..1) sent (0 = idle)
         }
@@ -231,25 +219,13 @@ namespace MozaPlugin.Devices.Haptics
         // tick methods. Any channel can run in either mode (additive partials).
         private bool ActiveByGame(BaseLfeChannel ch, bool feedLive, ref ChannelState st)
         {
-            if (!ch.Enabled || !feedLive) { st.Warm = false; return false; }
+            if (!ch.Enabled || !feedLive) { st.Edge.Reset(); return false; }
             if (ch.TriggerMode == BaseLfeTriggerMode.Level)
                 return Triggered(ch.TriggerFormula);
 
             long now = Stopwatch.GetTimestamp();
-            double raw = EvalFormulaRaw(ch.TriggerFormula);
-            if (!st.Warm) { st.LastTrigger = raw; st.Warm = true; }
-            else if (Math.Abs(raw - st.LastTrigger) > 1e-6)
-            {
-                bool intoNeutral = Math.Abs(raw) < 0.5;   // gear ≈ 0
-                st.LastTrigger = raw;
-                int debounceMs = ch.DebounceMs; if (debounceMs < 0) debounceMs = 0;
-                bool debounced = (now - st.LastFireTicks) * 1000.0 / Stopwatch.Frequency < debounceMs;
-                if ((!intoNeutral || ch.VibrateOnNeutral) && !debounced)
-                {
-                    st.LastFireTicks = now;
-                    st.BurstUntil = now + _burstTicks;
-                }
-            }
+            if (st.Edge.Fire(EvalFormulaRaw(ch.TriggerFormula), ch.VibrateOnNeutral, ch.DebounceMs, now))
+                st.BurstUntil = now + _burstTicks;
             return st.BurstUntil > now;
         }
 
@@ -356,12 +332,12 @@ namespace MozaPlugin.Devices.Haptics
                     // the sweep out of the near-0 Hz region where a waveform cycle is so
                     // long the base ignores mid-sweep updates.
                     if (ms > EngineTestMs) return false;
-                    double pct = SweepIdleFraction + (1.0 - SweepIdleFraction) * Clamp01(ms / EngineTestMs);
-                    double synthRpm = pct * SynthRedlineRpm;
-                    double synthSpeed = pct * SynthMaxSpeedKmh;
-                    freq = hasFormula ? ch.RescaleFreq(EvalTestFormula(ch.FrequencyFormula!, synthRpm, synthSpeed)) : ch.Frequency;
-                    int01 = Clamp01(EvalTestParam(ch.IntensityFormula, ClampPct(ch.Intensity), synthRpm, synthSpeed) / 100.0);
-                    smooth01 = Clamp01(EvalTestParam(ch.SmoothnessFormula, ClampPct(ch.Smoothness), synthRpm, synthSpeed) / 100.0);
+                    double pct = HapticsTestFormula.SweepIdleFraction + (1.0 - HapticsTestFormula.SweepIdleFraction) * Clamp01(ms / EngineTestMs);
+                    double synthRpm = pct * HapticsTestFormula.SynthRedlineRpm;
+                    double synthSpeed = pct * HapticsTestFormula.SynthMaxSpeedKmh;
+                    freq = hasFormula ? ch.RescaleFreq(HapticsTestFormula.Eval(ch.FrequencyFormula!, synthRpm, synthSpeed, _evalFormula)) : ch.Frequency;
+                    int01 = Clamp01(HapticsTestFormula.Param(ch.IntensityFormula, ClampPct(ch.Intensity), synthRpm, synthSpeed, _evalFormula) / 100.0);
+                    smooth01 = Clamp01(HapticsTestFormula.Param(ch.SmoothnessFormula, ClampPct(ch.Smoothness), synthRpm, synthSpeed, _evalFormula) / 100.0);
                     return true;
             }
         }
@@ -428,27 +404,6 @@ namespace MozaPlugin.Devices.Haptics
 
         private double EvalFormulaRaw(string? formula)
             => string.IsNullOrWhiteSpace(formula) ? 0.0 : _evalFormula(formula!);
-
-        // Evaluate a formula against a synthetic "accelerating flat-out" telemetry
-        // snapshot (rpm + speed sweeping, full throttle, no brake) so a parked test
-        // drives the real formulas — including load- and speed-scaled intensity.
-        // A pure-arithmetic result (RPM/throttle/speed-only formula) is parsed
-        // directly; anything still referencing other telemetry evaluates live.
-        private double EvalTestFormula(string formula, double synthRpm, double synthSpeed)
-        {
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            string s = formula
-                .Replace(RpmToken, synthRpm.ToString("R", inv))
-                .Replace(MaxRpmToken, SynthRedlineRpm.ToString("R", inv))
-                .Replace(ThrottleToken, "100")      // flat out
-                .Replace(BrakeToken, "0")
-                .Replace(SpeedToken, synthSpeed.ToString("R", inv));
-            if (double.TryParse(s, System.Globalization.NumberStyles.Any, inv, out double lit))
-                return lit;
-            return _evalFormula(s);
-        }
-        private double EvalTestParam(string? formula, double staticVal, double synthRpm, double synthSpeed)
-            => string.IsNullOrWhiteSpace(formula) ? staticVal : EvalTestFormula(formula!, synthRpm, synthSpeed);
 
         /// <summary>Slider value, or the formula's evaluated value when non-empty.</summary>
         private double EvalParam(string? formula, double sliderValue)

@@ -215,7 +215,6 @@ namespace MozaPlugin.Devices.Haptics
         private static readonly ConcurrentDictionary<Type, FieldInfo?> FieldCache =
             new ConcurrentDictionary<Type, FieldInfo?>();
 
-
         /// <summary>
         /// True when <paramref name="instance"/> is SimHub's motors (Haptics)
         /// sub-device. Matched by type name so this file stays loadable on a
@@ -242,24 +241,31 @@ namespace MozaPlugin.Devices.Haptics
         /// again, which stamps a fresh stock provider over ours.
         /// </summary>
         public static void TryInstallChannelsProvider(object motorsDeviceExtension)
+            => InstallOnOutputManagers(motorsDeviceExtension, Install, "LFE");
+
+        /// <summary>
+        /// Run <paramref name="install"/> (output manager, hosted settings) on every
+        /// output-manager slot a Haptics section uses: Settings.OutputManager,
+        /// CurrentOutputManager and CurrentProfile.OutputManager. Shared by every
+        /// device that swaps in its own channels provider.
+        /// </summary>
+        internal static void InstallOnOutputManagers(object motorsDeviceExtension,
+            Action<object?, object> install, string label)
         {
             if (!IsSupported) return;
 
             try
             {
-                var field = FieldCache.GetOrAdd(motorsDeviceExtension.GetType(),
-                    t => t.GetField(HostedPluginField, BindingFlags.NonPublic | BindingFlags.Instance));
-                var hosted = field?.GetValue(motorsDeviceExtension);
-                var settings = GetProp(hosted, "Settings");
+                var settings = GetHostedSettings(motorsDeviceExtension);
                 if (settings == null) return;   // not constructed yet; retried next tick
 
-                Install(GetProp(settings, "OutputManager"), settings);
-                Install(GetProp(settings, "CurrentOutputManager"), settings);
-                Install(GetProp(GetProp(settings, "CurrentProfile"), "OutputManager"), settings);
+                install(GetProp(settings, "OutputManager"), settings);
+                install(GetProp(settings, "CurrentOutputManager"), settings);
+                install(GetProp(GetProp(settings, "CurrentProfile"), "OutputManager"), settings);
             }
             catch (Exception ex)
             {
-                MozaLog.Debug($"[AZOM] Could not install the LFE channels provider: {ex.Message}");
+                MozaLog.Debug($"[AZOM] Could not install the {label} channels provider: {ex.Message}");
             }
         }
 

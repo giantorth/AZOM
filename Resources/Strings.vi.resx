@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>GA</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>PHANH</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>CÔN</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>GA · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>PHANH · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>CÔN · CHIỀU &amp; KHOẢNG</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA GA</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA PHANH</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA CÔN</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// ánh xạ vị trí vật lý sang đầu vào game</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// định hình phản hồi phanh</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// định hình phản hồi côn</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>GA · HIỆU CHUẨN</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>PHANH · HIỆU CHUẨN</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>CÔN · HIỆU CHUẨN</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Tỷ lệ cảm biến</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>BỐ CỤC CƠ HỌC</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R Bố cục 1</value></data>
@@ -172,8 +160,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Mức kích hoạt đầu vào</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Độ suy giảm rung</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ĐỌC TỪ THIẾT BỊ</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>HUB ĐA NĂNG · BÀN ĐẠP</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// cổng bàn đạp (kiểm tra mỗi 2 giây)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>BÀN ĐẠP</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Cổng bàn đạp</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>PHỤ KIỆN</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Cổng 1</value></data>
@@ -204,7 +191,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Tiêu đề</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Sửa đổi lần cuối</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>XÓA</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật máy chủ CoAP SDK</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Bật iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Bật máy chủ điều khiển UDP</value></data>
   <data name="Section_About" xml:space="preserve"><value>GIỚI THIỆU</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -253,7 +240,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Cấu hình SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Đóng</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Khởi động lại SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Có gì mới trong v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Tự động kiểm tra cập nhật</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Kênh phát hành</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Ổn định</value></data>
@@ -312,7 +298,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>NGỦ</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Chế độ ngủ</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Thời gian chờ ngủ</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>BẢNG ĐIỀU KHIỂN MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Đang tìm bảng điều khiển...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>CHẾ ĐỘ ĐÈN BÁO</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Chế độ đèn báo RPM</value></data>
@@ -500,13 +485,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Bộ gửi telemetry không khả dụng (plugin chưa khởi tạo).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Trước tiên hãy chọn một tệp .mzdash hoặc một mục thư viện.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(chưa nhận được trạng thái configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Plugin chưa được tải</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Không thể lấy dữ liệu byte cho "{0}" — hãy chọn một tệp cục bộ.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Thư mục: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Đã đưa tải lên vào hàng đợi — đang gửi "{0}" đến vô-lăng…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Chưa bắt đầu tải lên — vô-lăng chưa kết nối hoặc chưa có phiên quản lý.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Tải lên hoàn tất (trạng thái 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Đã dừng tải lên ở {0}% (trạng thái 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Đang hủy tải lên…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Đã hủy tải lên ở {0}%</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>"{0}" đã có trên vô-lăng, không thay đổi — không tải lên gì</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Chọn tệp .mzdash để tải lên</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Bảng đồng hồ Moza (*.mzdash)|*.mzdash|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Chọn thư mục chứa các tệp bảng đồng hồ .mzdash</value></data>
@@ -708,7 +695,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Phát hiện cần số chủ động (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Thiết bị rung bàn đạp kết hợp</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Biểu đồ</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Băng thông</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Mô-men xoắn</value></data>
@@ -845,4 +831,67 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Đỏ tươi nhạt</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Cài đặt sẵn PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>đã áp dụng “{0}” cho hồ sơ đang hoạt động</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Cài đặt chung</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Hiệu ứng telemetry (rung động cơ, ABS và sang số qua đế vô lăng) cần firmware đế 1.2.10.10 trở lên. Đế này đang có {0}. Hãy cập nhật firmware đế trong Pit House để sử dụng.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Rung S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ S12 của plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt theo từng bàn đạp</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kết hợp</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ S12 của plugin.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Đầu ra trực tiếp</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Độ dài xung</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Cổng 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Vô lăng</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Bảng đồng hồ</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Cần số</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Phanh tay</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Vô lăng ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Đế vô lăng</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Thiết bị 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>mất {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Tab mặc định</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Rung mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ mBooster của plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ mBooster của plugin.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Chưa thêm mBooster trong SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Bàn đạp mBooster đang được kết nối và đặt dùng ShakeIt, nhưng thiết bị mBooster chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Khoảng</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>HIỆU CHUẨN</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Nguồn chuyển động</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Telemetry trò chơi</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Hồ sơ SimHub Motion</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Bao gồm phản hồi xúc giác góc của SimHub</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Đã hiệu chuẩn</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Thủ công</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>ĐẶT LẠI</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Nhàn rỗi</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Đang chờ</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Sẵn sàng</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Đang nhả</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Đã hủy</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Tự động hiệu chuẩn</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} mẫu</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Nguồn côn</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Bàn đạp mBooster</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Điểm bắt côn ly hợp</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Độ rộng</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Độ dài tối thiểu (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Độ dài tối đa (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Tốc độ nhịp (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Kích hoạt khi</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Đạp</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Nhả</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Cả hai</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Giá trị trò chơi</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Trục HID</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Thiết bị</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>ĐẶT PHẠM VI</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>XONG</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Thanh trượt</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Núm xoay</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Bánh xe</value></data>
 </root>

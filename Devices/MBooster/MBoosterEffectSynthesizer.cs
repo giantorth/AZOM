@@ -52,7 +52,10 @@ namespace MozaPlugin.Devices.MBooster
         /// protocol-verified reference — a deliberate reuse of ABS's
         /// already-tuned "feel" for a tactile engagement cue, gated by
         /// pedal position rather than a wheel-slip/activation signal (see
-        /// MBoosterEffectWorker.UpdateBitePointRequest).
+        /// MBoosterEffectWorker.UpdateBitePointRequest). <paramref name="phase"/>
+        /// is the Pulse rate oscillator's, not the tone's: the ripple is sampled
+        /// once per 20 ms frame, so tying it to the tone only ever played the
+        /// tone's beat against 50 Hz (MBoosterUiConstants.BitePointLegacyPulseRateHz).
         /// </summary>
         public static double SynthesizeBitePoint(double intensity, double phase, double smoothness01)
         {

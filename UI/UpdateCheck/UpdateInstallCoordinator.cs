@@ -8,16 +8,14 @@ namespace MozaPlugin.UI.UpdateCheck
 {
     /// <summary>
     /// Session-scoped coordinator for the in-app update install. Owns the single
-    /// install flow plus the shared "install in progress" / "dismissed this
-    /// session" state, so every surface that renders the update banner stays in
+    /// install flow plus the shared "install in progress" state and the
+    /// visibility rule, so every surface that renders the update banner stays in
     /// sync: the cross-tab <c>PluginBanners</c> control (plugin pane + every
     /// device page) and the About-tab "Updates" card.
     ///
     /// Deliberately UI-agnostic — it raises <see cref="Progress"/> / <see
     /// cref="Completed"/> events and each surface paints itself. A process
-    /// singleton, so its state survives the plugin's game-switch reload (a
-    /// dismissal stays dismissed until an explicit "Check now" or a real
-    /// process exit).
+    /// singleton, so its state survives the plugin's game-switch reload.
     /// </summary>
     internal sealed class UpdateInstallCoordinator
     {
@@ -32,11 +30,19 @@ namespace MozaPlugin.UI.UpdateCheck
         public bool InstallInProgress { get; private set; }
 
         /// <summary>
-        /// Set when the user dismisses the update banner from any surface; hides
-        /// it everywhere for the rest of the session. Reset by an explicit
-        /// "Check now" (a clear request to see current status).
+        /// Hides the banner for the currently offered version on every surface,
+        /// persisted so it stays hidden across restarts until a different
+        /// version is published.
         /// </summary>
-        public bool DismissedThisSession { get; set; }
+        public static void DismissLatest(MozaPlugin? plugin)
+        {
+            var s = plugin?.Settings;
+            if (s == null) return;
+            string latest = s.LastSeenLatestVersion ?? "";
+            if (string.Equals(s.LastSkippedVersion, latest, StringComparison.Ordinal)) return;
+            s.LastSkippedVersion = latest;
+            try { plugin!.PersistSettings(); } catch { /* persistence is best-effort */ }
+        }
 
         /// <summary>Streaming progress (Downloading → Extracting → Installing).
         /// Raised on the UI thread — <see cref="RunInstallAsync"/> captures the
@@ -67,8 +73,8 @@ namespace MozaPlugin.UI.UpdateCheck
 
         /// <summary>
         /// Whether an update notification should show right now and in which mode.
-        /// Pure read of persisted state + the .old pending probe + the session
-        /// dismiss flag. <paramref name="pendingRestart"/> means an install
+        /// Pure read of persisted state + the .old pending probe.
+        /// <paramref name="pendingRestart"/> means an install
         /// already landed and SimHub must restart — never offer another install
         /// in that mode (it would fail with OldPending).
         /// </summary>
@@ -81,10 +87,10 @@ namespace MozaPlugin.UI.UpdateCheck
             hasAsset = false;
 
             if (s == null) return;
-            if (DismissedThisSession || !s.UpdateCheckEnabled) return;
+            if (!s.UpdateCheckEnabled) return;
             if (string.IsNullOrEmpty(latest)) return;
             if (!UpdateCheckService.IsUpdateAvailable(
-                    latest, current, s.UpdateChannelId, s.FollowBetaChannel)) return;
+                    latest, current, s.UpdateChannelId, s.StableDowngradeFromVersion)) return;
             if (!string.IsNullOrEmpty(s.LastSkippedVersion)
                 && string.Equals(s.LastSkippedVersion, latest, StringComparison.Ordinal)) return;
 

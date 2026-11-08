@@ -1,19 +1,12 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Reflection;
 using BA63Driver;
 using BA63Driver.Interfaces;
-using BA63Driver.Mapper;
 using GameReaderCommon.Enums;
-using SerialDash;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Device.MotorsWithFrequency;
 using SimHub.Plugins.DataPlugins.ShakeItV3.EffectsContainers;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Settings;
-using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
-using SimHub.Plugins.OutputPlugins.GraphicalDash.PSE;
 using MozaPlugin.Integration;
 using MozaPlugin.Protocol;
 
@@ -30,7 +23,7 @@ namespace MozaPlugin.Devices.Haptics
     /// <c>StandardProtocolConnectionDevice</c> that becomes the composite's only
     /// primary. If that never reports Connected, CompositeDeviceInstance sets
     /// PrimaryDeviceMissing and the whole device stops being driven.
-    /// <see cref="MozaPedalHapticsConnectionManager"/> is swapped in for it; its
+    /// <see cref="MozaHapticsConnectionManager"/> is swapped in for it; its
     /// GetDriverInstance() also answers the motors extension's lazily-resolved
     /// <see cref="IMotorsDriver"/>, so one swap covers both connection state and
     /// value delivery. No HID report ever leaves SimHub — the frames go out the
@@ -45,13 +38,6 @@ namespace MozaPlugin.Devices.Haptics
         /// <summary>Same probe as the wheelbase bridge — one SimHub feature, one gate.</summary>
         public static bool IsSupported => MozaBaseHapticsBridge.IsSupported;
 
-        // StandardProtocolMotorsDeviceExtension keeps its hosted ShakeIt plugin
-        // in a private field; everything past it is public.
-        private const string HostedPluginField = "shakeITV3PluginBase";
-
-        private static readonly ConcurrentDictionary<Type, FieldInfo?> FieldCache =
-            new ConcurrentDictionary<Type, FieldInfo?>();
-
         // Enum.GetValues allocates and boxes per call; the sweep walks placements per
         // leaf. Nested so FFBPlacement only loads with the guarded sweep methods.
         private static class Placements
@@ -60,10 +46,19 @@ namespace MozaPlugin.Devices.Haptics
         }
 
         /// <summary>Build the replacement manager lazily, inside a caller's guard.</summary>
-        public static object CreateConnectionManager(byte pedal) => new MozaPedalHapticsConnectionManager(pedal);
+        public static object CreateConnectionManager(byte pedal) => CreateManager(pedal);
 
         /// <summary>Same, for the combined device.</summary>
-        public static object CreateCombinedConnectionManager() => new MozaPedalHapticsConnectionManager(pedal: 0);
+        public static object CreateCombinedConnectionManager() => CreateManager(pedal: 0);
+
+        // The unselected layout reads disconnected, so SimHub shows it as idle rather than live.
+        private static MozaHapticsConnectionManager CreateManager(byte pedal)
+        {
+            bool combined = pedal == 0;
+            return new MozaHapticsConnectionManager(
+                () => MozaPlugin.Instance?.IsPedalHapticsActive(combined) == true,
+                new MozaPedalHapticsMotorsDriver(pedal));
+        }
 
         /// <summary>
         /// Replace SimHub's <c>StandardProtocolMotorsChannelsSettingsProvider</c>
@@ -83,29 +78,7 @@ namespace MozaPlugin.Devices.Haptics
             => TryInstall(motorsDeviceExtension, InstallCombined);
 
         private static void TryInstall(object motorsDeviceExtension, Action<object?, object> install)
-        {
-            if (!IsSupported) return;
-
-            try
-            {
-                var field = FieldCache.GetOrAdd(motorsDeviceExtension.GetType(),
-                    t => t.GetField(HostedPluginField, BindingFlags.NonPublic | BindingFlags.Instance));
-                var hosted = field?.GetValue(motorsDeviceExtension);
-                // GetProp handles the two traps the wheelbase bridge documents:
-                // ShakeItSettings<T> re-declares OutputManager with `new`, and
-                // AbstractSettingsStore.Settings is a field, not a property.
-                var settings = MozaBaseHapticsBridge.GetProp(hosted, "Settings");
-                if (settings == null) return;   // not constructed yet; retried next tick
-
-                install(MozaBaseHapticsBridge.GetProp(settings, "OutputManager"), settings);
-                install(MozaBaseHapticsBridge.GetProp(settings, "CurrentOutputManager"), settings);
-                install(MozaBaseHapticsBridge.GetProp(MozaBaseHapticsBridge.GetProp(settings, "CurrentProfile"), "OutputManager"), settings);
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Debug($"[AZOM] Could not install the pedal-haptics channels provider: {ex.Message}");
-            }
-        }
+            => MozaBaseHapticsBridge.InstallOnOutputManagers(motorsDeviceExtension, install, "pedal-haptics");
 
         /// <summary>
         /// Give every switched-on effect exactly one oscillator, and release the
@@ -376,78 +349,6 @@ namespace MozaPlugin.Devices.Haptics
             MozaLog.Info("[AZOM] Installed the MOZA pedal-haptics combined channels provider "
                        + $"({MozaPedalHapticsCombinedChannelsProvider.PedalChannels} pedals)");
         }
-    }
-
-    /// <summary>
-    /// Stand-in for SimHub's StandardProtocolConnectionDevice manager. Reports
-    /// whether a pedal-haptics unit has answered, never touches HID, and hands
-    /// out the motors driver.
-    ///
-    /// Implements <see cref="IConnectableLedDeviceManager"/> deliberately:
-    /// without it, StandardProtocolConnectionDevice.DataUpdate calls Display()
-    /// with six empty colour arrays every tick.
-    /// </summary>
-    internal sealed class MozaPedalHapticsConnectionManager : ILedDeviceManager, IConnectableLedDeviceManager
-    {
-        private readonly MozaPedalHapticsMotorsDriver _motors;
-        private readonly bool _combined;
-
-        /// <param name="pedal">Motor port, or 0 for the combined device.</param>
-        internal MozaPedalHapticsConnectionManager(byte pedal)
-        {
-            _combined = pedal == 0;
-            _motors = new MozaPedalHapticsMotorsDriver(pedal);
-        }
-        private bool _lastConnected;
-
-        public LedModuleSettings? LedModuleSettings { get; set; }
-        public LedDeviceState? LastState { get; private set; }
-
-#pragma warning disable CS0067 // Required by ILedDeviceManager; this device renders nothing
-        public event EventHandler? BeforeDisplay;
-        public event EventHandler? AfterDisplay;
-        public event EventHandler? OnError;
-#pragma warning restore CS0067
-        public event EventHandler? OnConnect;
-        public event EventHandler? OnDisconnect;
-
-        // This device has no LED sub-device to keep alive, so unlike the
-        // wheelbase there is no wide-gate/narrow-gate split — the connection and
-        // the motors driver can both use the one real condition. The unselected
-        // layout reads disconnected, so SimHub shows it as idle rather than live.
-        public bool IsConnected() => MozaPlugin.Instance?.IsPedalHapticsActive(_combined) == true;
-
-        /// <summary>Raise SimHub's connect/disconnect events when the state flips. Called from the device extension's DataUpdate.</summary>
-        public void UpdateConnectionState()
-        {
-            bool now = IsConnected();
-            if (now == _lastConnected) return;
-            _lastConnected = now;
-            if (now) OnConnect?.Invoke(this, EventArgs.Empty);
-            else OnDisconnect?.Invoke(this, EventArgs.Empty);
-        }
-
-        public void EnsureConnected() { }
-
-        public void Display(Func<Color[]> leds, Func<Color[]> buttons, Func<Color[]> encoders,
-            Func<Color[]> matrix, Func<Color[]> rawState, Func<Color[]> overrideState, bool forceRefresh,
-            Func<object>? extraData = null, double rpmBrightness = 1.0, double buttonsBrightness = 1.0,
-            double encodersBrightness = 1.0, double matrixBrightness = 1.0)
-        {
-            // The unit owns no pixels.
-        }
-
-        // The capture contains no identity traffic for device 0x1F at all — no
-        // serial, no firmware version, no model name — so there is nothing
-        // honest to report here. See docs/protocol/devices/pedal-haptics.md.
-        public string GetSerialNumber() => "";
-        public string GetFirmwareVersion() => "";
-        public object GetDriverInstance() => _motors;
-        public void Close() => _motors.Clear();
-        public void ResetDetection() { }
-        public void SerialPortCanBeScanned(object sender, SerialDashController.ScanArgs e) { }
-        public IPhysicalMapper GetPhysicalMapper() => new NeutralLedsMapper();
-        public ILedDriverBase? GetLedDriver() => null;
     }
 
     /// <summary>

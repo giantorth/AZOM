@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>ΓΚΑΖΙ</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>ΦΡΕΝΟ</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>ΣΥΜΠΛΕΚΤΗΣ</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>ΓΚΑΖΙ · ΚΑΤΕΥΘΥΝΣΗ &amp; ΕΜΒΕΛΕΙΑ</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>ΦΡΕΝΟ · ΚΑΤΕΥΘΥΝΣΗ &amp; ΕΜΒΕΛΕΙΑ</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>ΣΥΜΠΛΕΚΤΗΣ · ΚΑΤΕΥΘΥΝΣΗ &amp; ΕΜΒΕΛΕΙΑ</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΓΚΑΖΙΟΥ</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΦΡΕΝΟΥ</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>ΚΑΜΠΥΛΗ ΕΞΟΔΟΥ ΣΥΜΠΛΕΚΤΗ</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// Αντιστοίχιση φυσικής θέσης σε παιχνίδι</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// Διαμόρφωση απόκρισης φρένου</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// Διαμόρφωση απόκρισης συμπλέκτη</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>ΓΚΑΖΙ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>ΦΡΕΝΟ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>ΣΥΜΠΛΕΚΤΗΣ · ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>Αναλογία Αισθητήρα</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>ΜΗΧΑΝΙΚΗ ΔΙΑΤΑΞΗ</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>Διάταξη 5+R 1</value></data>
@@ -172,8 +160,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>Επίπεδο ενεργοποίησης</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>Απόσβεση δόνησης</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>ΑΝΑΓΝΩΣΗ ΑΠΟ ΣΥΣΚΕΥΗ</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>UNIVERSAL HUB · ΠΕΝΤΆΛ</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// Θύρα πεντάλ (ανανέωση κάθε 2 δευτερόλεπτα)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>ΠΕΝΤΆΛ</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>Θύρα Πεντάλ</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>ΑΞΕΣΟΥΑΡ</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>Θύρα 1</value></data>
@@ -204,7 +191,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>Τίτλος</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>Τελευταία τροποποίηση</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>ΔΙΑΓΡΑΦΗ</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση CoAP SDK server</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>Ενεργοποίηση iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>Ενεργοποίηση UDP control server</value></data>
   <data name="Section_About" xml:space="preserve"><value>ΣΧΕΤΙΚΑ</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -253,7 +240,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>Διαμόρφωση SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>Απόρριψη</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>Επανεκκίνηση SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>Νέα στην v{0}</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>Αυτόματος έλεγχος για ενημερώσεις</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>Κανάλι έκδοσης</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>Σταθερό</value></data>
@@ -312,7 +298,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>ΑΔΡΑΝΕΙΑ</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>Λειτουργία Αδράνειας</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>Χρόνος Αδράνειας</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>ΟΘΟΝΗ MOZA</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>Αναζήτηση Οθόνης...</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΕΣ ΔΕΙΚΤΗ</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>Λειτουργία δείκτη RPM</value></data>
@@ -499,13 +484,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>Ο αποστολέας τηλεμετρίας δεν είναι διαθέσιμος (το πρόσθετο δεν αρχικοποιήθηκε).</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Επιλέξτε πρώτα ένα αρχείο .mzdash ή μια καταχώριση βιβλιοθήκης.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(δεν έχει ληφθεί ακόμη κατάσταση configJson)</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>Το πρόσθετο δεν φορτώθηκε</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Δεν είναι δυνατή η ανάκτηση των ακατέργαστων δεδομένων για «{0}» — επιλέξτε ένα τοπικό αρχείο.</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>Φάκελος: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Η αποστολή σε ουρά — μεταφορά «{0}» στο τιμόνι…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Η αποστολή δεν ξεκίνησε — το τιμόνι δεν είναι συνδεδεμένο ή δεν υπάρχει ακόμη συνεδρία διαχείρισης.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (κατάσταση 0x{0})</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>Η αποστολή σταμάτησε στο {0}% (κατάσταση 0x{1})</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>Ακύρωση αποστολής…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>Η αποστολή ακυρώθηκε στο {0}%</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>Το «{0}» υπάρχει ήδη αμετάβλητο στο τιμόνι — δεν στάλθηκε τίποτα</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Επιλέξτε ένα αρχείο .mzdash για αποστολή</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Ταμπλό Moza (*.mzdash)|*.mzdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Επιλέξτε φάκελο που περιέχει αρχεία ταμπλό .mzdash</value></data>
@@ -707,7 +694,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>Ανίχνευση ενεργού επιλογέα ταχυτήτων (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>Ενιαία συσκευή απτικής ανάδρασης πεντάλ</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>Γράφημα</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>Εύρος ζώνης</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>Ροπή</value></data>
@@ -844,4 +830,67 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>Παστέλ ματζέντα</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>Preset PitHouse (*.mzpreset;*.json)|*.mzpreset;*.json|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>το «{0}» εφαρμόστηκε στο ενεργό προφίλ</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>Καθολικές ρυθμίσεις</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Τα εφέ τηλεμετρίας (δόνηση κινητήρα, ABS και αλλαγής ταχυτήτων μέσω της βάσης) απαιτούν υλικολογισμικό βάσης 1.2.10.10 ή νεότερο. Αυτή η βάση έχει {0}. Ενημερώστε το υλικολογισμικό της βάσης στο Pit House για να τα χρησιμοποιήσετε.</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Απτική S12</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Απτική πεντάλ S12</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Καρτέλα S12 του πρόσθετου</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt ανά πεντάλ</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt ενιαίο</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>Το ShakeIt απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα S12 του πρόσθετου.</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Ζωντανή έξοδος</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Διάρκεια παλμού</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>Θύρα 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>Τιμόνι</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>Ταμπλό</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>Λεβιέ ταχυτήτων</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>Χειρόφρενο</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>Τιμόνι ES</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>Βάση τιμονιού</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>Συσκευή 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>απώλεια {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Προεπιλεγμένη καρτέλα</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Δόνηση mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Καρτέλα mBooster του πρόσθετου</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>Το ShakeIt απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα mBooster του πρόσθετου.</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Το mBooster δεν έχει προστεθεί στο SimHub</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Τα πεντάλ mBooster είναι συνδεδεμένα και ρυθμισμένα σε ShakeIt, αλλά η συσκευή mBooster δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>Εύρος</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>ΒΑΘΜΟΝΟΜΗΣΗ</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>Πηγή κίνησης</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>Τηλεμετρία παιχνιδιού</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Προφίλ SimHub Motion</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Συμπερίληψη απτικών εφέ γωνιών του SimHub</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Βαθμονομημένο</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Χειροκίνητο</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>Αδράνεια</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>Έτοιμο</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>Απελευθέρωση</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Ακυρώθηκε</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Αυτόματη βαθμονόμηση</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} δείγματα</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>Πηγή συμπλέκτη</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Πεντάλ mBooster</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Σημείο εμπλοκής συμπλέκτη</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Εύρος</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Ελάχιστη διάρκεια (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Μέγιστη διάρκεια (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Ρυθμός παλμού (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Ενεργοποίηση κατά</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Πάτημα</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Απελευθέρωση</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Και τα δύο</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Τιμή παιχνιδιού</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Άξονας HID</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Συσκευή</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΕΥΡΟΥΣ</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>ΤΕΛΟΣ</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Ολισθητής</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Επιλογέας</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Τροχός</value></data>
 </root>

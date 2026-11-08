@@ -99,18 +99,6 @@
   <data name="Label_Throttle" xml:space="preserve"><value>油门</value></data>
   <data name="Label_Brake" xml:space="preserve"><value>刹车</value></data>
   <data name="Label_Clutch" xml:space="preserve"><value>离合</value></data>
-  <data name="Section_ThrottleDirectionRange" xml:space="preserve"><value>油门 · 方向与范围</value></data>
-  <data name="Section_BrakeDirectionRange" xml:space="preserve"><value>刹车 · 方向与范围</value></data>
-  <data name="Section_ClutchDirectionRange" xml:space="preserve"><value>离合 · 方向与范围</value></data>
-  <data name="Section_ThrottleOutputCurve" xml:space="preserve"><value>油门输出曲线</value></data>
-  <data name="Section_BrakeOutputCurve" xml:space="preserve"><value>刹车输出曲线</value></data>
-  <data name="Section_ClutchOutputCurve" xml:space="preserve"><value>离合输出曲线</value></data>
-  <data name="Subtitle_MapPhysicalPositionToGame" xml:space="preserve"><value>// 将物理位置映射为游戏输入</value></data>
-  <data name="Subtitle_ShapeBrakeResponse" xml:space="preserve"><value>// 调整刹车响应曲线</value></data>
-  <data name="Subtitle_ShapeClutchResponse" xml:space="preserve"><value>// 调整离合响应曲线</value></data>
-  <data name="Section_ThrottleCalibration" xml:space="preserve"><value>油门 · 校准</value></data>
-  <data name="Section_BrakeCalibration" xml:space="preserve"><value>刹车 · 校准</value></data>
-  <data name="Section_ClutchCalibration" xml:space="preserve"><value>离合 · 校准</value></data>
   <data name="SliderLabel_SensorRatio" xml:space="preserve"><value>传感器比例</value></data>
   <data name="Section_MechanicalLayout" xml:space="preserve"><value>机械布局</value></data>
   <data name="Option_Ab9Layout5R1" xml:space="preserve"><value>5+R 布局 1</value></data>
@@ -172,8 +160,7 @@
   <data name="SliderLabel_TriggerLevel" xml:space="preserve"><value>触发输入电平</value></data>
   <data name="SliderLabel_VibrationDecay" xml:space="preserve"><value>振动衰减</value></data>
   <data name="Button_ReadFromDevice" xml:space="preserve"><value>从设备读取</value></data>
-  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>通用 Hub · 踏板</value></data>
-  <data name="Subtitle_PedalsPort" xml:space="preserve"><value>// 踏板端口(每 2 秒轮询一次)</value></data>
+  <data name="Section_UniversalHubPedals" xml:space="preserve"><value>踏板</value></data>
   <data name="Label_PedalsPort" xml:space="preserve"><value>踏板端口</value></data>
   <data name="Section_Accessories" xml:space="preserve"><value>配件</value></data>
   <data name="Label_Port1" xml:space="preserve"><value>端口 1</value></data>
@@ -204,7 +191,7 @@
   <data name="DataGridHeader_Title" xml:space="preserve"><value>标题</value></data>
   <data name="DataGridHeader_LastModified" xml:space="preserve"><value>最后修改</value></data>
   <data name="Button_Delete" xml:space="preserve"><value>删除</value></data>
-  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 CoAP SDK 服务器</value></data>
+  <data name="SliderLabel_EnableCoapServer" xml:space="preserve"><value>启用 iRacing SDK</value></data>
   <data name="SliderLabel_EnableUdpControl" xml:space="preserve"><value>启用 UDP 控制服务器</value></data>
   <data name="Section_About" xml:space="preserve"><value>关于</value></data>
   <data name="Label_AzomTitle" xml:space="preserve"><value>AZOM</value></data>
@@ -253,7 +240,6 @@
   <data name="Button_ConfigureSdk" xml:space="preserve"><value>配置 SDK</value></data>
   <data name="Button_Dismiss" xml:space="preserve"><value>忽略</value></data>
   <data name="Button_RestartSimHub" xml:space="preserve"><value>重启 SimHub</value></data>
-  <data name="Label_WhatsNew" xml:space="preserve"><value>v{0} 新增内容</value></data>
   <data name="Label_CheckForUpdates" xml:space="preserve"><value>自动检查更新</value></data>
   <data name="Label_ReleaseChannel" xml:space="preserve"><value>发布通道</value></data>
   <data name="Option_ReleaseChannelStable" xml:space="preserve"><value>稳定版</value></data>
@@ -312,7 +298,6 @@
   <data name="Section_Sleep" xml:space="preserve"><value>休眠</value></data>
   <data name="SliderLabel_SleepMode" xml:space="preserve"><value>休眠模式</value></data>
   <data name="SliderLabel_SleepTimeout" xml:space="preserve"><value>休眠超时</value></data>
-  <data name="Section_MozaDashboard" xml:space="preserve"><value>MOZA 仪表盘</value></data>
   <data name="Status_SearchingForDashboard" xml:space="preserve"><value>正在搜索仪表盘…</value></data>
   <data name="Section_IndicatorModes" xml:space="preserve"><value>指示灯模式</value></data>
   <data name="SliderLabel_RpmIndicatorMode" xml:space="preserve"><value>RPM 指示模式</value></data>
@@ -500,13 +485,15 @@
   <data name="Status_TelemetrySenderUnavailableInit" xml:space="preserve"><value>遥测发送器不可用（插件未初始化）。</value></data>
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>请先选择一个 .mzdash 文件或库条目。</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>（尚未收到 configJson 状态）</value></data>
-  <data name="Status_PluginNotLoaded" xml:space="preserve"><value>插件未加载</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>无法解析 “{0}” 的原始字节——请改为选择本地文件。</value></data>
   <data name="Upload_FolderPrefix" xml:space="preserve"><value>文件夹：{0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>上传已排队——正在将 “{0}” 推送到方向盘…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
   <data name="Upload_Stopped" xml:space="preserve"><value>上传在 {0}% 停止（状态 0x{1}）</value></data>
+  <data name="Upload_Cancelling" xml:space="preserve"><value>正在取消上传…</value></data>
+  <data name="Upload_Cancelled" xml:space="preserve"><value>上传已在 {0}% 取消</value></data>
+  <data name="Upload_AlreadyOnWheel" xml:space="preserve"><value>“{0}” 已在方向盘上且未更改——未上传任何内容</value></data>
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
@@ -708,7 +695,6 @@ Id: {2}</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 兼容性</value></data>
   <data name="SliderLabel_Ab9Detection" xml:space="preserve"><value>主动换挡器检测 (AB9 / AB6)</value></data>
-  <data name="SliderLabel_PedalHapticsCombined" xml:space="preserve"><value>合并的踏板触觉设备</value></data>
   <data name="Label_BaseGraphMode" xml:space="preserve"><value>图表</value></data>
   <data name="Option_GraphBandwidth" xml:space="preserve"><value>带宽</value></data>
   <data name="Option_GraphTorque" xml:space="preserve"><value>扭矩</value></data>
@@ -845,4 +831,67 @@ Id: {2}</value></data>
   <data name="Swatch_PastelMagenta" xml:space="preserve"><value>淡品红色</value></data>
   <data name="FileFilter_PitHousePreset" xml:space="preserve"><value>PitHouse 预设 (*.mzpreset;*.json)|*.mzpreset;*.json|所有文件 (*.*)|*.*</value></data>
   <data name="Import_Footer_Applied" xml:space="preserve"><value>已将“{0}”应用到活动配置</value></data>
+  <data name="Label_GlobalSettings" xml:space="preserve"><value>全局设置</value></data>
+  <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>遥测效果（通过底座输出的引擎、ABS 和换挡振动）需要底座固件 1.2.10.10 或更高版本。此底座为 {0}。请在 Pit House 中更新底座固件以使用这些效果。</value></data>
+  <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12 触觉</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12 踏板触觉</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>插件 S12 选项卡</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt 按踏板</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt 合并</value></data>
+  <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt 需要 SimHub 9.12 或更高版本 — 当前使用插件的 S12 选项卡。</value></data>
+  <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>实时输出</value></data>
+  <data name="SliderLabel_PulseLength" xml:space="preserve"><value>脉冲长度</value></data>
+  <data name="Label_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="Label_Port4" xml:space="preserve"><value>端口 4</value></data>
+  <data name="HubDevice_Wheel" xml:space="preserve"><value>方向盘</value></data>
+  <data name="HubDevice_Dashboard" xml:space="preserve"><value>仪表盘</value></data>
+  <data name="HubDevice_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="HubDevice_Shifter" xml:space="preserve"><value>换挡器</value></data>
+  <data name="HubDevice_Handbrake" xml:space="preserve"><value>手刹</value></data>
+  <data name="HubDevice_EsWheel" xml:space="preserve"><value>ES 方向盘</value></data>
+  <data name="HubDevice_Wheelbase" xml:space="preserve"><value>方向盘基座</value></data>
+  <data name="HubDevice_Unknown" xml:space="preserve"><value>设备 0x{0:X2}</value></data>
+  <data name="HubPort_LossFormat" xml:space="preserve"><value>丢包 {0:0.#}%</value></data>
+  <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>默认选项卡</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster 振动</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>插件 mBooster 选项卡</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt 需要 SimHub 9.12 或更高版本 — 当前使用插件的 mBooster 选项卡。</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster 未在 SimHub 中添加</value></data>
+  <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 踏板已连接并设置为 ShakeIt，但尚未在 SimHub 中添加 mBooster 设备。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
+  <data name="SliderLabel_Range" xml:space="preserve"><value>范围</value></data>
+  <data name="Button_Calibrate" xml:space="preserve"><value>校准</value></data>
+  <data name="Motion_Panel_Source" xml:space="preserve"><value>运动来源</value></data>
+  <data name="Motion_Source_GameTelemetry" xml:space="preserve"><value>游戏遥测</value></data>
+  <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion 配置文件</value></data>
+  <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>包含 SimHub 角部触觉效果</value></data>
+  <data name="Option_BitePointCalibrated" xml:space="preserve"><value>已校准</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>手动</value></data>
+  <data name="Button_ResetCalibration" xml:space="preserve"><value>重置</value></data>
+  <data name="BiteCal_Idle" xml:space="preserve"><value>空闲</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>等待中</value></data>
+  <data name="BiteCal_Armed" xml:space="preserve"><value>就绪</value></data>
+  <data name="BiteCal_Releasing" xml:space="preserve"><value>松开中</value></data>
+  <data name="BiteCal_Cancelled" xml:space="preserve"><value>已取消</value></data>
+  <data name="Label_AutoCalibrate" xml:space="preserve"><value>自动校准</value></data>
+  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} 个样本</value></data>
+  <data name="Label_ClutchSource" xml:space="preserve"><value>离合来源</value></data>
+  <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 踏板</value></data>
+  <data name="Section_ClutchBitePoint" xml:space="preserve"><value>离合器结合点</value></data>
+  <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>宽度</value></data>
+  <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>最短时长 (ms)</value></data>
+  <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>最长时长 (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>脉动频率 (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>触发时机</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>踩下</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>松开</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>两者</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>游戏值</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 轴</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>设备</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>设置范围</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>完成</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>滑块</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>旋钮</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>滚轮</value></data>
 </root>

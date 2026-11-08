@@ -84,7 +84,7 @@ namespace MozaPlugin.Devices
         /// dedicated hub connection, must perform hub detection: the dedicated hub
         /// connection never opens because the primary already holds the only hub
         /// port (the <c>_activePorts</c> guard blocks a second open). Without this,
-        /// nothing reads <c>hub-port1-power</c>, so <c>IsHubConnected</c> never flips,
+        /// nothing reads <c>hub-port2-loss</c>, so <c>IsHubConnected</c> never flips,
         /// <c>Data.IsConnected</c> stays false, and the SimHub LED pipeline's
         /// connected-gate (<see cref="Devices.Led.MozaLedDeviceManager.Display"/>)
         /// suppresses every frame — the wheel sits on its static EEPROM colours.
@@ -101,6 +101,20 @@ namespace MozaPlugin.Devices
             && _connection.IsConnected
             && (MozaUsbIds.IsHubPid(_connection.DiscoveredPid)
                 || (_connection.DiscoveredPid == null && _connection.HubProbeSucceeded));
+
+        /// <summary>Pedals answered on the hub's pipe — the dedicated hub
+        /// connection, or the primary when it is itself bound to the hub.</summary>
+        internal bool PedalsOnHub
+        {
+            get
+            {
+                if (!_detectionState.PedalsDetected) return false;
+                var owner = _detectionState.PedalsOwner;
+                if (owner == null) return false;
+                if (_hubManager != null && ReferenceEquals(owner, _hubManager.DeviceManager)) return true;
+                return PrimaryBoundToHub && ReferenceEquals(owner, _deviceManager);
+            }
+        }
 
         /// <summary>
         /// Save a lane's durable device identity beside its port name. Called on
@@ -159,12 +173,12 @@ namespace MozaPlugin.Devices
                     // (its own port). The exception is the hub-ONLY case: the primary
                     // is itself bound to the hub, the dedicated hub connection can't
                     // open (port already held), so the primary must read
-                    // hub-port1-power here — its 0xE4 reply flips HubDetected /
-                    // IsHubConnected (DeviceProber.hub-port1-power case), which is what
+                    // hub-port2-loss here — its 0xE4 reply flips HubDetected /
+                    // IsHubConnected (DeviceProber.hub-port2-loss case), which is what
                     // turns Data.IsConnected true and lets the SimHub LED pipeline
                     // forward frames. A wheelbase-bound primary skips this.
                     if (PrimaryBoundToHub)
-                        _deviceManager.ReadSetting("hub-port1-power");
+                        _deviceManager.ReadSetting("hub-port2-loss");
 
                     // Persist successful port for next launch
                     var port = _connection.LastPortName;
@@ -230,7 +244,7 @@ namespace MozaPlugin.Devices
             try
             {
                 if (rising) _plugin.HardwareApplier.ForgetDashFlagsBrightness();
-                _plugin.HardwareApplier.ApplyDashToHardware(_plugin.Settings?.ProfileStore?.CurrentProfile);
+                _plugin.HardwareApplier.ApplyDashToHardware();
             }
             catch (Exception ex) { MozaLog.Debug($"[AZOM] Standalone dashboard profile apply skipped: {ex.Message}"); }
 
@@ -516,7 +530,7 @@ namespace MozaPlugin.Devices
             try { _plugin.PendingResponses.Clear(); } catch { }
 
             // Rebind the primary to the hub; TryConnect probes the wheel there and
-            // (PrimaryBoundToHub) reads hub-port1-power so IsHubConnected flips. The
+            // (PrimaryBoundToHub) reads hub-port2-loss so IsHubConnected flips. The
             // freed base port is claimed by TryConnectBase later in this same tick.
             TryConnect();
         }
@@ -614,6 +628,7 @@ namespace MozaPlugin.Devices
             // settings via the rebound primary.
             _plugin.DeviceProber.ReleasePeripheralOwnership();
             _detectionState.HubDetected = false;
+            _data.ResetHubPorts();
 
             // Rebind the primary; TryConnect re-probes the wheel and persists the
             // new (base) port. The freed hub port is claimed by TryConnectHub
@@ -622,7 +637,7 @@ namespace MozaPlugin.Devices
         }
 
         /// <summary>
-        /// Probe the hub pipe for its attached peripherals + port-power status.
+        /// Probe the hub pipe for its attached peripherals + port status.
         /// Pedals/handbrake presence probes fire on BOTH the base and hub pipes
         /// until detected (shared flags); first responder wins and records the
         /// owning pipe (DeviceProber.Mark*Detected). No-op unless the hub is up.
@@ -652,11 +667,11 @@ namespace MozaPlugin.Devices
             if (!_detectionState.NewWheelDetected && !_detectionState.OldWheelDetected
                 && !PrimaryBoundToHub)
                 dm.ProbeWheelDetection();
-            // hub-port1-power is the hub-presence trigger (first 0xE4 reply sets
+            // hub-port2-loss is the hub-presence trigger (first 0xE4 reply sets
             // HubDetected). Once detected, read the full set so every Hub-tab
-            // port-power indicator populates.
+            // port indicator populates.
             if (!_detectionState.HubDetected)
-                dm.ReadSetting("hub-port1-power");
+                dm.ReadSetting("hub-port2-loss");
             else
                 dm.ReadSettings(DeviceProber.HubReadCommands);
         }
@@ -669,6 +684,7 @@ namespace MozaPlugin.Devices
             if (MozaPlugin.IsShuttingDown) return;
             _detectionState.HubDetected = false;
             _data.IsHubConnected = false;
+            _data.ResetHubPorts();
             _hubDeviceProber.ReleasePeripheralOwnership();
             // The hub's tracked reads will never be answered now — drop them so
             // they don't retransmit against a reconnected (possibly different) hub.
@@ -681,7 +697,7 @@ namespace MozaPlugin.Devices
 
         /// <summary>
         /// Inbound from the dedicated hub connection. Only peripheral (pedals /
-        /// handbrake) and hub port-power frames are routed here — wheel / base /
+        /// handbrake) and hub port-status frames are routed here — wheel / base /
         /// dash / session frames are dropped so the wheel/telemetry pipeline stays
         /// exclusively on the primary (base) connection. Detection is dispatched
         /// to the hub prober so ownership lands on the hub pipe.

@@ -37,6 +37,9 @@ namespace MozaPlugin.Devices
         // S12 pedal vibration as one device, one channel per pedal. Coexists with
         // the per-pedal devices; the PedalHapticsCombinedDevice setting picks which drives.
         public const string PedalHapticsCombinedGuid = "ceec288f-d739-4891-b0a3-aadc0dbd4ef1";
+        // mBooster pedals ShakeIt device, one channel per pedal role. Permanent once
+        // shipped: changing it orphans the user's ShakeIt profile.
+        public const string MBoosterShakeItGuid = "5badc96c-de60-4fdf-8070-bba8088ff3dc";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -328,6 +331,10 @@ namespace MozaPlugin.Devices
         /// <summary>Returns true if the DeviceTypeID is one of the pedal-haptics devices, per-pedal or combined.</summary>
         public static bool IsPedalHapticsDevice(string deviceTypeId) =>
             PedalHapticsPedalFor(deviceTypeId) != 0 || IsPedalHapticsCombinedDevice(deviceTypeId);
+
+        /// <summary>Returns true if the DeviceTypeID is the mBooster ShakeIt device.</summary>
+        public static bool IsMBoosterShakeItDevice(string deviceTypeId) =>
+            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, MBoosterShakeItGuid);
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

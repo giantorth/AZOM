@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Newtonsoft.Json.Linq;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.Extensions
@@ -93,8 +92,11 @@ namespace MozaPlugin.Devices.Extensions
         {
             RemoveLegacyPedalHapticsDefinition();
 
-            string pid = wheelbasePid;
+            // Routed to the plugin's S12 tab: no SimHub device is wanted.
             var plugin = MozaPlugin.Instance;
+            if (plugin != null && !plugin.PedalHapticsRoutedToShakeIt) return (0, 0);
+
+            string pid = wheelbasePid;
             var registry = plugin?.PedalHapticsRegistry;
             if (registry != null)
             {
@@ -121,54 +123,25 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         private static bool DeployPedalHapticsDevice(byte pedal, string? discoveredPid, bool force = false)
-            => DeployPedalHapticsDefinition(
-                PedalHapticsDeviceName(pedal), PedalHapticsGuidFor(pedal),
-                "S12 " + MozaPedalHapticsProtocol.PedalLabel(pedal),
-                MozaPedalHapticsProtocol.ChannelsPerPedal, discoveredPid, force);
+            => DeployHapticsOnlyDefinition(
+                PedalHapticsDefinition(PedalHapticsDeviceName(pedal), PedalHapticsGuidFor(pedal),
+                    "S12 " + MozaPedalHapticsProtocol.PedalLabel(pedal), MozaPedalHapticsProtocol.ChannelsPerPedal),
+                discoveredPid, force);
 
         // MotorsCount is what SimHub's stock provider shows before ours is
         // installed: one motor per pedal.
         private static bool DeployPedalHapticsCombinedDevice(string? discoveredPid, bool force = false)
-            => DeployPedalHapticsDefinition(
-                PedalHapticsCombinedDeviceName, MozaDeviceConstants.PedalHapticsCombinedGuid,
-                "S12 Pedal Haptics", MozaPedalHapticsProtocol.PedalCount, discoveredPid, force);
+            => DeployHapticsOnlyDefinition(
+                PedalHapticsDefinition(PedalHapticsCombinedDeviceName, MozaDeviceConstants.PedalHapticsCombinedGuid,
+                    "S12 Pedal Haptics", MozaPedalHapticsProtocol.PedalCount),
+                discoveredPid, force);
 
-        private static bool DeployPedalHapticsDefinition(
-            string deviceName, string guid, string productName, int motorsCount, string? discoveredPid, bool force)
-        {
-            var pid = discoveredPid ?? FallbackPid;
+        private static HapticsOnlyDefinition PedalHapticsDefinition(
+            string deviceName, string guid, string productName, int motorsCount)
+            => new HapticsOnlyDefinition(deviceName, guid, productName, motorsCount,
+                MozaPedalHapticsProtocol.MinFrequencyHz, MozaPedalHapticsProtocol.MaxFrequencyHz,
+                GeneratedPedalHapticsSchemaVersion, PedalHapticsThumbnailKey, "pedal-haptics");
 
-            try
-            {
-                var deviceDir = Path.Combine(
-                    AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User", deviceName);
-                var deviceJsonPath = Path.Combine(deviceDir, "device.json");
-                bool fileExists = File.Exists(deviceJsonPath);
-
-                if (fileExists && !force && !IsPedalHapticsDefinitionStale(deviceJsonPath, guid, pid))
-                {
-                    // Current, but the artwork may still be missing.
-                    EnsureThumbnail(deviceDir, PedalHapticsThumbnailKey);
-                    return false;
-                }
-
-                Directory.CreateDirectory(deviceDir);
-                AtomicFile.WriteAllText(deviceJsonPath, GeneratePedalHapticsDeviceJson(guid, productName, motorsCount, pid));
-                EnsureThumbnail(deviceDir, PedalHapticsThumbnailKey);
-
-                MozaLog.Info(
-                    $"[AZOM] {(fileExists ? "Refreshed" : "Deployed")} pedal-haptics device definition: "
-                    + $"{deviceName} (guid={guid}, "
-                    + $"channels={motorsCount}, pid={pid}; "
-                    + "restart SimHub to pick it up)");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Error($"[AZOM] Error deploying the {deviceName} device definition: {ex.Message}");
-                return false;
-            }
-        }
         /// <summary>
         /// Drop the single all-pedals definition this replaced, so SimHub does
         /// not keep offering a device whose channels no longer route anywhere.
@@ -196,83 +169,11 @@ namespace MozaPlugin.Devices.Extensions
             }
         }
 
-
         private static string PedalHapticsGuidFor(byte pedal) => pedal switch
         {
             (byte)PedalHapticsPedal.Brake  => MozaDeviceConstants.PedalHapticsBrakeGuid,
             (byte)PedalHapticsPedal.Clutch => MozaDeviceConstants.PedalHapticsClutchGuid,
             _ => MozaDeviceConstants.PedalHapticsThrottleGuid,
         };
-
-        /// <summary>Rewrite when identity, content version or PID drift.</summary>
-        private static bool IsPedalHapticsDefinitionStale(string deviceJsonPath, string guid, string pid)
-        {
-            try
-            {
-                var existing = JObject.Parse(File.ReadAllText(deviceJsonPath));
-
-                if (!string.Equals(existing["DescriptorUniqueId"]?.Value<string>(), guid, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if ((existing["SchemaVersion"]?.Value<int>() ?? 0) != GeneratedPedalHapticsSchemaVersion)
-                    return true;
-                if (!PidEquals(
-                        existing.SelectToken("HardwareInterface.HardwareInterface.DeviceDetection.Pid")?.Value<string>(),
-                        pid))
-                    return true;
-
-                return false;
-            }
-            catch
-            {
-                // Unparseable — rewrite it.
-                return true;
-            }
-        }
-
-        private static string GeneratePedalHapticsDeviceJson(string guid, string productName, int motorsCount, string pid)
-        {
-            var device = new JObject
-            {
-                ["DescriptorUniqueId"] = guid,
-                ["SchemaVersion"] = GeneratedPedalHapticsSchemaVersion,
-                // HapticsFeature and the MotorsWithFrequency provider types are 9.12+.
-                ["MinimumSimHubVersion"] = "9.12.0",
-                ["DeviceDescription"] = new JObject
-                {
-                    ["BrandName"] = "MOZA",
-                    ["ProductName"] = productName
-                },
-                ["HapticsFeature"] = new JObject
-                {
-                    ["MotorsCount"] = motorsCount,
-                    ["HasFrequency"] = true,
-                    ["MinimumFrequency"] = MozaPedalHapticsProtocol.MinFrequencyHz,
-                    ["MaximumFrequency"] = MozaPedalHapticsProtocol.MaxFrequencyHz,
-                    ["IsEnabled"] = true
-                },
-                ["HardwareInterface"] = new JObject
-                {
-                    ["HardwareInterface"] = new JObject
-                    {
-                        ["TypeName"] = "LedsStandardHIDProtocol",
-                        ["IsSerialNumberPickerEnabled"] = false,
-                        ["HIDUsagePage"] = "0xFF00",
-                        ["HIDUsage"] = "0x77",
-                        ["HIDReportId"] = "0x68",
-                        ["HIDReportSize"] = 64,
-                        ["HIDFansReportId"] = HidFansReportId,
-                        ["HIDMotorsReportId"] = HidMotorsReportId,
-                        ["DeviceDetection"] = new JObject
-                        {
-                            ["Vid"] = "0x346E",
-                            ["Pid"] = pid
-                        }
-                    }
-                },
-                ["IsLocked"] = true
-            };
-
-            return device.ToString(Newtonsoft.Json.Formatting.Indented);
-        }
     }
 }
