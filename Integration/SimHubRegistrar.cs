@@ -265,8 +265,7 @@ namespace MozaPlugin.Integration
             // is what "work mode off" means for the base.
             _plugin.AddAction("AZOM.WorkModeOff", (a, b) =>
             {
-                if (_plugin.Data != null) _plugin.Data.WorkMode = 1;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 1);
+                _plugin.SetWorkMode(1);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode off (standby) via action");
             });
@@ -274,8 +273,7 @@ namespace MozaPlugin.Integration
             // normal active state.
             _plugin.AddAction("AZOM.WorkModeOn", (a, b) =>
             {
-                if (_plugin.Data != null) _plugin.Data.WorkMode = 0;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", 0);
+                _plugin.SetWorkMode(0);
                 _plugin.SaveSettings();
                 MozaLog.Debug("[AZOM] Work mode on via action");
             });
@@ -286,8 +284,7 @@ namespace MozaPlugin.Integration
                 var data = _plugin.Data;
                 if (data == null) return;
                 int val = data.WorkMode > 0 ? 0 : 1;
-                data.WorkMode = val;
-                _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
+                _plugin.SetWorkMode(val);
                 _plugin.SaveSettings();
                 MozaLog.Debug($"[AZOM] Work mode {(val == 0 ? "on" : "off (standby)")} via action");
             });

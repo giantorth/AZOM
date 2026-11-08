@@ -211,8 +211,7 @@ namespace MozaPlugin.UI
         {
             if (_suppressEvents) return;
             int val = StandbyCheck.IsChecked == true ? 1 : 0;
-            _data.WorkMode = val;
-            _plugin.HardwareApplier.WriteIfBaseConnected("main-set-work-mode", val);
+            _plugin.SetWorkMode(val);
             _plugin.SaveSettings();
         }
 

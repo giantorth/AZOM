@@ -61,6 +61,15 @@ namespace MozaPlugin
         /// <summary>Auto-standby coordinator. Null until Init constructs it.</summary>
         internal StandbyCoordinator? Standby => _standby;
 
+        /// <summary>Manual work-mode write (1 = standby, 0 = active), read back and
+        /// re-sent by the standby coordinator if the base doesn't take it.</summary>
+        internal void SetWorkMode(int value)
+        {
+            if (_standby != null) { _standby.SetWorkMode(value); return; }
+            if (_data != null) _data.WorkMode = value;
+            _hardwareApplier?.WriteIfBaseConnected("main-set-work-mode", value);
+        }
+
         // AppDomain.ProcessExit registration is one-shot per process. End()
         // intentionally leaves the persistent wire alive across plugin
         // reloads (game switches) — the wheel never sees the 10–14 s

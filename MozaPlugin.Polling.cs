@@ -436,6 +436,7 @@ namespace MozaPlugin
             // where SimHub stops calling DataUpdate with no game running) and
             // re-applies the desired work mode after a base reconnect.
             _standby?.Apply();
+            _standby?.VerifyWorkMode();
 
             // Hot-swap detection: track whether the locked wheel is still responding
             // and periodically verify the model name hasn't changed.

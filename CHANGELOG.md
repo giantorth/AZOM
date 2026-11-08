@@ -59,6 +59,7 @@ All notable changes to the AZOM plugin are documented here.
 ### Wheelbase, hub and detection
 
 - **Wheelbase no longer starts in standby on connect;** standby is no longer saved in profiles, so an auto-standby state can't drop the rim on the next launch.
+- **Wheelbase standby/wake is read back and re-sent** if the base ignores it, so a base left in standby wakes on connect.
 - **Device detection no longer writes to non-MOZA COM ports** (Bluetooth, motherboard serial, other adapters); on Windows only MOZA ports are probed.
 - **Hub tab shows the device on each port;** all four accessory ports plus the pedal port, with link loss.
 - **Base tab hides when no wheelbase is detected,** like the other device tabs.

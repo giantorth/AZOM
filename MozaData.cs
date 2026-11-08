@@ -263,6 +263,10 @@ namespace MozaPlugin
 
         // Main device
         public volatile int WorkMode = -1;
+        // Bumped on every main-get-work-mode reply so StandbyCoordinator can tell
+        // a fresh readback from the optimistic value set on write.
+        private int _workModeReadSeq;
+        public int WorkModeReadSeq => System.Threading.Volatile.Read(ref _workModeReadSeq);
         public volatile int LedStatus;
         public volatile int Interpolation = -1;
 
@@ -983,7 +987,10 @@ namespace MozaPlugin
                 case "main-get-spring-gain":   GameSpring = value; break;
 
                 // Main device
-                case "main-get-work-mode":     WorkMode = value; break;
+                case "main-get-work-mode":
+                    WorkMode = value;
+                    System.Threading.Interlocked.Increment(ref _workModeReadSeq);
+                    break;
                 case "main-get-led-status":    LedStatus = value; break;
                 case "main-get-interpolation": Interpolation = value; break;
                 case "main-get-ble-mode":      BleMode = value; break;
