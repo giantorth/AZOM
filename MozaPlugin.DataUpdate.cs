@@ -280,7 +280,8 @@ namespace MozaPlugin
                     gearIsNeutral: gearIsNeutral,
                     clutchBitePointPct: _currentClutchBitePointPct,
                     bitePointUsesOwnPedal: BitePointSource == MBoosterBitePointSource.MBoosterPedal,
-                    bitePointClutch01: BitePointSourceClutch01);
+                    bitePointClutch01: BitePointSourceClutch01,
+                    bitePointLiveClutch01: BitePointLiveClutchReader);
                 _mboosterRegistry.OnDataUpdate(snap);
             }
 

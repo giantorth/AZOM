@@ -886,4 +886,11 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>뗄 때</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>둘 다</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>게임 값</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 축</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>장치</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>범위 설정</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>완료</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>슬라이더</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>다이얼</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>휠</value></data>
 </root>

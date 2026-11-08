@@ -26,6 +26,10 @@ namespace MozaPlugin.UI
             string formulaText = _plugin.BitePointSourceFormula;
             MBoosterBiteSourceFormulaText.Text = formulaText;
             MBoosterBiteSourceFormulaText.Visibility = formula && formulaText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            bool hid = source == ClutchSource.HidAxis;
+            if (hid && MBoosterBiteHidHost.Content == null) MBoosterBiteHidHost.Content = new HidAxisPicker();
+            var hidVis = hid ? Visibility.Visible : Visibility.Collapsed;
+            if (MBoosterBiteHidHost.Visibility != hidVis) MBoosterBiteHidHost.Visibility = hidVis;
             MBoosterBiteSourceValue.Text = _plugin.TryGetBitePointClutchPosition(out double clutch01)
                 ? Math.Round(clutch01 * 100) + "%" : "—";
 

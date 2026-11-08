@@ -13,6 +13,8 @@ namespace MozaPlugin.Devices.MBooster
         Game,
         // A user SimHub formula/property, 0..100.
         Formula,
+        // Any HID game-controller axis, read on its own thread (HidAxisReader).
+        HidAxis,
     }
 
     /// <summary>

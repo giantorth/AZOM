@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using GameReaderCommon;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using SimHub.Plugins;
 
@@ -48,6 +49,12 @@ namespace MozaPlugin
         // Game/Formula source position (0..1, NaN = none) from the last data tick,
         // as double bits: a plain double can tear on the x86 build.
         private long _bitePointSourceClutchBits = BitConverter.DoubleToInt64Bits(double.NaN);
+        // HidAxis source reader; created on first use, disposed at shutdown.
+        private HidAxisReader? _bitePointHidReader;
+        private bool _bitePointHidApplied;
+        private readonly object _bitePointHidLock = new object();
+        // Handed to the mBooster workers so a HID clutch is read live each motor tick.
+        private Func<double>? _bitePointLiveClutch;
 
         /// <summary>The calibration in use as the UI shows it.</summary>
         internal readonly struct BitePointInfo
@@ -105,6 +112,7 @@ namespace MozaPlugin
                 _settings.MBoosterBitePointSource = value;
                 _bitePointCalibrator.Stop();
                 _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
+                ApplyBitePointHidReader();
                 PersistSettings();
             }
         }
@@ -123,6 +131,103 @@ namespace MozaPlugin
             }
         }
 
+        /// <summary>The axis read for <see cref="MBoosterBitePointSource.HidAxis"/>; changing the
+        /// axis (not just its travel) stops any run.</summary>
+        internal HidAxisSelection? BitePointHidAxis
+        {
+            get => _settings?.MBoosterBitePointHidAxis;
+            set
+            {
+                if (_settings == null) return;
+                var old = _settings.MBoosterBitePointHidAxis;
+                _settings.MBoosterBitePointHidAxis = value;
+                if (BitePointSource == MBoosterBitePointSource.HidAxis && !(value?.SameAxis(old) ?? old == null))
+                    _bitePointCalibrator.Stop();
+                ApplyBitePointHidReader();
+                PersistSettings();
+            }
+        }
+
+        /// <summary>The chosen HID axis' raw value, for the picker's readout.</summary>
+        internal bool TryGetBitePointHidRaw(out int raw)
+        {
+            raw = 0;
+            HidAxisReader? reader;
+            lock (_bitePointHidLock) reader = _bitePointHidReader;
+            return reader != null && BitePointHidAxis != null && reader.TryGetRaw(out raw);
+        }
+
+        internal bool IsBitePointHidRangeCapturing
+        {
+            get
+            {
+                lock (_bitePointHidLock) return _bitePointHidReader?.IsCapturing ?? false;
+            }
+        }
+
+        /// <summary>Start recording the axis' travel: press and release the pedal fully, then end it.</summary>
+        internal void BeginBitePointHidRangeCapture()
+        {
+            lock (_bitePointHidLock) _bitePointHidReader?.BeginRangeCapture();
+        }
+
+        /// <summary>Store the recorded travel; the pedal is taken to be released now.</summary>
+        /// <returns>False when the axis barely moved, leaving the travel unchanged.</returns>
+        internal bool EndBitePointHidRangeCapture()
+        {
+            HidAxisReader? reader;
+            lock (_bitePointHidLock) reader = _bitePointHidReader;
+            var sel = BitePointHidAxis;
+            if (reader == null || sel == null || !reader.EndRangeCapture(out int released, out int pressed)) return false;
+            BitePointHidAxis = new HidAxisSelection
+            {
+                VendorId = sel.VendorId,
+                ProductId = sel.ProductId,
+                DeviceName = sel.DeviceName,
+                DevicePath = sel.DevicePath,
+                Usage = sel.Usage,
+                LogicalMin = sel.LogicalMin,
+                LogicalMax = sel.LogicalMax,
+                RawReleased = released,
+                RawPressed = pressed,
+            };
+            MozaLog.Info($"[AZOM] Clutch HID axis travel set: released {released}, pressed {pressed}");
+            return true;
+        }
+
+        /// <summary>Stop recording without changing the stored travel.</summary>
+        internal void CancelBitePointHidRangeCapture()
+        {
+            lock (_bitePointHidLock) _bitePointHidReader?.EndRangeCapture(out _, out _);
+        }
+
+        // Point the reader at the chosen axis while the HidAxis source is in use.
+        private void ApplyBitePointHidReader()
+        {
+            var sel = BitePointSource == MBoosterBitePointSource.HidAxis ? BitePointHidAxis : null;
+            lock (_bitePointHidLock)
+            {
+                if (sel == null)
+                {
+                    _bitePointHidReader?.SetTarget(null);
+                    return;
+                }
+                (_bitePointHidReader ??= new HidAxisReader()).SetTarget(sel);
+            }
+        }
+
+        /// <summary>Shutdown: stop the HID axis thread.</summary>
+        internal void DisposeBitePointHidReader()
+        {
+            HidAxisReader? reader;
+            lock (_bitePointHidLock)
+            {
+                reader = _bitePointHidReader;
+                _bitePointHidReader = null;
+            }
+            reader?.Dispose();
+        }
+
         /// <summary>Game/Formula source position from the last data tick (0..1), NaN when none.</summary>
         internal double BitePointSourceClutch01 =>
             BitConverter.Int64BitsToDouble(Interlocked.Read(ref _bitePointSourceClutchBits));
@@ -131,8 +236,17 @@ namespace MozaPlugin
         /// <returns>False when the source has no value.</returns>
         internal bool TryGetBitePointClutchPosition(out double position01)
         {
-            if (BitePointSource == MBoosterBitePointSource.MBoosterPedal)
+            var source = BitePointSource;
+            if (source == MBoosterBitePointSource.MBoosterPedal)
                 return TryGetMBoosterClutchPosition(out position01);
+            if (source == MBoosterBitePointSource.HidAxis)
+            {
+                position01 = double.NaN;
+                var sel = BitePointHidAxis;
+                if (sel == null || !TryGetBitePointHidRaw(out int raw)) return false;
+                position01 = sel.Normalize(raw);
+                return !double.IsNaN(position01);
+            }
             position01 = BitePointSourceClutch01;
             return !double.IsNaN(position01);
         }
@@ -166,6 +280,7 @@ namespace MozaPlugin
             {
                 MBoosterBitePointSource.Game => "game:" + game,
                 MBoosterBitePointSource.Formula => "formula:" + game,
+                MBoosterBitePointSource.HidAxis => "hid:" + game,
                 _ => game,
             };
         }
@@ -325,9 +440,20 @@ namespace MozaPlugin
             if (!string.IsNullOrEmpty(vehicle)) _currentBitePointVehicle = vehicle;
         }
 
+        /// <summary>The worker's live clutch reader for the current source; null = use the snapshot value.</summary>
+        internal Func<double>? BitePointLiveClutchReader =>
+            BitePointSource == MBoosterBitePointSource.HidAxis
+                ? _bitePointLiveClutch ??= () => TryGetBitePointClutchPosition(out double p) ? p : double.NaN
+                : null;
+
         /// <summary>Data thread: read the clutch source, refresh the current value, observe standing starts.</summary>
         private void UpdateClutchBitePoint(PluginManager pluginManager, ref GameData data)
         {
+            if (!_bitePointHidApplied)
+            {
+                _bitePointHidApplied = true;
+                ApplyBitePointHidReader();
+            }
             Interlocked.Exchange(ref _bitePointSourceClutchBits, BitConverter.DoubleToInt64Bits(ReadBitePointSource(ref data)));
 
             string? game;

@@ -894,4 +894,11 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Release</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Both</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>Game value</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID axis</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Device</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>SET RANGE</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>DONE</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Slider</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Dial</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Wheel</value></data>
 </root>

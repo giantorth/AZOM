@@ -887,4 +887,11 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>松开</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>两者</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>游戏值</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 轴</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>设备</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>设置范围</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>完成</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>滑块</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>旋钮</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>滚轮</value></data>
 </root>

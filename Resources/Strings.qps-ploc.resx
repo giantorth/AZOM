@@ -877,4 +877,11 @@
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Let-go!</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Both-bork!</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>Game-woof!</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID sniff!</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Bork-box!</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>SNIFF RANGE!</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>GOOD BOY!</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Slidey!</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Spinny!</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Rolly!</value></data>
 </root>

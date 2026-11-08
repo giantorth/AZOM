@@ -945,5 +945,12 @@ namespace MozaPlugin.Resources
         public static string Option_BiteTriggerRelease => Get("Option_BiteTriggerRelease");
         public static string Option_BiteTriggerBoth => Get("Option_BiteTriggerBoth");
         public static string BiteCal_GameValue => Get("BiteCal_GameValue");
+        public static string Option_ClutchSourceHid => Get("Option_ClutchSourceHid");
+        public static string Label_HidDevice => Get("Label_HidDevice");
+        public static string Button_SetRange => Get("Button_SetRange");
+        public static string Button_RangeDone => Get("Button_RangeDone");
+        public static string HidAxis_Slider => Get("HidAxis_Slider");
+        public static string HidAxis_Dial => Get("HidAxis_Dial");
+        public static string HidAxis_Wheel => Get("HidAxis_Wheel");
     }
 }

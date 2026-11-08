@@ -2997,11 +2997,13 @@
                                             <ListBoxItem Content="{x:Static res:Strings.Option_ClutchSourceMBooster}"/>
                                             <ListBoxItem Content="{x:Static res:Strings.Motion_Source_GameTelemetry}"/>
                                             <ListBoxItem Content="{x:Static res:Strings.SliderLabel_Formula}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_ClutchSourceHid}"/>
                                         </ctrl:SegmentedControl>
                                         <Button Grid.Column="2" x:Name="MBoosterBiteSourceFx" Click="MBoosterBiteSourceFx_Click" ToolTip="{x:Static res:Strings.Tooltip_EditFormula}" Visibility="Collapsed" Width="34" Height="22" Padding="2" Margin="4,0,0,0" Background="Transparent" BorderThickness="0" Cursor="Hand" VerticalAlignment="Center"><TextBlock Text="𝑓(𝑥)" FontFamily="Cambria Math, Segoe UI" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextDimBrush}"/></Button>
                                         <TextBlock Grid.Column="3" x:Name="MBoosterBiteSourceValue" Foreground="{StaticResource CyanBrush}" FontFamily="{StaticResource FontMono}" FontSize="13" TextAlignment="Right" VerticalAlignment="Center"/>
                                     </Grid>
                                     <TextBlock x:Name="MBoosterBiteSourceFormulaText" Visibility="Collapsed" Foreground="{StaticResource CyanBrush}" FontFamily="{StaticResource FontMono}" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,0,4"/>
+                                    <ContentControl x:Name="MBoosterBiteHidHost" Visibility="Collapsed" Margin="0,0,0,4"/>
                                     <Grid Margin="0,0,0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>

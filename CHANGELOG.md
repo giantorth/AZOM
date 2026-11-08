@@ -19,7 +19,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Curve graph drag modifiers:** hold Ctrl for fine dragging, Shift to snap to steps of 5.
 - **Motion source setting for the motion platform;** stream the SimHub Motion profile instead of raw game telemetry, e.g. for flight sims.
 - **Clutch Bite Point ShakeIt effect** for the mBooster, PHF, and bass shakers.
-- **Clutch bite point calibration per game and vehicle;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch or a formula.
+- **Clutch bite point calibration per game and vehicle;** learned from slow standing starts or captured on demand, from the mBooster pedal, game clutch, a formula or any HID axis.
 - **Pulse rate setting for Clutch Bite Point;** sets how fast the Smoothness ripple throbs, and existing setups keep their current feel.
 
 ## Changed

@@ -238,6 +238,9 @@ namespace MozaPlugin.Settings
         // Formula for MBoosterBitePointSource.Formula: a property path, NCalc, or js:-prefixed, 0..100.
         public string MBoosterBitePointSourceFormula { get; set; } = "";
 
+        // Axis for MBoosterBitePointSource.HidAxis; null = none chosen.
+        public Protocol.HidAxisSelection? MBoosterBitePointHidAxis { get; set; }
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —

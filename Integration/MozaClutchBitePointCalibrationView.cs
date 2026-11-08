@@ -40,6 +40,7 @@ namespace MozaPlugin.Integration
             Margin = new Thickness(6, 0, 0, 0),
         };
         private readonly TextBlock _sourceValue = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+        private readonly HidAxisPicker _hidPicker = new HidAxisPicker { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 4) };
         private readonly TextBlock _sourceFormulaText = new TextBlock
         {
             TextTrimming = TextTrimming.CharacterEllipsis,
@@ -84,6 +85,7 @@ namespace MozaPlugin.Integration
             _source.Items.Add(Strings.Option_ClutchSourceMBooster);
             _source.Items.Add(Strings.Motion_Source_GameTelemetry);
             _source.Items.Add(Strings.SliderLabel_Formula);
+            _source.Items.Add(Strings.Option_ClutchSourceHid);
             var sourceRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
             sourceRow.Children.Add(new TextBlock { Text = Strings.Label_ClutchSource, VerticalAlignment = VerticalAlignment.Center });
             sourceRow.Children.Add(_source);
@@ -93,6 +95,7 @@ namespace MozaPlugin.Integration
             var root = new StackPanel { Margin = new Thickness(0, 0, 0, 6) };
             root.Children.Add(sourceRow);
             root.Children.Add(_sourceFormulaText);
+            root.Children.Add(_hidPicker);
             root.Children.Add(header);
             root.Children.Add(_auto);
             root.Children.Add(_useCalibratedRow);
@@ -172,6 +175,7 @@ namespace MozaPlugin.Integration
                 string formulaText = plugin.BitePointSourceFormula;
                 _sourceFormulaText.Text = formulaText;
                 _sourceFormulaText.Visibility = formula && formulaText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+                _hidPicker.Visibility = source == MBoosterBitePointSource.HidAxis ? Visibility.Visible : Visibility.Collapsed;
                 _sourceValue.Text = plugin.TryGetBitePointClutchPosition(out double clutch01)
                     ? Math.Round(clutch01 * 100) + "%" : "—";
 

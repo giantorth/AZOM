@@ -887,4 +887,11 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Отпускание</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Оба</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>Значение игры</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Ось HID</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Устройство</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>ЗАДАТЬ ДИАПАЗОН</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>ГОТОВО</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Ползунок</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Регулятор</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Колесо</value></data>
 </root>

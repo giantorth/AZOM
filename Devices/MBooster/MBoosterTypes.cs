@@ -1170,6 +1170,9 @@ namespace MozaPlugin.Devices.MBooster
         // BitePointClutch01 (0..1, NaN when the configured source has no value).
         public readonly bool BitePointUsesOwnPedal;
         public readonly double BitePointClutch01;
+        // Live clutch reader (HID axis source), preferred over BitePointClutch01
+        // so the motor tick doesn't wait for SimHub's frame. Null otherwise.
+        public readonly Func<double>? BitePointLiveClutch01;
 
         public MBoosterTelemetrySnapshot(
             bool gameRunning, double rpm, double maxRpm, double idleRpm, double brake, double throttle,
@@ -1177,8 +1180,9 @@ namespace MozaPlugin.Devices.MBooster
             double vehicleSpeedMs, bool hasWheelSpeeds, double maxWheelSpeedMs, double minWheelSpeedMs,
             double groundSpeedMs, double suspensionHeaveG, double longitudinalG,
             double brakeTempC, int gearShiftSeq, bool gearIsNeutral, int clutchBitePointPct,
-            bool bitePointUsesOwnPedal, double bitePointClutch01)
+            bool bitePointUsesOwnPedal, double bitePointClutch01, Func<double>? bitePointLiveClutch01)
         {
+            BitePointLiveClutch01 = bitePointLiveClutch01;
             ClutchBitePointPct = clutchBitePointPct;
             BitePointUsesOwnPedal = bitePointUsesOwnPedal;
             BitePointClutch01 = bitePointClutch01;
@@ -1203,6 +1207,6 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         public static readonly MBoosterTelemetrySnapshot Empty =
-            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, false, 0, 0, 0, 0, 0, 0, 0, false, -1, true, double.NaN);
+            new MBoosterTelemetrySnapshot(false, 0, 0, 800, 0, 0, false, false, 0, false, 0, 0, 0, 0, 0, 0, 0, false, -1, true, double.NaN, null);
     }
 }

@@ -892,4 +892,11 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Slipp</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Begge</value></data>
   <data name="BiteCal_GameValue" xml:space="preserve"><value>Spillverdi</value></data>
+  <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID-akse</value></data>
+  <data name="Label_HidDevice" xml:space="preserve"><value>Enhet</value></data>
+  <data name="Button_SetRange" xml:space="preserve"><value>ANGI OMRÅDE</value></data>
+  <data name="Button_RangeDone" xml:space="preserve"><value>FERDIG</value></data>
+  <data name="HidAxis_Slider" xml:space="preserve"><value>Glidebryter</value></data>
+  <data name="HidAxis_Dial" xml:space="preserve"><value>Dreieknapp</value></data>
+  <data name="HidAxis_Wheel" xml:space="preserve"><value>Hjul</value></data>
 </root>

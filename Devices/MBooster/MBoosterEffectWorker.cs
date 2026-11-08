@@ -1291,7 +1291,8 @@ namespace MozaPlugin.Devices.MBooster
             var direction = effects?.BitePoint?.BitePointDirection ?? MBoosterBitePointDirection.Both;
             long now = Stopwatch.GetTimestamp();
 
-            double sourcePos = snap.BitePointUsesOwnPedal ? PedalHid() : snap.BitePointClutch01;
+            double sourcePos = snap.BitePointUsesOwnPedal ? PedalHid()
+                : snap.BitePointLiveClutch01?.Invoke() ?? snap.BitePointClutch01;
             if (double.IsNaN(sourcePos))
             {
                 // The configured clutch source has no value (no game, empty formula).

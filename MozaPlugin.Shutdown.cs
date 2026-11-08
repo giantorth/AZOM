@@ -200,6 +200,7 @@ namespace MozaPlugin
             // each connection. Must happen before MozaData is torn down so the
             // position-merge path (which writes to _data) doesn't race.
             Teardown("mBooster registry", () => { _mboosterRegistry?.Dispose(); _mboosterRegistry = null; });
+            Teardown("clutch HID axis reader", DisposeBitePointHidReader);
             Teardown("routed mBooster probes", DisposeRoutedMBoosterProbes);
             // Pedal-haptics units — Dispose stops each unit's effect output, which queues
             // the disable frames before the pipe goes away, releases USB lanes' ports and

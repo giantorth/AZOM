@@ -105,11 +105,17 @@ namespace MozaPlugin.Protocol
 
         /// <summary>Input report length in bytes, report ID included.</summary>
         public int InputReportLength { get; }
+        /// <summary>Top-level collection usage page / usage (HIDP_CAPS), e.g. 0x01 / 0x04 joystick.</summary>
+        public ushort TopLevelUsagePage { get; }
+        public ushort TopLevelUsage { get; }
         public IReadOnlyList<HidValueField> Values { get; }
         public IReadOnlyList<HidButtonField> Buttons { get; }
 
-        private HidInputLayout(IntPtr preparsed, int inputLength, List<HidValueField> values, List<HidButtonField> buttons)
+        private HidInputLayout(IntPtr preparsed, int inputLength, ushort usagePage, ushort usage,
+                               List<HidValueField> values, List<HidButtonField> buttons)
         {
+            TopLevelUsagePage = usagePage;
+            TopLevelUsage = usage;
             _preparsed = preparsed;
             InputReportLength = inputLength;
             Values = values;
@@ -136,6 +142,8 @@ namespace MozaPlugin.Protocol
                 Check(HidP_GetCaps(preparsed, caps), "HidP_GetCaps");
                 // HIDP_CAPS: Usage, UsagePage, InputReportByteLength, ..., USHORT Reserved[17],
                 // NumberLinkCollectionNodes (44), NumberInputButtonCaps (46), NumberInputValueCaps (48).
+                ushort topUsage = BitConverter.ToUInt16(caps, 0);
+                ushort topUsagePage = BitConverter.ToUInt16(caps, 2);
                 int inputLength = BitConverter.ToUInt16(caps, 4);
                 ushort buttonCount = BitConverter.ToUInt16(caps, 46);
                 ushort valueCount = BitConverter.ToUInt16(caps, 48);
@@ -165,7 +173,7 @@ namespace MozaPlugin.Protocol
                     }
                 }
 
-                return new HidInputLayout(preparsed, inputLength, values, buttons);
+                return new HidInputLayout(preparsed, inputLength, topUsagePage, topUsage, values, buttons);
             }
             catch
             {
