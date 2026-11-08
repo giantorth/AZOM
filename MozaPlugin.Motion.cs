@@ -47,6 +47,12 @@ namespace MozaPlugin
                 _motionPresetsDeployed = true;
             }
 
+            // Once per SimHub Motion setup: start mode "Last" -> "Off", so SimHub doesn't lift
+            // the platform at launch just because motion was enabled when it last closed.
+            if (Integration.Motion.MotionIntegration.DefaultStartModeToOff(
+                    _pluginManager, _settings.MotionStartModeDefaultedSetups))
+                ScheduleSave();
+
             if (!lane.IsConnected) return;
             bool dirty = false;
             string port = lane.LastPortName ?? "";
