@@ -53,6 +53,11 @@ namespace MozaPlugin.Telemetry.Sessions
         // UTC ticks of the last forward gap; drives the soft-watchdog
         // escalation from passive-wait to prime+open-request.
         private long _lastForwardGapUtcTicks;
+        // Gap-warn rate limit: a stalled stream re-bursts past the hole at
+        // ~230 chunks/s and would flush the 5000-line log ring in seconds.
+        private long _lastGapWarnUtcTicks;
+        private int _gapWarnsSuppressed;
+        private static readonly long GapWarnIntervalTicks = TimeSpan.TicksPerSecond * 5;
 
         public int Length { get { lock (_lock) return _count; } }
 
@@ -195,13 +200,27 @@ namespace MozaPlugin.Telemetry.Sessions
                         // re-send this seq too (verified in PitHouse capture
                         // bridge-20260514-204307.jsonl: wheel re-bursts the
                         // full unacked window, not just the missing chunk).
-                        _lastForwardGapUtcTicks = System.DateTime.UtcNow.Ticks;
-                        int missing = seq - _lastSeq - 1;
-                        MozaLog.Warn(
-                            $"[AZOM] Reassembler forward gap{tagSuffix}: " +
-                            $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
-                            $"preserving {_count}B buffer, dropping out-of-order chunk — " +
-                            $"caller must ack HighWaterSeq={_lastSeq} so wheel retransmits");
+                        long nowTicks = System.DateTime.UtcNow.Ticks;
+                        // 0 = no gap since the last forward progress: new episode, always log.
+                        bool newEpisode = _lastForwardGapUtcTicks == 0;
+                        _lastForwardGapUtcTicks = nowTicks;
+                        if (newEpisode || nowTicks - _lastGapWarnUtcTicks >= GapWarnIntervalTicks)
+                        {
+                            int missing = seq - _lastSeq - 1;
+                            string sup = _gapWarnsSuppressed > 0
+                                ? $" [{_gapWarnsSuppressed} repeat(s) suppressed]" : "";
+                            _lastGapWarnUtcTicks = nowTicks;
+                            _gapWarnsSuppressed = 0;
+                            MozaLog.Warn(
+                                $"[AZOM] Reassembler forward gap{tagSuffix}: " +
+                                $"got seq={seq}, expected {_lastSeq + 1} ({missing} chunk(s) missing); " +
+                                $"preserving {_count}B buffer, dropping out-of-order chunk — " +
+                                $"caller must ack HighWaterSeq={_lastSeq} so wheel retransmits{sup}");
+                        }
+                        else
+                        {
+                            _gapWarnsSuppressed++;
+                        }
                         return ChunkInsertResult.GapDetected;
                     }
                 }
@@ -235,6 +254,7 @@ namespace MozaPlugin.Telemetry.Sessions
                 _overflowLogged = false;
                 _lastSeq = -1;
                 _lastForwardGapUtcTicks = 0;
+                _gapWarnsSuppressed = 0;
             }
         }
 
