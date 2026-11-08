@@ -38,6 +38,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Base tab hides when no wheelbase is detected,** like the other device tabs.
 - **Wheel dashboard fields no longer show the wrong channel after the wheel reconnects;** the plugin re-reads the wheel's channel list instead of reusing the old one.
 - **Uploading or deleting a dashboard no longer removes the wheel's other dashboards;** the dashboard list waits until the wheel's state has fully arrived, and a stalled transfer now reconnects within about 15 s.
+- **Dashboard preview image refreshes after the dashboard is edited;** a save in Studio re-renders it instead of showing the old picture.
 
 ## [1.7.2]
 

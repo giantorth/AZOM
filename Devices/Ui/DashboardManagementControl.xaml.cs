@@ -1001,6 +1001,9 @@ namespace MozaPlugin.Devices.Ui
         // DashCache hands back the same array until the dashboard changes, so a
         // reference compare spots a re-download/re-scan without re-hashing.
         private byte[]? _previewCacheRef;
+        // Source file write stamp: an edit saved to disk (Studio, PitHouse)
+        // leaves the library snapshot unchanged until a rescan.
+        private string _previewStamp = "";
         private int _previewRequest;
         private bool _previewKeyValid;
 
@@ -1024,32 +1027,41 @@ namespace MozaPlugin.Devices.Ui
             if (name == "(none)") name = null;
 
             bool custom = name != null && name.StartsWith("[Custom:");
+            string? path = name == null ? null
+                : custom ? _plugin.ActiveTelemetryMzdashPath
+                : _plugin.DashCache?.TryGetFolderFilePath(name);
+            string stamp = FileStamp(path);
             byte[]? cached = name != null && !custom ? _plugin.DashCache?.TryGetRawContent(name) : null;
-            if (_previewKeyValid && name == _previewName && ReferenceEquals(cached, _previewCacheRef)) return;
+            if (_previewKeyValid && name == _previewName && ReferenceEquals(cached, _previewCacheRef)
+                && stamp == _previewStamp) return;
             if (name != _previewName) _previewPage = 0;
             _previewKeyValid = true;
             _previewName = name;
             _previewCacheRef = cached;
+            _previewStamp = stamp;
             int request = ++_previewRequest;
 
-            byte[]? bytes = cached;
+            byte[]? bytes = null;
             string sourceDir = "";
             try
             {
-                if (custom)
+                if (stamp.Length > 0)
                 {
-                    string path = _plugin.ActiveTelemetryMzdashPath;
-                    if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
-                    {
-                        bytes = System.IO.File.ReadAllBytes(path);
-                        sourceDir = System.IO.Path.GetDirectoryName(path) ?? "";
-                    }
+                    bytes = System.IO.File.ReadAllBytes(path!);
+                    sourceDir = System.IO.Path.GetDirectoryName(path) ?? "";
                 }
-                else if (name != null)
+                else if (name != null && !custom)
                 {
-                    bytes ??= DashboardLibraryResolver.ResolveBytes(_plugin.DashCache, _plugin.DashProfileStore, name);
+                    bytes = cached ?? DashboardLibraryResolver.ResolveBytes(_plugin.DashCache, _plugin.DashProfileStore, name);
                     sourceDir = DashboardLibraryResolver.ResolveDirectory(_plugin.DashCache, name);
                 }
+            }
+            catch (System.IO.IOException ex)
+            {
+                // Likely mid-save: retry next tick.
+                MozaLog.DebugIfChanged("dash-preview-read", $"[AZOM] Dashboard preview: cannot read '{name}': {ex.Message}");
+                _previewKeyValid = false;
+                return;
             }
             catch (Exception ex)
             {
@@ -1116,6 +1128,18 @@ namespace MozaPlugin.Devices.Ui
             if (count < 2) return;
             _previewPage = ((_previewPage + delta) % count + count) % count;
             ShowPreviewPage();
+        }
+
+        /// <summary>Path + write time + size, or "" when there is no readable file.</summary>
+        private static string FileStamp(string? path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            try
+            {
+                var fi = new System.IO.FileInfo(path);
+                return fi.Exists ? $"{fi.FullName}|{fi.LastWriteTimeUtc.Ticks}|{fi.Length}" : "";
+            }
+            catch { return ""; }
         }
 
         // Decoded from memory and frozen so the PNGs stay unlocked for re-render/prune.
