@@ -154,6 +154,12 @@ namespace MozaPlugin.Telemetry
         // on a warm restart; _coldStartReprovokeAttempts bounds the retry so a
         // genuinely-stuck wheel still proceeds instead of looping forever.
         private int _forceColdReprovoke;
+        // Wheel loss / hot-swap: the returning wheel may not re-advertise its catalog
+        // on a warm start (only END), leaving the old catalog's indices bound to the
+        // wrong widgets. Bumped per loss; the next start whose sessions open goes cold
+        // and records the generation it handled, so an abandoned start doesn't eat it.
+        private int _wheelLossGen;
+        private int _wheelLossGenHandled;
         private int _coldStartReprovokeAttempts;
         private const int MaxColdStartReprovokes = 3;
         // Set when the wedge branch queues its re-provoke: holds the preamble (no
@@ -265,6 +271,12 @@ namespace MozaPlugin.Telemetry
             // inheriting the prior wheel's exhausted budget.
             try { _recovery.Reset(); } catch { }
         }
+
+        /// <summary>The wheel went away (presence miss, rim detach, port loss,
+        /// hot-swap): the next start re-provokes cold — wide session close and a
+        /// fresh catalog — instead of reusing the departed wheel's catalog.</summary>
+        internal void RequestColdStartAfterWheelLoss()
+            => System.Threading.Interlocked.Increment(ref _wheelLossGen);
 
         /// <summary>
         /// Raised when the wheel hardware initiates a dashboard switch (user

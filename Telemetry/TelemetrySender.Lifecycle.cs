@@ -119,7 +119,11 @@ namespace MozaPlugin.Telemetry
             // still keys off isFirstStartInProcess (a warm restart honors the ~11 s settle —
             // which is exactly the sess=0x09 timeout that makes the re-advertise land clean).
             bool forceColdReprovoke = System.Threading.Interlocked.Exchange(ref _forceColdReprovoke, 0) == 1;
-            bool coldReprovoke = isFirstStartInProcess || forceColdReprovoke;
+            int wheelLossGen = Volatile.Read(ref _wheelLossGen);
+            bool afterWheelLoss = wheelLossGen != Volatile.Read(ref _wheelLossGenHandled);
+            bool coldReprovoke = isFirstStartInProcess || forceColdReprovoke || afterWheelLoss;
+            if (afterWheelLoss && !isFirstStartInProcess)
+                MozaLog.Info("[AZOM] Start: wheel was lost since the last start — taking the cold path (wide close + fresh catalog)");
             // Genuine new start (not a wedge retry) → fresh re-provoke budget.
             if (!forceColdReprovoke) _coldStartReprovokeAttempts = 0;
             Stop();
@@ -176,7 +180,8 @@ namespace MozaPlugin.Telemetry
 
             InitTickStateAndTransitionToStarting();
             // Arm the sess=0x09-readiness preamble gate (see _coldStartWheelGatePending
-            // docs) for a true cold start OR a forced wrong-session-wedge re-provoke.
+            // docs) for a true cold start, a forced wrong-session-wedge re-provoke, or
+            // the first start after a wheel loss.
             // Must be set AFTER the init method above, which clears it. Plain warm/
             // game-switch reloads leave it false → no added preamble latency.
             _coldStartWheelGatePending = coldReprovoke;
@@ -214,6 +219,10 @@ namespace MozaPlugin.Telemetry
             // our token. An external Stop() during the same window pushes
             // state to Idle — both signal "abandon this StartInner".
             if (cancel.IsCancellationRequested || _state == TelemetryState.Idle) return;
+            // Sessions opened cold: this loss is handled. A loss logged since the
+            // read above has a newer gen and still forces the next start cold.
+            if (afterWheelLoss)
+                Volatile.Write(ref _wheelLossGenHandled, wheelLossGen);
 
             // Universal Hub: 5-frame slot enumeration burst so the wheel
             // populates per-port device metadata. Skipped when no hub.

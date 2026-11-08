@@ -36,6 +36,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Dismissing an update notification sticks across restarts;** it reappears only when a newer version is published.
 - **Beta builds are no longer offered an older stable release;** only switching the channel back to Stable offers the downgrade.
 - **Base tab hides when no wheelbase is detected,** like the other device tabs.
+- **Wheel dashboard fields no longer show the wrong channel after the wheel reconnects;** the plugin re-reads the wheel's channel list instead of reusing the old one.
 
 ## [1.7.2]
 

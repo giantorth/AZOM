@@ -141,6 +141,7 @@ namespace MozaPlugin
             // reset already cleared the wheel flags), and clear the start latch
             // so the reconnect's wheel detect cold-starts it.
             try { _telemetrySender?.Stop(); } catch { }
+            _telemetrySender?.RequestColdStartAfterWheelLoss();
             Interlocked.Exchange(ref _telemetryStartRequested, 0);
             // A bus CM2 lane on this pipe lost its sessions too.
             _dualDisplay?.OnConnectionLost(_connection);
@@ -212,6 +213,7 @@ namespace MozaPlugin
         {
             MozaLog.Debug($"[AZOM] {reason}");
             _telemetrySender?.Stop();
+            _telemetrySender?.RequestColdStartAfterWheelLoss();
             // Preserve dash detection across a WHEEL-rim reset: the dash (CM2/CM1)
             // is reached through the CONNECTION, not the wheel rim, so a hot-swap or
             // presence-miss of the rim must NOT blank it. Two cases:
