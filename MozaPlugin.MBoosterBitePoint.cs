@@ -9,9 +9,16 @@ using SimHub.Plugins;
 namespace MozaPlugin
 {
     /// <summary>
-    /// Per-game clutch bite point for the mBooster Clutch Bite Point effect: the clutch
-    /// position source, storage (per game and source), user-started calibration
-    /// runs, and automatic learning/refinement from every clean standing start.
+    /// Clutch bite point for the Clutch Bite Point effect: the clutch position
+    /// source, storage per game and per vehicle (both per source), user-started
+    /// calibration runs, and automatic learning/refinement from every clean
+    /// standing start.
+    ///
+    /// A game's first calibration seeds both the game and the vehicle it was
+    /// made in. A vehicle with no calibration of its own inherits the game's;
+    /// its first automatic sample within <see cref="InheritAgreementPct"/> of
+    /// that value keeps refining from the game's samples, anything further off
+    /// discards them and starts the vehicle fresh.
     /// </summary>
     public partial class MozaPlugin
     {
@@ -20,31 +27,41 @@ namespace MozaPlugin
         // Pedal fraction per second (1.0 = full travel in one second).
         private const double MaxAutoReleaseRatePerSec = 1.0;
 
+        // Clutch travel (%) within which an automatic sample agrees with an
+        // inherited game calibration.
+        private const int InheritAgreementPct = 5;
+
+        private const string VehicleKeySeparator = "|car:";
+
         private readonly MBoosterBitePointCalibrator _bitePointCalibrator = new MBoosterBitePointCalibrator();
         // Data thread only.
         private readonly MBoosterBitePointDetector _bitePointAutoDetector = new MBoosterBitePointDetector();
         private string? _bitePointAutoKey;
+        private string? _bitePointVehicleGame;
         private Func<string?, double>? _bitePointFormulaResolver;
         // Serializes writers; readers use the copy-on-write dictionary snapshot.
         private readonly object _bitePointLock = new object();
-        // Current game's bite point for the current source, refreshed every data tick; -1 when none.
+        // Current vehicle (CarId, else CarModel) in the current game; null when unknown.
+        private volatile string? _currentBitePointVehicle;
+        // Current bite point for the current source, refreshed every data tick; -1 when none.
         private volatile int _currentClutchBitePointPct = -1;
         // Game/Formula source position (0..1, NaN = none) from the last data tick,
         // as double bits: a plain double can tear on the x86 build.
         private long _bitePointSourceClutchBits = BitConverter.DoubleToInt64Bits(double.NaN);
 
-        /// <summary>One game's calibration as the UI shows it.</summary>
+        /// <summary>The calibration in use as the UI shows it.</summary>
         internal readonly struct BitePointInfo
         {
             public readonly int Pct;
             public readonly int SampleCount;
-            public readonly bool Pinned;
+            /// <summary>The vehicle has none of its own; this is the game's.</summary>
+            public readonly bool Inherited;
 
-            public BitePointInfo(int pct, int sampleCount, bool pinned)
+            public BitePointInfo(int pct, int sampleCount, bool inherited)
             {
                 Pct = pct;
                 SampleCount = sampleCount;
-                Pinned = pinned;
+                Inherited = inherited;
             }
 
             public bool IsCalibrated => Pct >= 0;
@@ -60,7 +77,7 @@ namespace MozaPlugin
             }
         }
 
-        /// <summary>The current game's bite point (0..100) for the current source, -1 when uncalibrated.</summary>
+        /// <summary>The bite point in use (0..100) for the current game, vehicle and source, -1 when uncalibrated.</summary>
         internal int CurrentClutchBitePointPct => _currentClutchBitePointPct;
 
         internal BitePointCalState BitePointCalibrationState => _bitePointCalibrator.State;
@@ -87,7 +104,7 @@ namespace MozaPlugin
                 if (_settings == null || _settings.MBoosterBitePointSource == value) return;
                 _settings.MBoosterBitePointSource = value;
                 _bitePointCalibrator.Stop();
-                _currentClutchBitePointPct = ClutchBitePointInfo(CurrentGameName).Pct;
+                _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
                 PersistSettings();
             }
         }
@@ -132,9 +149,9 @@ namespace MozaPlugin
                 case BitePointCalState.Releasing: state = Strings.BiteCal_Releasing; break;
                 case BitePointCalState.Cancelled: state = Strings.BiteCal_Cancelled; break;
                 default:
-                    state = info.Pinned ? Strings.BiteCal_Pinned
-                        : info.IsCalibrated ? string.Format(Strings.BiteCal_Samples, info.SampleCount)
-                        : Strings.BiteCal_Idle;
+                    state = !info.IsCalibrated ? Strings.BiteCal_Idle
+                        : info.Inherited ? Strings.BiteCal_GameValue
+                        : string.Format(Strings.BiteCal_Samples, info.SampleCount);
                     break;
             }
             return info.IsCalibrated ? info.Pct + "% · " + state : state;
@@ -142,7 +159,7 @@ namespace MozaPlugin
 
         // Settings key for a game under the current source. The mBooster pedal
         // keeps the bare game code; the others are prefixed.
-        private string? CalibrationKey(string? game)
+        private string? GameKey(string? game)
         {
             if (string.IsNullOrEmpty(game)) return null;
             return BitePointSource switch
@@ -153,62 +170,126 @@ namespace MozaPlugin
             };
         }
 
-        /// <summary>A game's calibration under the current source.</summary>
-        internal BitePointInfo ClutchBitePointInfo(string? game)
+        private static string? VehicleKey(string? gameKey, string? vehicle) =>
+            gameKey == null || string.IsNullOrEmpty(vehicle) ? null : gameKey + VehicleKeySeparator + vehicle;
+
+        private static string GameKeyOf(string key)
+        {
+            int i = key.IndexOf(VehicleKeySeparator, StringComparison.Ordinal);
+            return i < 0 ? key : key.Substring(0, i);
+        }
+
+        /// <summary>The calibration in use for the current game and vehicle under the current source.</summary>
+        internal BitePointInfo ClutchBitePointInfo()
         {
             var map = _settings?.MBoosterClutchBitePointCalibrations;
-            string? key = CalibrationKey(game);
-            if (map == null || key == null || !map.TryGetValue(key, out var cal) || cal == null)
-                return new BitePointInfo(-1, 0, false);
-            return new BitePointInfo(cal.Pct, cal.Samples?.Count ?? 0, cal.PinnedPct.HasValue);
+            string? gameKey = GameKey(CurrentGameName);
+            if (map == null || gameKey == null) return new BitePointInfo(-1, 0, false);
+            string? vehicleKey = VehicleKey(gameKey, _currentBitePointVehicle);
+            if (vehicleKey != null && map.TryGetValue(vehicleKey, out var own) && own != null)
+                return new BitePointInfo(own.Pct, own.Samples?.Count ?? 0, false);
+            if (map.TryGetValue(gameKey, out var game) && game != null)
+                return new BitePointInfo(game.Pct, game.Samples?.Count ?? 0, vehicleKey != null);
+            return new BitePointInfo(-1, 0, false);
         }
 
-        /// <summary>Hand-set a game's bite point; pins it against refinement.</summary>
-        internal void PinClutchBitePoint(string game, int pct)
-        {
-            pct = Math.Max(0, Math.Min(100, pct));
-            UpdateCalibration(CalibrationKey(game), cur =>
-            {
-                if (cur?.PinnedPct == pct) return null;
-                var next = cur?.Clone() ?? new MBoosterBitePointCalibration();
-                next.PinnedPct = pct;
-                return next;
-            });
-        }
-
-        /// <summary>Start a calibration run for the current game, or cancel the one in progress.</summary>
+        /// <summary>Start a calibration run for the current vehicle, or cancel the one in progress.</summary>
         internal void ToggleBitePointCalibration() => _bitePointCalibrator.Toggle();
 
-        /// <summary>Clear the current game's calibration (current source) and stop any run.</summary>
+        /// <summary>
+        /// Clear the current vehicle's own calibration (it falls back to the game's)
+        /// and stop any run. With no vehicle known, clears the game's.
+        /// </summary>
         internal void ResetClutchBitePoint()
         {
             _bitePointCalibrator.Stop();
-            UpdateCalibration(CalibrationKey(CurrentGameName), cur => cur == null ? null : RemoveEntry);
+            string? gameKey = GameKey(CurrentGameName);
+            string? key = VehicleKey(gameKey, _currentBitePointVehicle) ?? gameKey;
+            if (key == null) return;
+            UpdateCalibrations(map => map.Remove(key));
         }
 
-        // Marker for UpdateCalibration: drop the entry.
-        private static readonly MBoosterBitePointCalibration RemoveEntry = new MBoosterBitePointCalibration();
-
-        /// <param name="change">Returns the replacement entry, <see cref="RemoveEntry"/>, or null for no change.</param>
-        private void UpdateCalibration(string? key, Func<MBoosterBitePointCalibration?, MBoosterBitePointCalibration?> change)
+        /// <summary>Change the calibrations on a private copy, published only when
+        /// <paramref name="change"/> returns true.</summary>
+        private void UpdateCalibrations(Func<Dictionary<string, MBoosterBitePointCalibration>, bool> change)
         {
-            if (_settings == null || string.IsNullOrEmpty(key)) return;
-            int pct;
+            if (_settings == null) return;
             lock (_bitePointLock)
             {
-                var map = _settings.MBoosterClutchBitePointCalibrations;
-                map.TryGetValue(key!, out var cur);
-                var next = change(cur);
-                if (next == null) return;
-                var copy = new Dictionary<string, MBoosterBitePointCalibration>(map, StringComparer.OrdinalIgnoreCase);
-                if (ReferenceEquals(next, RemoveEntry)) copy.Remove(key!);
-                else copy[key!] = next;
+                var copy = new Dictionary<string, MBoosterBitePointCalibration>(
+                    _settings.MBoosterClutchBitePointCalibrations, StringComparer.OrdinalIgnoreCase);
+                if (!change(copy)) return;
                 _settings.MBoosterClutchBitePointCalibrations = copy;
-                pct = ReferenceEquals(next, RemoveEntry) ? -1 : next.Pct;
             }
-            if (string.Equals(key, CalibrationKey(CurrentGameName), StringComparison.OrdinalIgnoreCase))
-                _currentClutchBitePointPct = pct;
+            _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
             PersistSettings();
+        }
+
+        private static MBoosterBitePointCalibration SingleSample(int pct)
+        {
+            var cal = new MBoosterBitePointCalibration();
+            cal.AddSample(pct);
+            return cal;
+        }
+
+        // A user-started run: the key's own calibration restarts from this sample,
+        // and a game with no calibration yet takes it too.
+        private void StoreRunSample(string key, int pct)
+        {
+            string gameKey = GameKeyOf(key);
+            UpdateCalibrations(map =>
+            {
+                map[key] = SingleSample(pct);
+                if (!map.ContainsKey(gameKey)) map[gameKey] = SingleSample(pct);
+                return true;
+            });
+            MozaLog.Info($"[AZOM/mBooster] Clutch bite point for {key} calibrated at {pct}%");
+        }
+
+        // An automatic sample. See the class summary for how a vehicle inherits.
+        private void StoreAutoSample(string key, int pct)
+        {
+            string gameKey = GameKeyOf(key);
+            string note = "";
+            UpdateCalibrations(map =>
+            {
+                if (map.TryGetValue(key, out var own) && own != null)
+                {
+                    var next = own.Clone();
+                    next.AddSample(pct);
+                    map[key] = next;
+                    return true;
+                }
+                if (!map.TryGetValue(gameKey, out var game) || game == null)
+                {
+                    // The game's first calibration seeds the game and this vehicle.
+                    map[gameKey] = SingleSample(pct);
+                    if (key != gameKey) map[key] = SingleSample(pct);
+                    note = " (first for the game)";
+                    return true;
+                }
+                if (key == gameKey)
+                {
+                    var next = game.Clone();
+                    next.AddSample(pct);
+                    map[key] = next;
+                    return true;
+                }
+                if (Math.Abs(pct - game.Pct) <= InheritAgreementPct)
+                {
+                    var next = game.Clone();
+                    next.AddSample(pct);
+                    map[key] = next;
+                    note = $" (agrees with game {game.Pct}%)";
+                }
+                else
+                {
+                    map[key] = SingleSample(pct);
+                    note = $" (game {game.Pct}% discarded)";
+                }
+                return true;
+            });
+            MozaLog.Info($"[AZOM/mBooster] Clutch bite point sample for {key}: {pct}%{note}, now {ClutchBitePointInfo().Pct}%");
         }
 
         // Data thread: the Game/Formula source's position this tick (0..1), NaN when none.
@@ -231,6 +312,19 @@ namespace MozaPlugin
             }
         }
 
+        // Data thread: the current vehicle, kept while the game stays the same.
+        private void TrackBitePointVehicle(string? game, StatusDataBase? nd)
+        {
+            if (!string.Equals(game, _bitePointVehicleGame, StringComparison.OrdinalIgnoreCase))
+            {
+                _bitePointVehicleGame = game;
+                _currentBitePointVehicle = null;
+            }
+            string? vehicle = nd?.CarId;
+            if (string.IsNullOrEmpty(vehicle)) vehicle = nd?.CarModel;
+            if (!string.IsNullOrEmpty(vehicle)) _currentBitePointVehicle = vehicle;
+        }
+
         /// <summary>Data thread: read the clutch source, refresh the current value, observe standing starts.</summary>
         private void UpdateClutchBitePoint(PluginManager pluginManager, ref GameData data)
         {
@@ -239,27 +333,20 @@ namespace MozaPlugin
             string? game;
             try { game = pluginManager.GameName; }
             catch { game = null; }
-            string? key = CalibrationKey(game);
-            _currentClutchBitePointPct = ClutchBitePointInfo(game).Pct;
+            var nd = data.NewData;
+            TrackBitePointVehicle(game, nd);
+            string? gameKey = GameKey(game);
+            string? key = VehicleKey(gameKey, _currentBitePointVehicle) ?? gameKey;
+            _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
 
             bool hasClutch = TryGetBitePointClutchPosition(out double clutch01);
-            var nd = data.NewData;
             string? gear = nd?.Gear;
             bool inGear = !string.IsNullOrEmpty(gear) && gear != "N" && gear != "0";
             bool ready = data.GameRunning && !data.GamePaused && nd != null && hasClutch && inGear;
             double speedKmh = nd?.SpeedKmh ?? double.NaN;
 
             if (_bitePointCalibrator.Update(key, ready, speedKmh, clutch01, out string runKey, out var runSample))
-            {
-                // A user-started run replaces the history and any pin.
-                UpdateCalibration(runKey, _ =>
-                {
-                    var next = new MBoosterBitePointCalibration();
-                    next.AddSample(runSample.Pct);
-                    return next;
-                });
-                MozaLog.Info($"[AZOM/mBooster] Clutch bite point for {runKey} calibrated at {runSample.Pct}%");
-            }
+                StoreRunSample(runKey, runSample.Pct);
 
             if (_bitePointCalibrator.IsActive || !BitePointAutoCalibrate || key == null)
             {
@@ -278,17 +365,7 @@ namespace MozaPlugin
                 MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
                 return;
             }
-            bool added = false;
-            UpdateCalibration(key, cur =>
-            {
-                if (cur?.PinnedPct != null) return null;
-                var next = cur?.Clone() ?? new MBoosterBitePointCalibration();
-                next.AddSample(sample.Pct);
-                added = true;
-                return next;
-            });
-            if (added)
-                MozaLog.Info($"[AZOM/mBooster] Clutch bite point sample for {key}: {sample.Pct}% (now {ClutchBitePointInfo(game).Pct}%)");
+            StoreAutoSample(key, sample.Pct);
         }
     }
 }

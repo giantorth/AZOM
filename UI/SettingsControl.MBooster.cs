@@ -776,6 +776,7 @@ namespace MozaPlugin.UI
             MBoosterBitePointSource.SelectedIndex = (fx?.BitePoint?.UseCalibratedBitePoint ?? true) ? 0 : 1;
             MBoosterBitePointTriggerLevel.Value = fx?.BitePoint?.TriggerLevelPct ?? 50;
             SetValueText(MBoosterBitePointTriggerLevelValue, (fx?.BitePoint?.TriggerLevelPct ?? 50).ToString());
+            MBoosterBitePointDirection.SelectedIndex = (int)(fx?.BitePoint?.BitePointDirection ?? Devices.MBooster.MBoosterBitePointDirection.Both);
             int widthPct = fx?.BitePoint?.BitePointWidthPct ?? MBoosterUiConstants.BitePointWidthDefaultPct;
             MBoosterBitePointWidth.Value = widthPct;
             SetValueText(MBoosterBitePointWidthValue, widthPct.ToString());
@@ -787,6 +788,7 @@ namespace MozaPlugin.UI
             SetValueText(MBoosterBitePointMaxLengthValue, maxMs.ToString());
             MBoosterBitePointFrequencySlider.Value = fx?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz;
             SetValueText(MBoosterBitePointFrequencyValue, MBoosterBitePointFrequencySlider.Value.ToString("F0"));
+            ShowBitePointPulseRate(fx?.BitePoint);
             MBoosterBitePointSmoothness.Value = fx?.BitePoint?.SmoothnessPct ?? 100;
             SetValueText(MBoosterBitePointSmoothnessValue, (fx?.BitePoint?.SmoothnessPct ?? 100).ToString());
             MBoosterBitePointIntensity.Value = fx?.BitePoint?.IntensityPct ?? 50;

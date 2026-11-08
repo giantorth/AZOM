@@ -295,6 +295,10 @@ namespace MozaPlugin.Devices.MBooster
             public double RoadTextureRoughness01; // 0..1, Road-Texture-only: live suspension-derived intensity scale
             public double ThresholdDecayRequest01; // 0..1, Threshold-only: sustain-decay depth
             public double GForceSigned01; // -1..1, G-Force-only: live longitudinal-G fraction (+ accel, - brake)
+            // Amplitude-ripple oscillator, separate from the tone (Bite Point's
+            // Pulse rate); 0 Hz for every other effect, so it never moves.
+            public double PulsePhaseRad;
+            public double PulseRateHz;
         }
 
         public MBoosterEffectWorker(
@@ -501,6 +505,7 @@ namespace MozaPlugin.Devices.MBooster
         {
             st.Active = false;
             st.PhaseRad = 0;
+            st.PulsePhaseRad = 0;
             st.ElapsedSec = 0;
         }
 
@@ -1271,6 +1276,7 @@ namespace MozaPlugin.Devices.MBooster
             double freqHz = ClampBitePointFreq(effects?.BitePoint?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz);
             double smoothness01 = Clamp01((effects?.BitePoint?.SmoothnessPct ?? 100) / 100.0);
             st.SmoothnessRequest01 = smoothness01;
+            st.PulseRateHz = BitePointPulseRate(effects?.BitePoint, freqHz);
             int triggerPct = (effects?.BitePoint?.UseCalibratedBitePoint ?? true) && snap.ClutchBitePointPct >= 0
                 ? snap.ClutchBitePointPct
                 : effects?.BitePoint?.TriggerLevelPct ?? (int)MBoosterUiConstants.BitePointTriggerMinPct;
@@ -1282,6 +1288,7 @@ namespace MozaPlugin.Devices.MBooster
                 effects?.BitePoint?.BitePointMinLengthMs ?? MBoosterUiConstants.BitePointMinLengthDefaultMs));
             int maxMs = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs,
                 effects?.BitePoint?.BitePointMaxLengthMs ?? MBoosterUiConstants.BitePointMaxLengthDefaultMs));
+            var direction = effects?.BitePoint?.BitePointDirection ?? MBoosterBitePointDirection.Both;
             long now = Stopwatch.GetTimestamp();
 
             double sourcePos = snap.BitePointUsesOwnPedal ? PedalHid() : snap.BitePointClutch01;
@@ -1300,7 +1307,7 @@ namespace MozaPlugin.Devices.MBooster
             // shared with the real path below since only one runs per tick.
             if (TestOn(MBoosterTestEffect.BitePoint))
             {
-                if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, now))
+                if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, now))
                 {
                     st.IntensityRequest = 0;
                     st.FreqHz = 0;
@@ -1332,7 +1339,7 @@ namespace MozaPlugin.Devices.MBooster
                 return;
             }
 
-            if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, now))
+            if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, now))
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;
@@ -1341,6 +1348,15 @@ namespace MozaPlugin.Devices.MBooster
             st.FreqHz = freqHz;
             double bitePointScale = (effects.BitePoint.IntensityPct / 100.0) * BitePointScaleMax;
             st.IntensityRequest = Clamp01(bitePointScale);
+        }
+
+        // Explicit Pulse rate, else the rate the ripple played before the setting existed.
+        private static double BitePointPulseRate(MBoosterEffectSettings? bite, double toneHz)
+        {
+            float? rate = bite?.BitePointPulseRateHz;
+            if (rate == null) return MBoosterUiConstants.BitePointLegacyPulseRateHz(toneHz);
+            return Math.Max(MBoosterUiConstants.BitePointPulseRateMinHz,
+                Math.Min(MBoosterUiConstants.BitePointPulseRateMaxHz, (double)rate.Value));
         }
 
         private static double ClampBitePointFreq(double hz)
@@ -1609,6 +1625,7 @@ namespace MozaPlugin.Devices.MBooster
                 _device.SendOneShot(MozaMBoosterProtocol.BuildDisableFrame(id, TargetDevice));
                 st.Active = false;
                 st.PhaseRad = 0;
+                st.PulsePhaseRad = 0;
                 st.ElapsedSec = 0;
                 return;
             }
@@ -1622,11 +1639,13 @@ namespace MozaPlugin.Devices.MBooster
             {
                 st.Active = true;
                 st.PhaseRad = 0;
+                st.PulsePhaseRad = 0;
                 st.ElapsedSec = 0;
             }
 
             st.ElapsedSec += TickPeriodSec;
             st.PhaseRad = EngineVibrationMath.AdvancePhase(st.PhaseRad, st.FreqHz, TickPeriodSec);
+            st.PulsePhaseRad = EngineVibrationMath.AdvancePhase(st.PulsePhaseRad, st.PulseRateHz, TickPeriodSec);
 
             double amp01 = synthesize(st);
 
@@ -1973,7 +1992,7 @@ namespace MozaPlugin.Devices.MBooster
         /// </summary>
         private void ProcessBitePointEffect(ref EffectState st) =>
             ProcessEffect(MBoosterEffectId.Engine, ref st,
-                s => MBoosterEffectSynthesizer.SynthesizeBitePoint(s.IntensityRequest, s.PhaseRad, s.SmoothnessRequest01));
+                s => MBoosterEffectSynthesizer.SynthesizeBitePoint(s.IntensityRequest, s.PulsePhaseRad, s.SmoothnessRequest01));
 
         // ===== Helpers ====================================================
 

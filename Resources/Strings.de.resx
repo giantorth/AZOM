@@ -866,7 +866,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub-Motion-Profil</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>SimHub-Eckhaptik einbeziehen</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibriert</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Ersatzwert</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Manuell</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Wartet</value></data>
@@ -874,7 +874,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Loslassen</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Abgebrochen</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisch kalibrieren</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Fixiert</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} Messungen</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Kupplungsquelle</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-Pedal</value></data>
@@ -882,4 +881,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Breite</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Mindestdauer (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Höchstdauer (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Pulsrate (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Auslösen bei</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Drücken</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Loslassen</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Beides</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Spielwert</value></data>
 </root>

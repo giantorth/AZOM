@@ -3023,7 +3023,7 @@
                                             <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Trigger}" Style="{StaticResource SliderLabel}"/>
                                             <ctrl:SegmentedControl Grid.Column="1" x:Name="MBoosterBitePointSource" HorizontalAlignment="Left" SelectionChanged="MBoosterBitePointSource_Changed">
                                                 <ListBoxItem Content="{x:Static res:Strings.Option_BitePointCalibrated}"/>
-                                                <ListBoxItem Content="{x:Static res:Strings.Option_BitePointFallback}"/>
+                                                <ListBoxItem Content="{x:Static res:Strings.Option_BitePointManual}"/>
                                             </ctrl:SegmentedControl>
                                         </Grid>
                                     </StackPanel>
@@ -3039,6 +3039,18 @@
                                                  Tag="{Binding ElementName=MBoosterBitePointTriggerLevel}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="50"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.Label_BiteTriggerOn}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:SegmentedControl Grid.Column="1" x:Name="MBoosterBitePointDirection" HorizontalAlignment="Left" SelectionChanged="MBoosterBitePointDirection_Changed">
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_BiteTriggerBoth}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_BiteTriggerPress}"/>
+                                            <ListBoxItem Content="{x:Static res:Strings.Option_BiteTriggerRelease}"/>
+                                        </ctrl:SegmentedControl>
                                     </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
@@ -3095,6 +3107,19 @@
                                                  Tag="{Binding ElementName=MBoosterBitePointFrequencySlider}"
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="40"/>
+                                    </Grid>
+                                    <Grid Margin="0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_PulseRateHz}" Style="{StaticResource SliderLabel}"/>
+                                        <Slider Grid.Column="1" x:Name="MBoosterBitePointPulseRate" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="25" TickFrequency="1" ValueChanged="MBoosterBitePointPulseRate_ValueChanged"/>
+                                        <TextBox Grid.Column="2" x:Name="MBoosterBitePointPulseRateValue" Style="{StaticResource SliderValueEditBox}"
+                                                 Tag="{Binding ElementName=MBoosterBitePointPulseRate}"
+                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                 Text="10"/>
                                     </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>

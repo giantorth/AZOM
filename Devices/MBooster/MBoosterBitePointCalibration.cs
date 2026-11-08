@@ -16,8 +16,7 @@ namespace MozaPlugin.Devices.MBooster
     }
 
     /// <summary>
-    /// One game's clutch bite point: the median of the most recent captured
-    /// samples, or a value the user pinned by hand (which stops refinement).
+    /// One game's clutch bite point: the median of the most recent captured samples.
     /// Treat a stored instance as immutable: change a <see cref="Clone"/> and
     /// store that, so a concurrent settings save never sees a mutation.
     /// </summary>
@@ -29,12 +28,9 @@ namespace MozaPlugin.Devices.MBooster
         /// <summary>Captured bite points (0..100), oldest first.</summary>
         public List<int> Samples { get; set; } = new List<int>();
 
-        /// <summary>Hand-set value; while set, new samples are ignored.</summary>
-        public int? PinnedPct { get; set; }
-
         /// <summary>Bite point in use (0..100), -1 when there is none.</summary>
         [JsonIgnore]
-        public int Pct => PinnedPct ?? Median();
+        public int Pct => Median();
 
         public void AddSample(int pct)
         {
@@ -43,7 +39,7 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         public MBoosterBitePointCalibration Clone() =>
-            new MBoosterBitePointCalibration { Samples = new List<int>(Samples), PinnedPct = PinnedPct };
+            new MBoosterBitePointCalibration { Samples = new List<int>(Samples) };
 
         private int Median()
         {

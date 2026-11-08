@@ -9,7 +9,6 @@ using GameReaderCommon.Enums;
 using GameReaderCommon.Feedback;
 using MozaPlugin.Devices.Haptics;
 using MozaPlugin.Devices.MBooster;
-using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
 using Newtonsoft.Json;
 using SimHub.Plugins.DataPlugins.ShakeItV3.Calibration;
@@ -79,6 +78,16 @@ namespace MozaPlugin.Integration
         /// <summary>Ripple depth, 0..100 (see MBoosterEffectSynthesizer.SynthesizeBitePoint).</summary>
         public int SmoothnessPct { get; set; } = DefaultSmoothnessPct;
 
+        /// <summary>
+        /// Ripple rate, Hz. Before it existed the ripple played the tone's beat
+        /// against 50 Hz; set it to that (MBoosterUiConstants.BitePointLegacyPulseRateHz,
+        /// 10 for 40 Hz) for the old output.
+        /// </summary>
+        public int PulseRateHz { get; set; } = MBoosterUiConstants.BitePointPulseRateDefaultHz;
+
+        /// <summary>Fire passing the bite point pressing, releasing or both.</summary>
+        public MBoosterBitePointDirection Direction { get; set; } = MBoosterBitePointDirection.Both;
+
         [JsonIgnore]
         public EffectBase Pulse { get; } = new MozaClutchBitePointEffect();
 
@@ -130,7 +139,7 @@ namespace MozaPlugin.Integration
             int maxMs = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs,
                 Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs, MaxLengthMs));
             if (!_trigger.Update(Clamp01(pos), Clamp01(triggerPct / 100.0), widthPct / 100.0,
-                    minMs / 1000.0, maxMs / 1000.0, now))
+                    minMs / 1000.0, maxMs / 1000.0, Direction, now))
             {
                 _waveActive = false;
                 return 0;
@@ -147,19 +156,13 @@ namespace MozaPlugin.Integration
             long due = (now - _waveStart) / StepTicks + 1;
             if (due > _stepsDone)
             {
-                _phaseRad = EngineVibrationMath.AdvancePhase(_phaseRad, ToneFrequencyHz(),
+                int rateHz = Math.Max(MBoosterUiConstants.BitePointPulseRateMinHz,
+                    Math.Min(MBoosterUiConstants.BitePointPulseRateMaxHz, PulseRateHz));
+                _phaseRad = EngineVibrationMath.AdvancePhase(_phaseRad, rateHz,
                     MBoosterEffectWorker.TickPeriodSec * (due - _stepsDone));
                 _stepsDone = due;
             }
             return MBoosterEffectSynthesizer.SynthesizeBitePoint(1.0, _phaseRad, Clamp01(SmoothnessPct / 100.0));
-        }
-
-        // The tone the worker plays, clamped as it clamps it.
-        private double ToneFrequencyHz()
-        {
-            int hz = (Output as SingleToneOutput)?.Frequency ?? DefaultFrequencyHz;
-            return Math.Max(MozaMBoosterProtocol.ShakeItMinFrequencyHz,
-                Math.Min(MozaMBoosterProtocol.ShakeItMaxFrequencyHz, hz));
         }
 
         // ShakeIt stopped evaluating the effect (out of game on shakers).
@@ -174,16 +177,36 @@ namespace MozaPlugin.Integration
         protected override UserControl GetEditControl()
         {
             var panel = new StackPanel();
-            // Calibration, the Calibrated/Fallback picker and Trigger Input Level.
+            // Calibration, the Calibrated/Manual picker and Trigger Input Level.
             panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
+            panel.Children.Add(DirectionPicker());
             panel.Children.Add(Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
                 MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct));
             panel.Children.Add(Slider(Strings.SliderLabel_BiteMinLength, nameof(MinLengthMs),
                 MBoosterUiConstants.BitePointMinLengthMinMs, MBoosterUiConstants.BitePointMinLengthMaxMs, 10));
             panel.Children.Add(Slider(Strings.SliderLabel_BiteMaxLength, nameof(MaxLengthMs),
                 MBoosterUiConstants.BitePointMaxLengthMinMs, MBoosterUiConstants.BitePointMaxLengthMaxMs, 50));
+            panel.Children.Add(Slider(Strings.SliderLabel_PulseRateHz, nameof(PulseRateHz),
+                MBoosterUiConstants.BitePointPulseRateMinHz, MBoosterUiConstants.BitePointPulseRateMaxHz));
             panel.Children.Add(Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100));
             return new UserControl { Content = panel, DataContext = this };
+        }
+
+        private FrameworkElement DirectionPicker()
+        {
+            var combo = new ComboBox { MinWidth = 140, Margin = new Thickness(8, 0, 0, 0) };
+            combo.Items.Add(Strings.Option_BiteTriggerBoth);
+            combo.Items.Add(Strings.Option_BiteTriggerPress);
+            combo.Items.Add(Strings.Option_BiteTriggerRelease);
+            combo.SelectedIndex = (int)Direction;
+            combo.SelectionChanged += (s, e) =>
+            {
+                if (combo.SelectedIndex >= 0) Direction = (MBoosterBitePointDirection)combo.SelectedIndex;
+            };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            row.Children.Add(new TextBlock { Text = Strings.Label_BiteTriggerOn, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(combo);
+            return row;
         }
 
         private static TitledSlider Slider(string title, string path, double min, double max, double step = 1)

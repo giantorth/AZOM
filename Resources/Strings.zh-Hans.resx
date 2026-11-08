@@ -866,7 +866,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion 配置文件</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>包含 SimHub 角部触觉效果</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>已校准</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>备用</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>手动</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>重置</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>空闲</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>等待中</value></data>
@@ -874,7 +874,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>松开中</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>已取消</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>自动校准</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>已固定</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} 个样本</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>离合来源</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 踏板</value></data>
@@ -882,4 +881,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>宽度</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>最短时长 (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>最长时长 (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>脉动频率 (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>触发时机</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>踩下</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>松开</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>两者</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>游戏值</value></data>
 </root>

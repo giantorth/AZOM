@@ -866,7 +866,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Профиль SimHub Motion</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Включить угловые тактильные эффекты SimHub</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Калиброванная</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Резервная</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Вручную</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>СБРОС</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Неактивно</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Ожидание</value></data>
@@ -874,7 +874,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Отпускание</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Отменено</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Автокалибровка</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Закреплено</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>Замеров: {0}</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Источник сцепления</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Педаль mBooster</value></data>
@@ -882,4 +881,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Ширина</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Минимальная длительность (мс)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Максимальная длительность (мс)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Частота пульсации (Гц)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Срабатывать при</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Нажатие</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Отпускание</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Оба</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Значение игры</value></data>
 </root>

@@ -866,7 +866,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Hồ sơ SimHub Motion</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Bao gồm phản hồi xúc giác góc của SimHub</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Đã hiệu chuẩn</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Dự phòng</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Thủ công</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ĐẶT LẠI</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Nhàn rỗi</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Đang chờ</value></data>
@@ -874,7 +874,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Đang nhả</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Đã hủy</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Tự động hiệu chuẩn</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Đã ghim</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} mẫu</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Nguồn côn</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Bàn đạp mBooster</value></data>
@@ -882,4 +881,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Độ rộng</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Độ dài tối thiểu (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Độ dài tối đa (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Tốc độ nhịp (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Kích hoạt khi</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Đạp</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Nhả</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Cả hai</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Giá trị trò chơi</value></data>
 </root>

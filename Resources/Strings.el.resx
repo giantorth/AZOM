@@ -865,7 +865,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Προφίλ SimHub Motion</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Συμπερίληψη απτικών εφέ γωνιών του SimHub</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Βαθμονομημένο</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Εφεδρικό</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Χειροκίνητο</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Αδράνεια</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
@@ -873,7 +873,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Απελευθέρωση</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Ακυρώθηκε</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Αυτόματη βαθμονόμηση</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Κλειδωμένο</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} δείγματα</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Πηγή συμπλέκτη</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Πεντάλ mBooster</value></data>
@@ -881,4 +880,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Εύρος</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Ελάχιστη διάρκεια (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Μέγιστη διάρκεια (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Ρυθμός παλμού (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Ενεργοποίηση κατά</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Πάτημα</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Απελευθέρωση</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Και τα δύο</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Τιμή παιχνιδιού</value></data>
 </root>

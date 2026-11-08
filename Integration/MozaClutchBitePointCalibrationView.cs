@@ -12,11 +12,11 @@ using SimHub.Plugins.UI;
 namespace MozaPlugin.Integration
 {
     /// <summary>
-    /// Clutch source, calibration, Calibrated/Fallback picker and Trigger Input
+    /// Clutch source, calibration, Calibrated/Manual picker and Trigger Input
     /// Level for the ShakeIt Clutch Bite Point editor — the same plugin state the
     /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). Trigger Input
-    /// Level shows the calibrated value while it is in use (dragging pins it),
-    /// else the effect's fallback. Polls while on screen.
+    /// Level shows the calibrated value read-only while it is in use, else the
+    /// effect's editable fallback. Polls while on screen.
     /// </summary>
     internal sealed class MozaClutchBitePointCalibrationView : UserControl
     {
@@ -66,7 +66,7 @@ namespace MozaPlugin.Integration
             header.Children.Add(_reset);
 
             _useCalibrated.Items.Add(Strings.Option_BitePointCalibrated);
-            _useCalibrated.Items.Add(Strings.Option_BitePointFallback);
+            _useCalibrated.Items.Add(Strings.Option_BitePointManual);
             _useCalibratedRow.Children.Add(new TextBlock { Text = Strings.SliderLabel_Trigger, VerticalAlignment = VerticalAlignment.Center });
             _useCalibratedRow.Children.Add(_useCalibrated);
 
@@ -127,9 +127,7 @@ namespace MozaPlugin.Integration
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin == null || _refreshing) return;
-                string? game = plugin.CurrentGameName;
-                if (UsesCalibration(plugin, plugin.ClutchBitePointInfo(game))) plugin.PinClutchBitePoint(game!, pct);
-                else _effect.TriggerLevelPct = pct;
+                if (!UsesCalibration(plugin, plugin.ClutchBitePointInfo())) _effect.TriggerLevelPct = pct;
             };
 
             _timer.Tick += (s, e) => Refresh();
@@ -148,7 +146,7 @@ namespace MozaPlugin.Integration
             Refresh();
         }
 
-        // Trigger Input Level edits the calibration while the effect is using it.
+        // Trigger Input Level shows the calibration while the effect is using it.
         private bool UsesCalibration(MozaPlugin plugin, in MozaPlugin.BitePointInfo info) =>
             _effect.UseCalibratedBitePoint && info.IsCalibrated && !string.IsNullOrEmpty(plugin.CurrentGameName);
 
@@ -162,7 +160,7 @@ namespace MozaPlugin.Integration
         {
             var plugin = MozaPlugin.Instance;
             if (plugin == null) return;
-            var info = plugin.ClutchBitePointInfo(plugin.CurrentGameName);
+            var info = plugin.ClutchBitePointInfo();
             bool running = plugin.IsBitePointCalibrationRunning;
             _refreshing = true;
             try
@@ -179,12 +177,15 @@ namespace MozaPlugin.Integration
 
                 _status.Text = plugin.BitePointStatusText(info);
                 _calibrate.Content = running ? Strings.Button_Cancel : Strings.Button_Calibrate;
-                _reset.IsEnabled = info.IsCalibrated || running;
+                _reset.IsEnabled = (info.IsCalibrated && !info.Inherited) || running;
                 _auto.IsChecked = plugin.BitePointAutoCalibrate;
                 _useCalibratedRow.Visibility = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;
                 _useCalibrated.SelectedIndex = _effect.UseCalibratedBitePoint ? 0 : 1;
+                bool showsCalibration = UsesCalibration(plugin, info);
+                // The calibrated value is read-only here; Manual makes it editable.
+                _trigger.IsEnabled = !showsCalibration;
                 if (!_trigger.IsMouseCaptureWithin)
-                    _model.Pct = UsesCalibration(plugin, info) ? info.Pct : _effect.TriggerLevelPct;
+                    _model.Pct = showsCalibration ? info.Pct : _effect.TriggerLevelPct;
             }
             finally
             {

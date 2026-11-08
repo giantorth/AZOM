@@ -871,7 +871,7 @@ Id: {2}</value></data>
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>SimHub Motion-profil</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Ta med SimHub-hjørnehaptikk</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibrert</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Reserve</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Manuell</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>TILBAKESTILL</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Venter</value></data>
@@ -879,7 +879,6 @@ Id: {2}</value></data>
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Slipper</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Avbrutt</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisk kalibrering</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Låst</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} målinger</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Clutchkilde</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-pedal</value></data>
@@ -887,4 +886,10 @@ Id: {2}</value></data>
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Bredde</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Minste varighet (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Lengste varighet (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Pulsrate (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Utløs ved</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Trykk</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Slipp</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Begge</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Spillverdi</value></data>
 </root>

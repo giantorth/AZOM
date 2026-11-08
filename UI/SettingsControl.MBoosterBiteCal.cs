@@ -29,20 +29,22 @@ namespace MozaPlugin.UI
             MBoosterBiteSourceValue.Text = _plugin.TryGetBitePointClutchPosition(out double clutch01)
                 ? Math.Round(clutch01 * 100) + "%" : "—";
 
-            var info = _plugin.ClutchBitePointInfo(_plugin.CurrentGameName);
+            var info = _plugin.ClutchBitePointInfo();
             bool running = _plugin.IsBitePointCalibrationRunning;
             MBoosterBiteCalState.Text = _plugin.BitePointStatusText(info);
             MBoosterBiteCalButton.Content = running ? Strings.Button_Cancel : Strings.Button_Calibrate;
-            MBoosterBiteCalResetButton.IsEnabled = info.IsCalibrated || running;
+            MBoosterBiteCalResetButton.IsEnabled = (info.IsCalibrated && !info.Inherited) || running;
             MBoosterBiteCalAuto.IsChecked = _plugin.BitePointAutoCalibrate;
 
             var vis = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;
             if (MBoosterBiteCalValuePanel.Visibility != vis) MBoosterBiteCalValuePanel.Visibility = vis;
 
             var fx = PeekMBoosterEffectTarget();
-            int shown = BiteTriggerShowsCalibration(fx, out _)
-                ? info.Pct
-                : fx?.BitePoint?.TriggerLevelPct ?? 50;
+            bool showsCalibration = BiteTriggerShowsCalibration(fx, out _);
+            int shown = showsCalibration ? info.Pct : fx?.BitePoint?.TriggerLevelPct ?? 50;
+            // The calibrated value is read-only here; Manual makes it editable.
+            MBoosterBitePointTriggerLevel.IsEnabled = !showsCalibration;
+            MBoosterBitePointTriggerLevelValue.IsEnabled = !showsCalibration;
             // Don't fight a drag.
             if ((int)Math.Round(MBoosterBitePointTriggerLevel.Value) != shown && !MBoosterBitePointTriggerLevel.IsMouseCaptureWithin)
             {
@@ -58,7 +60,7 @@ namespace MozaPlugin.UI
             game = _plugin.CurrentGameName ?? "";
             return (fx?.BitePoint?.UseCalibratedBitePoint ?? true)
                    && game.Length > 0
-                   && _plugin.ClutchBitePointInfo(game).IsCalibrated;
+                   && _plugin.ClutchBitePointInfo().IsCalibrated;
         }
 
         private void MBoosterBiteSource_Changed(object sender, SelectionChangedEventArgs e)

@@ -223,8 +223,9 @@ namespace MozaPlugin.Settings
             = new Dictionary<string, int[]>(StringComparer.OrdinalIgnoreCase);
 
         // Clutch bite point calibration per SimHub game code and clutch source
-        // (key: game, "game:"+game or "formula:"+game). Absent = uncalibrated.
-        // See MBoosterBitePointCalibration / MozaPlugin.MBoosterBitePoint.cs.
+        // (game key: game, "game:"+game or "formula:"+game), and per vehicle
+        // (game key + "|car:" + CarId/CarModel). Absent = uncalibrated; a vehicle
+        // without its own inherits the game's. See MozaPlugin.MBoosterBitePoint.cs.
         public Dictionary<string, MBoosterBitePointCalibration> MBoosterClutchBitePointCalibrations { get; set; }
             = new Dictionary<string, MBoosterBitePointCalibration>(StringComparer.OrdinalIgnoreCase);
 

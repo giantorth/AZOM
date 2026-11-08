@@ -856,7 +856,7 @@
   <data name="Motion_Source_SimHubPose" xml:space="preserve"><value>Boof Woof Arf</value></data>
   <data name="Motion_Panel_CornerHaptics" xml:space="preserve"><value>Woof Arf Grr Bark</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Ruffed!</value></data>
-  <data name="Option_BitePointFallback" xml:space="preserve"><value>Woof-back!</value></data>
+  <data name="Option_BitePointManual" xml:space="preserve"><value>Paw-made!</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>GRRR!!</value></data>
   <data name="BiteCal_Idle" xml:space="preserve"><value>Yowff!</value></data>
   <data name="BiteCal_Waiting" xml:space="preserve"><value>Wait-woof!</value></data>
@@ -864,7 +864,6 @@
   <data name="BiteCal_Releasing" xml:space="preserve"><value>Let-go-woof!</value></data>
   <data name="BiteCal_Cancelled" xml:space="preserve"><value>Whimper!</value></data>
   <data name="Label_AutoCalibrate" xml:space="preserve"><value>Auto-woof!</value></data>
-  <data name="BiteCal_Pinned" xml:space="preserve"><value>Stay!</value></data>
   <data name="BiteCal_Samples" xml:space="preserve"><value>{0} sniffs!</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Clutch-sniff!</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster woof!</value></data>
@@ -872,4 +871,10 @@
   <data name="SliderLabel_BiteWidth" xml:space="preserve"><value>Wide-woof!</value></data>
   <data name="SliderLabel_BiteMinLength" xml:space="preserve"><value>Short-bark (ms)</value></data>
   <data name="SliderLabel_BiteMaxLength" xml:space="preserve"><value>Long-howl (ms)</value></data>
+  <data name="SliderLabel_PulseRateHz" xml:space="preserve"><value>Pant-rate (Hz)</value></data>
+  <data name="Label_BiteTriggerOn" xml:space="preserve"><value>Bark when</value></data>
+  <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Push-woof!</value></data>
+  <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Let-go!</value></data>
+  <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Both-bork!</value></data>
+  <data name="BiteCal_GameValue" xml:space="preserve"><value>Game-woof!</value></data>
 </root>

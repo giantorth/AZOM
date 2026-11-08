@@ -763,22 +763,28 @@ namespace MozaPlugin.UI
             (s.BitePoint ??= new MBoosterEffectSettings()).Enabled = MBoosterBitePointEnable.IsChecked == true;
             _plugin.SaveSettings();
         }
-        // The bite point (%): while the calibration is in use this edits (and
-        // pins) the current game's calibration, else the fallback
-        // MBoosterEffectSettings.TriggerLevelPct. See RefreshMBoosterBiteCal.
+        // Fallback bite point (%), MBoosterEffectSettings.TriggerLevelPct. While
+        // the calibration is in use the slider shows it read-only
+        // (RefreshMBoosterBiteCal), so edits here only ever reach the fallback.
         private void MBoosterBitePointTriggerLevel_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (_suppressEvents) return;
             int v = Math.Max((int)MBoosterUiConstants.BitePointTriggerMinPct, Math.Min((int)MBoosterUiConstants.BitePointTriggerMaxPct, (int)Math.Round(e.NewValue)));
             MBoosterBitePointTriggerLevelValue.Text = v.ToString();
             var s = CurrentMBoosterEffectTarget();
-            if (BiteTriggerShowsCalibration(s, out string game))
-            {
-                _plugin.PinClutchBitePoint(game, v);
-                return;
-            }
-            if (s == null) return;
+            if (s == null || BiteTriggerShowsCalibration(s, out _)) return;
             (s.BitePoint ??= new MBoosterEffectSettings()).TriggerLevelPct = v;
+            _plugin.SaveSettings();
+        }
+        // Fire passing the bite point pressing, releasing or both. See
+        // MBoosterEffectSettings.BitePointDirection.
+        private void MBoosterBitePointDirection_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents || MBoosterBitePointDirection.SelectedIndex < 0) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointDirection =
+                (Devices.MBooster.MBoosterBitePointDirection)MBoosterBitePointDirection.SelectedIndex;
             _plugin.SaveSettings();
         }
         // Clutch travel (%) either side of the bite point that triggers the
@@ -825,6 +831,31 @@ namespace MozaPlugin.UI
             if (s == null) return;
             (s.BitePoint ??= new MBoosterEffectSettings()).FrequencyHz = v;
             _plugin.SaveSettings();
+            // A never-set Pulse rate follows Frequency (the legacy beat).
+            if (s.BitePoint.BitePointPulseRateHz == null)
+                using (_suppressor.Begin()) ShowBitePointPulseRate(s.BitePoint);
+        }
+        // Smoothness ripple rate (Hz). See MBoosterEffectSettings.BitePointPulseRateHz.
+        private void MBoosterBitePointPulseRate_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents) return;
+            int v = Math.Max(MBoosterUiConstants.BitePointPulseRateMinHz, Math.Min(MBoosterUiConstants.BitePointPulseRateMaxHz, (int)Math.Round(e.NewValue)));
+            MBoosterBitePointPulseRateValue.Text = v.ToString();
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointPulseRateHz = v;
+            _plugin.SaveSettings();
+        }
+        // The Pulse rate in effect: the set value, else the one derived from
+        // Frequency (shown as a magnitude; the worker keeps its sign).
+        private void ShowBitePointPulseRate(MBoosterEffectSettings? bite)
+        {
+            double toneHz = Math.Max(MBoosterUiConstants.BitePointFreqMinHz, Math.Min(MBoosterUiConstants.BitePointFreqMaxHz,
+                bite?.FrequencyHz ?? MBoosterUiConstants.BitePointFreqMinHz));
+            int rate = (int)Math.Round(bite?.BitePointPulseRateHz
+                ?? Math.Abs(MBoosterUiConstants.BitePointLegacyPulseRateHz(toneHz)));
+            MBoosterBitePointPulseRate.Value = rate;
+            SetValueText(MBoosterBitePointPulseRateValue, rate.ToString());
         }
         // Pulse modulation depth — same ripple-depth control as ABS's
         // Smoothness (MBoosterEffectSynthesizer.SynthesizeBitePoint uses

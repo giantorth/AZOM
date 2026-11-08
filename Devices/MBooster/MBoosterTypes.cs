@@ -135,6 +135,21 @@ namespace MozaPlugin.Devices.MBooster
         public const int BitePointMaxLengthMaxMs = 10000;
         public const int BitePointMaxLengthDefaultMs = 1500;
 
+        // Bite Point's Pulse rate slider bounds: how fast the Smoothness ripple
+        // throbs. 25 Hz is the most a 50 Hz motor stream can carry; 0 is steady.
+        public const int BitePointPulseRateMinHz = 0;
+        public const int BitePointPulseRateMaxHz = 25;
+        public const int BitePointPulseRateDefaultHz = 10;
+
+        /// <summary>
+        /// The ripple rate a Bite Point with no Pulse rate set plays: before the
+        /// setting existed the ripple ran at the tone frequency but was only
+        /// sampled every 20 ms, so it played the beat against 50 Hz (40 Hz → -10).
+        /// Signed, so untouched profiles reproduce that output exactly.
+        /// </summary>
+        public static double BitePointLegacyPulseRateHz(double toneHz) =>
+            toneHz - 50.0 * Math.Round(toneHz / 50.0);
+
         // Brake Fade's Onset Temperature slider bounds, in the same unit
         // BrakeTempC normalizes to (Celsius) — see
         // MBoosterEffectSettings.BrakeFadeOnsetC. Real fade onset varies
@@ -350,6 +365,16 @@ namespace MozaPlugin.Devices.MBooster
         public int BitePointMinLengthMs { get; set; } = MBoosterUiConstants.BitePointMinLengthDefaultMs;
         public int BitePointMaxLengthMs { get; set; } = MBoosterUiConstants.BitePointMaxLengthDefaultMs;
 
+        // Bite Point-only: Smoothness ripple rate, Hz (MBoosterUiConstants
+        // .BitePointPulseRateMinHz/MaxHz). Null = never set: derived from
+        // FrequencyHz the way the ripple always played
+        // (MBoosterUiConstants.BitePointLegacyPulseRateHz).
+        public float? BitePointPulseRateHz { get; set; }
+
+        // Bite Point-only: fire passing the bite point pressing, releasing or
+        // both (MBoosterBitePointTrigger).
+        public MBoosterBitePointDirection BitePointDirection { get; set; } = MBoosterBitePointDirection.Both;
+
         // Threshold-only, 0..100 — how much the pulse fades after its
         // initial burst. Generalizes MBoosterEffectSynthesizer
         // .SynthesizeThreshold's fixed "20ms full + 120ms @ 80% + 60ms gap"
@@ -416,6 +441,8 @@ namespace MozaPlugin.Devices.MBooster
                 BitePointWidthPct = BitePointWidthPct,
                 BitePointMinLengthMs = BitePointMinLengthMs,
                 BitePointMaxLengthMs = BitePointMaxLengthMs,
+                BitePointPulseRateHz = BitePointPulseRateHz,
+                BitePointDirection = BitePointDirection,
                 DecayPct = DecayPct,
                 BrakeFadeOnsetC = BrakeFadeOnsetC,
                 VibrateOnNeutral = VibrateOnNeutral,
