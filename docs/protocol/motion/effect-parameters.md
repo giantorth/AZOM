@@ -28,6 +28,11 @@ powered up, then Motion Manager started) reads road detail `1F 06` as `00000000 
 the 0.0/0.5 the previous session had pushed — before Motion Manager writes anything;
 `startup-shutdown` and `nurburgring` read back the GT3 preset's 0.79/0.40 the same way.
 
+A controller can hold `0/0` on every slot and road detail: bug report SJ6QA6F2 (G01 fw 2.35)
+read that at connect, streamed live `0x22/00` telemetry in mode 1 with no errors, and the user
+reported no motion. When the enrol reads zero intensity on all five slots, the plugin writes the
+"iRacing gt3" values above to every slot its profile leaves unset (road detail untouched).
+
 Slots 2, 4, 5, 6 are never written on this rig (presumably surge / sway / yaw / traction-loss
 effects of other platform types). The "Gear Shift Isolation" toggle under Acceleration Pitch has
 no observed write.

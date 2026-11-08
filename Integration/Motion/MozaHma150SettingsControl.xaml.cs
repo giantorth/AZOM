@@ -115,16 +115,18 @@ namespace MozaPlugin.Integration.Motion
                 if (s.RigLengthMm.HasValue) RigLengthBox.Text = s.RigLengthMm.Value.ToString("0", CultureInfo.CurrentCulture);
                 if (s.RigWidthMm.HasValue) RigWidthBox.Text = s.RigWidthMm.Value.ToString("0", CultureInfo.CurrentCulture);
             }
-            if (s != null && connected && !_effectsLoaded && s.RoadDetail.HasValue && s.Effects.All(e => e.HasValue))
+            // After the enrol: it decides whether defaults replace an all-zero controller.
+            if (s != null && connected && !_effectsLoaded && s.Phase != MotionLanePhase.Enrolling
+                && s.RoadDetail.HasValue && s.Effects.All(e => e.HasValue))
             {
-                // The active profile's values where it has them, else what the controller holds.
+                // The active profile's values where it has them, else the lane's defaults, else what the controller holds.
                 _effectsLoaded = true;
                 var profileEffects = MozaPlugin.Instance?.Settings?.ProfileStore?.CurrentProfile?.MotionEffects;
                 var desired = MozaPlugin.ToDesiredEffects(profileEffects);
                 for (int i = 0; i < _effectBoxes.Count; i++)
                 {
                     var held = i < s.Effects.Length ? s.Effects[i]!.Value : s.RoadDetail.Value;
-                    ShowEffect(_effectBoxes[i], desired[i] ?? held);
+                    ShowEffect(_effectBoxes[i], desired[i] ?? lane!.SeededEffect(i) ?? held);
                 }
                 int engine = profileEffects?.EngineVibrationStrength ?? -1;
                 int tactile = profileEffects?.TactileIntensity ?? -1;
