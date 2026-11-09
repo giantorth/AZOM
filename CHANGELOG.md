@@ -7,6 +7,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
+- **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
 
 ## Changed
 

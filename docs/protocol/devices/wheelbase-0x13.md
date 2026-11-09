@@ -188,6 +188,18 @@ Group 42 is used for both writes (calibration, music set) and reads (music get).
 ```
 Both produce ACK response: `7E 03 AA 31 43 0x 05 [chk]` (echo with group|0x80, device nibble-swapped).
 
+**Read frames** carry one zero placeholder byte; the reply echoes the get cmd id:
+```
+7E 03 2A 13 43 02 00 [chk]   →  7E 03 AA 31 43 02 NN [chk]   ← index
+7E 03 2A 13 43 04 00 [chk]   →  7E 03 AA 31 43 04 NN [chk]   ← enabled
+7E 03 2A 13 44 01 00 [chk]   →  7E 03 AA 31 44 01 NN [chk]   ← volume
+```
+PitHouse polls all three together every ~2 s.
+
+**Plugin:** `base-music-*` in `MozaCommandDatabase`; the three gets ride the base
+settings sweep and the Base tab's Startup Music card is shown only once
+`43 04` answers (a base without startup music is never asked to write).
+
 ### Group `0x2B` (43) — Status (read-only)
 
 | Command | ID | Bytes | Type | Notes |

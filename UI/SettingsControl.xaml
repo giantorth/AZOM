@@ -923,8 +923,8 @@
                             <Slider x:Name="FfbCurveY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY5Slider_ValueChanged"/>
                         </StackPanel>
 
-                        <!-- Miscellaneous + High Speed Damping sit side-by-side: small
-                             cards that round out the tab at the bottom. -->
+                        <!-- Miscellaneous on the left; High Speed Damping and Startup Music
+                             stacked on the right. -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -969,37 +969,81 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
 
-                            <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_HighSpeedDamping}"
-                                              Icon="{StaticResource IconSpeed}" Margin="7,0,0,14">
-                                <StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingLevel}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="SpeedDampingSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="SpeedDampingSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="SpeedDampingValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=SpeedDampingSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0%"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerSpeed}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="SpeedDampingPointSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="400" TickFrequency="10" ValueChanged="SpeedDampingPointSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="SpeedDampingPointValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=SpeedDampingPointSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="120 kph"/>
-                                    </Grid>
-                                </StackPanel>
-                            </ctrl:SectionCard>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionCard Title="{x:Static res:Strings.Section_HighSpeedDamping}"
+                                                  Icon="{StaticResource IconSpeed}" Margin="7,0,0,14">
+                                    <StackPanel>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingLevel}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="SpeedDampingSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="SpeedDampingSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="SpeedDampingValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=SpeedDampingSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0%"/>
+                                        </Grid>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerSpeed}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="SpeedDampingPointSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="400" TickFrequency="10" ValueChanged="SpeedDampingPointSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="SpeedDampingPointValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=SpeedDampingPointSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="120 kph"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </ctrl:SectionCard>
+                                <!-- Shown once the base answers the music reads. -->
+                                <ctrl:SectionCard x:Name="StartupMusicCard" Visibility="Collapsed"
+                                                  Title="{x:Static res:Strings.Section_StartupMusic}"
+                                                  Icon="{StaticResource IconMusic}" Margin="7,0,0,14">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8">
+                                            <TextBlock Text="{x:Static res:Strings.Label_Enable}" Style="{StaticResource SliderLabel}"/>
+                                            <ctrl:OffOnToggle x:Name="StartupMusicCheck" VerticalAlignment="Center" Click="StartupMusicCheck_Click"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8">
+                                            <TextBlock Text="{x:Static res:Strings.SliderLabel_StartupMusicTrack}" Style="{StaticResource SliderLabel}"/>
+                                            <ComboBox x:Name="StartupMusicTrackCombo" Width="110" VerticalAlignment="Center"
+                                                      SelectionChanged="StartupMusicTrackCombo_Changed">
+                                                <ComboBoxItem Tag="1" Content="1"/>
+                                                <ComboBoxItem Tag="2" Content="2"/>
+                                                <ComboBoxItem Tag="3" Content="3"/>
+                                                <ComboBoxItem Tag="4" Content="4"/>
+                                                <ComboBoxItem Tag="5" Content="5"/>
+                                                <ComboBoxItem Tag="6" Content="6"/>
+                                                <ComboBoxItem Tag="7" Content="7"/>
+                                                <ComboBoxItem Tag="8" Content="8"/>
+                                                <ComboBoxItem Tag="9" Content="9"/>
+                                                <ComboBoxItem Tag="10" Content="10"/>
+                                            </ComboBox>
+                                            <Button Content="{x:Static res:Strings.Label_Test}" Padding="10,2" Margin="8,0,0,0"
+                                                    VerticalAlignment="Center" Click="StartupMusicTest_Click"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_StartupMusicVolume}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="StartupMusicVolumeSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="StartupMusicVolumeSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="StartupMusicVolumeValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=StartupMusicVolumeSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="9%"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </ctrl:SectionCard>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>

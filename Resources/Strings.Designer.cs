@@ -951,5 +951,8 @@ namespace MozaPlugin.Resources
         public static string HidAxis_Slider => Get("HidAxis_Slider");
         public static string HidAxis_Dial => Get("HidAxis_Dial");
         public static string HidAxis_Wheel => Get("HidAxis_Wheel");
+        public static string SliderLabel_StartupMusicTrack => Get("SliderLabel_StartupMusicTrack");
+        public static string SliderLabel_StartupMusicVolume => Get("SliderLabel_StartupMusicVolume");
+        public static string Section_StartupMusic => Get("Section_StartupMusic");
     }
 }

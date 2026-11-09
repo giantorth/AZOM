@@ -898,4 +898,7 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>Glidebryter</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>Dreieknapp</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>Hjul</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Musikkspor</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Musikkvolum</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>OPPSTARTSMUSIKK</value></data>
 </root>

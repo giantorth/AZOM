@@ -681,6 +681,13 @@ namespace MozaPlugin
         // BleMode's inverted convention. -1 = not read back yet.
         public volatile int CompatMode = -1;
 
+        // Startup music (group 42 cmd 43/44). -1 = not read back; a base that
+        // never answers has no startup music.
+        public volatile int BaseMusicEnabled = -1;
+        public volatile int BaseMusicIndex = -1;     // 1..10
+        public volatile int BaseMusicVolume = -1;    // 0..255
+        public bool BaseSupportsStartupMusic => BaseMusicEnabled >= 0;
+
         // ===== Pedals settings =====
         public volatile int PedalsThrottleDir;
         public volatile int PedalsThrottleMin;
@@ -990,6 +997,11 @@ namespace MozaPlugin
                 case "base-ffb-reverse":    FfbReverse = value; break;
                 case "base-temp-strategy":  TempStrategy = value; break;
                 case "base-gearshift-vibration": GearshiftVibration = value; break;
+
+                // Startup music
+                case "base-music-enabled-get": BaseMusicEnabled = value; break;
+                case "base-music-index-get":   BaseMusicIndex = value; break;
+                case "base-music-volume-get":  BaseMusicVolume = value; break;
 
                 // Game effects
                 case "main-get-damper-gain":   GameDamper = value; break;
@@ -1554,6 +1566,9 @@ namespace MozaPlugin
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
             BaseTorqueBoost = TorqueBoostUnread;
+            BaseMusicEnabled = -1;
+            BaseMusicIndex = -1;
+            BaseMusicVolume = -1;
             // BaseFwVersion is intentionally NOT cleared — see its field comment.
             // It is static-backed and survives resets so the LFE card doesn't blink
             // out; the prober overwrites it on the next base detect.

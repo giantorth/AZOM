@@ -44,6 +44,7 @@ namespace MozaPlugin.UI
                 "base-soft-limit-stiffness", "base-soft-limit-strength", "base-soft-limit-retain",
                 "base-ffb-reverse", "main-get-work-mode", "main-get-led-status",
                 "main-get-ble-mode", "main-get-compat-mode",
+                "base-music-enabled-get", "base-music-index-get", "base-music-volume-get",
                 "base-mcu-temp", "base-mosfet-temp", "base-motor-temp"
             );
         }
@@ -434,6 +435,17 @@ namespace MozaPlugin.UI
             SyncAutoStandbyCombo();
             LedStatusCheck.IsChecked = _data.LedStatus != 0;
             BluetoothCheck.IsChecked = _data.BleMode == 0;
+
+            bool music = _data.BaseSupportsStartupMusic;
+            StartupMusicCard.Visibility = music ? Visibility.Visible : Visibility.Collapsed;
+            if (music)
+            {
+                StartupMusicCheck.IsChecked = _data.BaseMusicEnabled != 0;
+                int track = _data.BaseMusicIndex;
+                StartupMusicTrackCombo.SelectedIndex = track >= 1 && track <= 10 ? track - 1 : -1;
+                if (_data.BaseMusicVolume >= 0)
+                    SetSliderPercent(StartupMusicVolumeSlider, StartupMusicVolumeValue, _data.BaseMusicVolume / 2.55, 0, 100);
+            }
 
             // FFB Equalizer (100% = flat). Ranges depend on the band mode:
             // legacy 0-400 on all six; 10-band fw is 0-500 except the 100 Hz

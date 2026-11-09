@@ -893,4 +893,7 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>滑块</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>旋钮</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>滚轮</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>音乐曲目</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>音乐音量</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>开机音乐</value></data>
 </root>

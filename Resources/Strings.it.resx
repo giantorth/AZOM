@@ -896,4 +896,7 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>Cursore</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>Manopola</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>Rotella</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Brano</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Volume musica</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>MUSICA DI AVVIO</value></data>
 </root>

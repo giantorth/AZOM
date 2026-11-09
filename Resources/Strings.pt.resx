@@ -892,4 +892,7 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>Controle deslizante</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>Botão giratório</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>Roda</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Faixa de música</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Volume da música</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>MÚSICA DE INICIALIZAÇÃO</value></data>
 </root>

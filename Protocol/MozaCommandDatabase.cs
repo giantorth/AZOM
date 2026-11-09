@@ -95,6 +95,16 @@ namespace MozaPlugin.Protocol
             // Wheelbase calibration (write group 42)
             AddCommand("base-calibration", "base", 0xFF, 42, new byte[] { 1 }, 2, "int");
 
+            // Startup music (group 42). Reads carry one zero byte; replies echo the
+            // cmd id on 0xAA. Index 1..10, volume 0..255.
+            AddCommand("base-music-preview",     "base", 0xFF, 42, new byte[] { 0x43, 0x00 }, 1, "int");
+            AddCommand("base-music-index-set",   "base", 0xFF, 42, new byte[] { 0x43, 0x01 }, 1, "int");
+            AddCommand("base-music-index-get",   "base", 42, 0xFF, new byte[] { 0x43, 0x02 }, 1, "int");
+            AddCommand("base-music-enabled-set", "base", 0xFF, 42, new byte[] { 0x43, 0x03 }, 1, "int");
+            AddCommand("base-music-enabled-get", "base", 42, 0xFF, new byte[] { 0x43, 0x04 }, 1, "int");
+            AddCommand("base-music-volume-set",  "base", 0xFF, 42, new byte[] { 0x44, 0x00 }, 1, "int");
+            AddCommand("base-music-volume-get",  "base", 42, 0xFF, new byte[] { 0x44, 0x01 }, 1, "int");
+
             // Partner-SDK (iRacing-MOZA bridge). iRacing POSTs each of these
             // CoAP URIs exactly once per session as a capability probe; the
             // wheel firmware persists the value to EEPROM (Tables 11 / 5 — see
