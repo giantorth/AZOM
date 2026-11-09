@@ -373,6 +373,11 @@ namespace MozaPlugin.UI
                 ProfileListControl.DataContext = null;
                 ProfileListControl.DataContext = _plugin.ProfileStore;
             }
+            if (_stalksWired)
+            {
+                BuildStalkRows();
+                SeedStalksControls();
+            }
         }
 
         // ===== Profile system (SimHub native) =====

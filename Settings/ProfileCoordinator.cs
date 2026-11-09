@@ -127,6 +127,7 @@ namespace MozaPlugin.Settings
             // telemetry off for new wheels, wheelbase LFE off ShakeIt).
             _plugin._settings = MozaPluginSettings.CreateForNewInstall();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
+            _plugin.ApplyStalksSettings();
             // InitProfileSystem re-pushes the master-mapper defaults from the
             // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();

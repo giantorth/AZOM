@@ -80,6 +80,8 @@ namespace MozaPlugin.Settings
             MBoosterHapticsSource = MBoosterHapticsSource.ShakeIt,
             DeviceProfilesSplit = true,
             Cm2DashboardKeysReset = true,
+            StalksMode = StalkMode.TruckSim,
+            StalksTruckSim = StalkTruckSimSettings.CreateEts2Defaults(),
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -787,9 +789,10 @@ namespace MozaPlugin.Settings
 
         // --- MOZA Multi-Function Stalks: truck-sim keyboard emulation ---
 
-        /// <summary>Stalks operating mode. Default <see cref="StalkMode.ButtonBox"/>
-        /// = the plugin does nothing (raw HID buttons). <see cref="StalkMode.TruckSim"/>
-        /// enables ETS2/ATS keyboard emulation from the button map below.</summary>
+        /// <summary>Stalks operating mode. <see cref="StalkMode.ButtonBox"/> = the plugin
+        /// does nothing (raw HID buttons). <see cref="StalkMode.TruckSim"/> enables
+        /// ETS2/ATS keyboard emulation from the button map below; new installs start
+        /// in TruckSim (<see cref="CreateForNewInstall"/>).</summary>
         public StalkMode StalksMode { get; set; } = StalkMode.ButtonBox;
 
         /// <summary>Per-button map + wiper/light stage config used when
@@ -858,9 +861,9 @@ namespace MozaPlugin.Settings
 
     /// <summary>
     /// Truck-sim keyboard-mapping config for the MOZA Multi-Function Stalks. Stored
-    /// on <see cref="MozaPluginSettings.StalksTruckSim"/>. The per-button map is
-    /// assigned interactively in the Stalks settings tab — there is no default map.
-    /// Cycle keys / stage counts start at ETS2 defaults and are user-adjustable.
+    /// on <see cref="MozaPluginSettings.StalksTruckSim"/>. New installs start from
+    /// <see cref="CreateEts2Defaults"/>; the field initializers keep the button map
+    /// empty so an existing settings file's map is never merged with defaults.
     /// </summary>
     public sealed class StalkTruckSimSettings
     {
@@ -923,6 +926,14 @@ namespace MozaPlugin.Settings
         /// <summary>Populate the ETS2/ATS default button map (0-based button indices,
         /// i.e. HID button number − 1): light knob 1–3, high beam 4/5, turn signals
         /// 8/9/10, wipers single-swipe 20 and stages 21–24.</summary>
+        public static StalkTruckSimSettings CreateEts2Defaults()
+        {
+            var s = new StalkTruckSimSettings();
+            s.ApplyEts2Defaults();
+            return s;
+        }
+
+        /// <summary>Reset to the ETS2/ATS defaults; see <see cref="CreateEts2Defaults"/>.</summary>
         public void ApplyEts2Defaults()
         {
             WiperForwardKey = "P";

@@ -12,6 +12,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Changed
 
 - **Steering Wheel Inertia is saved per wheel;** it follows the attached rim across profiles, while Hands-off Protection stays in the profile.
+- **Stalks start in truck-sim mode with the ETS2/ATS key map** on new installs and after Clear all settings.
 
 ## [1.7.3]
 
