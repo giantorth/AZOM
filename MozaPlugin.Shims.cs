@@ -241,6 +241,9 @@ namespace MozaPlugin
         internal WheelSleepSettings? GetOrCreateActiveWheelSleep() => _profileCoordinator.GetOrCreateActiveWheelSleep();
         internal WheelIdleSettings? ActiveWheelIdle => _profileCoordinator.ActiveWheelIdle;
         internal WheelIdleSettings? GetOrCreateActiveWheelIdle() => _profileCoordinator.GetOrCreateActiveWheelIdle();
+        internal int GetWheelNaturalInertia(Guid pageGuid) => _profileCoordinator.GetWheelNaturalInertia(pageGuid);
+        internal void SetWheelNaturalInertia(Guid pageGuid, int value) => _profileCoordinator.SetWheelNaturalInertia(pageGuid, value);
+        internal void SetActiveWheelNaturalInertia(int value) => _profileCoordinator.SetActiveWheelNaturalInertia(value);
 
         // CM2 dash settings are keyed under a fixed page GUID with a single
         // dashboard key, so the CM2's dashboard/channel config is fully independent

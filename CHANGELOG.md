@@ -2,6 +2,12 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.4]
+
+## Changed
+
+- **Steering Wheel Inertia is saved per wheel;** it follows the attached rim across profiles, while Hands-off Protection stays in the profile.
+
 ## [1.7.3]
 
 ## Highlights

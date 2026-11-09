@@ -666,6 +666,13 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, WheelIdleSettings> WheelIdleByPageGuid { get; set; }
             = new Dictionary<Guid, WheelIdleSettings>();
 
+        // Per-wheel-page Steering Wheel Inertia (hands-off protection, base cmd 0x13,
+        // raw 100..4000). It describes the rim, so it follows the attached wheel and
+        // is shared across profiles; the Hands-off Protection toggle stays on the
+        // profile. Absence = base keeps its stored value (seeded from it on first apply).
+        public Dictionary<Guid, int> WheelNaturalInertiaByPageGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
         // ===== Dashboard Telemetry =====
         public bool TelemetryEnabled { get; set; } = false;
 

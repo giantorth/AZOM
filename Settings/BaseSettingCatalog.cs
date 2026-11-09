@@ -36,6 +36,8 @@ namespace MozaPlugin.Settings
             public Func<MozaData, int>? MaxFor;
             /// <summary>Firmware capability gate. Null = always available.</summary>
             public Func<MozaData, bool>? Supported;
+            /// <summary>Persistence outside the profile capture (raw value). Null = profile only.</summary>
+            public Action<MozaPlugin, int>? Commit;
 
             public int EffectiveMax(MozaData d) => MaxFor?.Invoke(d) ?? Max;
             public bool IsSupported(MozaData d) => Supported?.Invoke(d) ?? true;
@@ -236,7 +238,8 @@ namespace MozaPlugin.Settings
             new NumericSetting {
                 Name = "NaturalInertia", Commands = new[] { "base-natural-inertia" },
                 GetRaw = d => d.NaturalInertia, SetRaw = (d, v) => d.NaturalInertia = v,
-                Min = 100, Max = 4000, Fine = 50, Coarse = 200 },
+                Min = 100, Max = 4000, Fine = 50, Coarse = 200,
+                Commit = (p, v) => p.SetActiveWheelNaturalInertia(v) },
 
             new NumericSetting {
                 Name = "SoftLimitStiffness", Commands = new[] { "base-soft-limit-stiffness" },

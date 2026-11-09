@@ -764,6 +764,7 @@ namespace MozaPlugin.UI
             NaturalInertiaValue.Text = $"{val}";
             _data.NaturalInertia = val;
             _plugin.HardwareApplier.WriteIfBaseConnected("base-natural-inertia", val);
+            _plugin.SetActiveWheelNaturalInertia(val);
             _plugin.SaveSettings();
         }
 

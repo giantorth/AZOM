@@ -468,6 +468,7 @@ namespace MozaPlugin.Integration
             def.SetRaw(data, raw);
             foreach (var cmd in def.Commands)
                 _plugin.HardwareApplier.WriteIfBaseConnected(cmd, raw);
+            def.Commit?.Invoke(_plugin, raw);
             _plugin.SaveSettings();
             MozaLog.Debug($"[AZOM] {def.Name} → {next} via action");
         }

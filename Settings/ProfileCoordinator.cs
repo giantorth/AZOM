@@ -711,6 +711,35 @@ namespace MozaPlugin.Settings
             }
         }
 
+        /// <summary>Steering Wheel Inertia stored for a wheel page; -1 when none.</summary>
+        internal int GetWheelNaturalInertia(Guid pageGuid)
+        {
+            var dict = _plugin.Settings?.WheelNaturalInertiaByPageGuid;
+            return dict != null && dict.TryGetValue(pageGuid, out var v) ? v : -1;
+        }
+
+        internal void SetWheelNaturalInertia(Guid pageGuid, int value)
+        {
+            var s = _plugin.Settings;
+            if (s == null || value < 0) return;
+            lock (_pageBundleSwapLock)
+            {
+                var cur = s.WheelNaturalInertiaByPageGuid;
+                if (cur != null && cur.TryGetValue(pageGuid, out var prev) && prev == value) return;
+                var next = cur == null ? new Dictionary<Guid, int>() : new Dictionary<Guid, int>(cur);
+                next[pageGuid] = value;
+                s.WheelNaturalInertiaByPageGuid = next;
+            }
+        }
+
+        /// <summary>Record a user-set Steering Wheel Inertia for the attached wheel.
+        /// No-op until the wheel identifies — the base still holds the written value.</summary>
+        internal void SetActiveWheelNaturalInertia(int value)
+        {
+            var g = _plugin.GetCurrentWheelPageGuid();
+            if (g.HasValue) SetWheelNaturalInertia(g.Value, value);
+        }
+
         /// <summary>
         /// Sleep-light bundle for the current wheel page (shared across profiles).
         /// null means "leave the wheel's stored value alone".

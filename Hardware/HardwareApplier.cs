@@ -1718,9 +1718,16 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.SpeedDampingPoint,  v => profile.SpeedDampingPoint  = v,
                   () => _data.SpeedDampingPoint,    v => _data.SpeedDampingPoint    = v,
                   "base-speed-damping-point");
-            Apply(() => profile.NaturalInertia,     v => profile.NaturalInertia     = v,
-                  () => _data.NaturalInertia,       v => _data.NaturalInertia       = v,
-                  "base-natural-inertia");
+            // Steering Wheel Inertia is per wheel, not per profile. Page resolved once
+            // so a hot-swap can't split the read and the seed across two wheels.
+            var wheelPage = _plugin.GetCurrentWheelPageGuid();
+            if (wheelPage.HasValue)
+            {
+                var page = wheelPage.Value;
+                Apply(() => _plugin.GetWheelNaturalInertia(page), v => _plugin.SetWheelNaturalInertia(page, v),
+                      () => _data.NaturalInertia,               v => _data.NaturalInertia = v,
+                      "base-natural-inertia");
+            }
             Apply(() => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v,
                   () => _data.SoftLimitStiffness,   v => _data.SoftLimitStiffness   = v,
                   "base-soft-limit-stiffness");
@@ -1908,7 +1915,7 @@ namespace MozaPlugin.Hardware
                 profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
-                profile.NaturalInertia = -1; profile.SoftLimitStiffness = -1;
+                profile.SoftLimitStiffness = -1;
                 profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
