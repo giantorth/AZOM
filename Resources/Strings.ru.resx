@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>ПАРАБОЛА</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>ПРОЧЕЕ</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>ДЕМПФИРОВАНИЕ НА ВЫСОКОЙ СКОРОСТИ</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// понятия не имею, что делают эти настройки</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Инверсия обратной связи</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Режим ожидания</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Ожидание через</value></data>

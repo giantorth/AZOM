@@ -970,7 +970,6 @@
                             </ctrl:SectionCard>
 
                             <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_HighSpeedDamping}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_HighSpeedDamping}"
                                               Icon="{StaticResource IconSpeed}" Margin="7,0,0,14">
                                 <StackPanel>
                                     <Grid Margin="0,4">

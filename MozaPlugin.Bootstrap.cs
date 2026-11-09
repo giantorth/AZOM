@@ -767,6 +767,7 @@ namespace MozaPlugin
                 _hardwareApplier = new HardwareApplier(this, _data, _deviceManager, _ab9Manager, DetectionState, _dashboardManager);
                 _gearshift = new GearshiftDetector(this, _data, _deviceManager, _ab9Manager, DetectionState);
                 _standby = new StandbyCoordinator(this, _data, DetectionState, _hidReader);
+                _highSpeedDamping = new HighSpeedDampingCoordinator(this, _data, DetectionState);
                 _deviceProber = new DeviceProber(this, _connection, _deviceManager, _data, DetectionState);
                 // Now that the hardware applier exists, do the initial standalone
                 // peripheral walk — surfaces a pedal set / handbrake attached

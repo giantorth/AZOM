@@ -64,7 +64,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>BORK!!</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>YAP!!</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>Wuff Howl Arf!</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Yowff!</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Woof!</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Ruff!</value></data>

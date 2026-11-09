@@ -793,6 +793,46 @@ namespace MozaPlugin.Hardware
         // Pedals/Handbrake resolvers above.
         private MozaDeviceManager BaseManager => _detectionState.BaseOwner ?? _deviceManager;
 
+        // ── High-speed damping overlay ──
+        // Every base-damper write goes through WriteBaseSetting so the active speed
+        // boost rides on top of the user's value; _data.Damper never holds the boost.
+        private readonly object _damperWireLock = new object();
+        private const int DamperRawMax = 1000;
+
+        private bool WriteBaseSetting(string command, int value)
+        {
+            if (command != "base-damper") return BaseManager.WriteSetting(command, value);
+            lock (_damperWireLock) return WriteBaseDamperLocked(value);
+        }
+
+        private bool WriteBaseDamperLocked(int userRaw)
+        {
+            int boost = _data.DamperSpeedBoost;
+            if (boost <= 0) return BaseManager.WriteSetting("base-damper", userRaw);
+            int wire = Math.Min(DamperRawMax, userRaw + boost);
+            _data.DamperBoostedWire = wire;
+            return BaseManager.WriteSetting("base-damper", wire);
+        }
+
+        /// <summary>Set the high-speed damping boost (raw tenths, 0 = off) and push
+        /// Damper plus boost. True iff the write was dispatched.</summary>
+        internal bool SetDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock)
+            {
+                _data.DamperSpeedBoost = boostRaw;
+                int user = _data.Damper;
+                if (user < 0 || !_detectionState.BaseDetected) return false;
+                return WriteBaseDamperLocked(user);
+            }
+        }
+
+        /// <summary>Set the overlay without a write, for when the wire already matches.</summary>
+        internal void SyncDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock) _data.DamperSpeedBoost = boostRaw;
+        }
+
         // All-sentinel stand-in while the attached wheel has no store yet (not
         // identified, or its store is still being seeded): mirrors nothing, writes
         // nothing saved, but the per-wheel bundles and display-rotation still run.
@@ -1798,7 +1838,7 @@ namespace MozaPlugin.Hardware
                     {
                         if (deviceVal >= 0) BaseCfgPrime(cmd, deviceVal);
                         if (BaseCfgChanged(cmd, val))
-                            BaseManager.WriteSetting(cmd, val);
+                            WriteBaseSetting(cmd, val);
                     }
             }
 
@@ -2127,7 +2167,7 @@ namespace MozaPlugin.Hardware
         public bool WriteIfBaseConnected(string command, int value)
         {
             if (value < 0) return false;
-            return _detectionState.BaseDetected && BaseManager.WriteSetting(command, value);
+            return _detectionState.BaseDetected && WriteBaseSetting(command, value);
         }
         public void WriteFloatIfBaseConnected(string command, int value)
         {

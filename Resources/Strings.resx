@@ -65,7 +65,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOLIC</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>MISCELLANEOUS</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>HIGH SPEED DAMPING</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// I have no idea what these settings do</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Force Feedback Reversal</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Standby Mode</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Standby after</value></data>

@@ -63,7 +63,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOLSK</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>DIVERSE</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>DEMPING VED HØY HASTIGHET</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// jeg vet ærlig talt ikke hva disse gjør</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>FFB-reversering</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Standby-modus</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Standby etter</value></data>

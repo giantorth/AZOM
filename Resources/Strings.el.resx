@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>ΠΑΡΑΒΟΛΙΚΟ</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>ΔΙΑΦΟΡΑ</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>ΑΠΟΣΒΕΣΗ ΥΨΗΛΗΣ ΤΑΧΥΤΗΤΑΣ</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// δεν ξέρω τι κάνουν αυτές οι ρυθμίσεις</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Αντιστροφή Force Feedback</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Λειτουργία Αναμονής</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Αναμονή μετά από</value></data>

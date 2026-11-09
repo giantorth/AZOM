@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOLISCH</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>SONSTIGES</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>DÄMPFUNG BEI HOHER GESCHWINDIGKEIT</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// keine Ahnung, was diese Einstellungen bewirken</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Force-Feedback-Umkehrung</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Standby-Modus</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Standby nach</value></data>

@@ -49,6 +49,8 @@ namespace MozaPlugin
         // Auto-standby (idle-timeout Work Mode standby) + the HID-activity
         // baseline that feeds it — see Devices/StandbyCoordinator.cs.
         private StandbyCoordinator? _standby;
+        // Speed-triggered damper boost — see Devices/HighSpeedDampingCoordinator.cs.
+        private HighSpeedDampingCoordinator? _highSpeedDamping;
         // Per-channel + global-default SimHub property mapping —
         // see Telemetry/ChannelMappingCoordinator.cs.
         private ChannelMappingCoordinator _channelMapping = null!;

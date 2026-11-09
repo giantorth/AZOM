@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>抛物线</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>杂项</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>高速阻尼</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// 不清楚这些设置具体作用</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>力反馈反向</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>待机模式</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>待机延时</value></data>

@@ -61,7 +61,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOLICA</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>VARIE</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>SMORZAMENTO AD ALTA VELOCITÀ</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// aggiunge una percentuale di smorzamento sopra una certa velocità in gioco</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Inversione Force Feedback</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Modalità Standby</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Standby dopo</value></data>

@@ -125,7 +125,6 @@ namespace MozaPlugin.Resources
         public static string Button_Parabolic => Get("Button_Parabolic");
         public static string Section_Miscellaneous => Get("Section_Miscellaneous");
         public static string Section_HighSpeedDamping => Get("Section_HighSpeedDamping");
-        public static string Subtitle_HighSpeedDamping => Get("Subtitle_HighSpeedDamping");
         public static string SliderLabel_ForceFeedbackReversal => Get("SliderLabel_ForceFeedbackReversal");
         public static string SliderLabel_StandbyMode => Get("SliderLabel_StandbyMode");
         public static string SliderLabel_AutoStandbyTimeout => Get("SliderLabel_AutoStandbyTimeout");

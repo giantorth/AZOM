@@ -38,6 +38,9 @@ namespace MozaPlugin
             TeardownStopTimers();
             TeardownStopWorkers();
 
+            // Before detection flags are reset, which would gate the write off.
+            Teardown("high speed damping release", () => _highSpeedDamping?.Release());
+
             // Burst silent-slot frames + an engine-pulse OFF to stop the AB9
             // effect immediately on shutdown. Without this the firmware keeps
             // the last-streamed buzz running until its ~10 s keepalive timeout,

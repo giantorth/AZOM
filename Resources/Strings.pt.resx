@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABÓLICA</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>DIVERSOS</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>AMORTECIMENTO EM ALTA VELOCIDADE</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// não faço ideia do que estas opções fazem</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Inversão do force feedback</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Modo de espera</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Espera após</value></data>

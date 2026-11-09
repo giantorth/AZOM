@@ -58,7 +58,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>포물선</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>기타</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>고속 댐핑</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// 이 설정들이 무슨 역할을 하는지는 알 수 없습니다</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>포스 피드백 반전</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>대기 모드</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>대기 시작까지</value></data>

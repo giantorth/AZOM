@@ -132,6 +132,8 @@ namespace MozaPlugin
             _baseLfeWorker?.PostFrame(engineOn);
             _pedalHapticsWorker?.PostFrame(engineOn);
 
+            _highSpeedDamping?.Tick(data.GameRunning, data.NewData?.SpeedKmh ?? 0.0);
+
             // Control Mapper variant-provider bridge: drive wheel-change detection
             // each tick when registered; otherwise retry registration up to the
             // tick budget (ControlMapperPlugin may not be loaded at Init time).

@@ -4,6 +4,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.4]
 
+## Added
+
+- **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
+
 ## Changed
 
 - **Steering Wheel Inertia is saved per wheel;** it follows the attached rim across profiles, while Hands-off Protection stays in the profile.

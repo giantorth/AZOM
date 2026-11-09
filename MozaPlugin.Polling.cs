@@ -430,6 +430,9 @@ namespace MozaPlugin
             // CM2/CM1 drivers above. Idempotent: no-op unless a stopped FSR1.
             _dualDisplay?.StartFsr1DriverIfNeeded();
 
+            // Before the primary-connection gate: the base may be on the base-aux pipe.
+            _highSpeedDamping?.Reconcile();
+
             if (!_connection.IsConnected) return;
 
             // Auto-standby backstop: enters standby when idle (covers the case

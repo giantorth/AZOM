@@ -242,6 +242,13 @@ namespace MozaPlugin
         // High speed damping
         public volatile int SpeedDamping = -1;
         public volatile int SpeedDampingPoint = -1;
+        // Raw boost HighSpeedDampingCoordinator overlays on base-damper (0 = none).
+        // Damper always holds the user's value; the boost lives only on the wire.
+        public volatile int DamperSpeedBoost;
+        // Last boosted base-damper value sent, so its readback isn't adopted as Damper.
+        public volatile int DamperBoostedWire = -1;
+        // Readback showed a leftover boost with none active; coordinator rewrites Damper.
+        public volatile bool DamperWireStale;
 
         // Soft limit
         public volatile int SoftLimitStiffness = -1;
@@ -957,7 +964,11 @@ namespace MozaPlugin
                 case "base-speed":          Speed = value; break;
 
                 // Effects
-                case "base-damper":         Damper = value; break;
+                case "base-damper":
+                    if (DamperSpeedBoost > 0) break;
+                    if (value == DamperBoostedWire && value != Damper) { DamperWireStale = true; break; }
+                    Damper = value;
+                    break;
                 case "base-friction":       Friction = value; break;
                 case "base-inertia":        Inertia = value; break;
                 case "base-spring":         Spring = value; break;

@@ -63,7 +63,6 @@
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABÓLICA</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>VARIOS</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>AMORTIGUACIÓN A ALTA VELOCIDAD</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// no tengo idea de para qué sirven estos ajustes</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Inversión del retorno de fuerza</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Modo de espera</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Espera tras</value></data>
