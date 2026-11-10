@@ -957,5 +957,6 @@ namespace MozaPlugin.Resources
         public static string ControlDash_Title => Get("ControlDash_Title");
         public static string ControlDash_Description => Get("ControlDash_Description");
         public static string ControlDash_CurvePoint => Get("ControlDash_CurvePoint");
+        public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
     }
 }

@@ -899,4 +899,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 基座控制</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>通过手机或平板调整基座设置。</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>点 {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>坡顶强度</value></data>
 </root>

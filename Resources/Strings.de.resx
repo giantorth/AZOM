@@ -899,4 +899,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Basis-Steuerung</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Basis-Einstellungen vom Smartphone oder Tablet aus anpassen.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punkt {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Stärke über Kuppen</value></data>
 </root>

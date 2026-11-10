@@ -889,4 +889,5 @@
   <data name="ControlDash_Title" xml:space="preserve"><value>Woof Bark Grrowl!</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Ruff bark woof grrowl bark!</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Sniff {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Woof Arf</value></data>
 </root>

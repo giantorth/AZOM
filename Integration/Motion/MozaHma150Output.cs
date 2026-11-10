@@ -26,6 +26,7 @@ namespace MozaPlugin.Integration.Motion
     {
         private MozaHma150Source _source;
         private bool _includeCornerHaptics = true;
+        private int _crestBoost;
 
         public MozaHma150Source Source
         {
@@ -50,6 +51,23 @@ namespace MozaPlugin.Integration.Motion
             {
                 if (_includeCornerHaptics == value) return;
                 _includeCornerHaptics = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, 0–100: strength of the crest signal, the game's slow lightness
+        /// added to the heave the controller is sent (<see cref="MotionGameFeed.PoseFrame"/>).
+        /// 0 = off.
+        /// </summary>
+        public int CrestBoost
+        {
+            get => _crestBoost;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_crestBoost == value) return;
+                _crestBoost = value;
                 Output?.ApplySettings();
             }
         }
@@ -188,7 +206,8 @@ namespace MozaPlugin.Integration.Motion
                     ? primary?.FinalMotionState ?? primary?.MotionState
                     : primary?.MotionState;
                 if (pose != null)
-                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game));
+                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
+                        currentSettings.CrestBoost));
                 return;
             }
             if (game != null) lane!.PostFrame(game);

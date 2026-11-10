@@ -899,4 +899,5 @@ Id : {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Contrôle de la base MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Réglez la base depuis un téléphone ou une tablette.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Point {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Force sur les bosses</value></data>
 </root>

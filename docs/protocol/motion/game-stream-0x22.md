@@ -110,7 +110,7 @@ profile (washout, limits, per-game tuning) does the cueing:
 | f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
 | f4, f5 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f6 | −`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 moves the platform down and SimHub's +mm is up |
+| f6 | −`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 moves the platform down and SimHub's +mm is up. *Crest strength* adds to it (below) |
 | f8–f11 | rest − `HeaveMm`. Felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s |
 
 Heave inputs in game mode, seat-judged bench run of 10 Nov (`tools/hma150-characterize.ps1
@@ -119,6 +119,29 @@ and 3 Hz sines): f6 ±8 m/s² and all four shocks ±10 mm were each felt as shar
 −8 the strongest. The one snapshot inside the f6 +8 pulses read −5.42 mm on all four
 actuators 0.26 s after a pulse ended, so the Heave effect follows f6 with a short memory;
 the snapshot inside the shock sine (8.4 mm off rest, Road Detail 1.0) read 0.00.
+
+**Crest strength** (0–100, default 0 = off, pose source only) adds strength/100 · p to f6, where
+p is built from the game's own `AccelerationHeave`, not from the profile:
+
+| Step | Rule |
+|------|------|
+| Input | `AccelerationHeave` clipped to ±12 m/s², low-passed with τ = 0.2 s → a |
+| Target | min(30, max(0, −a − 2) · 15): lightness only, 2 m/s² dead band, ceiling 30 |
+| Attack | p rises to the target with τ = 0.05 s |
+| Release | p falls with τ = 0.8 s, shortening to 0.3 s as a turns positive (full at +3 m/s²: the car landing) |
+| Impact | \|surge\| or \|sway\| > 30 m/s² holds a at 0 for 2 s and releases p with τ = 0.15 s |
+
+Why each part is there (iRacing, Bathurst, 911 Cup, 10 Nov, USB captures with matching replays):
+a crest is long and small (217 km/h: 1.2 s at −4 m/s² mean, which a road-tuned profile turned
+into f6 ≈ +0.35, the size of its road noise) and a bump short and large (~7 m/s² for 30–50 ms),
+so only duration separates them, hence the low-pass and dead band. A first two-sided version
+pushed back as hard on the landing after the crest (a 47 m/s² swing within a second at strength
+80), and the controller left game mode with error 261 seconds later (meaning unknown, cleared
+by a power cycle), hence lightness only. Over a long crest the lightness wobbles around the
+dead band at 2–3 Hz, which an instant release chopped into separate pushes, hence the slow
+release; a release tied to the landing lets a soft landing down gently and a firm one firmly.
+Wall hits got through the low-pass and held the push at its ceiling, hence the clip and the
+impact hold. Tested on that one track and car only.
 
 The pose is `FinalMotionState` (corner haptics folded in) while *Include SimHub corner haptics*
 is on (default), else `MotionState`; haptics that write heave directly (engine, touchdown) are

@@ -25,6 +25,39 @@ namespace MozaPlugin.Devices.Motion
         // game's own vertical acceleration. Bench run of 10 Nov: f6 is what the controller's
         // Heave effect follows in game mode, and +f6 moves the platform down.
         private const float HeaveAccelPerMm = 17f / 80f;
+        // Crest signal. A crest is a long, gentle lightness (Bathurst, 911 Cup, 217 km/h: 1.2 s at
+        // −4 m/s² mean, −4.7 low-passed peak), a bump a short, large one (~7 m/s² for 30–50 ms),
+        // so only duration tells them apart: the low-pass keeps the first and the dead band drops
+        // what it leaves of the second. One-sided: a first version also answered compressions,
+        // and the landing after that crest pushed back as hard as the crest itself (a 47 m/s²
+        // swing within a second at strength 80), which felt odd and was followed by the
+        // controller leaving game mode with error 261.
+        private const double HeaveSlowSeconds = 0.2;
+        private const double CrestDeadbandAccel = 2.0;
+        // At full strength: f6 per m/s² of lightness beyond the dead band, and the ceiling; the
+        // strength slider scales the result. 30 is the push judged right from the seat on that
+        // crest, with every controller status line at error 0.
+        private const double CrestGainFull = 15.0;
+        private const double CrestMaxAccel = 30.0;
+        // An impact is not a crest. Lightness on track peaked at −12 m/s² raw (the mountain,
+        // 200 km/h), so that is the most the signal is allowed to see; braking and cornering
+        // stay under 20 m/s², so 30 along or across the car means a hit.
+        private const double CrestInputLimit = 12.0;
+        private const double CrestImpactAccel = 30.0;
+        private const int CrestImpactHoldMs = 2000;
+        // The push follows the lightness up at once and lets go slowly. Over a long crest the
+        // lightness wobbles around the dead band two or three times a second (Bathurst, 250 km/h,
+        // 3.5 s: six separate pushes of 0 ↔ 30, felt as being bounced); with a slow release the
+        // same stretch is one push, and a lap's 29 pushes become 10.
+        private const double CrestAttackSeconds = 0.05;
+        // How it lets go follows the car: gently while nothing presses back, firmly as the car
+        // lands (slow acceleration turning positive, full firmness from +3 m/s²). One fixed
+        // release fitted the crest whose landing is firm and came out too severe on those that
+        // land softly or late.
+        private const double CrestReleaseSoftSeconds = 0.8;
+        private const double CrestReleaseFirmSeconds = 0.3;
+        private const double CrestLandingAccel = 3.0;
+        private const double CrestImpactReleaseSeconds = 0.15;
         private const int GearPulseMs = 120;
         private const double EngineOffRpm = 100.0;
 
@@ -53,6 +86,10 @@ namespace MozaPlugin.Devices.Motion
         private long _stampMs;
         private string? _lastGear;
         private long _shiftUntilMs;
+        private double _heaveSlow;
+        private long _heaveSlowAtMs = -1;
+        private long _crestHoldUntilMs;
+        private double _crestPush;
 
         /// <summary>Latest frame if it is younger than <paramref name="maxAgeMs"/>.</summary>
         public MotionTelemetryFrame? Latest(int maxAgeMs)
@@ -69,6 +106,10 @@ namespace MozaPlugin.Devices.Motion
             {
                 Volatile.Write(ref _latest, null);
                 _lastGear = null;
+                _heaveSlow = 0.0;
+                _heaveSlowAtMs = -1;
+                _crestHoldUntilMs = 0;
+                _crestPush = 0.0;
                 return;
             }
 
@@ -89,6 +130,32 @@ namespace MozaPlugin.Devices.Motion
             f.Fields[5] = (float)sway;
             f.Fields[6] = (float)heave;
             f.Fields[7] = (float)speed;
+            double sinceSlow = _heaveSlowAtMs < 0 ? 0.0 : Math.Min(0.25, (now - _heaveSlowAtMs) / 1000.0);
+            _heaveSlowAtMs = now;
+            // An impact's spikes (−20…−28 m/s² vertical with 90…350 along the car, Bathurst wall,
+            // 10 Nov) got through the low-pass and held the crest push at its ceiling again and
+            // again. Clip what goes in, and sit out the seconds after a hit.
+            if (Math.Abs(surge) > CrestImpactAccel || Math.Abs(sway) > CrestImpactAccel)
+                _crestHoldUntilMs = now + CrestImpactHoldMs;
+            if (now < _crestHoldUntilMs)
+                _heaveSlow = 0.0;
+            else
+                _heaveSlow += (Math.Max(-CrestInputLimit, Math.Min(CrestInputLimit, heave)) - _heaveSlow)
+                    * (1.0 - Math.Exp(-sinceSlow / HeaveSlowSeconds));
+            double crestTarget = Math.Min(CrestMaxAccel, Math.Max(0.0, -_heaveSlow - CrestDeadbandAccel) * CrestGainFull);
+            double crestRate;
+            if (crestTarget > _crestPush)
+                crestRate = 1.0 / CrestAttackSeconds;
+            else if (now < _crestHoldUntilMs)
+                crestRate = 1.0 / CrestImpactReleaseSeconds;
+            else
+            {
+                double landing = Math.Max(0.0, Math.Min(1.0, _heaveSlow / CrestLandingAccel));
+                crestRate = 1.0 / CrestReleaseSoftSeconds
+                    + (1.0 / CrestReleaseFirmSeconds - 1.0 / CrestReleaseSoftSeconds) * landing;
+            }
+            _crestPush += (crestTarget - _crestPush) * (1.0 - Math.Exp(-sinceSlow * crestRate));
+            f.CrestPush = (float)_crestPush;
             if (!ReadIRacingShocks(pluginManager, f))
             {
                 for (int k = 0; k < 4; k++)
@@ -119,9 +186,13 @@ namespace MozaPlugin.Devices.Motion
         /// from <paramref name="game"/> when a game runs.
         /// Pose signs: SimHub's pitch is −GameData pitch and its roll +GameData roll (MotionPlugin),
         /// so both flip to match <see cref="Update"/>. Heave: +mm is up, and +f6 moves the platform down.
+        /// <paramref name="crestStrength"/> (0–100) adds the game's slow lightness
+        /// (<see cref="MotionTelemetryFrame.CrestPush"/>) to f6: the car going light over a crest
+        /// lowers the platform, whatever the profile's heave makes of something that long and
+        /// gentle. Compressions are left to the profile.
         /// </summary>
         public static MotionTelemetryFrame PoseFrame(double pitchDegrees, double rollDegrees, double heaveMm,
-            MotionTelemetryFrame? game)
+            MotionTelemetryFrame? game, double crestStrength = 0.0)
         {
             var f = new MotionTelemetryFrame();
             f.Fields[0] = (float)(-pitchDegrees * DegToRad);
@@ -140,6 +211,8 @@ namespace MozaPlugin.Devices.Motion
             else
                 f.Flags = MozaMotionProtocol.FlagInGame;
             f.Fields[6] = (float)(-heaveMm * HeaveAccelPerMm);
+            if (crestStrength > 0.0 && game != null)
+                f.Fields[6] += (float)(Math.Min(1.0, crestStrength / 100.0) * game.CrestPush);
             for (int k = 0; k < 4; k++)
                 f.Fields[8 + k] = (float)(MotionTelemetryFrame.ShockRestMm[k] - heaveMm);
             return f;

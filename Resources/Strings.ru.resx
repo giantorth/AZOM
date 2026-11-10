@@ -899,4 +899,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Управление базой MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Настройка базы с телефона или планшета.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Точка {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Сила на гребнях</value></data>
 </root>

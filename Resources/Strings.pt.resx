@@ -898,4 +898,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Controle da base MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Ajuste a base pelo celular ou tablet.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Ponto {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Força em lombas</value></data>
 </root>

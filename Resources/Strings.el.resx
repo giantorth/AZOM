@@ -898,4 +898,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Έλεγχος βάσης τιμονιού</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Ρυθμίστε τη βάση τιμονιού από κινητό ή tablet.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Σημείο {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Ένταση σε κορυφές</value></data>
 </root>

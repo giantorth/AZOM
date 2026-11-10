@@ -899,4 +899,5 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Điều khiển đế MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Điều chỉnh cài đặt đế từ điện thoại hoặc máy tính bảng.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Điểm {0}</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Cường độ khi qua đỉnh dốc</value></data>
 </root>
