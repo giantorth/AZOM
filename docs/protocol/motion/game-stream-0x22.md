@@ -110,17 +110,37 @@ profile (washout, limits, per-game tuning) does the cueing:
 | f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
 | f4, f5 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f6 | −`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 moves the platform down and SimHub's +mm is up. *Crest strength* adds to it (below) |
+| f6 | +`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 raises the platform, as SimHub's +mm does. *Crest strength* takes its push off it (below) |
 | f8–f11 | rest − `HeaveMm`. Felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s |
 
 Heave inputs in game mode, seat-judged bench run of 10 Nov (`tools/hma150-characterize.ps1
 -Experiment HeaveFeel`: Heave 1.0 / 0, Road Detail 0, f7 40 m/s; pulses of 0.3 s, a 2 s step
 and 3 Hz sines): f6 ±8 m/s² and all four shocks ±10 mm were each felt as sharp movement, f6
 −8 the strongest. The one snapshot inside the f6 +8 pulses read −5.42 mm on all four
-actuators 0.26 s after a pulse ended, so the Heave effect follows f6 with a short memory;
-the snapshot inside the shock sine (8.4 mm off rest, Road Detail 1.0) read 0.00.
+actuators 0.26 s after a pulse ended; the snapshot inside the shock sine (8.4 mm off rest,
+Road Detail 1.0) read 0.00.
 
-**Crest strength** (0–100, default 0 = off, pose source only) adds strength/100 · p to f6, where
+Direction and size of the Heave effect's answer to f6 (`-Experiment HeaveGain`, 10 Nov, same
+settings: an f6 step started a set time before each 60 s `Output Displacement` line, all four
+actuators equal in every line; positive displacement is up, as the mode 2 heave setpoint
+showed from the seat):
+
+| f6 step | Into the step | Displacement |
+|---------|---------------|--------------|
+| +8 m/s² | 142 ms | +0.55 mm |
+| +8 | 488 ms | +22.75 mm |
+| +8 | 1985 ms | +0.47 mm |
+| +16 | 512 ms | +28.09 mm |
+| +24 | 456 ms | +29.39 mm |
+| −8 | 485 ms | −21.98 mm |
+
+So +f6 raises the platform, about 2.8 mm per m/s² half a second in, levelling off near
+29–30 mm from about 16 m/s². It is a washout: a held step is back at rest within 2 s, and
+the platform dips the other way when the input lets go, which is what the −5.42 mm above
+(and a −12 mm line 0.3 s after a +18 push had ramped out on track) caught. A reading taken
+just after a pulse therefore shows the opposite sign to the pulse.
+
+**Crest strength** (0–100, default 0 = off, pose source only) takes strength/100 · p off f6, where
 p is built from the game's own `AccelerationHeave`, not from the profile:
 
 | Step | Rule |
@@ -133,7 +153,7 @@ p is built from the game's own `AccelerationHeave`, not from the profile:
 
 Why each part is there (iRacing, Bathurst, 911 Cup, 10 Nov, USB captures with matching replays):
 a crest is long and small (217 km/h: 1.2 s at −4 m/s² mean, which a road-tuned profile turned
-into f6 ≈ +0.35, the size of its road noise) and a bump short and large (~7 m/s² for 30–50 ms),
+into an f6 of about 0.35, the size of its road noise) and a bump short and large (~7 m/s² for 30–50 ms),
 so only duration separates them, hence the low-pass and dead band. A first two-sided version
 pushed back as hard on the landing after the crest (a 47 m/s² swing within a second at strength
 80), and the controller left game mode with error 261 seconds later (meaning unknown, cleared
@@ -142,6 +162,13 @@ dead band at 2–3 Hz, which an instant release chopped into separate pushes, he
 release; a release tied to the landing lets a soft landing down gently and a firm one firmly.
 Wall hits got through the low-pass and held the push at its ceiling, hence the clip and the
 impact hold. Tested on that one track and car only.
+
+Two limits to keep in mind. The shape above was tuned from the seat while the push still went
+out with the wrong sign (it lifted the platform, and the drop that felt right was the dip on
+its release); with the sign corrected the drop comes as the car goes light, driven once and
+judged good, not yet retuned. And because the Heave effect is a washout that levels off near
+30 mm, the platform answers the start and the end of a push, not its length, and a push of
+30 is already at the top of what f6 can ask for.
 
 The pose is `FinalMotionState` (corner haptics folded in) while *Include SimHub corner haptics*
 is on (default), else `MotionState`; haptics that write heave directly (engine, touchdown) are

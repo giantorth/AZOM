@@ -58,7 +58,7 @@ namespace MozaPlugin.Protocol
 
         /// <summary>
         /// The crest signal at full strength (m/s² of f6, ≥ 0): the car's slow lightness beyond a
-        /// dead band, quick to rise and slow to let go; not sent, scaled into f6 by the pose source.
+        /// dead band, quick to rise and slow to let go; not sent, scaled and taken off f6 by the pose source.
         /// </summary>
         public float CrestPush;
 

@@ -10,7 +10,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
 - **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
 - **HMA150 heave from a SimHub Motion profile;** the profile's heave now reaches the controller as vertical acceleration, the input its Heave effect follows, so bumps move the platform.
-- **HMA150 "Crest strength" slider (SimHub Motion profile source);** when the car goes light over a crest the platform drops with it and is let back down as the car lands. Works from the game's own vertical acceleration, so it needs no per-track or per-car tuning. 0 = off (default).
+- **HMA150 "Crest strength" slider (SimHub Motion profile source);** when the car goes light over a crest the platform drops with it and comes back as the car lands. Works from the game's own vertical acceleration, so it needs no per-track or per-car tuning. 0 = off (default).
 
 ## Changed
 

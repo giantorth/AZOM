@@ -22,8 +22,10 @@ namespace MozaPlugin.Devices.Motion
         private const double DegToRad = Math.PI / 180.0;
         // Pose heave as f6: SimHub's default heave range (17 m/s² of vertical acceleration to
         // 80 mm) run backwards, so at that range and 100 % gain the controller gets about the
-        // game's own vertical acceleration. Bench run of 10 Nov: f6 is what the controller's
-        // Heave effect follows in game mode, and +f6 moves the platform down.
+        // game's own vertical acceleration. f6 is what the controller's Heave effect follows in
+        // game mode, and +f6 raises the platform: bench run of 10 Nov (HeaveGain, Heave 1.0 / 0),
+        // +8 m/s² held read +22.8 mm on all four actuators after 0.5 s and −8 read −22.0. The
+        // effect washes out (+0.5 mm 2 s into the same step) and dips the other way on release.
         private const float HeaveAccelPerMm = 17f / 80f;
         // Crest signal. A crest is a long, gentle lightness (Bathurst, 911 Cup, 217 km/h: 1.2 s at
         // −4 m/s² mean, −4.7 low-passed peak), a bump a short, large one (~7 m/s² for 30–50 ms),
@@ -185,9 +187,9 @@ namespace MozaPlugin.Devices.Motion
         /// acceleration effects stay idle. Heading, yaw rate, speed, pedals, engine and flags come
         /// from <paramref name="game"/> when a game runs.
         /// Pose signs: SimHub's pitch is −GameData pitch and its roll +GameData roll (MotionPlugin),
-        /// so both flip to match <see cref="Update"/>. Heave: +mm is up, and +f6 moves the platform down.
-        /// <paramref name="crestStrength"/> (0–100) adds the game's slow lightness
-        /// (<see cref="MotionTelemetryFrame.CrestPush"/>) to f6: the car going light over a crest
+        /// so both flip to match <see cref="Update"/>. Heave: +mm is up, and +f6 raises the platform.
+        /// <paramref name="crestStrength"/> (0–100) takes the game's slow lightness
+        /// (<see cref="MotionTelemetryFrame.CrestPush"/>) off f6: the car going light over a crest
         /// lowers the platform, whatever the profile's heave makes of something that long and
         /// gentle. Compressions are left to the profile.
         /// </summary>
@@ -210,9 +212,9 @@ namespace MozaPlugin.Devices.Motion
             }
             else
                 f.Flags = MozaMotionProtocol.FlagInGame;
-            f.Fields[6] = (float)(-heaveMm * HeaveAccelPerMm);
+            f.Fields[6] = (float)(heaveMm * HeaveAccelPerMm);
             if (crestStrength > 0.0 && game != null)
-                f.Fields[6] += (float)(Math.Min(1.0, crestStrength / 100.0) * game.CrestPush);
+                f.Fields[6] -= (float)(Math.Min(1.0, crestStrength / 100.0) * game.CrestPush);
             for (int k = 0; k < 4; k++)
                 f.Fields[8 + k] = (float)(MotionTelemetryFrame.ShockRestMm[k] - heaveMm);
             return f;
