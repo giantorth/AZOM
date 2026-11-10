@@ -9,6 +9,7 @@ All notable changes to the AZOM plugin are documented here.
 - **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
 - **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
+- **HMA150 heave from a SimHub Motion profile;** the profile's heave now reaches the controller as vertical acceleration, the input its Heave effect follows, so bumps move the platform.
 
 ## Changed
 

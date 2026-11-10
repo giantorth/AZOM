@@ -109,8 +109,16 @@ profile (washout, limits, per-game tuning) does the cueing:
 |-------|--------|
 | f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
-| f4–f6 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f8–f11 | rest − `HeaveMm`, the common-mode shock change the controller turns into heave (above). Sign and gain not yet checked on a rig, and the controller washes held offsets out in ~1 s |
+| f4, f5 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
+| f6 | −`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 moves the platform down and SimHub's +mm is up |
+| f8–f11 | rest − `HeaveMm`. Felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s |
+
+Heave inputs in game mode, seat-judged bench run of 10 Nov (`tools/hma150-characterize.ps1
+-Experiment HeaveFeel`: Heave 1.0 / 0, Road Detail 0, f7 40 m/s; pulses of 0.3 s, a 2 s step
+and 3 Hz sines): f6 ±8 m/s² and all four shocks ±10 mm were each felt as sharp movement, f6
+−8 the strongest. The one snapshot inside the f6 +8 pulses read −5.42 mm on all four
+actuators 0.26 s after a pulse ended, so the Heave effect follows f6 with a short memory;
+the snapshot inside the shock sine (8.4 mm off rest, Road Detail 1.0) read 0.00.
 
 The pose is `FinalMotionState` (corner haptics folded in) while *Include SimHub corner haptics*
 is on (default), else `MotionState`; haptics that write heave directly (engine, touchdown) are
