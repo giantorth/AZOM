@@ -8,11 +8,13 @@ All notable changes to the AZOM plugin are documented here.
 
 - **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
+- **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
 
 ## Changed
 
 - **Steering Wheel Inertia is saved per wheel;** it follows the attached rim across profiles, while Hands-off Protection stays in the profile.
 - **Stalks start in truck-sim mode with the ETS2/ATS key map** on new installs and after Clear all settings.
+- **FFB curve input step actions stop at the neighbouring points;** curve points can no longer be stepped past each other.
 
 ## [1.7.3]
 

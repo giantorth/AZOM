@@ -17,6 +17,12 @@ namespace MozaPlugin.Integration
     /// </summary>
     internal sealed class SimHubRegistrar
     {
+        /// <summary>
+        /// Name SimHub publishes for an <c>AZOM.*</c> property/action: the
+        /// AddAction/AttachDelegate extensions prefix the plugin's type name.
+        /// </summary>
+        internal static string FullName(string azomName) => typeof(MozaPlugin).Name + ".AZOM." + azomName;
+
         private readonly MozaPlugin _plugin;
 
         internal SimHubRegistrar(MozaPlugin plugin)
@@ -79,6 +85,20 @@ namespace MozaPlugin.Integration
                     if (d == null || !def.IsSupported(d)) return -1;
                     return def.ToDisplay(def.GetRaw(d));
                 });
+                // Live bounds (EQ band mode, curve neighbours), so dashboards
+                // can grey out step buttons at the rail.
+                if (def.MinFor != null)
+                    _plugin.AttachDelegate("AZOM." + def.Name + "Min", () =>
+                    {
+                        var d = _plugin.Data;
+                        return d == null ? def.Min : def.EffectiveMin(d);
+                    });
+                if (def.MaxFor != null)
+                    _plugin.AttachDelegate("AZOM." + def.Name + "Max", () =>
+                    {
+                        var d = _plugin.Data;
+                        return d == null ? def.Max : def.EffectiveMax(d);
+                    });
             }
             foreach (var t in BaseSettingCatalog.Toggles)
             {
@@ -462,7 +482,9 @@ namespace MozaPlugin.Integration
             var data = _plugin.Data;
             if (data == null || !def.IsSupported(data)) return;
             int current = def.ToDisplay(def.GetRaw(data));
-            int next = ClampStep(current, delta, def.Min, def.EffectiveMax(data));
+            int lo = def.EffectiveMin(data);
+            int hi = Math.Max(lo, def.EffectiveMax(data));
+            int next = ClampStep(current, delta, lo, hi);
             if (next == current) return; // saturated — skip the redundant flash write
             int raw = def.ToRaw(next);
             def.SetRaw(data, raw);

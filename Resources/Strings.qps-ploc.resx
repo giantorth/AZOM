@@ -886,4 +886,7 @@
   <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Arf Arf!</value></data>
   <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Howl Howl!</value></data>
   <data name="Section_StartupMusic" xml:space="preserve"><value>AWOO WOOF!!</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>Woof Bark Grrowl!</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>Ruff bark woof grrowl bark!</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Sniff {0}</value></data>
 </root>

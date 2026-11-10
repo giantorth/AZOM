@@ -895,4 +895,7 @@ Id: {2}</value></data>
   <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Κομμάτι μουσικής</value></data>
   <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Ένταση μουσικής</value></data>
   <data name="Section_StartupMusic" xml:space="preserve"><value>ΜΟΥΣΙΚΗ ΕΚΚΙΝΗΣΗΣ</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Έλεγχος βάσης τιμονιού</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>Ρυθμίστε τη βάση τιμονιού από κινητό ή tablet.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Σημείο {0}</value></data>
 </root>

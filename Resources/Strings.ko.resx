@@ -895,4 +895,7 @@ Id: {2}</value></data>
   <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>음악 트랙</value></data>
   <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>음악 볼륨</value></data>
   <data name="Section_StartupMusic" xml:space="preserve"><value>시작 음악</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 휠베이스 제어</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>휴대폰이나 태블릿에서 휠베이스 설정을 조정합니다.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>포인트 {0}</value></data>
 </root>

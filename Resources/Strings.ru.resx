@@ -896,4 +896,7 @@ Id: {2}</value></data>
   <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Мелодия</value></data>
   <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Громкость музыки</value></data>
   <data name="Section_StartupMusic" xml:space="preserve"><value>МУЗЫКА ПРИ ЗАПУСКЕ</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>Управление базой MOZA</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>Настройка базы с телефона или планшета.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Точка {0}</value></data>
 </root>

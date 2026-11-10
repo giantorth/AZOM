@@ -24,6 +24,7 @@ using MozaPlugin.Telemetry.TileServer;
 using MozaPlugin.UI.UpdateCheck;
 using Timer = System.Timers.Timer;
 using MozaPlugin.Integration;
+using MozaPlugin.Integration.ControlDash;
 using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Devices.Extensions;
 using MozaPlugin.Devices.Haptics;
@@ -321,6 +322,7 @@ namespace MozaPlugin
                 _simHubRegistrar = new SimHubRegistrar(this);
                 _simHubRegistrar.RegisterProperties(pluginManager);
                 _simHubRegistrar.RegisterActions();
+                ControlDashInstaller.InstallInBackground(_data.UseFahrenheit);
 
                 // Wheelbase + Universal HUB + unknown Moza PIDs. Excludes
                 // pedals/shifter/handbrake/AB9 (they ignore base probes).
