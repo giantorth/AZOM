@@ -4,7 +4,6 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MozaPlugin.Devices.Motion;
@@ -43,6 +42,7 @@ namespace MozaPlugin.Integration.Motion
         private bool _readsRequested;
         private MozaMotionController? _held;
         private readonly MozaHma150Output? _output;
+        private bool _crestSyncing;
 
         public MozaHma150SettingsControl(MozaHma150Output? output = null)
         {
@@ -51,7 +51,7 @@ namespace MozaPlugin.Integration.Motion
             BuildSourceItems();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _timer.Tick += (_, __) => Refresh();
-            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); Refresh(); _timer.Start(); };
+            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); SyncCrestSlider(); Refresh(); _timer.Start(); };
             Unloaded += (_, __) => { _timer.Stop(); Unhold(); };
         }
 
@@ -152,8 +152,7 @@ namespace MozaPlugin.Integration.Motion
             SourceCombo.IsEnabled = settings != null;
             SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
-            CrestBoostSlider.Value = settings?.CrestBoost ?? 0;
-            CrestBoostValue.Text = ((int)CrestBoostSlider.Value).ToString(CultureInfo.CurrentCulture);
+            SyncCrestSlider();
             UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
             {
@@ -167,33 +166,32 @@ namespace MozaPlugin.Integration.Motion
                 var s = _output?.Settings;
                 if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
             };
-            // Only the user's own input writes the setting. A drag or a key press sets the slider's
-            // "current" value over the local one given above, and WPF drops that when the page
-            // leaves the dialog, so Value falls back and raises ValueChanged once more on the way out
-            // (seen 10 Nov: 80 → 0, 22 ms before Unloaded, and the 0 was saved).
-            bool crestKeyDown = false;
-            CrestBoostSlider.PreviewKeyDown += (_, e) =>
-            {
-                switch (e.Key)
-                {
-                    case Key.Left: case Key.Right: case Key.Up: case Key.Down:
-                    case Key.PageUp: case Key.PageDown: case Key.Home: case Key.End:
-                        crestKeyDown = true;
-                        break;
-                }
-            };
-            CrestBoostSlider.PreviewKeyUp += (_, __) => crestKeyDown = false;
-            CrestBoostSlider.LostKeyboardFocus += (_, __) => crestKeyDown = false;
             CrestBoostSlider.ValueChanged += (_, __) =>
             {
-                bool byUser = crestKeyDown || CrestBoostSlider.IsMouseCaptureWithin
-                    || (CrestBoostSlider.IsMouseOver && Mouse.LeftButton == MouseButtonState.Pressed);
-                if (!byUser) return;
+                if (_crestSyncing) return;
                 int value = (int)Math.Round(CrestBoostSlider.Value);
+                // A drag or a key press sets the slider's "current" value over its local one, and
+                // WPF drops a current value when the page leaves the dialog: Value fell back to the
+                // local one and raised ValueChanged on the way out (10 Nov: 80 → 0, 22 ms before
+                // Unloaded, and the 0 was saved). Making every change the local value leaves
+                // nothing to fall back to.
+                _crestSyncing = true;
+                try { CrestBoostSlider.Value = value; }
+                finally { _crestSyncing = false; }
                 CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
                 var s = _output?.Settings;
                 if (s != null) s.CrestBoost = value;
             };
+        }
+
+        /// <summary>Shows the saved crest strength; run when the page is built and each time it loads.</summary>
+        private void SyncCrestSlider()
+        {
+            int value = _output?.Settings?.CrestBoost ?? 0;
+            _crestSyncing = true;
+            try { CrestBoostSlider.Value = value; }
+            finally { _crestSyncing = false; }
+            CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
         }
 
         /// <summary>The haptics choice and the crest strength only apply to the pose source.</summary>

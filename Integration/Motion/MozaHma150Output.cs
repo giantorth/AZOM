@@ -57,7 +57,7 @@ namespace MozaPlugin.Integration.Motion
 
         /// <summary>
         /// Pose source only, 0–100: strength of the crest signal, the game's slow lightness
-        /// added to the heave the controller is sent (<see cref="MotionGameFeed.PoseFrame"/>).
+        /// taken off the heave the controller is sent (<see cref="MotionGameFeed.PoseFrame"/>).
         /// 0 = off.
         /// </summary>
         public int CrestBoost
@@ -197,7 +197,8 @@ namespace MozaPlugin.Integration.Motion
         {
             var lane = Lane;
             if (!CheckLane(lane)) return;
-            var game = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
+            var feed = MozaPlugin.Instance?.MotionFeed;
+            var game = feed?.Latest(FeedMaxAgeMs);
             if (currentSettings?.Source == MozaHma150Source.SimHubPose)
             {
                 // Final state: the bypass geometry folds corner haptics into it, as SimHub's <PoseAxis> token reads.
@@ -206,8 +207,12 @@ namespace MozaPlugin.Integration.Motion
                     ? primary?.FinalMotionState ?? primary?.MotionState
                     : primary?.MotionState;
                 if (pose != null)
+                {
+                    // The crest signal belongs to the running game: none without a fresh game frame.
+                    double crestPush = game != null ? currentSettings.CrestBoost / 100.0 * feed!.CrestPush : 0.0;
                     lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
-                        currentSettings.CrestBoost));
+                        crestPush));
+                }
                 return;
             }
             if (game != null) lane!.PostFrame(game);

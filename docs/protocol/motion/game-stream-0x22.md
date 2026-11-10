@@ -110,8 +110,8 @@ profile (washout, limits, per-game tuning) does the cueing:
 | f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
 | f4, f5 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f6 | +`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 raises the platform, as SimHub's +mm does. *Crest strength* takes its push off it (below) |
-| f8–f11 | rest − `HeaveMm`. Felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s |
+| f6 | +`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 raises the platform, as SimHub's +mm does. *Crest strength* takes its push off it (below), and the sum is held within ±30. The scale is fixed: the profile's Heave row is where strength is tuned, and a row set up for less travel gives proportionally less f6 |
+| f8–f11 | rest, so heave reaches the base through f6 alone. (They carried rest − `HeaveMm` before f6 did: felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s) |
 
 Heave inputs in game mode, seat-judged bench run of 10 Nov (`tools/hma150-characterize.ps1
 -Experiment HeaveFeel`: Heave 1.0 / 0, Road Detail 0, f7 40 m/s; pulses of 0.3 s, a 2 s step
@@ -149,7 +149,7 @@ p is built from the game's own `AccelerationHeave`, not from the profile:
 | Target | min(30, max(0, −a − 2) · 15): lightness only, 2 m/s² dead band, ceiling 30 |
 | Attack | p rises to the target with τ = 0.05 s |
 | Release | p falls with τ = 0.8 s, shortening to 0.3 s as a turns positive (full at +3 m/s²: the car landing) |
-| Impact | \|surge\| or \|sway\| > 30 m/s² holds a at 0 for 2 s and releases p with τ = 0.15 s |
+| Impact | \|surge\| or \|sway\| > 80 m/s² holds a at 0 for 2 s and releases p with τ = 0.15 s |
 
 Why each part is there (iRacing, Bathurst, 911 Cup, 10 Nov, USB captures with matching replays):
 a crest is long and small (217 km/h: 1.2 s at −4 m/s² mean, which a road-tuned profile turned
@@ -161,7 +161,10 @@ by a power cycle), hence lightness only. Over a long crest the lightness wobbles
 dead band at 2–3 Hz, which an instant release chopped into separate pushes, hence the slow
 release; a release tied to the landing lets a soft landing down gently and a firm one firmly.
 Wall hits got through the low-pass and held the push at its ceiling, hence the clip and the
-impact hold. Tested on that one track and car only.
+impact hold. The impact level is 80 m/s² so that no car's braking or cornering trips it (the
+fastest downforce cars reach 5–6 g, about 60 m/s²; the wall hit read 90–350 along the car);
+a lighter hit is not caught, and the input clip and the ceiling still bound what it can ask
+for. Tested on that one track and car only.
 
 Two limits to keep in mind. The shape above was tuned from the seat while the push still went
 out with the wrong sign (it lifted the platform, and the drop that felt right was the dip on
