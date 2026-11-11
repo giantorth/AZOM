@@ -718,6 +718,8 @@ skipReadByMode:
                 bool showTelemetry = newWheel
                                      && ((_plugin?.IsFsr1DisplayWheel ?? false)
                                          || (_plugin?.ShouldDriveDashboard() ?? false));
+                // FSR1's group-0x42 display has no tier-def upload path.
+                bool showFilesTab = showTelemetry && !(_plugin?.IsFsr1DisplayWheel ?? false);
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
                 // Knobs tab covers two independent capabilities: knob LEDs
                 // (KnobCount) and configurable rotary encoders (what the wheel
@@ -735,7 +737,7 @@ skipReadByMode:
                 // slot and flash its firmware (and vice versa).
                 InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
-                FilesTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
+                FilesTab.Visibility = showFilesTab ? Visibility.Visible : Visibility.Collapsed;
                 RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;
