@@ -53,6 +53,14 @@ namespace MozaPlugin.Integration.Motion
                 Output?.ApplySettings();
             }
         }
+
+        /// <summary>
+        /// While SimHub's Manual control (or its automated test cycles) or Hop-in position moves the
+        /// platform, leave game mode for the controller's Manual Motion Test (mode 2, <c>0x1E/07</c>
+        /// setpoints), which ramps slowly to each target as Motion Manager's own test does and holds
+        /// heave. On by default.
+        /// </summary>
+        public bool SlowManualControl { get; set; } = true;
     }
 
     /// <summary>
@@ -88,7 +96,13 @@ namespace MozaPlugin.Integration.Motion
         private const int FrameIntervalMs = 30;
         private const int FeedMaxAgeMs = 500;
 
+        // Manual mode: SimHub's Manual control full scale (its sliders reach ±20° and ±200 mm on the
+        // 6DOF bypass geometry, capture 2026-11-11 19-07-06) maps to Motion Manager's ±100 %.
+        private const double ManualFullScaleDegrees = 20.0, ManualFullScaleHeaveMm = 200.0;
+
         private int _counted;
+        private readonly System.Diagnostics.Stopwatch _manualPoll = new System.Diagnostics.Stopwatch();
+        private const int ManualPollMs = 200;
 
         [JsonIgnore]
         public override string Name => DisplayNameText;
@@ -160,6 +174,7 @@ namespace MozaPlugin.Integration.Motion
             if (Interlocked.Exchange(ref _counted, 1) == 0)
                 lane.Acquire();
             lane.SetIdle(false);
+            PollManualControl(lane);
             lane.Engage(new MotionEngageConfig { FrameIntervalMs = FrameIntervalMs });
             ConnectionState = OutputConnectionState.Connected;
         }
@@ -167,18 +182,33 @@ namespace MozaPlugin.Integration.Motion
         public override void StopInternal()
         {
             var lane = Lane;
+            lane?.SetManualWanted(false);
             lane?.Disengage();
             if (Interlocked.Exchange(ref _counted, 0) == 1)
                 lane?.Release();
         }
 
         public override bool IsReadyForLiveMotionData()
-            => base.IsReadyForLiveMotionData() && Lane?.Phase == MotionLanePhase.Game;
+            => base.IsReadyForLiveMotionData()
+               && (Lane?.Phase == MotionLanePhase.Game || (Lane?.ManualDriven == true && Lane.ManualTestActive));
 
         protected override void UpdateInternal(CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
         {
             var lane = Lane;
+            PollManualControl(lane);
             if (!CheckLane(lane)) return;
+            if (lane!.ManualDriven)
+            {
+                // Manual control and Hop-in poses carry no effects, so either state reads the same.
+                var primary = geometryResult?.PrimaryGeometryResult;
+                var pose = primary?.MotionState ?? primary?.FinalMotionState;
+                if (pose != null)
+                    lane.PostManualPose(
+                        (float)(pose.PitchDegrees / ManualFullScaleDegrees),
+                        (float)(pose.RollDegrees / ManualFullScaleDegrees),
+                        (float)(pose.HeaveMm / ManualFullScaleHeaveMm));
+                return;
+            }
             var game = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
             if (currentSettings?.Source == MozaHma150Source.SimHubPose)
             {
@@ -195,7 +225,23 @@ namespace MozaPlugin.Integration.Motion
         }
 
         protected override void KeepAliveInternal(CompositeGeometryResult geometryResult)
-            => CheckLane(Lane);
+        {
+            PollManualControl(Lane);
+            CheckLane(Lane);
+        }
+
+        /// <summary>
+        /// Tell the lane, a few times a second, whether SimHub's Manual control or Hop-in position is
+        /// the motion source; the lane then swaps game mode for the slow manual mode and back on its own.
+        /// </summary>
+        private void PollManualControl(MozaMotionController? lane)
+        {
+            if (lane == null) return;
+            if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
+            _manualPoll.Restart();
+            lane.SetManualWanted(Settings?.SlowManualControl != false
+                && MozaPlugin.Instance?.MotionManualControlActive == true);
+        }
 
         protected override void BeforeStartingIdle(CompositeGeometryResult geometryResult) => Lane?.SetIdle(true);
 

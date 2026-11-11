@@ -12,6 +12,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed.
 - **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
 - **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs, saved per device, and the profile's dashboard returns when a game starts.
+- **SimHub's Manual control and Hop-in position move the motion platform slowly;** while either is active the platform leaves game mode for the controller's own manual test mode, as Motion Manager's Manual Motion Test does, so heave holds and nothing lunges, and game mode returns on its own. On by default, with a switch in the output's settings.
 
 ## Changed
 

@@ -143,8 +143,8 @@ f0–f5 and f8–f11, tail bytes, oscillator formula, ABS and gear-shift events.
 Open (also listed in [`../open-questions.md`](../open-questions.md)): telemetry field `f7`;
 exact semantics of modes 3/4/5 and of the `0x20/02` 02↔03 toggles; status-record byte 1 and
 flag bit `0x04`; the `0x0E/03` notification codes; the per-port status word that appears in
-game mode; the actuator `0x27` calibration block; whether mode 2 accepts a continuous
-`0x1E/07` stream; heave's exact source and washout in game mode (a held common-mode shock
+game mode; the actuator `0x27` calibration block; whether mode 2 accepts a `0x1E/07`
+stream at game rates (10 Hz works); heave's exact source and washout in game mode (a held common-mode shock
 offset washes out completely); the heave sign; the `0x1F/0A` read that differed at pitch;
 current mode 9 / `ErrCode:512`. No on-demand position read exists (register scan,
 [`firmware-log-0x0E.md`](firmware-log-0x0E.md)).

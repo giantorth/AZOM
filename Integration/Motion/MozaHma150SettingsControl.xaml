@@ -77,6 +77,11 @@
                       Content="{x:Static res:Strings.Motion_Panel_CornerHaptics}"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="SlowManualCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_SlowManualControl}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_MaxStroke}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="MaxStrokeBox"/>
             <Button x:Name="MaxStrokeApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="MaxStrokeApply_Click"/>

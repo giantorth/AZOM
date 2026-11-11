@@ -208,7 +208,16 @@ b2h  7E 06 9E 21 07 00 3F800000 [chk]      echo
 | −100 % | −1.0 | `BF800000` |
 | Zero | 0.0 | `00000000` |
 
-The captures contain only discrete slider moves (9 frames in 73 s); whether the controller
-accepts a continuous stream of `0x1E/07` setpoints at game rates, and how it filters them, is
-untested (open question). The mode poll reads `03 02 02 00 00` throughout the manual-test
-captures; the controller logs nothing per setpoint.
+The captures contain only discrete slider moves (9 frames in 73 s). The mode poll reads
+`03 02 02 00 00` throughout the manual-test captures; the controller logs nothing per setpoint.
+
+Motion Manager's sequence around the test (`2026-11-11 18-03-53`): Start = `set mode 7`, `set mode 0`,
+`0x20/02 02 00`, `set mode 3`; toggle on = `set mode 2` (the actuators had reached mode 3 ~3.3 s
+after the controller); toggle off = `set mode 3`; Stop = `0x20/02 01 00`, `set mode 13`. The
+controller ramps to each setpoint at its own slow rate, also for a −1 → +1 jump.
+
+The plugin uses mode 2 as a slow follow target while SimHub's Manual control or Hop-in position
+is the motion source (`MozaMotionController.ManualSetpointTick`): each axis is re-sent when it
+moves by 0.5 %, at most every 100 ms. The controller (fw 2.35) accepts that stream and keeps
+ramping towards the latest target. Rates above 10 Hz per axis are untested. Unlike game mode, a
+held heave setpoint stays put (game mode washes a steady shock offset out).

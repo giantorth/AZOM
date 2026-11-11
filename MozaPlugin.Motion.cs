@@ -26,6 +26,10 @@ namespace MozaPlugin
         internal Integration.Motion.MotionSetupStatus MotionSetupStatus
             => Integration.Motion.MotionIntegration.GetSetupStatus(_pluginManager);
 
+        /// <summary>Whether SimHub's Manual control (or its automated test cycles) or Hop-in position is moving the active setup.</summary>
+        internal bool MotionManualControlActive
+            => Integration.Motion.MotionIntegration.IsManualControlActive(_pluginManager);
+
         private void InitMotionLane()
         {
             _motionController = new MozaMotionController(() => IsShuttingDown);

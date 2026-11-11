@@ -45,6 +45,9 @@ namespace MozaPlugin.Devices.Motion
         private const int StandbyTimeoutMs = 5_000;
         private const int DesiredCheckMs = 1_000;
         private const int DesiredPushAttempts = 3;
+        private const int ManualModeTimeoutMs = 10_000;
+        // Actuators follow the controller into mode 3 ~3.3 s after it (capture 2026-11-11).
+        private const int ManualActuatorSettleMs = 3_500;
         private const float DefaultEngineStrength = DefaultEngineStrengthPercent / 100f, DefaultTactile = 0.4f;
 
         /// <summary>Engine vibration strength used while the profile sets none (the "iRacing gt3" preset's).</summary>
@@ -123,6 +126,18 @@ namespace MozaPlugin.Devices.Motion
         private bool _released;
         private long _lastConnectAttemptMs = -ConnectRetryMs;
         private IReadOnlyList<MotionConfigIssue> _lastIssues = Array.Empty<MotionConfigIssue>();
+        // Manual mode (controller mode 2) while SimHub's Manual control or Hop-in position is the
+        // motion source: wanted = the output's request, driven = the lane has left game mode for it.
+        private volatile bool _manualDriven;
+        private volatile bool _manualWanted;
+        private float[]? _manualPose;          // pitch, roll, heave −1..1, posted by the output
+        private long _manualPosedAtMs;
+        private readonly float[] _manualSent = new float[3];
+        private long _nextManualMs;
+        private const int ManualSetpointIntervalMs = 100;
+        private const float ManualSetpointStep = 0.005f;
+        private static readonly byte[] ManualAxes =
+            { MozaMotionProtocol.ManualAxisPitch, MozaMotionProtocol.ManualAxisRoll, MozaMotionProtocol.ManualAxisHeave };
 
         // ---- port demand
         private int _holds;
@@ -198,6 +213,7 @@ namespace MozaPlugin.Devices.Motion
             var phase = _phase;
             if (phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
                 || phase == MotionLanePhase.SelfChecking) return;
+            if (phase == MotionLanePhase.ManualTest && _manualDriven) return;
             if (phase == MotionLanePhase.Faulted) _phase = MotionLanePhase.Ready;
             Interlocked.Exchange(ref _pendingEngageSinceMs, _clock.ElapsedMilliseconds);
             Volatile.Write(ref _pendingEngage, config);
@@ -221,6 +237,23 @@ namespace MozaPlugin.Devices.Motion
             Volatile.Write(ref _postedFrame, frame);
             Interlocked.Exchange(ref _postedAtMs, _clock.ElapsedMilliseconds);
         }
+
+        /// <summary>Manual mode: SimHub's pose as setpoints, −1..+1 each (+ = pitch up, roll right, heave up).</summary>
+        public void PostManualPose(float pitch, float roll, float heave)
+        {
+            Volatile.Write(ref _manualPose, new[] { pitch, roll, heave });
+            Interlocked.Exchange(ref _manualPosedAtMs, _clock.ElapsedMilliseconds);
+        }
+
+        /// <summary>True while the lane is in, entering or leaving manual mode for the output.</summary>
+        public bool ManualDriven => _manualDriven;
+
+        /// <summary>
+        /// The output's motion source is SimHub's Manual control or Hop-in position: while true the
+        /// lane leaves game mode for manual mode (mode 2) and follows <see cref="PostManualPose"/>;
+        /// false returns to game mode.
+        /// </summary>
+        public void SetManualWanted(bool wanted) => _manualWanted = wanted;
 
         /// <summary>SimHub idle: keep game mode, stream neutral frames with the in-game flag clear.</summary>
         public void SetIdle(bool idle) => _idle = idle;
@@ -254,6 +287,9 @@ namespace MozaPlugin.Devices.Motion
                 StartSequence(TravelSelfCheckSequence());
             });
         }
+
+        /// <summary>True once the controller reports mode 2 in manual mode; setpoints are sent only then.</summary>
+        public bool ManualTestActive => _phase == MotionLanePhase.ManualTest && _modeCurrent == (int)MotionMode.ManualTest;
 
         /// <summary>Max Available Stroke (0..1). Write inferred from the 0x1F/04 read; read back.</summary>
         public void WriteMaxStroke(float value)
@@ -571,7 +607,16 @@ namespace MozaPlugin.Devices.Motion
                 {
                     _frameIntervalMs = Math.Max(5, engage.FrameIntervalMs);
                     _faultReason = null;
-                    StartSequence(EngageSequence());
+                    if (_manualWanted)
+                    {
+                        // SimHub's Manual control is already open: skip game mode, which it would
+                        // only pass through; the lane enters it when Manual control closes.
+                        _manualDriven = true;
+                        Volatile.Write(ref _manualPose, null);
+                        StartSequence(ManualTestSequence(fromGame: false));
+                    }
+                    else
+                        StartSequence(EngageSequence());
                 }
                 else if (!Wanted)
                     StartSequence(ReleaseSequence());
@@ -581,6 +626,41 @@ namespace MozaPlugin.Devices.Motion
                 StreamTick(now);
             if (_phase == MotionLanePhase.Game)
                 WatchGameMode(now);
+            // SimHub's Manual control or Hop-in went on or off: swap game mode for manual mode and back.
+            if (_sequence == null)
+            {
+                if (_manualWanted && _phase == MotionLanePhase.Game)
+                {
+                    _manualDriven = true;
+                    Volatile.Write(ref _manualPose, null);
+                    StartSequence(ManualTestSequence(fromGame: true));
+                }
+                else if (!_manualWanted && _manualDriven && _phase == MotionLanePhase.ManualTest)
+                    StartSequence(ManualTestExitSequence());
+            }
+            if (_manualDriven && _sequence == null && ManualTestActive)
+                ManualSetpointTick(now);
+        }
+
+        /// <summary>
+        /// Manual mode: send each axis's target when it has moved, at most every 100 ms; SimHub idle
+        /// or a stale pose holds the centre. The controller ramps to each target at its own rate.
+        /// </summary>
+        private void ManualSetpointTick(long now)
+        {
+            if (now < _nextManualMs) return;
+            _nextManualMs = now + ManualSetpointIntervalMs;
+            var pose = Volatile.Read(ref _manualPose);
+            bool fresh = pose != null && now - Interlocked.Read(ref _manualPosedAtMs) <= StaleFrameMs;
+            for (int i = 0; i < ManualAxes.Length; i++)
+            {
+                float target = _idle || !fresh ? 0f : Math.Max(-1f, Math.Min(1f, pose![i]));
+                if (float.IsNaN(target)) continue;
+                if (Math.Abs(target - _manualSent[i]) < ManualSetpointStep
+                    && !(target == 0f && _manualSent[i] != 0f)) continue;
+                Send(MozaMotionProtocol.BuildManualSetpoint(ManualAxes[i], target));
+                _manualSent[i] = target;
+            }
         }
 
         /// <summary>Open the port when wanted and present; an engage that can't connect gives up.</summary>
@@ -667,6 +747,7 @@ namespace MozaPlugin.Devices.Motion
         {
             _faultReason = reason;
             _phase = MotionLanePhase.Faulted;
+            _manualDriven = false;
             _sequence = null;
             MozaLog.Warn($"[AZOM/Motion] {reason}");
         }
@@ -709,6 +790,7 @@ namespace MozaPlugin.Devices.Motion
             _activeErrors.Clear();
             _logPartial.Clear();
             _gameLostSinceMs = -1;
+            _manualDriven = false;
         }
 
         private void ResetEffects()
@@ -868,6 +950,7 @@ namespace MozaPlugin.Devices.Motion
         private IEnumerator<int> DisengageSequence()
         {
             _phase = MotionLanePhase.Disengaging;
+            _manualDriven = false;
             _connection.ClearStreamSlots((int)StreamKind.MotionTelemetry, 2);
             // Motion Manager's last 0x22/09 when it leaves game mode has every gain at zero.
             if (_vibrating)
@@ -922,6 +1005,84 @@ namespace MozaPlugin.Devices.Motion
             yield return 300;
             Send(MozaMotionProtocol.BuildSetMode(MotionMode.Idle));
             _phase = MotionLanePhase.Ready;
+        }
+
+        /// <summary>
+        /// Into manual mode as Motion Manager does it (capture 2026-11-11): Start = self-check (mode 7),
+        /// mode 0, run state hold, mode 3; ticking "Manual Motion Test" = mode 2. Leaving game mode
+        /// skips straight to hold + mode 3, the mode the controller passes through on the way into
+        /// game mode.
+        /// </summary>
+        private IEnumerator<int> ManualTestSequence(bool fromGame)
+        {
+            _phase = MotionLanePhase.ManualTest;
+            Array.Clear(_manualSent, 0, _manualSent.Length);
+            _nextManualMs = 0;
+            if (fromGame)
+            {
+                _connection.ClearStreamSlots((int)StreamKind.MotionTelemetry, 2);
+                if (_vibrating) SilenceVibration();
+                MozaLog.Info("[AZOM/Motion] Manual mode: leaving game mode");
+            }
+            if (!_selfCheckPassed)
+            {
+                _selfCheckSeen = false;
+                MozaLog.Info("[AZOM/Motion] Manual mode: travel self-check");
+                Send(MozaMotionProtocol.BuildSetMode(MotionMode.TravelSelfCheck));
+                long checkDeadline = _clock.ElapsedMilliseconds + SelfCheckTimeoutMs;
+                while (!_selfCheckSeen)
+                {
+                    if (_clock.ElapsedMilliseconds > checkDeadline) { Fault("travel self-check did not report success"); yield break; }
+                    yield return 20;
+                }
+                yield return 300;
+            }
+            if (!fromGame)
+            {
+                Send(MozaMotionProtocol.BuildSetMode(MotionMode.Idle));
+                yield return 30;
+            }
+            SendRunState(MotionRunState.Hold);
+            if (!fromGame) yield return 15;
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.PositionCalibration));
+            long deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            while (_modeCurrent != (int)MotionMode.PositionCalibration)
+            {
+                if (_clock.ElapsedMilliseconds > deadline) { Fault($"controller did not reach the ready position (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                yield return 50;
+            }
+            yield return ManualActuatorSettleMs;
+
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.ManualTest));
+            deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            long resendAt = _clock.ElapsedMilliseconds + 1_000;
+            while (_modeCurrent != (int)MotionMode.ManualTest)
+            {
+                if (_clock.ElapsedMilliseconds > deadline) { Fault($"controller did not enter manual mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                if (_clock.ElapsedMilliseconds >= resendAt)
+                {
+                    Send(MozaMotionProtocol.BuildSetMode(MotionMode.ManualTest));
+                    resendAt = _clock.ElapsedMilliseconds + 1_000;
+                }
+                yield return 50;
+            }
+            MozaLog.Info("[AZOM/Motion] Manual mode (SimHub Manual control / Hop-in)");
+        }
+
+        /// <summary>
+        /// Out of manual mode as Motion Manager's toggle off does (mode 3, the ready position), then
+        /// the normal engage into game mode. One sequence, so an output stop replaces all of it.
+        /// </summary>
+        private IEnumerator<int> ManualTestExitSequence()
+        {
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.PositionCalibration));
+            long deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            while (_modeCurrent != (int)MotionMode.PositionCalibration && _clock.ElapsedMilliseconds < deadline)
+                yield return 50;
+            _manualDriven = false;
+            MozaLog.Info($"[AZOM/Motion] Manual mode off (mode {_modeCurrent})");
+            var engage = EngageSequence();
+            while (engage.MoveNext()) yield return engage.Current;
         }
 
         private IEnumerator<int> PortSelfTestSequence(Dictionary<int, MotionCorner> roles)

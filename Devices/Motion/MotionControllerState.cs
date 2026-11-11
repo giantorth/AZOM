@@ -16,6 +16,8 @@ namespace MozaPlugin.Devices.Motion
         Disengaging,
         PortSelfTest,
         Faulted,
+        /// <summary>Manual mode (Motion Manager's Manual Motion Test): controller mode 2, following <c>0x1E/07</c> setpoints.</summary>
+        ManualTest,
     }
 
     /// <summary>Engage parameters. The effect sliders live on the controller and are not touched.</summary>

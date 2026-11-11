@@ -854,6 +854,8 @@ namespace MozaPlugin.Resources
         public static string Motion_Phase_Disengaging => Get("Motion_Phase_Disengaging");
         public static string Motion_Phase_PortSelfTest => Get("Motion_Phase_PortSelfTest");
         public static string Motion_Phase_Faulted => Get("Motion_Phase_Faulted");
+        public static string Motion_Phase_ManualTest => Get("Motion_Phase_ManualTest");
+        public static string Motion_Panel_SlowManualControl => Get("Motion_Panel_SlowManualControl");
         public static string Banner_MotionPluginDisabled_Title => Get("Banner_MotionPluginDisabled_Title");
         public static string Banner_MotionPluginDisabled_Body => Get("Banner_MotionPluginDisabled_Body");
         public static string Banner_ProfileNotAddedMotion_Title => Get("Banner_ProfileNotAddedMotion_Title");
