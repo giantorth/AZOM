@@ -360,6 +360,7 @@
   <data name="Edit_Bias" xml:space="preserve"><value>바이어스</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>렌더링 중…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>대기 시간</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>게임 외 대시보드</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>동기화 LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1분</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2분</value></data>

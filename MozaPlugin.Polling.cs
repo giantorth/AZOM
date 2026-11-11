@@ -417,6 +417,10 @@ namespace MozaPlugin
             // below passes anyway — running them here only adds the USB-only case.
             _dualDisplay?.EnsureCm2Pipeline();
             _dualDisplay?.TickCm2LaneHygiene();
+            // Before the profile retries / CM2 re-assert: when the idle dashboard
+            // applies it binds first and they find nothing left to switch.
+            try { _idleDashboards?.Tick(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Idle dashboard tick failed: {ex.Message}"); }
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             _dualDisplay?.TickCm2DashboardReassert();
             _dashboardBindingCoordinator?.TickPendingCm2DashboardRetry();

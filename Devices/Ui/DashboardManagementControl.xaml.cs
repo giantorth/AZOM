@@ -72,6 +72,7 @@ namespace MozaPlugin.Devices.Ui
             try
             {
                 RefreshDashboardManagement();
+                PopulateIdleDashboardCombo();
                 UpdateDashboardPreview();
             }
             catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-dashmgmt", $"[AZOM] Dashboard tab tick failed: {ex}"); }
@@ -380,12 +381,18 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
+        private void PopulateDashboardCombo()
+        {
+            PopulateDashboardComboCore();
+            PopulateIdleDashboardCombo();
+        }
+
         /// <summary>
         /// Populate the dashboard dropdown from the wheel's reported dashboard
         /// list (session 0x09 configJson state push). Falls back to builtin
         /// profile names if the wheel hasn't pushed state yet.
         /// </summary>
-        private void PopulateDashboardCombo()
+        private void PopulateDashboardComboCore()
         {
             if (_plugin == null) return;
             // Any non-CM1 list invalidates the CM1 page snapshot.
@@ -819,6 +826,90 @@ namespace MozaPlugin.Devices.Ui
                 }
             }
             WheelDisplayStandbyCombo.SelectedIndex = -1;
+        }
+
+        // ===== Idle dashboard =====
+
+        private string _idleComboSignature = "\0";
+
+        /// <summary>Page the idle pick is saved under, and whether it is a fixed page
+        /// index (FSR V1 / CM1) rather than a dashboard name. Null page = no device.</summary>
+        private (Guid? Page, bool ByIndex) IdleTarget()
+        {
+            if (_plugin == null) return (null, false);
+            if (IsCm1) return (MozaPlugin.Cm1PageGuid, true);
+            if (IsCm2Target) return (MozaPlugin.Cm2PageGuid, false);
+            return (_plugin.GetCurrentWheelPageGuid(), _plugin.IsFsr1DisplayWheel);
+        }
+
+        // Same list as the dashboard list above, plus Off; a saved name the device
+        // doesn't list (yet) stays shown.
+        private void PopulateIdleDashboardCombo()
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_plugin == null || idle == null) return;
+            var (page, byIndex) = IdleTarget();
+            var items = new List<(object Tag, string Label)>();
+            object? selectedTag = null;
+            if (page.HasValue && byIndex)
+            {
+                bool cm1 = IsCm1;
+                int min = cm1 ? global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MinDashboardIndex : 0;
+                int max = cm1
+                    ? global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex
+                    : global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
+                for (int i = min; i <= max; i++)
+                    items.Add((i, $"Dashboard {(cm1 ? i : i + 1)}"));
+                int saved = idle.IdleIndex(page.Value);
+                if (saved >= min && saved <= max) selectedTag = saved;
+            }
+            else if (page.HasValue)
+            {
+                var list = ActiveSender?.WheelState?.ConfigJsonList;
+                if (list != null)
+                    foreach (var n in list)
+                        if (!string.IsNullOrEmpty(n)) items.Add((n, n));
+                string? saved = idle.IdleName(page.Value);
+                if (saved != null)
+                {
+                    selectedTag = items.Select(t => t.Tag).FirstOrDefault(t =>
+                        string.Equals((string)t, saved, StringComparison.OrdinalIgnoreCase));
+                    if (selectedTag == null)
+                    {
+                        items.Add((saved, saved));
+                        selectedTag = saved;
+                    }
+                }
+            }
+
+            string sig = $"{page}|{byIndex}|{selectedTag}|" + string.Join("\n", items.Select(t => t.Tag));
+            if (sig == _idleComboSignature) return;
+            _idleComboSignature = sig;
+            using (_suppressor.Begin())
+            {
+                IdleDashboardCombo.Items.Clear();
+                IdleDashboardCombo.Items.Add(new ComboBoxItem { Tag = null, Content = Strings.Option_Off });
+                int sel = 0;
+                foreach (var (tag, label) in items)
+                {
+                    if (Equals(tag, selectedTag)) sel = IdleDashboardCombo.Items.Count;
+                    IdleDashboardCombo.Items.Add(new ComboBoxItem { Tag = tag, Content = label });
+                }
+                IdleDashboardCombo.SelectedIndex = sel;
+                IdleDashboardCombo.IsEnabled = page.HasValue;
+            }
+        }
+
+        private void IdleDashboardCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_suppressEvents || idle == null) return;
+            var (page, byIndex) = IdleTarget();
+            if (!page.HasValue) return;
+            var tag = (IdleDashboardCombo.SelectedItem as ComboBoxItem)?.Tag;
+            // Switches now only when no game runs; in game it waits for the game to end.
+            if (byIndex) idle.SetIdleIndex(page.Value, tag is int i ? i : -1);
+            else idle.SetIdleName(page.Value, tag as string);
         }
 
         // VGS display-rotation mode (0=off, 1=smooth, 2=immediate). Wheel-only

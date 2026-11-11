@@ -88,6 +88,7 @@ namespace MozaPlugin
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
                 _deviceProfiles = new DeviceProfileCoordinator(this, _profileCoordinator);
+                _idleDashboards = new IdleDashboardCoordinator(this, _profileCoordinator, _fsr1Cm1Mapping);
                 _channelMapping = new ChannelMappingCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);

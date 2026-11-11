@@ -904,12 +904,20 @@ namespace MozaPlugin.UI
                 // The saved name the re-assert resolves to a slot; a value absent from
                 // the list above is why a re-assert silently does nothing.
                 sb.AppendLine();
-                sb.Append($"CM2 saved dash:    {Blank(plugin!.ActiveCm2DashboardName)}");
+                sb.Append($"CM2 saved dash:    {Blank(plugin!.SavedCm2DashboardName)}");
             }
             else if (cm2Present)
             {
                 sb.AppendLine();
                 sb.Append("CM2 dash lane:     (not started)");
+            }
+
+            // Out-of-game dashboards (per device) and which screens show one now.
+            string? idleDash = plugin?.IdleDashboards?.DescribeState();
+            if (idleDash != null)
+            {
+                sb.AppendLine();
+                sb.Append($"Idle dashboards:   {idleDash}");
             }
 
             // Dash LED driver (SimHub effects → CM2 bitmask/colour bridge).

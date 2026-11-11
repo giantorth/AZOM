@@ -475,6 +475,7 @@ namespace MozaPlugin.Resources
         public static string Edit_Bias => Get("Edit_Bias");
         public static string Status_RenderingPreview => Get("Status_RenderingPreview");
         public static string SliderLabel_StandbyTime => Get("SliderLabel_StandbyTime");
+        public static string SliderLabel_IdleDashboard => Get("SliderLabel_IdleDashboard");
         public static string SliderLabel_SyncStatusLed => Get("SliderLabel_SyncStatusLed");
         public static string Option_Time1Min => Get("Option_Time1Min");
         public static string Option_Time2Min => Get("Option_Time2Min");

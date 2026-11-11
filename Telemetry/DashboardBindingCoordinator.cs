@@ -194,6 +194,13 @@ namespace MozaPlugin.Telemetry
             Interlocked.Exchange(ref _telemetryDisabledSkipLogged, 0);
         }
 
+        /// <summary>The wheel moved off the profile's dashboard (idle dashboard): drop the
+        /// already-applied memo so the profile's re-apply switches back.</summary>
+        public void ForgetLastAppliedDashboardKey()
+        {
+            lock (_stateLock) { _lastAppliedDashboardKey = null; }
+        }
+
         // ── Lock-guarded helpers (call ONLY from outside _stateLock) ─────────
 
         private string? GetLastAppliedKey()
@@ -541,7 +548,20 @@ namespace MozaPlugin.Telemetry
                     MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring (key={key}): wheel state not yet available — {reason}");
                 return false;
             }
+            // Out of game the wheel's idle dashboard wins; this key applies when a game starts.
+            var hold = _plugin.IdleDashboards?.HoldWheel() ?? IdleDashboardCoordinator.Hold.Proceed;
+            if (hold == IdleDashboardCoordinator.Hold.Defer)
+            {
+                if (RecordDeferReason("idle dashboard: game state not known yet"))
+                    MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring (key={key}): game state not known yet");
+                return false;
+            }
             ClearDeferReason();
+            if (hold == IdleDashboardCoordinator.Hold.Held)
+            {
+                MozaLog.Info($"[AZOM] Profile dashboard {key} held — idle dashboard showing while no game runs");
+                return true;
+            }
             _plugin.ChannelMapping.MigrateLegacyWheelKeys();
 
             // Resolve target dashboard name + branch-specific side data.
@@ -748,7 +768,19 @@ namespace MozaPlugin.Telemetry
                     MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring to CM2 lane (key={key}): no CM2 catalog yet");
                 return false;
             }
+            var hold = _plugin.IdleDashboards?.HoldCm2() ?? IdleDashboardCoordinator.Hold.Proceed;
+            if (hold == IdleDashboardCoordinator.Hold.Defer)
+            {
+                if (RecordDeferReason("CM2 idle dashboard: game state not known yet"))
+                    MozaLog.Debug($"[AZOM] ApplyTelemetryDashboardFromProfile deferring to CM2 lane (key={key}): game state not known yet");
+                return false;
+            }
             ClearDeferReason();
+            if (hold == IdleDashboardCoordinator.Hold.Held)
+            {
+                MozaLog.Info($"[AZOM] CM2 profile dashboard {key} held — idle dashboard showing while no game runs");
+                return true;
+            }
 
             // Resolve key → name against the CM2's own catalog. file: keys match by
             // bare name only — the CM2 is catalog-only, no mzdash side-load.
@@ -996,6 +1028,11 @@ namespace MozaPlugin.Telemetry
                 {
                     _plugin.ActiveCm2DashboardName = newName;
                     _plugin.PersistSettings();
+                }
+                else
+                {
+                    // A switch made on the wheel ends the idle dashboard until the next game.
+                    _plugin.IdleDashboards?.YieldWheel();
                 }
 
                 if (sender.Profile != null)

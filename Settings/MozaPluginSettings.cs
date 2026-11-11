@@ -790,6 +790,17 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, int> Cm1ActiveDashboardByGuid { get; set; }
             = new Dictionary<Guid, int>();
 
+        /// <summary>Dashboard shown while no game runs, per device page (wheel page GUID,
+        /// <c>Cm2PageGuid</c>): a dashboard name from that device's list. Per device, not
+        /// per profile. Absent = off. See <c>IdleDashboardCoordinator</c>.</summary>
+        public Dictionary<Guid, string> IdleDashboardByPageGuid { get; set; }
+            = new Dictionary<Guid, string>();
+
+        /// <summary>Index form of <see cref="IdleDashboardByPageGuid"/> for the fixed-page
+        /// screens: FSR V1 (wheel page GUID, 0..18) and CM1 (<c>Cm1PageGuid</c>, 1-based).</summary>
+        public Dictionary<Guid, int> IdleDashboardIndexByPageGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
         // --- MOZA Multi-Function Stalks: truck-sim keyboard emulation ---
 
         /// <summary>Stalks operating mode. <see cref="StalkMode.ButtonBox"/> = the plugin

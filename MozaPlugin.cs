@@ -305,6 +305,9 @@ namespace MozaPlugin
         // Each device page's own profile store — see Settings/DeviceProfileCoordinator.cs.
         private DeviceProfileCoordinator _deviceProfiles = null!;
         internal DeviceProfileCoordinator? DeviceProfiles => _deviceProfiles;
+        // Per-device dashboard shown while no game runs — see Telemetry/IdleDashboardCoordinator.cs.
+        private IdleDashboardCoordinator? _idleDashboards;
+        internal IdleDashboardCoordinator? IdleDashboards => _idleDashboards;
         // Startup GitHub Releases check (24h throttle + per-process dedupe) —
         // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
         private UpdateCheckCoordinator _updateCheck = null!;

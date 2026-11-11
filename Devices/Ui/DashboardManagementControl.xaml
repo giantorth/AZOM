@@ -291,6 +291,12 @@
                                 <ComboBoxItem Tag="300" Content="{x:Static res:Strings.Option_Time5Hour}"/>
                             </ComboBox>
                         </StackPanel>
+                        <!-- Shown while no game runs; saved per device, not per profile. -->
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="{x:Static res:Strings.SliderLabel_IdleDashboard}" Style="{StaticResource SliderLabel}"/>
+                            <ComboBox x:Name="IdleDashboardCombo" Width="140"
+                                      SelectionChanged="IdleDashboardCombo_Changed"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </StackPanel>

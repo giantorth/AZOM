@@ -365,6 +365,7 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Sesgo</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Renderizando…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Tiempo de espera</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Tablero fuera de juego</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED de sincronización</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minuto</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutos</value></data>

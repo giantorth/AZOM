@@ -360,6 +360,7 @@
   <data name="Edit_Bias" xml:space="preserve"><value>偏置</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>正在渲染…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>待机时间</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>非游戏时仪表盘</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>同步指示灯</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 分钟</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 分钟</value></data>

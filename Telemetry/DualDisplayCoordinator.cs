@@ -312,7 +312,11 @@ namespace MozaPlugin.Telemetry
         }
 
         // One-shot guard: re-assert the saved CM2 dashboard once per pipeline start.
-        private bool _cm2ReassertAttempted;
+        private volatile bool _cm2ReassertAttempted;
+
+        /// <summary>The idle dashboard's kind=4 bound the CM2 for this pipeline; the
+        /// re-assert has nothing left to do.</summary>
+        internal void MarkCm2DashboardReasserted() => _cm2ReassertAttempted = true;
         // Attempts made in the current pipeline lifetime. The one-shot is only claimed
         // once the kind=4 actually reaches the wire, so a sender that keeps refusing
         // would otherwise be retried on every PollStatus tick forever; cap it so a
@@ -334,6 +338,8 @@ namespace MozaPlugin.Telemetry
             if (_cm2ReassertAttempted) return;
             var cm2 = _plugin._cm2Sender;
             if (cm2 == null || cm2.FramesSent == 0) return;
+            // An idle dashboard may be the right target; it binds the CM2 itself.
+            if (_plugin.IdleDashboards?.Cm2ReassertMustWait == true) return;
             // Match what SendDashboardSwitch itself requires (Active, out of the
             // post-emit cooldown) rather than the broader Enabled, so a sender still
             // cold-starting is waited out silently instead of burning an attempt.

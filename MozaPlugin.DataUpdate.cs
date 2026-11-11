@@ -44,7 +44,11 @@ namespace MozaPlugin
             // feeds the graph's autoscale fallback, and blanking a 2-minute trace
             // mid-session reads as a glitch.
             if (data.GameRunning && !_lastGameRunningForTorquePeak)
+            {
                 _data?.ResetLiveTorquePeak();
+                // Swap the idle dashboard for the profile's now, not on the next 5 s poll.
+                _idleDashboards?.RequestTick();
+            }
             _lastGameRunningForTorquePeak = data.GameRunning;
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
