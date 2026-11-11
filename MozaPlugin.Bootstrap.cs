@@ -84,6 +84,7 @@ namespace MozaPlugin
                 _data = new MozaData();
                 _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings",
                     MozaPluginSettings.CreateForNewInstall);
+                LoadBitePointTravel();
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
                 _deviceProfiles = new DeviceProfileCoordinator(this, _profileCoordinator);

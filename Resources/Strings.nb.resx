@@ -904,4 +904,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA basestyring</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Juster baseinnstillingene fra mobil eller nettbrett.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punkt {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Forutsigelse</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Motorvibrasjon i clutch</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Clutch lukket</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradvis ved bitepunktet</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under bitepunktet</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Helt sluppet</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Sylindere</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
 </root>

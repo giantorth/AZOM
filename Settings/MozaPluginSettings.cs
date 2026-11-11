@@ -243,6 +243,9 @@ namespace MozaPlugin.Settings
         // Axis for MBoosterBitePointSource.HidAxis; null = none chosen.
         public Protocol.HidAxisSelection? MBoosterBitePointHidAxis { get; set; }
 
+        // Clutch travel times Prediction learns (MBoosterBitePointTravel); null = none yet.
+        public Devices.MBooster.MBoosterBitePointTravelTimes? MBoosterBitePointTravelTimes { get; set; }
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —

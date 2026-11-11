@@ -906,4 +906,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Wheelbase Control</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Adjust wheelbase settings from a phone or tablet.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Point {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Prediction</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Clutch Engine Vibration</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Clutch closed</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Fade at bite point</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Below bite point</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Fully released</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylinders</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max frequency (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Idle strength (%)</value></data>
 </root>

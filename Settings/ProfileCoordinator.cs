@@ -128,6 +128,7 @@ namespace MozaPlugin.Settings
             _plugin._settings = MozaPluginSettings.CreateForNewInstall();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
             _plugin.ApplyStalksSettings();
+            _plugin.LoadBitePointTravel();
             // InitProfileSystem re-pushes the master-mapper defaults from the
             // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();

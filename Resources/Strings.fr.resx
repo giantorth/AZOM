@@ -899,4 +899,13 @@ Id : {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Contrôle de la base MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Réglez la base depuis un téléphone ou une tablette.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Point {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Anticipation</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Vibration moteur à l'embrayage</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Embrayage fermé</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Progressif au point de patinage</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Sous le point de patinage</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Entièrement relâché</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylindres</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Fréquence max. (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensité au ralenti (%)</value></data>
 </root>

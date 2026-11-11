@@ -899,4 +899,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Basis-Steuerung</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Basis-Einstellungen vom Smartphone oder Tablet aus anpassen.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punkt {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Vorhersage</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Kupplungs-Motorvibration</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Kupplung geschlossen</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Am Schleifpunkt einblenden</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Unter dem Schleifpunkt</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Ganz losgelassen</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Zylinder</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max. Frequenz (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Stärke im Leerlauf (%)</value></data>
 </root>

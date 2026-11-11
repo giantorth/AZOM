@@ -899,4 +899,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Điều khiển đế MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Điều chỉnh cài đặt đế từ điện thoại hoặc máy tính bảng.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Điểm {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Dự đoán</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Rung động cơ qua côn</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Côn đóng</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Chuyển dần tại điểm bám</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Dưới điểm bám</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Nhả hoàn toàn</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Số xi-lanh</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Tần số tối đa (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Cường độ không tải (%)</value></data>
 </root>

@@ -898,4 +898,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 휠베이스 제어</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>휴대폰이나 태블릿에서 휠베이스 설정을 조정합니다.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>포인트 {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>예측</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>클러치 엔진 진동</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>클러치 연결</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>물림점에서 서서히</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>물림점 아래</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>완전히 뗐을 때</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>실린더</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>최대 주파수 (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>공회전 강도 (%)</value></data>
 </root>

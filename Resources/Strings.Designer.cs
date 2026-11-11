@@ -957,5 +957,14 @@ namespace MozaPlugin.Resources
         public static string ControlDash_Title => Get("ControlDash_Title");
         public static string ControlDash_Description => Get("ControlDash_Description");
         public static string ControlDash_CurvePoint => Get("ControlDash_CurvePoint");
+        public static string Label_BitePrediction => Get("Label_BitePrediction");
+        public static string Section_ClutchEngine => Get("Section_ClutchEngine");
+        public static string Label_ClutchClosed => Get("Label_ClutchClosed");
+        public static string Option_ClutchClosedFade => Get("Option_ClutchClosedFade");
+        public static string Option_ClutchClosedBelowBite => Get("Option_ClutchClosedBelowBite");
+        public static string Option_ClutchClosedReleased => Get("Option_ClutchClosedReleased");
+        public static string SliderLabel_Cylinders => Get("SliderLabel_Cylinders");
+        public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
+        public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
     }
 }

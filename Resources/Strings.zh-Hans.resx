@@ -899,4 +899,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 基座控制</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>通过手机或平板调整基座设置。</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>点 {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>预测</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>离合器引擎振动</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>离合器闭合</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>在接合点渐变</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>低于接合点</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>完全松开</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>气缸数</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>最高频率 (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>怠速强度 (%)</value></data>
 </root>

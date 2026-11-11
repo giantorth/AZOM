@@ -195,6 +195,7 @@ namespace MozaPlugin
             Teardown("Control Mapper unregister", () => { _controlMapperBridge?.Unregister(); _controlMapperBridge = null; });
             // Static persistence hook captures this instance; drop it on teardown.
             MozaControls.MozaPalette.SavedColorPersist = null;
+            Devices.MBooster.MBoosterBitePointTravel.Changed = null;
         }
 
         private void TeardownReleaseLanes()

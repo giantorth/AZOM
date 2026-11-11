@@ -899,4 +899,13 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Управление базой MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Настройка базы с телефона или планшета.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Точка {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Упреждение</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Вибрация двигателя на сцеплении</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Сцепление замкнуто</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Плавно у точки схватывания</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Ниже точки схватывания</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Полностью отпущено</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Цилиндры</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Макс. частота (Гц)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Сила на холостых (%)</value></data>
 </root>
