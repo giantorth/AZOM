@@ -80,6 +80,8 @@ namespace MozaPlugin
                 try { _motionFeed.Update(pluginManager, data); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/Motion] Feed: {ex.Message}"); }
             }
+            else
+                _motionFeed.Reset();
 
             // Push SimHub's shared/master LED brightness to the wheel firmware group
             // brightness (rpm/buttons/knobs) when the user moves the slider. The wheel

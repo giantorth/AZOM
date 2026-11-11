@@ -117,27 +117,36 @@ namespace MozaPlugin.Devices.Motion
             return f;
         }
 
+        /// <summary>
+        /// Drop the latest frame and the crest filter. Called whenever the feed stops being
+        /// updated, so a push left over from before is not sent when updates resume.
+        /// </summary>
+        public void Reset()
+        {
+            Volatile.Write(ref _latest, null);
+            _lastGear = null;
+            _heaveSlow = 0.0;
+            _heaveSlowAtMs = -1;
+            _crestHoldUntilMs = 0;
+            _crestPush = 0.0;
+            _crestPushOut = 0f;
+        }
+
         public void Update(PluginManager pluginManager, GameData data)
         {
             var d = data.NewData;
             if (!data.GameRunning || data.GamePaused || d == null)
             {
-                Volatile.Write(ref _latest, null);
-                _lastGear = null;
-                _heaveSlow = 0.0;
-                _heaveSlowAtMs = -1;
-                _crestHoldUntilMs = 0;
-                _crestPush = 0.0;
-                _crestPushOut = 0f;
+                Reset();
                 return;
             }
 
             long now = _clock.ElapsedMilliseconds;
-            double surge = d.AccelerationSurge ?? 0.0;   // m/s², braking positive
+            double surge = Finite(d.AccelerationSurge);   // m/s², braking positive
             // SimHub's sway is opposite to Motion Manager's lateral field (MM capture,
             // iRacing slow turns, bridge v31).
-            double sway = -(d.AccelerationSway ?? 0.0);
-            double heave = d.AccelerationHeave ?? 0.0;
+            double sway = -Finite(d.AccelerationSway);
+            double heave = Finite(d.AccelerationHeave);
             double speed = d.SpeedKmh / 3.6;
 
             var f = new MotionTelemetryFrame();
@@ -229,7 +238,7 @@ namespace MozaPlugin.Devices.Motion
             }
             else
                 f.Flags = MozaMotionProtocol.FlagInGame;
-            double heaveAccel = heaveMm * HeaveAccelPerMm - Math.Max(0.0, crestPush);
+            double heaveAccel = Finite(heaveMm) * HeaveAccelPerMm - Math.Max(0.0, Finite(crestPush));
             f.Fields[6] = (float)Math.Max(-PoseHeaveAccelLimit, Math.Min(PoseHeaveAccelLimit, heaveAccel));
             for (int k = 0; k < 4; k++)
                 f.Fields[8 + k] = MotionTelemetryFrame.ShockRestMm[k];
@@ -257,6 +266,10 @@ namespace MozaPlugin.Devices.Motion
             catch { return false; }
             return !double.IsNaN(value) && !double.IsInfinity(value);
         }
+
+        // A non-finite sample would stick in the crest filter and reach the wire.
+        private static double Finite(double? v)
+            => v is double x && !double.IsNaN(x) && !double.IsInfinity(x) ? x : 0.0;
 
         private static byte Percent(double v) => (byte)Math.Max(0, Math.Min(100, Math.Round(v)));
 
