@@ -320,11 +320,11 @@ namespace MozaPlugin.Telemetry
         internal Guid? MappingPageGuid;
 
         /// <summary>
-        /// Fixed dashboard-key list this sender uses to look up channel mappings
-        /// (null = the wheel's ChannelMappingCoordinator.GetActiveDashboardKeyCandidates). A CM2 sender uses a
-        /// single fixed key since it catalog-synthesises one dashboard.
+        /// Dashboard key this sender looks its channel mappings up under, read at each
+        /// resolve (null = the wheel's ChannelMappingCoordinator.GetActiveDashboardKeyCandidates).
+        /// A CM2 sender reads its current pick (<c>MozaPlugin.Cm2MappingDashKey</c>).
         /// </summary>
-        internal System.Collections.Generic.IReadOnlyList<string>? MappingDashKeys;
+        internal Func<string>? MappingDashKeyProvider;
 
         /// <summary>Send a periodic frame on this sender's lane (slot = base + logical).</summary>
         private void SendStreamSlot(int logicalSlot, byte[] frame) =>

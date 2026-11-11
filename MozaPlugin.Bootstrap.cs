@@ -221,6 +221,8 @@ namespace MozaPlugin
                     DeviceProfileMigration.ResetCm2DashboardKeys(_settings);
                     _profileCoordinator.PersistSettings();
                 }
+                if (DeviceProfileMigration.MigrateCm2MappingKeys(_settings))
+                    _profileCoordinator.PersistSettings();
 
                 // v1.6 replaced the code-registered "Wheelbase LFE haptics" device
                 // with the per-model wheelbase device's Haptics section. An upgraded

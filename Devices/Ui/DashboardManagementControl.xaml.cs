@@ -1291,7 +1291,7 @@ namespace MozaPlugin.Devices.Ui
             foreach (var row in _channelRows)
                 _plugin.ChannelMapping.UpdateActive(row.Url, "", resetSender);
             if (IsCm2Target)
-                _plugin.ChannelMapping.ClearCurrentDashboard(MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey);
+                _plugin.ChannelMapping.ClearCurrentDashboard(MozaPlugin.Cm2PageGuid, _plugin.Cm2MappingDashKey);
             else
                 _plugin.ChannelMapping.ClearCurrentDashboard();
             PopulateChannelMappingList();
@@ -1516,7 +1516,7 @@ namespace MozaPlugin.Devices.Ui
             if (string.IsNullOrEmpty(row.Url)) return;
             if (IsCm2Target)
                 _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty,
-                    MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
+                    MozaPlugin.Cm2PageGuid, _plugin.Cm2MappingDashKey, _plugin.ActiveCm2Sender);
             else
                 _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty);
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";

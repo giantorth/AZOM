@@ -88,6 +88,20 @@ namespace MozaPlugin
                 if (profile != null)
                     profile.TelemetryDashboardKey = name.Length > 0
                         ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : null;
+                // A first-ever pick gives pickless profiles a key for their legacy bucket.
+                if (_settings != null) DeviceProfileMigration.MigrateCm2MappingKeys(_settings);
+            }
+        }
+
+        /// <summary>Channel-mapping key for the CM2's selected dashboard on its current
+        /// profile (<c>wheel:&lt;name&gt;</c>); the legacy <see cref="Cm2LegacyDashKey"/>
+        /// bucket only while no dashboard has ever been picked.</summary>
+        internal string Cm2MappingDashKey
+        {
+            get
+            {
+                string name = ActiveCm2DashboardName;
+                return name.Length > 0 ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : Cm2LegacyDashKey;
             }
         }
 

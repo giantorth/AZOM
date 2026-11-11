@@ -22,6 +22,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **Clutch Bite Point pulses when the clutch jumps past the bite point between readings** instead of staying silent.
 - **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
+- **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
 
 ## [1.7.3]
 

@@ -444,6 +444,15 @@ namespace MozaPlugin.Settings
         internal void ApplyCm2SavedDashboard(MozaDashProfile? profile)
         {
             if (profile == null) return;
+            ApplyCm2SavedDashboardCore(profile);
+            // The CM2's mappings follow its profile too, and a switch between profiles on
+            // the same dashboard emits no kind=4 — rebind the live channels (wire-neutral).
+            try { _plugin.Cm2Sender?.ReResolveActiveDashboardMappings(onlyIfChanged: true); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] CM2 mapping re-resolve after profile apply failed: " + ex.Message); }
+        }
+
+        private void ApplyCm2SavedDashboardCore(MozaDashProfile profile)
+        {
             if (string.IsNullOrEmpty(profile.TelemetryDashboardKey))
             {
                 // A profile with no pick yet takes the dashboard the CM2 is on, so the

@@ -283,7 +283,7 @@ namespace MozaPlugin.Telemetry
             sender.StandaloneDashboardMode = false;
             sender.TargetDeviceId = targetDeviceId;
             sender.MappingPageGuid = null;
-            sender.MappingDashKeys = null;
+            sender.MappingDashKeyProvider = null;
             // The main sender always uses lane base 0. Its strict-inbound / shares-
             // connection flags (set when a co-resident _cm2Sender shares the bus) are
             // owned by MozaPlugin.EnsureCm2Pipeline, not reset here.
@@ -704,6 +704,10 @@ namespace MozaPlugin.Telemetry
             if (string.Equals(canonical, key, StringComparison.OrdinalIgnoreCase)) return key;
             if (string.Equals(profile.TelemetryDashboardKey, key, StringComparison.OrdinalIgnoreCase))
                 profile.TelemetryDashboardKey = canonical;
+            // A CM2 profile's mappings are keyed by this same key; carry them over.
+            if (profile is MozaDashProfile dash && dash.ChannelMappings != null
+                && dash.ChannelMappings.ContainsKey(key))
+                dash.ChannelMappings = ChannelMappingCoordinator.MoveBucket(dash.ChannelMappings, key, canonical);
             MozaLog.Info($"[AZOM] Migrated profile dashboard key {key} → {canonical}");
             return canonical;
         }
@@ -860,6 +864,10 @@ namespace MozaPlugin.Telemetry
                 // dwell has elapsed, and the switch below would then bail with
                 // state=Idle. Re-check before committing.
                 _plugin.EnsureCm2Pipeline();
+                // Same keepExistingSynth gap as the wheel above: CM2 mappings are per
+                // dashboard, so rebind to the newly picked one's (callers set
+                // ActiveCm2DashboardName first).
+                sender.ReResolveActiveDashboardMappings();
                 if (!sender.Enabled)
                 {
                     MozaLog.Debug(
@@ -979,21 +987,23 @@ namespace MozaPlugin.Telemetry
                 // the only non-null value here is the synth or a stale staged
                 // one. NO writes to persisted settings — the saved profile
                 // preference is the user's intent; wheel nav must not clobber it.
+                //
+                // The CM2's saved selection is the one the re-assert reads, so a
+                // dash-side switch has to update it. The wheel's is left alone (see
+                // the method summary). Before the null below: it is also the CM2's
+                // mapping key, which the rebuild reads.
+                if (!isWheel)
+                {
+                    _plugin.ActiveCm2DashboardName = newName;
+                    _plugin.PersistSettings();
+                }
+
                 if (sender.Profile != null)
                     sender.Profile = null;
 
                 MozaLog.Info(
                     $"[AZOM] WheelInitiatedSwitch({lane}) slot={slot} ('{newName}'): " +
                     $"catalog-only — rebuilding synthesised profile from post-switch catalog");
-
-                // The CM2's saved selection is the one the re-assert reads, so a
-                // dash-side switch has to update it. The wheel's is left alone (see
-                // the method summary).
-                if (!isWheel)
-                {
-                    _plugin.ActiveCm2DashboardName = newName;
-                    _plugin.PersistSettings();
-                }
 
                 // UI dropdown reads sender.WheelReportedSlot directly when building
                 // the selection (not ActiveTelemetryProfileName), so the dropdown
