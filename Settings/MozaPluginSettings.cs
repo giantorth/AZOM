@@ -814,7 +814,10 @@ namespace MozaPlugin.Settings
     /// </summary>
     public sealed class WheelSleepSettings
     {
-        public int Mode { get; set; } = -1;          // cmd 0x20 mode enum
+        // cmd 0x20: 0 = Off, 1 = Breathing. Older builds stored 2-6, which the
+        // wheel never keeps (reads back 1), so those load as Breathing.
+        private int _mode = -1;
+        public int Mode { get => _mode; set => _mode = value > 1 ? 1 : value; }
         public int TimeoutMin { get; set; } = -1;    // cmd 0x21 BE u16 minutes
         public int SpeedMs { get; set; } = -1;       // cmd 0x22 BE u16 ms
         public int[]? Color { get; set; }            // packed R<<16|G<<8|B (single)

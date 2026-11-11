@@ -798,7 +798,7 @@ skipReadByMode:
                     // which doesn't map to any dropdown option → the dropdown
                     // would render empty and look like the value was wiped.
                     var sleepBundle = _plugin!.ActiveWheelSleep;
-                    int sleepMode = sleepBundle?.Mode ?? _data.WheelIdleMode;
+                    int sleepMode = System.Math.Min(sleepBundle?.Mode ?? _data.WheelIdleMode, 1);
                     int sleepTimeoutMin = sleepBundle?.TimeoutMin > 0
                         ? sleepBundle.TimeoutMin
                         : _data.WheelIdleTimeout;
@@ -1119,8 +1119,8 @@ skipReadByMode:
             _data!.WheelIdleSpeed = ms;
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             if (sleep != null) sleep.SpeedMs = ms;
-            int mode = _data.WheelIdleMode;
-            if (mode >= 2)
+            int mode = WheelSleepModeCombo.SelectedIndex;
+            if (mode >= 1)
                 _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
             _plugin.SaveSettings();
         }
@@ -1162,7 +1162,7 @@ skipReadByMode:
         private void UpdateSleepSpeedRowVisibility()
         {
             if (_data == null) return;
-            WheelSleepSpeedRow.Visibility = _data.WheelIdleMode >= 2
+            WheelSleepSpeedRow.Visibility = WheelSleepModeCombo.SelectedIndex >= 1
                 ? Visibility.Visible : Visibility.Collapsed;
         }
 

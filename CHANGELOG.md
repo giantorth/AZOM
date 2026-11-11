@@ -24,6 +24,8 @@ All notable changes to the AZOM plugin are documented here.
 - **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
 - **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
 - **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
+- **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.
+- **Wheel sleep light offers Off and Breathing only,** matching Pit House; the speed slider shows for Breathing.
 
 ## [1.7.3]
 
