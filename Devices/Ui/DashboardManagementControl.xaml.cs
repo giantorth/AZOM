@@ -230,7 +230,7 @@ namespace MozaPlugin.Devices.Ui
                 {
                     // Repopulate only on a page change: every rebuild re-selects, and
                     // the selection handler's ScrollIntoView snaps the list back.
-                    if ((_plugin?.GetActiveCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
+                    if ((_plugin?.GetStoredCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
                         || TelemetryProfileList.Items.Count == 0)
                         PopulateDashboardCombo();
                     long sigc = ComputeMappingDataSignature();
@@ -409,7 +409,8 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex;
                     for (int i = min; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i}");
-                    int active = _plugin.GetActiveCm1Index();
+                    // The stored pick, not an idle page showing out of game.
+                    int active = _plugin.GetStoredCm1Index();
                     int idx = active - min;
                     TelemetryProfileList.SelectedIndex = (idx >= 0 && idx < TelemetryProfileList.Items.Count) ? idx : 0;
                     _lastPopulatedWheelSlot = -1;
@@ -433,7 +434,10 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
                     for (int i = 0; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i + 1}");
-                    int active = _plugin.GetActiveFsr1Index();
+                    // The stored pick, not an idle page showing out of game.
+                    int active = (_plugin.IdleDashboards?.Fsr1OverrideIndex ?? -1) >= 0
+                        ? _plugin.GetStoredFsr1Index()
+                        : _plugin.GetActiveFsr1Index();
                     TelemetryProfileList.SelectedIndex = (active >= 0 && active <= max) ? active : 0;
                     _lastPopulatedWheelSlot = -1;
                 }
@@ -475,7 +479,12 @@ namespace MozaPlugin.Devices.Ui
                 // never writes device switches to the saved name); otherwise the saved
                 // name, so a fresh pick doesn't snap back to the pre-switch dash
                 // before the echo lands; the stale reported slot as last resort.
-                string? savedName = IsCm2Target ? _plugin.ActiveCm2DashboardName : _plugin.ActiveTelemetryProfileName;
+                // The profile's own pick: while an idle dashboard shows out of game, the
+                // list keeps the profile's selection rather than the screen's.
+                string? savedName = IsCm2Target ? _plugin.SavedCm2DashboardName : _plugin.SavedTelemetryProfileName;
+                bool idleShowing = IsCm2Target
+                    ? _plugin.IdleDashboards?.Cm2OverrideName != null
+                    : _plugin.IdleDashboards?.WheelEngaged == true;
                 bool savedInList = false;
                 if (!string.IsNullOrEmpty(savedName))
                 {
@@ -495,10 +504,11 @@ namespace MozaPlugin.Devices.Ui
                     reportedName = state.ConfigJsonList[sender.WheelReportedSlot];
                 bool reportedCurrent = !string.IsNullOrEmpty(reportedName)
                     && sender!.WheelReportedSlot == sender.LastEmittedKind4Slot;
-                string? selectedName = reportedCurrent ? reportedName
+                string? selectedName = idleShowing ? (savedInList ? savedName : null)
+                    : reportedCurrent ? reportedName
                     : savedInList ? savedName
                     : reportedName;
-                if (string.IsNullOrEmpty(selectedName))
+                if (string.IsNullOrEmpty(selectedName) && !idleShowing)
                     selectedName = savedName;
                 if (!string.IsNullOrEmpty(selectedName))
                 {
@@ -516,7 +526,7 @@ namespace MozaPlugin.Devices.Ui
                         }
                     }
                 }
-                if (TelemetryProfileList.SelectedIndex < 0 && TelemetryProfileList.Items.Count > 0)
+                if (TelemetryProfileList.SelectedIndex < 0 && TelemetryProfileList.Items.Count > 0 && !idleShowing)
                     TelemetryProfileList.SelectedIndex = 0;
 
                 // Snapshot the wheel-reported slot we just populated against,
