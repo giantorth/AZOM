@@ -32,6 +32,7 @@ All notable changes to the AZOM plugin are documented here.
 - **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
 - **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.
 - **Wheel sleep light offers Off and Breathing only,** matching Pit House; the speed slider shows for Breathing.
+- **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
 
 ## [1.7.3]
 

@@ -198,6 +198,19 @@ namespace MozaPlugin.Devices.Motion
 
         private bool Wanted => Volatile.Read(ref _holds) > 0 || Volatile.Read(ref _pendingEngage) != null;
 
+        /// <summary>Something holds the lane or the platform is running: keep it across a plugin reload.</summary>
+        public bool InUse
+        {
+            get
+            {
+                var phase = _phase;
+                return Wanted || phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
+                    || phase == MotionLanePhase.SelfChecking || phase == MotionLanePhase.ManualTest;
+            }
+        }
+
+        public bool IsDisposed => !_running;
+
         // ------------------------------------------------------------ output API
 
         /// <summary>

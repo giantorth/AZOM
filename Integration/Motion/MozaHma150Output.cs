@@ -136,7 +136,7 @@ namespace MozaPlugin.Integration.Motion
 
         public override Control SettingsControl => new MozaHma150SettingsControl(this);
 
-        private static MozaMotionController? Lane => MozaPlugin.Instance?.MotionController;
+        private static MozaMotionController? Lane => MozaPlugin.SharedMotionController;
 
         public override IEnumerable<string> GetReservedSerialPorts()
         {
@@ -266,6 +266,8 @@ namespace MozaPlugin.Integration.Motion
         {
             if (lane == null) return;
             if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
+            // Between plugin instances (SimHub game switch) there is nothing to ask: keep the last answer.
+            if (MozaPlugin.Instance == null) return;
             _manualPoll.Restart();
             lane.SetManualWanted(Settings?.SlowManualControl != false
                 && MozaPlugin.Instance?.MotionManualControlActive == true);

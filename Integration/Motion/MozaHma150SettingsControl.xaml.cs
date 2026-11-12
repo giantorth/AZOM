@@ -69,7 +69,7 @@ namespace MozaPlugin.Integration.Motion
             _held = null;
         }
 
-        private static MozaMotionController? Lane => MozaPlugin.Instance?.MotionController;
+        private static MozaMotionController? Lane => MozaPlugin.SharedMotionController;
 
         private void RequestReads()
         {
