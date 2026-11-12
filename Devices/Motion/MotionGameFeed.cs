@@ -20,6 +20,28 @@ namespace MozaPlugin.Devices.Motion
     public sealed class MotionGameFeed
     {
         private const double DegToRad = Math.PI / 180.0;
+        // Pose heave → f6: SimHub's default heave range (17 m/s² → 80 mm) run backwards. Fixed on
+        // purpose; the profile's Heave row is where strength is tuned. +f6 raises the platform.
+        private const float HeaveAccelPerMm = 17f / 80f;
+        // Bound on pose f6 (heave + crest push); travel levels off near 16 m/s².
+        private const float PoseHeaveAccelLimit = 30f;
+        // Crest signal (docs/protocol/motion/game-stream-0x22.md § Plugin mapping): low-passed
+        // vertical accel, one-sided past a dead band, so crests pass and short bumps don't.
+        private const double HeaveSlowSeconds = 0.2;
+        private const double CrestDeadbandAccel = 2.0;
+        private const double CrestGainFull = 15.0;
+        private const double CrestMaxAccel = 30.0;
+        // Impacts: input clipped, and |surge| or |sway| above 80 (past any car's braking or
+        // cornering) holds the signal at 0 for 2 s.
+        private const double CrestInputLimit = 12.0;
+        private const double CrestImpactAccel = 80.0;
+        private const int CrestImpactHoldMs = 2000;
+        // Fast attack, slow release so a wobbling crest is one push; release firms up as the car lands.
+        private const double CrestAttackSeconds = 0.05;
+        private const double CrestReleaseSoftSeconds = 0.8;
+        private const double CrestReleaseFirmSeconds = 0.3;
+        private const double CrestLandingAccel = 3.0;
+        private const double CrestImpactReleaseSeconds = 0.15;
         private const int GearPulseMs = 120;
         private const double EngineOffRpm = 100.0;
 
@@ -48,6 +70,14 @@ namespace MozaPlugin.Devices.Motion
         private long _stampMs;
         private string? _lastGear;
         private long _shiftUntilMs;
+        private double _heaveSlow;
+        private long _heaveSlowAtMs = -1;
+        private long _crestHoldUntilMs;
+        private double _crestPush;
+        private volatile float _crestPushOut;
+
+        /// <summary>Crest push at full strength (m/s² of f6, ≥ 0); 0 while no game runs.</summary>
+        public float CrestPush => _crestPushOut;
 
         /// <summary>Latest frame if it is younger than <paramref name="maxAgeMs"/>.</summary>
         public MotionTelemetryFrame? Latest(int maxAgeMs)
@@ -57,22 +87,33 @@ namespace MozaPlugin.Devices.Motion
             return f;
         }
 
+        /// <summary>Drop the latest frame and the crest filter state.</summary>
+        public void Reset()
+        {
+            Volatile.Write(ref _latest, null);
+            _lastGear = null;
+            _heaveSlow = 0.0;
+            _heaveSlowAtMs = -1;
+            _crestHoldUntilMs = 0;
+            _crestPush = 0.0;
+            _crestPushOut = 0f;
+        }
+
         public void Update(PluginManager pluginManager, GameData data)
         {
             var d = data.NewData;
             if (!data.GameRunning || data.GamePaused || d == null)
             {
-                Volatile.Write(ref _latest, null);
-                _lastGear = null;
+                Reset();
                 return;
             }
 
             long now = _clock.ElapsedMilliseconds;
-            double surge = d.AccelerationSurge ?? 0.0;   // m/s², braking positive
+            double surge = Finite(d.AccelerationSurge);   // m/s², braking positive
             // SimHub's sway is opposite to Motion Manager's lateral field (MM capture,
             // iRacing slow turns, bridge v31).
-            double sway = -(d.AccelerationSway ?? 0.0);
-            double heave = d.AccelerationHeave ?? 0.0;
+            double sway = -Finite(d.AccelerationSway);
+            double heave = Finite(d.AccelerationHeave);
             double speed = d.SpeedKmh / 3.6;
 
             var f = new MotionTelemetryFrame();
@@ -84,6 +125,29 @@ namespace MozaPlugin.Devices.Motion
             f.Fields[5] = (float)sway;
             f.Fields[6] = (float)heave;
             f.Fields[7] = (float)speed;
+            double sinceSlow = _heaveSlowAtMs < 0 ? 0.0 : Math.Min(0.25, (now - _heaveSlowAtMs) / 1000.0);
+            _heaveSlowAtMs = now;
+            if (Math.Abs(surge) > CrestImpactAccel || Math.Abs(sway) > CrestImpactAccel)
+                _crestHoldUntilMs = now + CrestImpactHoldMs;
+            if (now < _crestHoldUntilMs)
+                _heaveSlow = 0.0;
+            else
+                _heaveSlow += (Math.Max(-CrestInputLimit, Math.Min(CrestInputLimit, heave)) - _heaveSlow)
+                    * (1.0 - Math.Exp(-sinceSlow / HeaveSlowSeconds));
+            double crestTarget = Math.Min(CrestMaxAccel, Math.Max(0.0, -_heaveSlow - CrestDeadbandAccel) * CrestGainFull);
+            double crestRate;
+            if (crestTarget > _crestPush)
+                crestRate = 1.0 / CrestAttackSeconds;
+            else if (now < _crestHoldUntilMs)
+                crestRate = 1.0 / CrestImpactReleaseSeconds;
+            else
+            {
+                double landing = Math.Max(0.0, Math.Min(1.0, _heaveSlow / CrestLandingAccel));
+                crestRate = 1.0 / CrestReleaseSoftSeconds
+                    + (1.0 / CrestReleaseFirmSeconds - 1.0 / CrestReleaseSoftSeconds) * landing;
+            }
+            _crestPush += (crestTarget - _crestPush) * (1.0 - Math.Exp(-sinceSlow * crestRate));
+            _crestPushOut = (float)_crestPush;
             if (!ReadIRacingShocks(pluginManager, f))
             {
                 for (int k = 0; k < 4; k++)
@@ -107,14 +171,15 @@ namespace MozaPlugin.Devices.Motion
 
         /// <summary>
         /// A frame that carries a SimHub Motion pose instead of raw physics: pitch/roll in f0/f1,
-        /// which the controller applies as platform attitude; heave as a common-mode shock offset,
-        /// the controller's heave source; f4–f6 zero so its acceleration effects stay idle. Heading,
-        /// yaw rate, speed, pedals, engine and flags come from <paramref name="game"/> when a game runs.
-        /// Pose signs: SimHub's pitch is −GameData pitch and its roll +GameData roll (MotionPlugin),
-        /// so both flip to match <see cref="Update"/>. Heave sign untested on the rig.
+        /// which the controller applies as platform attitude; heave as vertical acceleration in f6
+        /// (the input its washed-out Heave effect follows), minus <paramref name="crestPush"/>, held
+        /// within ±<see cref="PoseHeaveAccelLimit"/>; f4/f5 zero so its acceleration effects stay
+        /// idle; shocks at rest. Heading, yaw rate, speed, pedals, engine and flags come from
+        /// <paramref name="game"/> when a game runs. Pose signs: SimHub's pitch is −GameData pitch
+        /// and its roll +GameData roll (MotionPlugin), so both flip to match <see cref="Update"/>.
         /// </summary>
         public static MotionTelemetryFrame PoseFrame(double pitchDegrees, double rollDegrees, double heaveMm,
-            MotionTelemetryFrame? game)
+            MotionTelemetryFrame? game, double crestPush = 0.0)
         {
             var f = new MotionTelemetryFrame();
             f.Fields[0] = (float)(-pitchDegrees * DegToRad);
@@ -132,8 +197,10 @@ namespace MozaPlugin.Devices.Motion
             }
             else
                 f.Flags = MozaMotionProtocol.FlagInGame;
+            double heaveAccel = Finite(heaveMm) * HeaveAccelPerMm - Math.Max(0.0, Finite(crestPush));
+            f.Fields[6] = (float)Math.Max(-PoseHeaveAccelLimit, Math.Min(PoseHeaveAccelLimit, heaveAccel));
             for (int k = 0; k < 4; k++)
-                f.Fields[8 + k] = (float)(MotionTelemetryFrame.ShockRestMm[k] - heaveMm);
+                f.Fields[8 + k] = MotionTelemetryFrame.ShockRestMm[k];
             return f;
         }
 
@@ -156,8 +223,13 @@ namespace MozaPlugin.Devices.Motion
             if (v == null) return false;
             try { value = Convert.ToDouble(v, CultureInfo.InvariantCulture); }
             catch { return false; }
-            return !double.IsNaN(value) && !double.IsInfinity(value);
+            return IsFinite(value);
         }
+
+        private static bool IsFinite(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
+
+        // A non-finite sample would stick in the crest filter.
+        private static double Finite(double? v) => v is double x && IsFinite(x) ? x : 0.0;
 
         private static byte Percent(double v) => (byte)Math.Max(0, Math.Min(100, Math.Round(v)));
 

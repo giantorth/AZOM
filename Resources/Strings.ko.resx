@@ -911,4 +911,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>실린더</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>최대 주파수 (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>공회전 강도 (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>언덕 정상 강도</value></data>
 </root>
