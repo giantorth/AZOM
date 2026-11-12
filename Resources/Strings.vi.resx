@@ -910,4 +910,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Số xi-lanh</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Tần số tối đa (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Cường độ không tải (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Cường độ khi qua đỉnh dốc</value></data>
 </root>

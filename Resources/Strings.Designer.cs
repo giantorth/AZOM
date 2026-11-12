@@ -968,5 +968,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_Cylinders => Get("SliderLabel_Cylinders");
         public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
         public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
+        public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
     }
 }

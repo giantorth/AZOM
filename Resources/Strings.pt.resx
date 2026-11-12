@@ -909,4 +909,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindros</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frequência máx. (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensidade em marcha lenta (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Força em lombas</value></data>
 </root>

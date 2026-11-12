@@ -910,4 +910,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>气缸数</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>最高频率 (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>怠速强度 (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>坡顶强度</value></data>
 </root>

@@ -909,4 +909,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Κύλινδροι</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Μέγιστη συχνότητα (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Ένταση στο ρελαντί (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Ένταση σε κορυφές</value></data>
 </root>

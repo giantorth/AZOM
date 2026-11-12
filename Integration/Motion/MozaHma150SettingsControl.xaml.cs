@@ -42,6 +42,7 @@ namespace MozaPlugin.Integration.Motion
         private bool _readsRequested;
         private MozaMotionController? _held;
         private readonly MozaHma150Output? _output;
+        private bool _crestSyncing;
 
         public MozaHma150SettingsControl(MozaHma150Output? output = null)
         {
@@ -50,7 +51,7 @@ namespace MozaPlugin.Integration.Motion
             BuildSourceItems();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _timer.Tick += (_, __) => Refresh();
-            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); Refresh(); _timer.Start(); };
+            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); SyncCrestSlider(); Refresh(); _timer.Start(); };
             Unloaded += (_, __) => { _timer.Stop(); Unhold(); };
         }
 
@@ -151,6 +152,7 @@ namespace MozaPlugin.Integration.Motion
             SourceCombo.IsEnabled = settings != null;
             SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
+            SyncCrestSlider();
             UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
             {
@@ -164,11 +166,37 @@ namespace MozaPlugin.Integration.Motion
                 var s = _output?.Settings;
                 if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
             };
+            CrestBoostSlider.ValueChanged += (_, __) =>
+            {
+                if (_crestSyncing) return;
+                int value = (int)Math.Round(CrestBoostSlider.Value);
+                // Re-set as the local value: WPF drops a drag's "current" value when the page
+                // unloads and raises ValueChanged with the stale local one, which got saved.
+                _crestSyncing = true;
+                try { CrestBoostSlider.Value = value; }
+                finally { _crestSyncing = false; }
+                CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+                var s = _output?.Settings;
+                if (s != null) s.CrestBoost = value;
+            };
         }
 
-        /// <summary>The haptics choice only applies to the pose source.</summary>
+        private void SyncCrestSlider()
+        {
+            int value = _output?.Settings?.CrestBoost ?? 0;
+            _crestSyncing = true;
+            try { CrestBoostSlider.Value = value; }
+            finally { _crestSyncing = false; }
+            CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+        }
+
+        /// <summary>The haptics choice and the crest strength only apply to the pose source.</summary>
         private void UpdateCornerHapticsEnabled()
-            => CornerHapticsCheck.IsEnabled = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
+        {
+            bool pose = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
+            CornerHapticsCheck.IsEnabled = pose;
+            CrestBoostSlider.IsEnabled = pose;
+        }
 
         // ------------------------------------------------------------ motion effects
 
