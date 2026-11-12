@@ -20,50 +20,24 @@ namespace MozaPlugin.Devices.Motion
     public sealed class MotionGameFeed
     {
         private const double DegToRad = Math.PI / 180.0;
-        // Pose heave as f6: SimHub's default heave range (17 m/s² of vertical acceleration to
-        // 80 mm) run backwards, so at that range and 100 % gain the controller gets about the
-        // game's own vertical acceleration. f6 is what the controller's Heave effect follows in
-        // game mode, and +f6 raises the platform: bench run of 10 Nov (HeaveGain, Heave 1.0 / 0),
-        // +8 m/s² held read +22.8 mm on all four actuators after 0.5 s and −8 read −22.0. The
-        // effect washes out (+0.5 mm 2 s into the same step) and dips the other way on release.
-        // The scale is fixed on purpose: the profile's Heave row (gain, ranges, gamma) is where the
-        // strength is tuned, and a row set up for less travel gives proportionally less f6.
+        // Pose heave → f6: SimHub's default heave range (17 m/s² → 80 mm) run backwards. Fixed on
+        // purpose; the profile's Heave row is where strength is tuned. +f6 raises the platform.
         private const float HeaveAccelPerMm = 17f / 80f;
-        // The most the pose source sends as f6 either way, profile heave and crest push together:
-        // the level driven on the rig, and well past the ~16 m/s² where the controller's travel
-        // levels off (bench table in docs/protocol/motion/game-stream-0x22.md).
+        // Bound on pose f6 (heave + crest push); travel levels off near 16 m/s².
         private const float PoseHeaveAccelLimit = 30f;
-        // Crest signal. A crest is a long, gentle lightness (Bathurst, 911 Cup, 217 km/h: 1.2 s at
-        // −4 m/s² mean, −4.7 low-passed peak), a bump a short, large one (~7 m/s² for 30–50 ms),
-        // so only duration tells them apart: the low-pass keeps the first and the dead band drops
-        // what it leaves of the second. One-sided: a first version also answered compressions,
-        // and the landing after that crest pushed back as hard as the crest itself (a 47 m/s²
-        // swing within a second at strength 80), which felt odd and was followed by the
-        // controller leaving game mode with error 261.
+        // Crest signal (docs/protocol/motion/game-stream-0x22.md § Plugin mapping): low-passed
+        // vertical accel, one-sided past a dead band, so crests pass and short bumps don't.
         private const double HeaveSlowSeconds = 0.2;
         private const double CrestDeadbandAccel = 2.0;
-        // At full strength: f6 per m/s² of lightness beyond the dead band, and the ceiling; the
-        // strength slider scales the result. 30 is the push judged right from the seat on that
-        // crest, with every controller status line at error 0.
         private const double CrestGainFull = 15.0;
         private const double CrestMaxAccel = 30.0;
-        // An impact is not a crest. Lightness on track peaked at −12 m/s² raw (the mountain,
-        // 200 km/h), so that is the most the signal is allowed to see. The fastest downforce cars
-        // brake and corner at 5–6 g (about 60 m/s²) and the wall hit that prompted this read
-        // 90–350 along the car, so 80 along or across the car means a hit in any car. A lighter
-        // hit is not caught; the input limit and the ceiling still bound what it can ask for.
+        // Impacts: input clipped, and |surge| or |sway| above 80 (past any car's braking or
+        // cornering) holds the signal at 0 for 2 s.
         private const double CrestInputLimit = 12.0;
         private const double CrestImpactAccel = 80.0;
         private const int CrestImpactHoldMs = 2000;
-        // The push follows the lightness up at once and lets go slowly. Over a long crest the
-        // lightness wobbles around the dead band two or three times a second (Bathurst, 250 km/h,
-        // 3.5 s: six separate pushes of 0 ↔ 30, felt as being bounced); with a slow release the
-        // same stretch is one push, and a lap's 29 pushes become 10.
+        // Fast attack, slow release so a wobbling crest is one push; release firms up as the car lands.
         private const double CrestAttackSeconds = 0.05;
-        // How it lets go follows the car: gently while nothing presses back, firmly as the car
-        // lands (slow acceleration turning positive, full firmness from +3 m/s²). One fixed
-        // release fitted the crest whose landing is firm and came out too severe on those that
-        // land softly or late.
         private const double CrestReleaseSoftSeconds = 0.8;
         private const double CrestReleaseFirmSeconds = 0.3;
         private const double CrestLandingAccel = 3.0;
@@ -102,11 +76,7 @@ namespace MozaPlugin.Devices.Motion
         private double _crestPush;
         private volatile float _crestPushOut;
 
-        /// <summary>
-        /// The crest signal at full strength (m/s² of f6, ≥ 0): the car's slow lightness beyond a
-        /// dead band, quick to rise and slow to let go. 0 while no game runs. The pose source scales
-        /// it by its strength setting and takes it off f6 (<see cref="PoseFrame"/>).
-        /// </summary>
+        /// <summary>Crest push at full strength (m/s² of f6, ≥ 0); 0 while no game runs.</summary>
         public float CrestPush => _crestPushOut;
 
         /// <summary>Latest frame if it is younger than <paramref name="maxAgeMs"/>.</summary>
@@ -117,10 +87,7 @@ namespace MozaPlugin.Devices.Motion
             return f;
         }
 
-        /// <summary>
-        /// Drop the latest frame and the crest filter. Called whenever the feed stops being
-        /// updated, so a push left over from before is not sent when updates resume.
-        /// </summary>
+        /// <summary>Drop the latest frame and the crest filter state.</summary>
         public void Reset()
         {
             Volatile.Write(ref _latest, null);
@@ -160,9 +127,6 @@ namespace MozaPlugin.Devices.Motion
             f.Fields[7] = (float)speed;
             double sinceSlow = _heaveSlowAtMs < 0 ? 0.0 : Math.Min(0.25, (now - _heaveSlowAtMs) / 1000.0);
             _heaveSlowAtMs = now;
-            // An impact's spikes (−20…−28 m/s² vertical with 90…350 along the car, Bathurst wall,
-            // 10 Nov) got through the low-pass and held the crest push at its ceiling again and
-            // again. Clip what goes in, and sit out the seconds after a hit.
             if (Math.Abs(surge) > CrestImpactAccel || Math.Abs(sway) > CrestImpactAccel)
                 _crestHoldUntilMs = now + CrestImpactHoldMs;
             if (now < _crestHoldUntilMs)
@@ -207,17 +171,12 @@ namespace MozaPlugin.Devices.Motion
 
         /// <summary>
         /// A frame that carries a SimHub Motion pose instead of raw physics: pitch/roll in f0/f1,
-        /// which the controller applies as platform attitude; heave as vertical acceleration in f6,
-        /// which the controller's Heave effect follows (quick, and washed out, so it gives bumps and
-        /// crests their kick and holds nothing); f4/f5 zero so its acceleration effects stay idle,
-        /// and the shocks at rest, so heave reaches the base through f6 alone. Heading, yaw rate,
-        /// speed, pedals, engine and flags come from <paramref name="game"/> when a game runs.
-        /// Pose signs: SimHub's pitch is −GameData pitch and its roll +GameData roll (MotionPlugin),
-        /// so both flip to match <see cref="Update"/>. Heave: +mm is up, and +f6 raises the platform.
-        /// <paramref name="crestPush"/> (m/s², ≥ 0; <see cref="CrestPush"/> scaled by the strength
-        /// setting) comes off f6: the car going light over a crest lowers the platform, whatever
-        /// the profile's heave makes of something that long and gentle. Compressions are left to
-        /// the profile. The sum is held within ±<see cref="PoseHeaveAccelLimit"/>.
+        /// which the controller applies as platform attitude; heave as vertical acceleration in f6
+        /// (the input its washed-out Heave effect follows), minus <paramref name="crestPush"/>, held
+        /// within ±<see cref="PoseHeaveAccelLimit"/>; f4/f5 zero so its acceleration effects stay
+        /// idle; shocks at rest. Heading, yaw rate, speed, pedals, engine and flags come from
+        /// <paramref name="game"/> when a game runs. Pose signs: SimHub's pitch is −GameData pitch
+        /// and its roll +GameData roll (MotionPlugin), so both flip to match <see cref="Update"/>.
         /// </summary>
         public static MotionTelemetryFrame PoseFrame(double pitchDegrees, double rollDegrees, double heaveMm,
             MotionTelemetryFrame? game, double crestPush = 0.0)
@@ -264,12 +223,13 @@ namespace MozaPlugin.Devices.Motion
             if (v == null) return false;
             try { value = Convert.ToDouble(v, CultureInfo.InvariantCulture); }
             catch { return false; }
-            return !double.IsNaN(value) && !double.IsInfinity(value);
+            return IsFinite(value);
         }
 
-        // A non-finite sample would stick in the crest filter and reach the wire.
-        private static double Finite(double? v)
-            => v is double x && !double.IsNaN(x) && !double.IsInfinity(x) ? x : 0.0;
+        private static bool IsFinite(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
+
+        // A non-finite sample would stick in the crest filter.
+        private static double Finite(double? v) => v is double x && IsFinite(x) ? x : 0.0;
 
         private static byte Percent(double v) => (byte)Math.Max(0, Math.Min(100, Math.Round(v)));
 

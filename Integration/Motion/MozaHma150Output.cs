@@ -55,11 +55,7 @@ namespace MozaPlugin.Integration.Motion
             }
         }
 
-        /// <summary>
-        /// Pose source only, 0–100: strength of the crest signal, the game's slow lightness
-        /// taken off the heave the controller is sent (<see cref="MotionGameFeed.PoseFrame"/>).
-        /// 0 = off.
-        /// </summary>
+        /// <summary>Pose source only, 0–100 (0 = off): share of <see cref="MotionGameFeed.CrestPush"/> taken off f6.</summary>
         public int CrestBoost
         {
             get => _crestBoost;

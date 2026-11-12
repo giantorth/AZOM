@@ -170,11 +170,8 @@ namespace MozaPlugin.Integration.Motion
             {
                 if (_crestSyncing) return;
                 int value = (int)Math.Round(CrestBoostSlider.Value);
-                // A drag or a key press sets the slider's "current" value over its local one, and
-                // WPF drops a current value when the page leaves the dialog: Value fell back to the
-                // local one and raised ValueChanged on the way out (10 Nov: 80 → 0, 22 ms before
-                // Unloaded, and the 0 was saved). Making every change the local value leaves
-                // nothing to fall back to.
+                // Re-set as the local value: WPF drops a drag's "current" value when the page
+                // unloads and raises ValueChanged with the stale local one, which got saved.
                 _crestSyncing = true;
                 try { CrestBoostSlider.Value = value; }
                 finally { _crestSyncing = false; }
@@ -184,7 +181,6 @@ namespace MozaPlugin.Integration.Motion
             };
         }
 
-        /// <summary>Shows the saved crest strength; run when the page is built and each time it loads.</summary>
         private void SyncCrestSlider()
         {
             int value = _output?.Settings?.CrestBoost ?? 0;
