@@ -210,7 +210,8 @@ namespace MozaPlugin
             // the disable frames before the pipe goes away, releases USB lanes' ports and
             // detaches routed lanes from the (possibly persistent) shared pipe.
             Teardown("pedal-haptics registry", () => { _pedalHapticsRegistry?.Dispose(); _pedalHapticsRegistry = null; });
-            // Motion controller — drops a running platform to standby before closing.
+            // Motion controller — kept running while the SimHub Motion output holds it (game
+            // switch); otherwise closed. See MozaPlugin.Motion.cs.
             Teardown("motion lane", DisposeMotionLane);
             // Standalone pedals/handbrake connections — close before MozaData
             // teardown so the response path (which writes to _data) can't race.
@@ -357,6 +358,9 @@ namespace MozaPlugin
         // the OS write buffer before the FTDI handle goes away.
         private static void OnAppDomainProcessExit(object? sender, EventArgs e)
         {
+            // First: a motion platform kept running across End() must not stay up after SimHub.
+            try { DisposePersistentMotionLane(); }
+            catch { }
             try
             {
                 var ts = s_persistentTelemetrySender;
