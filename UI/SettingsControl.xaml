@@ -3110,6 +3110,7 @@
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="5"/>
                                     </Grid>
+                                    <ctrl:OffOnToggle x:Name="MBoosterBitePointPredict" Content="{x:Static res:Strings.Label_BitePrediction}" HorizontalAlignment="Left" Margin="0,4" Checked="MBoosterBitePointPredict_Changed" Unchecked="MBoosterBitePointPredict_Changed"/>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>

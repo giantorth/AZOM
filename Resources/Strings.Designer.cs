@@ -475,6 +475,8 @@ namespace MozaPlugin.Resources
         public static string Edit_Bias => Get("Edit_Bias");
         public static string Status_RenderingPreview => Get("Status_RenderingPreview");
         public static string SliderLabel_StandbyTime => Get("SliderLabel_StandbyTime");
+        public static string SliderLabel_IdleDashboard => Get("SliderLabel_IdleDashboard");
+        public static string SliderLabel_IdleWhenNotDriving => Get("SliderLabel_IdleWhenNotDriving");
         public static string SliderLabel_SyncStatusLed => Get("SliderLabel_SyncStatusLed");
         public static string Option_Time1Min => Get("Option_Time1Min");
         public static string Option_Time2Min => Get("Option_Time2Min");
@@ -957,6 +959,15 @@ namespace MozaPlugin.Resources
         public static string ControlDash_Title => Get("ControlDash_Title");
         public static string ControlDash_Description => Get("ControlDash_Description");
         public static string ControlDash_CurvePoint => Get("ControlDash_CurvePoint");
+        public static string Label_BitePrediction => Get("Label_BitePrediction");
+        public static string Section_ClutchEngine => Get("Section_ClutchEngine");
+        public static string Label_ClutchClosed => Get("Label_ClutchClosed");
+        public static string Option_ClutchClosedFade => Get("Option_ClutchClosedFade");
+        public static string Option_ClutchClosedBelowBite => Get("Option_ClutchClosedBelowBite");
+        public static string Option_ClutchClosedReleased => Get("Option_ClutchClosedReleased");
+        public static string SliderLabel_Cylinders => Get("SliderLabel_Cylinders");
+        public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
+        public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
         public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
     }
 }

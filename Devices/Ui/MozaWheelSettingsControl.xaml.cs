@@ -718,6 +718,8 @@ skipReadByMode:
                 bool showTelemetry = newWheel
                                      && ((_plugin?.IsFsr1DisplayWheel ?? false)
                                          || (_plugin?.ShouldDriveDashboard() ?? false));
+                // FSR1's group-0x42 display has no tier-def upload path.
+                bool showFilesTab = showTelemetry && !(_plugin?.IsFsr1DisplayWheel ?? false);
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
                 // Knobs tab covers two independent capabilities: knob LEDs
                 // (KnobCount) and configurable rotary encoders (what the wheel
@@ -735,7 +737,7 @@ skipReadByMode:
                 // slot and flash its firmware (and vice versa).
                 InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
-                FilesTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
+                FilesTab.Visibility = showFilesTab ? Visibility.Visible : Visibility.Collapsed;
                 RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;
@@ -796,7 +798,7 @@ skipReadByMode:
                     // which doesn't map to any dropdown option → the dropdown
                     // would render empty and look like the value was wiped.
                     var sleepBundle = _plugin!.ActiveWheelSleep;
-                    int sleepMode = sleepBundle?.Mode ?? _data.WheelIdleMode;
+                    int sleepMode = System.Math.Min(sleepBundle?.Mode ?? _data.WheelIdleMode, 1);
                     int sleepTimeoutMin = sleepBundle?.TimeoutMin > 0
                         ? sleepBundle.TimeoutMin
                         : _data.WheelIdleTimeout;
@@ -1117,8 +1119,8 @@ skipReadByMode:
             _data!.WheelIdleSpeed = ms;
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             if (sleep != null) sleep.SpeedMs = ms;
-            int mode = _data.WheelIdleMode;
-            if (mode >= 2)
+            int mode = WheelSleepModeCombo.SelectedIndex;
+            if (mode >= 1)
                 _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
             _plugin.SaveSettings();
         }
@@ -1160,7 +1162,7 @@ skipReadByMode:
         private void UpdateSleepSpeedRowVisibility()
         {
             if (_data == null) return;
-            WheelSleepSpeedRow.Visibility = _data.WheelIdleMode >= 2
+            WheelSleepSpeedRow.Visibility = WheelSleepModeCombo.SelectedIndex >= 1
                 ? Visibility.Visible : Visibility.Collapsed;
         }
 

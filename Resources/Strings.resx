@@ -389,6 +389,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Bias</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Rendering…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby Time</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Idle Dashboard</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Idle in Menus</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minute</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutes</value></data>
@@ -906,5 +908,14 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA Wheelbase Control</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Adjust wheelbase settings from a phone or tablet.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Point {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Prediction</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Clutch Engine Vibration</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Clutch closed</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Fade at bite point</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Below bite point</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Fully released</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylinders</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max frequency (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Idle strength (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Crest strength</value></data>
 </root>

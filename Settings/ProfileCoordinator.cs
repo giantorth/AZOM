@@ -33,7 +33,8 @@ namespace MozaPlugin.Settings
             try
             {
                 var holder = _plugin.DeviceProfiles?.WheelDashboardKeyProfile;
-                if (holder != null)
+                // The idle dashboard is not the profile's pick.
+                if (holder != null && _plugin.IdleDashboards?.WheelEngaged != true)
                 {
                     var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
                     if (cands.Count > 0) holder.TelemetryDashboardKey = cands[0];
@@ -128,6 +129,7 @@ namespace MozaPlugin.Settings
             _plugin._settings = MozaPluginSettings.CreateForNewInstall();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
             _plugin.ApplyStalksSettings();
+            _plugin.LoadBitePointTravel();
             // InitProfileSystem re-pushes the master-mapper defaults from the
             // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();
@@ -443,6 +445,15 @@ namespace MozaPlugin.Settings
         internal void ApplyCm2SavedDashboard(MozaDashProfile? profile)
         {
             if (profile == null) return;
+            ApplyCm2SavedDashboardCore(profile);
+            // The CM2's mappings follow its profile too, and a switch between profiles on
+            // the same dashboard emits no kind=4 — rebind the live channels (wire-neutral).
+            try { _plugin.Cm2Sender?.ReResolveActiveDashboardMappings(onlyIfChanged: true); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] CM2 mapping re-resolve after profile apply failed: " + ex.Message); }
+        }
+
+        private void ApplyCm2SavedDashboardCore(MozaDashProfile profile)
+        {
             if (string.IsNullOrEmpty(profile.TelemetryDashboardKey))
             {
                 // A profile with no pick yet takes the dashboard the CM2 is on, so the
@@ -663,23 +674,36 @@ namespace MozaPlugin.Settings
             }
         }
 
-        /// <summary>Active wheel's dashboard profile name (cache key / builtin name). "" when unset.</summary>
+        /// <summary>The wheel screen's current dashboard name (cache key / builtin name):
+        /// the idle dashboard while one is showing, else the active wheel profile's pick.
+        /// "" when unset. A write is an explicit pick to the profile and ends the idle
+        /// dashboard until the next game.</summary>
         internal string ActiveTelemetryProfileName
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+            get => _plugin.IdleDashboards?.WheelOverrideName
+                   ?? _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryProfileName = value ?? "";
             }
         }
 
-        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none).</summary>
+        /// <summary>The active wheel profile's own dashboard pick, ignoring a showing idle dashboard.</summary>
+        internal string SavedTelemetryProfileName =>
+            _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+
+        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none, and while
+        /// the idle dashboard — always a wheel slot — is showing).</summary>
         internal string ActiveTelemetryMzdashPath
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
+            get => _plugin.IdleDashboards?.WheelEngaged == true
+                ? ""
+                : _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryMzdashPath = value ?? "";
             }

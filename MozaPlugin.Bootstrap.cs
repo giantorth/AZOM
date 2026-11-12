@@ -84,9 +84,11 @@ namespace MozaPlugin
                 _data = new MozaData();
                 _settings = this.ReadCommonSettings<MozaPluginSettings>("MozaPluginSettings",
                     MozaPluginSettings.CreateForNewInstall);
+                LoadBitePointTravel();
                 _fsr1Cm1Mapping = new Fsr1Cm1MappingCoordinator(this);
                 _profileCoordinator = new ProfileCoordinator(this);
                 _deviceProfiles = new DeviceProfileCoordinator(this, _profileCoordinator);
+                _idleDashboards = new IdleDashboardCoordinator(this, _profileCoordinator, _fsr1Cm1Mapping);
                 _channelMapping = new ChannelMappingCoordinator(this);
                 _updateCheck = new UpdateCheckCoordinator(this);
                 _fsr1Probe = new Diagnostics.Fsr1ProbeTool(this);
@@ -220,6 +222,8 @@ namespace MozaPlugin
                     DeviceProfileMigration.ResetCm2DashboardKeys(_settings);
                     _profileCoordinator.PersistSettings();
                 }
+                if (DeviceProfileMigration.MigrateCm2MappingKeys(_settings))
+                    _profileCoordinator.PersistSettings();
 
                 // v1.6 replaced the code-registered "Wheelbase LFE haptics" device
                 // with the per-model wheelbase device's Haptics section. An upgraded

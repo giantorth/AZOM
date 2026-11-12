@@ -365,6 +365,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Sesgo</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Renderizando…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Tiempo de espera</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Tablero fuera de juego</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Mostrar en menús</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED de sincronización</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minuto</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutos</value></data>
@@ -904,5 +906,14 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>Control de la base MOZA</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Ajusta la base desde un móvil o una tableta.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punto {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Predicción</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Vibración del motor en el embrague</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Embrague cerrado</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradual en el punto de mordida</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Bajo el punto de mordida</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Totalmente suelto</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindros</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frecuencia máx. (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensidad en ralentí (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Fuerza en rasantes</value></data>
 </root>

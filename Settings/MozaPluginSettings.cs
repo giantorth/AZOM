@@ -243,6 +243,9 @@ namespace MozaPlugin.Settings
         // Axis for MBoosterBitePointSource.HidAxis; null = none chosen.
         public Protocol.HidAxisSelection? MBoosterBitePointHidAxis { get; set; }
 
+        // Clutch travel times Prediction learns (MBoosterBitePointTravel); null = none yet.
+        public Devices.MBooster.MBoosterBitePointTravelTimes? MBoosterBitePointTravelTimes { get; set; }
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —
@@ -787,6 +790,22 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, int> Cm1ActiveDashboardByGuid { get; set; }
             = new Dictionary<Guid, int>();
 
+        /// <summary>Dashboard shown while no game runs, per device page (wheel page GUID,
+        /// <c>Cm2PageGuid</c>): a dashboard name from that device's list. Per device, not
+        /// per profile. Absent = off. See <c>IdleDashboardCoordinator</c>.</summary>
+        public Dictionary<Guid, string> IdleDashboardByPageGuid { get; set; }
+            = new Dictionary<Guid, string>();
+
+        /// <summary>Index form of <see cref="IdleDashboardByPageGuid"/> for the fixed-page
+        /// screens: FSR V1 (wheel page GUID, 0..18) and CM1 (<c>Cm1PageGuid</c>, 1-based).</summary>
+        public Dictionary<Guid, int> IdleDashboardIndexByPageGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
+        /// <summary>Pages whose idle dashboard also shows in game while not driving
+        /// (paused, menus, replay, spectating). Absent = only when no game runs.</summary>
+        public Dictionary<Guid, bool> IdleDashboardWhenNotDrivingByPageGuid { get; set; }
+            = new Dictionary<Guid, bool>();
+
         // --- MOZA Multi-Function Stalks: truck-sim keyboard emulation ---
 
         /// <summary>Stalks operating mode. <see cref="StalkMode.ButtonBox"/> = the plugin
@@ -811,7 +830,10 @@ namespace MozaPlugin.Settings
     /// </summary>
     public sealed class WheelSleepSettings
     {
-        public int Mode { get; set; } = -1;          // cmd 0x20 mode enum
+        // cmd 0x20: 0 = Off, 1 = Breathing. Older builds stored 2-6, which the
+        // wheel never keeps (reads back 1), so those load as Breathing.
+        private int _mode = -1;
+        public int Mode { get => _mode; set => _mode = value > 1 ? 1 : value; }
         public int TimeoutMin { get; set; } = -1;    // cmd 0x21 BE u16 minutes
         public int SpeedMs { get; set; } = -1;       // cmd 0x22 BE u16 ms
         public int[]? Color { get; set; }            // packed R<<16|G<<8|B (single)

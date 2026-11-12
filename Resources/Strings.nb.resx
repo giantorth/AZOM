@@ -365,6 +365,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Forskyvning</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Gjengir…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-tid</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Dashboard utenfor spill</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Vis i menyer</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Synk-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minutt</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutter</value></data>
@@ -904,5 +906,14 @@ Id: {2}</value></data>
   <data name="ControlDash_Title" xml:space="preserve"><value>MOZA basestyring</value></data>
   <data name="ControlDash_Description" xml:space="preserve"><value>Juster baseinnstillingene fra mobil eller nettbrett.</value></data>
   <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punkt {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Forutsigelse</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Motorvibrasjon i clutch</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Clutch lukket</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradvis ved bitepunktet</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under bitepunktet</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Helt sluppet</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Sylindere</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Styrke over bakketopper</value></data>
 </root>

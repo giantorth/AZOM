@@ -11,9 +11,19 @@ using SimHub.Plugins.UI;
 
 namespace MozaPlugin.Integration
 {
+    /// <summary>A ShakeIt effect that works from the clutch bite point.</summary>
+    internal interface IClutchBitePointSettings
+    {
+        /// <summary>Use the current game's calibrated bite point when one exists.</summary>
+        bool UseCalibratedBitePoint { get; set; }
+
+        /// <summary>Manual bite point, clutch position 0..100.</summary>
+        int TriggerLevelPct { get; set; }
+    }
+
     /// <summary>
     /// Clutch source, calibration, Calibrated/Manual picker and Trigger Input
-    /// Level for the ShakeIt Clutch Bite Point editor — the same plugin state the
+    /// Level for the ShakeIt clutch effect editors — the same plugin state the
     /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). Trigger Input
     /// Level shows the calibrated value read-only while it is in use, else the
     /// effect's editable fallback. Polls while on screen.
@@ -50,10 +60,10 @@ namespace MozaPlugin.Integration
         private readonly ComboBox _useCalibrated = new ComboBox { MinWidth = 140, Margin = new Thickness(8, 0, 0, 0) };
         private readonly StackPanel _useCalibratedRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
         private readonly TitledSlider _trigger;
-        private readonly MozaClutchBitePointContainer _effect;
+        private readonly IClutchBitePointSettings _effect;
         private bool _refreshing;
 
-        public MozaClutchBitePointCalibrationView(MozaClutchBitePointContainer effect)
+        public MozaClutchBitePointCalibrationView(IClutchBitePointSettings effect)
         {
             _effect = effect;
             var header = new Grid { Margin = new Thickness(0, 0, 0, 2) };

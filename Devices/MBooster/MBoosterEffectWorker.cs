@@ -1289,6 +1289,7 @@ namespace MozaPlugin.Devices.MBooster
             int maxMs = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs, Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs,
                 effects?.BitePoint?.BitePointMaxLengthMs ?? MBoosterUiConstants.BitePointMaxLengthDefaultMs));
             var direction = effects?.BitePoint?.BitePointDirection ?? MBoosterBitePointDirection.Both;
+            bool predict = effects?.BitePoint?.BitePointPredict ?? false;
             long now = Stopwatch.GetTimestamp();
 
             double sourcePos = snap.BitePointUsesOwnPedal ? PedalHid()
@@ -1308,7 +1309,7 @@ namespace MozaPlugin.Devices.MBooster
             // shared with the real path below since only one runs per tick.
             if (TestOn(MBoosterTestEffect.BitePoint))
             {
-                if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, now))
+                if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, predict, now))
                 {
                     st.IntensityRequest = 0;
                     st.FreqHz = 0;
@@ -1340,7 +1341,7 @@ namespace MozaPlugin.Devices.MBooster
                 return;
             }
 
-            if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, now))
+            if (!_bitePointTrigger.Update(pedalPos, triggerLevel, width01, minMs / 1000.0, maxMs / 1000.0, direction, predict, now))
             {
                 st.IntensityRequest = 0;
                 st.FreqHz = 0;

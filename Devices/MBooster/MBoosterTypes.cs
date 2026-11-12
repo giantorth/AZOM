@@ -365,6 +365,10 @@ namespace MozaPlugin.Devices.MBooster
         public int BitePointMinLengthMs { get; set; } = MBoosterUiConstants.BitePointMinLengthDefaultMs;
         public int BitePointMaxLengthMs { get; set; } = MBoosterUiConstants.BitePointMaxLengthDefaultMs;
 
+        // Bite Point-only: fire ahead of a fast clutch after a touch
+        // (MBoosterBitePointTrigger).
+        public bool BitePointPredict { get; set; }
+
         // Bite Point-only: Smoothness ripple rate, Hz (MBoosterUiConstants
         // .BitePointPulseRateMinHz/MaxHz). Null = never set: derived from
         // FrequencyHz the way the ripple always played
@@ -441,6 +445,7 @@ namespace MozaPlugin.Devices.MBooster
                 BitePointWidthPct = BitePointWidthPct,
                 BitePointMinLengthMs = BitePointMinLengthMs,
                 BitePointMaxLengthMs = BitePointMaxLengthMs,
+                BitePointPredict = BitePointPredict,
                 BitePointPulseRateHz = BitePointPulseRateHz,
                 BitePointDirection = BitePointDirection,
                 DecayPct = DecayPct,

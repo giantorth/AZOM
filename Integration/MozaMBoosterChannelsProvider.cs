@@ -52,8 +52,8 @@ namespace MozaPlugin.Integration
             if (effectsContainerBase.EffectsAggregates.Any(i => i.Key == "Mono"))
                 effectsContainerBase.AggregationMode = "Mono";
 
-            // Bite Point is a clutch effect, as on the plugin tab.
-            if (effectsContainerBase is MozaClutchBitePointContainer)
+            // The clutch effects play on the clutch pedal, as Bite Point does on the plugin tab.
+            if (effectsContainerBase is MozaClutchBitePointContainer || effectsContainerBase is MozaClutchEngineContainer)
                 SeedSingleChannel(effectsContainerBase, MBoosterDeviceController.RoleIndexOf(MBoosterRole.Clutch));
         }
 
