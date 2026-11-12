@@ -34,7 +34,7 @@ namespace MozaPlugin.Devices.Motion
         private const int StaleFrameMs = 500;
         private const int SelfCheckTimeoutMs = 30_000;
         private const int GameEntryTimeoutMs = 15_000;
-        private const int GameLossToleranceMs = 1_500;
+        private const int ModeLossToleranceMs = 1_500;
         private const int PortSelfTestTimeoutMs = 40_000;
         private const int LogRingSize = 200;
         private const int EnrolReadSpacingMs = 15;
@@ -118,7 +118,7 @@ namespace MozaPlugin.Devices.Motion
         private long _lastHeartbeatMs = -HeartbeatMs;
         private long _lastPortPollMs = -PortPollMs;
         private long _nextFrameMs;
-        private long _gameLostSinceMs = -1;
+        private long _modeLostSinceMs = -1;
         private long _framesSent;
         private bool _vibrating;
         private int _frameIntervalMs = 30;
@@ -533,7 +533,8 @@ namespace MozaPlugin.Devices.Motion
                 if (_wasConnected)
                 {
                     _wasConnected = false;
-                    bool streaming = _phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame;
+                    bool streaming = _phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame
+                        || _phase == MotionLanePhase.ManualTest;
                     _sequence = null;
                     ResetDeviceState();
                     _phase = MotionLanePhase.Disconnected;
@@ -625,7 +626,9 @@ namespace MozaPlugin.Devices.Motion
             if (_phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame)
                 StreamTick(now);
             if (_phase == MotionLanePhase.Game)
-                WatchGameMode(now);
+                WatchMode(now, MotionMode.Game, "game");
+            else if (_phase == MotionLanePhase.ManualTest && _manualDriven && _sequence == null)
+                WatchMode(now, MotionMode.ManualTest, "manual");
             // SimHub's Manual control or Hop-in went on or off: swap game mode for manual mode and back.
             if (_sequence == null)
             {
@@ -729,12 +732,12 @@ namespace MozaPlugin.Devices.Motion
                 MozaMotionProtocol.BuildEngineVibrationSilent());
         }
 
-        private void WatchGameMode(long now)
+        private void WatchMode(long now, MotionMode mode, string name)
         {
-            if (_modeCurrent == (int)MotionMode.Game) { _gameLostSinceMs = -1; return; }
-            if (_gameLostSinceMs < 0) { _gameLostSinceMs = now; return; }
-            if (now - _gameLostSinceMs > GameLossToleranceMs)
-                Fault($"controller left game mode (mode {_modeCurrent}, flags 0x{_flags:X2}{ErrorSuffix()})");
+            if (_modeCurrent == (int)mode) { _modeLostSinceMs = -1; return; }
+            if (_modeLostSinceMs < 0) { _modeLostSinceMs = now; return; }
+            if (now - _modeLostSinceMs > ModeLossToleranceMs)
+                Fault($"controller left {name} mode (mode {_modeCurrent}, flags 0x{_flags:X2}{ErrorSuffix()})");
         }
 
         private string ErrorSuffix()
@@ -789,7 +792,7 @@ namespace MozaPlugin.Devices.Motion
             while (_paced.TryDequeue(out _)) { }
             _activeErrors.Clear();
             _logPartial.Clear();
-            _gameLostSinceMs = -1;
+            _modeLostSinceMs = -1;
             _manualDriven = false;
         }
 
@@ -942,7 +945,7 @@ namespace MozaPlugin.Devices.Motion
                 yield return 33;
             }
             if (!runSent) SendRunState(MotionRunState.Run);
-            _gameLostSinceMs = -1;
+            _modeLostSinceMs = -1;
             _phase = MotionLanePhase.Game;
             MozaLog.Info("[AZOM/Motion] Game mode");
         }
@@ -1015,6 +1018,16 @@ namespace MozaPlugin.Devices.Motion
         /// </summary>
         private IEnumerator<int> ManualTestSequence(bool fromGame)
         {
+            // Same port-setup gate as EngageSequence; from game mode it already passed.
+            if (!fromGame)
+            {
+                var issues = CurrentIssues();
+                if (issues.Count > 0)
+                {
+                    Fault("configuration: " + string.Join("; ", issues));
+                    yield break;
+                }
+            }
             _phase = MotionLanePhase.ManualTest;
             Array.Clear(_manualSent, 0, _manualSent.Length);
             _nextManualMs = 0;
@@ -1066,6 +1079,7 @@ namespace MozaPlugin.Devices.Motion
                 }
                 yield return 50;
             }
+            _modeLostSinceMs = -1;
             MozaLog.Info("[AZOM/Motion] Manual mode (SimHub Manual control / Hop-in)");
         }
 
@@ -1269,7 +1283,7 @@ namespace MozaPlugin.Devices.Motion
             var phase = _phase;
             if (_connection.IsConnected
                 && (phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
-                    || phase == MotionLanePhase.SelfChecking))
+                    || phase == MotionLanePhase.SelfChecking || phase == MotionLanePhase.ManualTest))
             {
                 try
                 {

@@ -26,6 +26,7 @@ namespace MozaPlugin.Integration.Motion
     {
         private MozaHma150Source _source;
         private bool _includeCornerHaptics = true;
+        private bool _slowManualControl = true;
 
         public MozaHma150Source Source
         {
@@ -55,12 +56,19 @@ namespace MozaPlugin.Integration.Motion
         }
 
         /// <summary>
-        /// While SimHub's Manual control (or its automated test cycles) or Hop-in position moves the
-        /// platform, leave game mode for the controller's Manual Motion Test (mode 2, <c>0x1E/07</c>
-        /// setpoints), which ramps slowly to each target as Motion Manager's own test does and holds
-        /// heave. On by default.
+        /// While SimHub's Manual control or Hop-in position moves the platform, use the controller's
+        /// Manual Motion Test (mode 2, <c>0x1E/07</c> setpoints) instead of game mode.
         /// </summary>
-        public bool SlowManualControl { get; set; } = true;
+        public bool SlowManualControl
+        {
+            get => _slowManualControl;
+            set
+            {
+                if (_slowManualControl == value) return;
+                _slowManualControl = value;
+                Output?.ApplySettings();
+            }
+        }
     }
 
     /// <summary>
