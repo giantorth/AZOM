@@ -802,6 +802,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Deteniendo</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Autoprueba de puertos</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Fallo</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>Prueba de movimiento manual</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>Usar el modo manual lento del controlador para el control manual y la posición Hop-in de SimHub</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion no está activado</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>Hay un MOZA Motion Controller conectado, pero el plugin Motion de SimHub no está activado. Actívalo en Settings &gt; Plugins y luego añade el controlador MOZA HMA150 en Motion.</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 no añadido en SimHub Motion</value></data>

@@ -151,6 +151,13 @@ namespace MozaPlugin.Integration.Motion
             var settings = _output?.Settings;
             SourceCombo.IsEnabled = settings != null;
             SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            SlowManualCheck.IsEnabled = settings != null;
+            SlowManualCheck.IsChecked = settings?.SlowManualControl ?? true;
+            SlowManualCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.SlowManualControl = SlowManualCheck.IsChecked == true;
+            };
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
             SyncCrestSlider();
             UpdateCornerHapticsEnabled();
@@ -406,6 +413,7 @@ namespace MozaPlugin.Integration.Motion
             MotionLanePhase.Disengaging => Strings.Motion_Phase_Disengaging,
             MotionLanePhase.PortSelfTest => Strings.Motion_Phase_PortSelfTest,
             MotionLanePhase.Faulted => Strings.Motion_Phase_Faulted,
+            MotionLanePhase.ManualTest => Strings.Motion_Phase_ManualTest,
             _ => phase.ToString(),
         };
     }

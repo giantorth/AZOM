@@ -14,6 +14,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
 - **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
+- **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
 
 ## Changed
 

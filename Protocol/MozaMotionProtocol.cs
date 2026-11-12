@@ -102,6 +102,7 @@ namespace MozaPlugin.Protocol
         public const byte CmdGlobal = 0x04;
         public const byte CmdEffectSlot = 0x05;
         public const byte CmdRoadDetail = 0x06;
+        public const byte CmdManualSetpoint = 0x07;
         public const byte CmdRigDimensions = 0x08;
         public const byte CmdDeviceType = 0x0A;
         public const byte CmdLighting = 0x0B;
@@ -119,6 +120,9 @@ namespace MozaPlugin.Protocol
         /// <summary>Effect slots MM writes on this platform.</summary>
         public const byte SlotPitch = 0x00, SlotRoll = 0x01, SlotHeave = 0x03, SlotAccelPitch = 0x07, SlotAccelRoll = 0x08;
         public static readonly byte[] EffectSlots = { SlotPitch, SlotRoll, SlotHeave, SlotAccelPitch, SlotAccelRoll };
+
+        /// <summary>Manual Motion Test axes (<c>0x1E/07</c>); <c>02</c> is never sent on this platform.</summary>
+        public const byte ManualAxisPitch = 0x00, ManualAxisRoll = 0x01, ManualAxisHeave = 0x03;
 
         // Mode-poll / controller-status flag byte.
         public const byte FlagSelfCheckRunning = 0x80;
@@ -233,6 +237,20 @@ namespace MozaPlugin.Protocol
         /// </summary>
         public static byte[] BuildEffectSlotRead(byte slot)
             => Build(GroupRead, DeviceController, CmdEffectSlot, slot, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        /// <summary>
+        /// Manual Motion Test setpoint, mode 2 only: <c>1E 12 07 [axis] [f32 −1..+1]</c>, e.g. pitch
+        /// +100 % <c>7E 06 1E 12 07 00 3F800000</c>, echoed on <c>9E 21</c>. Motion Manager sends one
+        /// per slider release (Zero = 0.0); the controller ramps to the new position itself.
+        /// </summary>
+        public static byte[] BuildManualSetpoint(byte axis, float value)
+        {
+            var p = new byte[6];
+            p[0] = CmdManualSetpoint;
+            p[1] = axis;
+            PutF32(p, 2, Math.Max(-1f, Math.Min(1f, value)));
+            return Build(GroupWrite, DeviceController, p);
+        }
 
         /// <summary><c>7e091f12060000000000000000cb</c> → <c>9F 21 06 [f32][f32]</c>.</summary>
         public static byte[] BuildRoadDetailRead()

@@ -797,6 +797,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>正在停止</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>端口自检</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>故障</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>手动运动测试</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>SimHub 手动控制和 Hop-in 位置使用控制器的慢速手动模式</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion 未启用</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>已连接 MOZA Motion Controller，但 SimHub 的 Motion 插件未启用。请在 Settings &gt; Plugins 中启用它，然后在 Motion 中添加 MOZA HMA150 控制器。</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>未在 SimHub Motion 中添加 MOZA HMA150</value></data>

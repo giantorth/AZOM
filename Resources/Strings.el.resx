@@ -796,6 +796,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Διακοπή</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Αυτοέλεγχος θυρών</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Σφάλμα</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>Χειροκίνητη δοκιμή κίνησης</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>Χρήση της αργής χειροκίνητης λειτουργίας του ελεγκτή για τον χειροκίνητο έλεγχο και τη θέση Hop-in του SimHub</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>Το SimHub Motion δεν είναι ενεργοποιημένο</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>Ένας MOZA Motion Controller είναι συνδεδεμένος, αλλά το πρόσθετο Motion του SimHub δεν είναι ενεργοποιημένο. Ενεργοποιήστε το στο Settings &gt; Plugins και, στη συνέχεια, προσθέστε τον ελεγκτή MOZA HMA150 στο Motion.</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>Το MOZA HMA150 δεν έχει προστεθεί στο SimHub Motion</value></data>

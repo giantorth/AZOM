@@ -787,6 +787,8 @@
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Sit</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Fetch Fetch</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Grrr!</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>Woof Bark Grr</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Woof Grr Bark</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>MOZA Woof Bark Grr Arf Yip Rrrf Boof Snarf Howl Woof Bark!</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 Woof Grr SimHub Bark</value></data>
