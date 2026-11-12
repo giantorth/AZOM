@@ -361,6 +361,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Отрисовка…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Время ожидания</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Панель вне игры</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Показывать в меню</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Индикатор синхр.</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 минута</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 минуты</value></data>

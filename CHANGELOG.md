@@ -11,7 +11,7 @@ All notable changes to the AZOM plugin are documented here.
 - **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
 - **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed.
 - **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
-- **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs, saved per device, and the profile's dashboard returns when a game starts.
+- **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
 
 ## Changed
 

@@ -134,7 +134,7 @@ namespace MozaPlugin.Telemetry
             // agreement on the frozen page for the probe's lifetime.
             int frozen = _plugin.Fsr1Probe.FrozenIndex;
             if (frozen >= 0) return frozen;
-            // The idle page while no game runs; the stored page is the in-game pick.
+            // The idle page while idle; the stored page is the driving pick.
             int idle = _plugin.IdleDashboards?.Fsr1OverrideIndex ?? -1;
             if (idle >= 0) return idle;
             return RawActiveFsr1Index();

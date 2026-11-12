@@ -409,7 +409,7 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex;
                     for (int i = min; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i}");
-                    // The stored pick, not an idle page showing out of game.
+                    // The stored pick, not an idle page showing.
                     int active = _plugin.GetStoredCm1Index();
                     int idx = active - min;
                     TelemetryProfileList.SelectedIndex = (idx >= 0 && idx < TelemetryProfileList.Items.Count) ? idx : 0;
@@ -434,7 +434,7 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
                     for (int i = 0; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i + 1}");
-                    // The stored pick, not an idle page showing out of game.
+                    // The stored pick, not an idle page showing.
                     int active = (_plugin.IdleDashboards?.Fsr1OverrideIndex ?? -1) >= 0
                         ? _plugin.GetStoredFsr1Index()
                         : _plugin.GetActiveFsr1Index();
@@ -479,7 +479,7 @@ namespace MozaPlugin.Devices.Ui
                 // never writes device switches to the saved name); otherwise the saved
                 // name, so a fresh pick doesn't snap back to the pre-switch dash
                 // before the echo lands; the stale reported slot as last resort.
-                // The profile's own pick: while an idle dashboard shows out of game, the
+                // The profile's own pick: while an idle dashboard shows, the
                 // list keeps the profile's selection rather than the screen's.
                 string? savedName = IsCm2Target ? _plugin.SavedCm2DashboardName : _plugin.SavedTelemetryProfileName;
                 bool idleShowing = IsCm2Target
@@ -892,6 +892,12 @@ namespace MozaPlugin.Devices.Ui
                 }
             }
 
+            using (_suppressor.Begin())
+            {
+                IdleWhenNotDrivingToggle.IsChecked = page.HasValue && idle.WhenNotDriving(page.Value);
+                IdleWhenNotDrivingToggle.IsEnabled = page.HasValue && selectedTag != null;
+            }
+
             string sig = $"{page}|{byIndex}|{selectedTag}|" + string.Join("\n", items.Select(t => t.Tag));
             if (sig == _idleComboSignature) return;
             _idleComboSignature = sig;
@@ -917,9 +923,19 @@ namespace MozaPlugin.Devices.Ui
             var (page, byIndex) = IdleTarget();
             if (!page.HasValue) return;
             var tag = (IdleDashboardCombo.SelectedItem as ComboBoxItem)?.Tag;
-            // Switches now only when no game runs; in game it waits for the game to end.
+            // Switches now only while idle; otherwise it waits for idle.
             if (byIndex) idle.SetIdleIndex(page.Value, tag is int i ? i : -1);
             else idle.SetIdleName(page.Value, tag as string);
+            IdleWhenNotDrivingToggle.IsEnabled = tag != null;
+        }
+
+        private void IdleWhenNotDrivingToggle_Click(object sender, RoutedEventArgs e)
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_suppressEvents || idle == null) return;
+            var (page, _) = IdleTarget();
+            if (!page.HasValue) return;
+            idle.SetWhenNotDriving(page.Value, IdleWhenNotDrivingToggle.IsChecked == true);
         }
 
         // VGS display-rotation mode (0=off, 1=smooth, 2=immediate). Wheel-only

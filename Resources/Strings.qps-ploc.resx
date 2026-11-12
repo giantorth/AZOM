@@ -388,6 +388,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Sniff sniff…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Awoo!</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Yip yip!</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Yip awoo!</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Yip!</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>Boof!</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>Howl!</value></data>

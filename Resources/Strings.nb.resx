@@ -366,6 +366,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Gjengir…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-tid</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Dashboard utenfor spill</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Vis i menyer</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Synk-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minutt</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutter</value></data>

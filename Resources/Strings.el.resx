@@ -361,6 +361,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Απόδοση…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Χρόνος Αναμονής</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Οθόνη εκτός παιχνιδιού</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Εμφάνιση σε μενού</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED συγχρονισμού</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 λεπτό</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 λεπτά</value></data>

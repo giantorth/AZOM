@@ -390,6 +390,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Rendering…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby Time</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Idle Dashboard</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Idle in Menus</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minute</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minutes</value></data>

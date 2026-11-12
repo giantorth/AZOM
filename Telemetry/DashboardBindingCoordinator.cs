@@ -559,7 +559,7 @@ namespace MozaPlugin.Telemetry
             ClearDeferReason();
             if (hold == IdleDashboardCoordinator.Hold.Held)
             {
-                MozaLog.Info($"[AZOM] Profile dashboard {key} held — idle dashboard showing while no game runs");
+                MozaLog.Info($"[AZOM] Profile dashboard {key} held — idle dashboard showing");
                 return true;
             }
             _plugin.ChannelMapping.MigrateLegacyWheelKeys();
@@ -778,7 +778,7 @@ namespace MozaPlugin.Telemetry
             ClearDeferReason();
             if (hold == IdleDashboardCoordinator.Hold.Held)
             {
-                MozaLog.Info($"[AZOM] CM2 profile dashboard {key} held — idle dashboard showing while no game runs");
+                MozaLog.Info($"[AZOM] CM2 profile dashboard {key} held — idle dashboard showing");
                 return true;
             }
 

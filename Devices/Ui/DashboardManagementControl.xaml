@@ -297,6 +297,11 @@
                             <ComboBox x:Name="IdleDashboardCombo" Width="140"
                                       SelectionChanged="IdleDashboardCombo_Changed"/>
                         </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,4">
+                            <TextBlock Text="{x:Static res:Strings.SliderLabel_IdleWhenNotDriving}" Style="{StaticResource SliderLabel}"/>
+                            <ctrl:OffOnToggle x:Name="IdleWhenNotDrivingToggle" VerticalAlignment="Center"
+                                              Click="IdleWhenNotDrivingToggle_Click"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </StackPanel>
