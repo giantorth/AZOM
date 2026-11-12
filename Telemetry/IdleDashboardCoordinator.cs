@@ -7,22 +7,26 @@ using MozaPlugin.Settings;
 namespace MozaPlugin.Telemetry
 {
     /// <summary>
-    /// Idle dashboard: a per-device dashboard shown while no game runs, stored per
+    /// Idle dashboard: a per-device dashboard shown while no game runs (optionally also
+    /// in game while not driving: paused, menus, replay, spectating), stored per
     /// device page (<see cref="MozaPluginSettings.IdleDashboardByPageGuid"/> /
-    /// <see cref="MozaPluginSettings.IdleDashboardIndexByPageGuid"/>), never on a profile.
+    /// <see cref="MozaPluginSettings.IdleDashboardIndexByPageGuid"/> /
+    /// <see cref="MozaPluginSettings.IdleDashboardWhenNotDrivingByPageGuid"/>), never on
+    /// a profile.
     ///
     /// <para>One lane per screen: the tier-def wheel, the CM2, the FSR V1 wheel and the
-    /// CM1. Out of game a lane is "engaged": the current-pick getters
+    /// CM1. While idle a lane is "engaged": the current-pick getters
     /// (<c>ActiveTelemetryProfileName</c>, <c>ActiveCm2DashboardName</c>,
     /// <c>GetActiveFsr1Index</c>, <c>GetActiveCm1Index</c>) return the idle pick, so
     /// channel mappings, the dashboard list and the re-asserts follow the screen, while
     /// the profile's own pick stays untouched. Profile applies arriving while engaged are
-    /// held (<see cref="HoldWheel"/> / <see cref="HoldCm2"/>). When a game starts the
-    /// lane disengages and the profile's pick is re-applied.</para>
+    /// held (<see cref="HoldWheel"/> / <see cref="HoldCm2"/>). When idle ends (game
+    /// starts, or driving resumes) the lane disengages and the profile's pick is
+    /// re-applied.</para>
     ///
     /// <para>An explicit pick while engaged (dashboard list, cycle action, a switch made
-    /// on the device) is a normal profile pick: the lane stands down until the next
-    /// game session ends.</para>
+    /// on the device) is a normal profile pick: the lane stands down until idle
+    /// ends.</para>
     /// </summary>
     internal sealed class IdleDashboardCoordinator
     {
@@ -67,8 +71,14 @@ namespace MozaPlugin.Telemetry
         private long _fsr1EchoUntilTicks, _cm1EchoUntilTicks;
         private static readonly long EchoWindowTicks = TimeSpan.FromSeconds(15).Ticks;
 
-        private bool _lastGameActive;
         private int _tickQueued;
+
+        // Not-driving clock from DataUpdate (0 = driving or no game). Settled after
+        // NotDrivingSettleTicks so a brief menu/pause flag doesn't swap dashboards.
+        private long _notDrivingSinceTicks;
+        private int _notDrivingTickSent;
+        private bool _lastGameRunning; // DataUpdate thread only
+        private static readonly long NotDrivingSettleTicks = TimeSpan.FromSeconds(3).Ticks;
 
         // IsGameActive reads false until the first DataUpdate stamps the feed, so right
         // after Init (a reload mid-game included) "no game" can't be trusted yet.
@@ -108,7 +118,7 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>Save a tier-def screen's idle dashboard (null = off). Takes effect at
-        /// once out of game; in game it waits for the game to end.</summary>
+        /// once while idle; otherwise it waits for idle.</summary>
         internal void SetIdleName(Guid page, string? name)
         {
             var s = _plugin.Settings;
@@ -126,6 +136,34 @@ namespace MozaPlugin.Telemetry
             if (page == MozaPlugin.Cm2PageGuid) _cm2Yielded = false;
             else _wheelYielded = false;
             MozaLog.Info($"[AZOM] Idle dashboard ({Describe(page)}) set to {(string.IsNullOrEmpty(name) ? "off" : "'" + name + "'")}");
+            _plugin.PersistSettings();
+            RequestTick();
+        }
+
+        internal bool WhenNotDriving(Guid page)
+        {
+            var d = _plugin.Settings?.IdleDashboardWhenNotDrivingByPageGuid;
+            return d != null && d.TryGetValue(page, out var v) && v;
+        }
+
+        /// <summary>Also show the page's idle dashboard in game while not driving.</summary>
+        internal void SetWhenNotDriving(Guid page, bool on)
+        {
+            var s = _plugin.Settings;
+            if (s == null) return;
+            lock (_settingsLock)
+            {
+                var next = s.IdleDashboardWhenNotDrivingByPageGuid == null
+                    ? new Dictionary<Guid, bool>()
+                    : new Dictionary<Guid, bool>(s.IdleDashboardWhenNotDrivingByPageGuid);
+                if (on) next[page] = true;
+                else next.Remove(page);
+                s.IdleDashboardWhenNotDrivingByPageGuid = next;
+            }
+            if (page == MozaPlugin.Cm2PageGuid) _cm2Yielded = false;
+            else if (page == MozaPlugin.Cm1PageGuid) _cm1Yielded = false;
+            else _wheelYielded = _fsr1Yielded = false;
+            MozaLog.Info($"[AZOM] Idle dashboard ({Describe(page)}) when not driving: {(on ? "on" : "off")}");
             _plugin.PersistSettings();
             RequestTick();
         }
@@ -191,7 +229,7 @@ namespace MozaPlugin.Telemetry
             if (_wheel == null) return;
             _wheel = null;
             _wheelYielded = true;
-            MozaLog.Info("[AZOM] Idle dashboard (wheel): dashboard picked — standing down until the next game ends");
+            MozaLog.Info("[AZOM] Idle dashboard (wheel): dashboard picked — standing down until idle ends");
         }
 
         internal void YieldCm2()
@@ -200,7 +238,7 @@ namespace MozaPlugin.Telemetry
             if (_cm2 == null) return;
             _cm2 = null;
             _cm2Yielded = true;
-            MozaLog.Info("[AZOM] Idle dashboard (CM2): dashboard picked — standing down until the next game ends");
+            MozaLog.Info("[AZOM] Idle dashboard (CM2): dashboard picked — standing down until idle ends");
         }
 
         /// <summary>Returns true when the idle page was showing, so the caller must send
@@ -210,7 +248,7 @@ namespace MozaPlugin.Telemetry
             if (_fsr1 == null) return false;
             _fsr1 = null;
             _fsr1Yielded = true;
-            MozaLog.Info("[AZOM] Idle dashboard (FSR1): page picked — standing down until the next game ends");
+            MozaLog.Info("[AZOM] Idle dashboard (FSR1): page picked — standing down until idle ends");
             return true;
         }
 
@@ -219,7 +257,7 @@ namespace MozaPlugin.Telemetry
             if (_cm1 < 0) return false;
             _cm1 = -1;
             _cm1Yielded = true;
-            MozaLog.Info("[AZOM] Idle dashboard (CM1): page picked — standing down until the next game ends");
+            MozaLog.Info("[AZOM] Idle dashboard (CM1): page picked — standing down until idle ends");
             return true;
         }
 
@@ -247,7 +285,7 @@ namespace MozaPlugin.Telemetry
             string? name = IdleName(page.Value);
             if (name == null) return Hold.Proceed;
             if (!GameStateKnown) return Hold.Defer;
-            if (_plugin.IsGameActive) return Hold.Proceed;
+            if (!LaneIdle(page.Value)) return Hold.Proceed;
             lock (_tickLock) return EngageWheel(page.Value, name) ? Hold.Held : Hold.Proceed;
         }
 
@@ -258,7 +296,7 @@ namespace MozaPlugin.Telemetry
             string? name = IdleName(MozaPlugin.Cm2PageGuid);
             if (name == null) return Hold.Proceed;
             if (!GameStateKnown) return Hold.Defer;
-            if (_plugin.IsGameActive) return Hold.Proceed;
+            if (!LaneIdle(MozaPlugin.Cm2PageGuid)) return Hold.Proceed;
             lock (_tickLock) return EngageCm2(name) ? Hold.Held : Hold.Proceed;
         }
 
@@ -282,27 +320,67 @@ namespace MozaPlugin.Telemetry
             });
         }
 
-        /// <summary>PollStatus: engage out of game, disengage and restore in game.</summary>
+        /// <summary>
+        /// DataUpdate: the game-start edge and the not-driving clock. A game that starts
+        /// in its menus counts as not driving at once, so the idle dashboard doesn't
+        /// drop and come back.
+        /// </summary>
+        internal void NoteGameData(bool gameRunning, bool driving)
+        {
+            bool started = gameRunning && !_lastGameRunning;
+            _lastGameRunning = gameRunning;
+            bool tick = started;
+            if (!gameRunning || driving)
+            {
+                Interlocked.Exchange(ref _notDrivingSinceTicks, 0);
+                // Back to driving after a settled stop: swap now, not on the next poll.
+                if (Interlocked.Exchange(ref _notDrivingTickSent, 0) != 0) tick = true;
+            }
+            else
+            {
+                long now = DateTime.UtcNow.Ticks;
+                long since = Interlocked.Read(ref _notDrivingSinceTicks);
+                if (since == 0)
+                {
+                    since = started ? now - NotDrivingSettleTicks : now;
+                    Interlocked.Exchange(ref _notDrivingSinceTicks, since);
+                }
+                if (now - since >= NotDrivingSettleTicks && Interlocked.Exchange(ref _notDrivingTickSent, 1) == 0)
+                    tick = true;
+            }
+            if (tick) RequestTick();
+        }
+
+        private bool NotDriving
+        {
+            get
+            {
+                long since = Interlocked.Read(ref _notDrivingSinceTicks);
+                return since != 0 && DateTime.UtcNow.Ticks - since >= NotDrivingSettleTicks;
+            }
+        }
+
+        /// <summary>The page's idle dashboard applies now: no game, or (when enabled) in
+        /// game but not driving.</summary>
+        private bool LaneIdle(Guid page) =>
+            !_plugin.IsGameActive || (NotDriving && WhenNotDriving(page));
+
+        /// <summary>PollStatus: engage while idle, disengage and restore otherwise.</summary>
         internal void Tick()
         {
             if (MozaPlugin.IsShuttingDown || !GameStateKnown) return;
             lock (_tickLock)
             {
-                bool game = _plugin.IsGameActive;
-                if (game && !_lastGameActive)
-                    _wheelYielded = _cm2Yielded = _fsr1Yielded = _cm1Yielded = false;
-                _lastGameActive = game;
-
-                TickWheel(game);
-                TickCm2(game);
-                TickFsr1(game);
-                TickCm1(game);
+                TickWheel();
+                TickCm2();
+                TickFsr1();
+                TickCm1();
             }
         }
 
         // ----- Wheel (tier-def) -----
 
-        private void TickWheel(bool game)
+        private void TickWheel()
         {
             var page = _plugin.GetCurrentWheelPageGuid();
             var eng = _wheel;
@@ -313,9 +391,12 @@ namespace MozaPlugin.Telemetry
                 _wheel = eng = null;
                 _wheelRestorePending = false;
             }
+            bool idle = LaneIdle(page.Value);
+            // An explicit pick holds until the lane next leaves idle.
+            if (!idle) _wheelYielded = false;
             if (!_plugin.ShouldDriveDashboard() || _plugin.IsFsr1DisplayWheel) return;
 
-            string? want = !game && !_wheelYielded ? IdleName(page.Value) : null;
+            string? want = idle && !_wheelYielded ? IdleName(page.Value) : null;
             if (want != null)
             {
                 EngageWheel(page.Value, want);
@@ -325,7 +406,7 @@ namespace MozaPlugin.Telemetry
             {
                 _wheel = null;
                 _wheelRestorePending = true;
-                MozaLog.Info($"[AZOM] Idle dashboard (wheel): '{eng.Name}' released ({(game ? "game running" : "turned off")})");
+                MozaLog.Info($"[AZOM] Idle dashboard (wheel): '{eng.Name}' released ({(idle ? "turned off" : "in game")})");
             }
             if (_wheelRestorePending) RestoreWheel();
         }
@@ -386,7 +467,7 @@ namespace MozaPlugin.Telemetry
             }
             // The profile pick is no longer on screen; let its re-apply switch back.
             bindings.ForgetLastAppliedDashboardKey();
-            MozaLog.Info($"[AZOM] Idle dashboard (wheel): showing '{slotName}' (slot {slot}) while no game runs"
+            MozaLog.Info($"[AZOM] Idle dashboard (wheel): showing '{slotName}' (slot {slot}) while idle"
                          + (bound ? " — already on it" : ""));
             _plugin.RaiseDashboardSelectionChangedInternal();
             return true;
@@ -429,11 +510,13 @@ namespace MozaPlugin.Telemetry
 
         private bool Cm2LaneUp => _plugin.IsCm2Present && !_plugin.DashIsCm1;
 
-        private void TickCm2(bool game)
+        private void TickCm2()
         {
+            bool idle = LaneIdle(MozaPlugin.Cm2PageGuid);
+            if (!idle) _cm2Yielded = false;
             // Absent dash: keep the state for its return.
             if (!Cm2LaneUp) return;
-            string? want = !game && !_cm2Yielded ? IdleName(MozaPlugin.Cm2PageGuid) : null;
+            string? want = idle && !_cm2Yielded ? IdleName(MozaPlugin.Cm2PageGuid) : null;
             if (want != null)
             {
                 EngageCm2(want);
@@ -444,7 +527,7 @@ namespace MozaPlugin.Telemetry
             {
                 _cm2 = null;
                 _cm2RestorePending = true;
-                MozaLog.Info($"[AZOM] Idle dashboard (CM2): '{eng}' released ({(game ? "game running" : "turned off")})");
+                MozaLog.Info($"[AZOM] Idle dashboard (CM2): '{eng}' released ({(idle ? "turned off" : "in game")})");
             }
             if (_cm2RestorePending) RestoreCm2();
         }
@@ -500,7 +583,7 @@ namespace MozaPlugin.Telemetry
                 cm2.ReResolveActiveDashboardMappings(onlyIfChanged: true);
             }
             bindings.ClearPendingCm2DashboardKey();
-            MozaLog.Info($"[AZOM] Idle dashboard (CM2): showing '{slotName}' (slot {slot}) while no game runs"
+            MozaLog.Info($"[AZOM] Idle dashboard (CM2): showing '{slotName}' (slot {slot}) while idle"
                          + (bound ? " — already on it" : ""));
             _plugin.RaiseDashboardSelectionChangedInternal();
             return true;
@@ -537,15 +620,17 @@ namespace MozaPlugin.Telemetry
 
         // ----- FSR V1 (fixed pages) -----
 
-        private void TickFsr1(bool game)
+        private void TickFsr1()
         {
             var page = _plugin.GetCurrentWheelPageGuid();
             if (!page.HasValue) return;
             var eng = _fsr1;
             if (eng != null && eng.Page != page.Value) _fsr1 = eng = null;
+            bool idle = LaneIdle(page.Value);
+            if (!idle) _fsr1Yielded = false;
             if (!_plugin.IsFsr1DisplayWheel) return;
 
-            int want = !game && !_fsr1Yielded ? IdleIndex(page.Value) : -1;
+            int want = idle && !_fsr1Yielded ? IdleIndex(page.Value) : -1;
             if (want >= 0)
             {
                 if (eng != null && eng.Index == want) return;
@@ -557,7 +642,7 @@ namespace MozaPlugin.Telemetry
                     Volatile.Write(ref _fsr1EchoIndex, want);
                     _indexes.QueueFsr1Select(want);
                 }
-                MozaLog.Info($"[AZOM] Idle dashboard (FSR1): showing page index {want} while no game runs");
+                MozaLog.Info($"[AZOM] Idle dashboard (FSR1): showing page index {want} while idle");
                 _plugin.RaiseFsr1ActiveIndexChanged();
                 return;
             }
@@ -565,17 +650,19 @@ namespace MozaPlugin.Telemetry
             _fsr1 = null;
             int stored = _indexes.StoredFsr1Index();
             if (stored != eng.Index) _indexes.QueueFsr1Select(stored);
-            MozaLog.Info($"[AZOM] Idle dashboard (FSR1): page index {eng.Index} released, back to {stored} ({(game ? "game running" : "turned off")})");
+            MozaLog.Info($"[AZOM] Idle dashboard (FSR1): page index {eng.Index} released, back to {stored} ({(idle ? "turned off" : "in game")})");
             _plugin.RaiseFsr1ActiveIndexChanged();
         }
 
         // ----- CM1 (fixed pages) -----
 
-        private void TickCm1(bool game)
+        private void TickCm1()
         {
+            bool idle = LaneIdle(MozaPlugin.Cm1PageGuid);
+            if (!idle) _cm1Yielded = false;
             // Absent dash: keep the state for its return.
             if (!_plugin.DashIsCm1) return;
-            int want = !game && !_cm1Yielded ? IdleIndex(MozaPlugin.Cm1PageGuid) : -1;
+            int want = idle && !_cm1Yielded ? IdleIndex(MozaPlugin.Cm1PageGuid) : -1;
             int eng = _cm1;
             if (want >= 0)
             {
@@ -588,7 +675,7 @@ namespace MozaPlugin.Telemetry
                     Volatile.Write(ref _cm1EchoIndex, want);
                     _indexes.QueueCm1Select(want);
                 }
-                MozaLog.Info($"[AZOM] Idle dashboard (CM1): showing page {want} while no game runs");
+                MozaLog.Info($"[AZOM] Idle dashboard (CM1): showing page {want} while idle");
                 _plugin.RaiseCm1ActiveIndexChanged();
                 return;
             }
@@ -596,7 +683,7 @@ namespace MozaPlugin.Telemetry
             _cm1 = -1;
             int stored = _indexes.StoredCm1Index();
             if (stored != eng) _indexes.QueueCm1Select(stored);
-            MozaLog.Info($"[AZOM] Idle dashboard (CM1): page {eng} released, back to {stored} ({(game ? "game running" : "turned off")})");
+            MozaLog.Info($"[AZOM] Idle dashboard (CM1): page {eng} released, back to {stored} ({(idle ? "turned off" : "in game")})");
             _plugin.RaiseCm1ActiveIndexChanged();
         }
 
@@ -615,6 +702,8 @@ namespace MozaPlugin.Telemetry
             : page == MozaPlugin.Cm1PageGuid ? "CM1"
             : "wheel " + page.ToString("N").Substring(0, 8);
 
+        private string NotDrivingTag(Guid page) => WhenNotDriving(page) ? "(+not driving)" : "";
+
         /// <summary>One diagnostics line: configured picks and what is engaged, or null
         /// when nothing is configured or engaged.</summary>
         internal string? DescribeState()
@@ -622,10 +711,10 @@ namespace MozaPlugin.Telemetry
             var parts = new List<string>();
             var names = _plugin.Settings?.IdleDashboardByPageGuid;
             if (names != null)
-                foreach (var kv in names) parts.Add($"{Describe(kv.Key)}='{kv.Value}'");
+                foreach (var kv in names) parts.Add($"{Describe(kv.Key)}='{kv.Value}'{NotDrivingTag(kv.Key)}");
             var idx = _plugin.Settings?.IdleDashboardIndexByPageGuid;
             if (idx != null)
-                foreach (var kv in idx) parts.Add($"{Describe(kv.Key)}=#{kv.Value}");
+                foreach (var kv in idx) parts.Add($"{Describe(kv.Key)}=#{kv.Value}{NotDrivingTag(kv.Key)}");
             var w = _wheel;
             var f = _fsr1;
             string engaged = string.Join(" ", new[]
@@ -643,7 +732,7 @@ namespace MozaPlugin.Telemetry
             if (parts.Count == 0 && engaged.Length == 0) return null;
             return $"{(parts.Count == 0 ? "(none set)" : string.Join(" ", parts))} | engaged: {(engaged.Length == 0 ? "none" : engaged)}"
                    + (yielded.Length > 0 ? $" | yielded: {yielded}" : "")
-                   + $" | game={(_plugin.IsGameActive ? "yes" : "no")}";
+                   + $" | game={(_plugin.IsGameActive ? (NotDriving ? "not driving" : "driving") : "no")}";
         }
     }
 }

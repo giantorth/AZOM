@@ -690,6 +690,10 @@ namespace MozaPlugin.Settings
             }
         }
 
+        /// <summary>The active wheel profile's own dashboard pick, ignoring a showing idle dashboard.</summary>
+        internal string SavedTelemetryProfileName =>
+            _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+
         /// <summary>Active wheel's user-loaded .mzdash file path (empty = none, and while
         /// the idle dashboard — always a wheel slot — is showing).</summary>
         internal string ActiveTelemetryMzdashPath

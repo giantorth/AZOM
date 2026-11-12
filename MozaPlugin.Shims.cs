@@ -227,6 +227,7 @@ namespace MozaPlugin
             get => _profileCoordinator.ActiveTelemetryProfileName;
             set => _profileCoordinator.ActiveTelemetryProfileName = value;
         }
+        internal string SavedTelemetryProfileName => _profileCoordinator.SavedTelemetryProfileName;
         internal string ActiveTelemetryMzdashPath
         {
             get => _profileCoordinator.ActiveTelemetryMzdashPath;
@@ -283,6 +284,8 @@ namespace MozaPlugin
         internal Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? GetActiveFsr1Mappings() => _fsr1Cm1Mapping.GetActiveFsr1Mappings();
         internal void SetFsr1FieldMapping(string recordKey, string fieldId, Fsr1FieldMapping? mapping) => _fsr1Cm1Mapping.SetFsr1FieldMapping(recordKey, fieldId, mapping);
         internal int GetActiveFsr1Index() => _fsr1Cm1Mapping.GetActiveFsr1Index();
+        /// <summary>The stored FSR1 page (in-game pick), ignoring a showing idle page.</summary>
+        internal int GetStoredFsr1Index() => _fsr1Cm1Mapping.StoredFsr1Index();
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
@@ -305,6 +308,8 @@ namespace MozaPlugin
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);
         internal void ClearCm1Mappings() => _fsr1Cm1Mapping.ClearCm1Mappings();
         internal int GetActiveCm1Index() => _fsr1Cm1Mapping.GetActiveCm1Index();
+        /// <summary>The stored CM1 page (in-game pick), ignoring a showing idle page.</summary>
+        internal int GetStoredCm1Index() => _fsr1Cm1Mapping.StoredCm1Index();
         internal void SetActiveCm1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveCm1Index(index, sendToWheel);
         internal int TakePendingCm1Select() => _fsr1Cm1Mapping.TakePendingCm1Select();
 

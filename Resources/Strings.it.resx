@@ -364,6 +364,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Generazione anteprima…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Tempo Standby</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Dashboard fuori gioco</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Mostra nei menu</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED sincronizzazione</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minuto</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minuti</value></data>

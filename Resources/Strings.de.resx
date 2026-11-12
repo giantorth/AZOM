@@ -361,6 +361,7 @@
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Wird gerendert…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Standby-Zeit</value></data>
   <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Dashboard ohne Spiel</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>In Menüs anzeigen</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>Sync-LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 Minute</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 Minuten</value></data>

@@ -801,6 +801,11 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, int> IdleDashboardIndexByPageGuid { get; set; }
             = new Dictionary<Guid, int>();
 
+        /// <summary>Pages whose idle dashboard also shows in game while not driving
+        /// (paused, menus, replay, spectating). Absent = only when no game runs.</summary>
+        public Dictionary<Guid, bool> IdleDashboardWhenNotDrivingByPageGuid { get; set; }
+            = new Dictionary<Guid, bool>();
+
         // --- MOZA Multi-Function Stalks: truck-sim keyboard emulation ---
 
         /// <summary>Stalks operating mode. <see cref="StalkMode.ButtonBox"/> = the plugin
