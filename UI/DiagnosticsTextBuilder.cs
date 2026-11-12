@@ -154,6 +154,10 @@ namespace MozaPlugin.UI
                 sb.AppendLine($"Wine HID:       hidraw=[{Pids(hid.Hidraw.Keys)}] open=[{Pids(hid.OpenPids)}] dead=[{Pids(hid.DeadPids)}]");
                 sb.AppendLine($"winebus:        {hid.Winebus}");
             }
+            if (Protocol.WineHost.IsWine && Protocol.WineHost.UnixRoot != null)
+                sb.AppendLine("Node access:    " + (Protocol.LinuxDeviceAccess.Supported
+                    ? Protocol.LinuxDeviceAccess.Describe(Protocol.LinuxDeviceAccess.Current)
+                    : "(unavailable: no native exec)"));
 
             if (ports.Count == 0)
             {

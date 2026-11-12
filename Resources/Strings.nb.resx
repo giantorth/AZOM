@@ -918,4 +918,8 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Styrke over bakketopper</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blokkerer tilgang til MOZA-enheter</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så programtillegget kan ikke koble til.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så ratt-, pedal- og knappeinndata mangler.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Legg til en udev-regel som gir MOZA-enheter (idVendor 346e) TAG+="uaccess" i delsystemet {0}, og koble dem deretter fra og til igjen.</value></data>
 </root>

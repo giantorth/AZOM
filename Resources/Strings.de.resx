@@ -913,4 +913,8 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max. Frequenz (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Stärke im Leerlauf (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Stärke über Kuppen</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blockiert den Zugriff auf MOZA-Geräte</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ihr Linux-Benutzer kann {0} nicht öffnen, daher kann das Plugin keine Verbindung herstellen.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Ihr Linux-Benutzer kann {0} nicht öffnen, daher fehlen Lenkungs-, Pedal- und Tasteneingaben.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Fügen Sie eine udev-Regel hinzu, die MOZA-Geräten (idVendor 346e) im Subsystem {0} TAG+="uaccess" zuweist, und stecken Sie sie anschließend ab und wieder an.</value></data>
 </root>

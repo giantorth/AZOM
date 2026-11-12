@@ -913,4 +913,8 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>最高频率 (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>怠速强度 (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>坡顶强度</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux 正在阻止访问 MOZA 设备</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此插件无法连接到该设备。</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此缺少方向盘、踏板和按键输入。</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>添加一条 udev 规则，在 {0} 子系统中为 MOZA 设备（idVendor 346e）设置 TAG+="uaccess"，然后拔下并重新插入设备。</value></data>
 </root>

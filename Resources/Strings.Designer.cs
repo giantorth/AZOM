@@ -971,5 +971,9 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
         public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
         public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
+        public static string Banner_LinuxAccess_Title => Get("Banner_LinuxAccess_Title");
+        public static string Banner_LinuxAccess_TtyFmt => Get("Banner_LinuxAccess_TtyFmt");
+        public static string Banner_LinuxAccess_HidFmt => Get("Banner_LinuxAccess_HidFmt");
+        public static string Banner_LinuxAccess_FixFmt => Get("Banner_LinuxAccess_FixFmt");
     }
 }

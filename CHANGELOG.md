@@ -16,6 +16,7 @@ All notable changes to the AZOM plugin are documented here.
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
 - **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
 - **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
+- **Linux permission banner;** warns when your user can't open a MOZA serial or HID device node and names the missing udev rule.
 
 ## Changed
 

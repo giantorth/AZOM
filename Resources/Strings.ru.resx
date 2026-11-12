@@ -913,4 +913,8 @@ Id: {2}</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Макс. частота (Гц)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Сила на холостых (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Сила на гребнях</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux блокирует доступ к устройствам MOZA</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому плагин не может к нему подключиться.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому нет данных руля, педалей и кнопок.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Добавьте правило udev, назначающее устройствам MOZA (idVendor 346e) TAG+="uaccess" в подсистеме {0}, затем отключите и снова подключите их.</value></data>
 </root>
