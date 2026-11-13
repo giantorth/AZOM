@@ -130,6 +130,11 @@ namespace MozaPlugin.Devices.Motion
         // motion source: wanted = the output's request, driven = the lane has left game mode for it.
         private volatile bool _manualDriven;
         private volatile bool _manualWanted;
+        // Pose streaming in the controller's AI mode (mode 11) instead of game mode: wanted = the
+        // output's request, _aiMode = what the current / last engage entered.
+        private volatile bool _aiWanted;
+        private volatile bool _aiMode;
+        private MotionMode StreamMode => _aiMode ? MotionMode.AiPose : MotionMode.Game;
         private float[]? _manualPose;          // pitch, roll, heave −1..1, posted by the output
         private long _manualPosedAtMs;
         private readonly float[] _manualSent = new float[3];
@@ -267,6 +272,68 @@ namespace MozaPlugin.Devices.Motion
         /// false returns to game mode.
         /// </summary>
         public void SetManualWanted(bool wanted) => _manualWanted = wanted;
+
+        /// <summary>
+        /// Stream in the controller's AI mode (mode 11), where the frame's pitch, roll and f6 are
+        /// followed as a held pose, instead of game mode. A change while streaming re-enters.
+        /// </summary>
+        public void SetAiPoseWanted(bool wanted) => _aiWanted = wanted;
+
+        /// <summary>
+        /// AI mode: false (default) keeps every actuator within game mode's travel and caps speed and
+        /// acceleration (<see cref="AiPoseLimiter"/>); true follows the pose as posted, each of pitch
+        /// and roll held only to the angle that moves an actuator 65 mm, leaving the rest to the
+        /// controller's own soft limit.
+        /// </summary>
+        public void SetAiMaxPerformance(bool on) => _aiMaxPerformance = on;
+        private volatile bool _aiMaxPerformance;
+
+        // The controller levels AI mode heave off as 25.5·tanh(f6 / 25.5) mm; f6 = 25.5·atanh(mm / 25.5) undoes it.
+        private const double AiHeaveScaleMm = 25.5, AiHeaveMaxShare = 0.9;
+        private const double MaxPerformanceAxisTravelMm = 65.0;
+        private readonly AiPoseLimiter _aiLimiter = new AiPoseLimiter();
+
+        /// <summary>Max Available Stroke as read from the controller (0.9 until it is), which scales the AI mode travel limits.</summary>
+        private double AiStrokeShare()
+        {
+            float stroke = Volatile.Read(ref _maxStroke);
+            return float.IsNaN(stroke) ? 0.9 : Math.Max(0f, Math.Min(1f, stroke));
+        }
+
+        /// <summary>Half the actuator spacing along and across the rig (mm); a 1000 × 700 rig until read.</summary>
+        private void AiRigHalves(out double halfLength, out double halfWidth)
+        {
+            float l = Volatile.Read(ref _rigLength), w = Volatile.Read(ref _rigWidth);
+            halfLength = (float.IsNaN(l) || l < 100f ? 1000f : l) / 2.0;
+            halfWidth = (float.IsNaN(w) || w < 100f ? 700f : w) / 2.0;
+        }
+
+        /// <summary>AI mode: multiplier on the engine vibration's frequency (1 = Motion Manager's 25–60 Hz).</summary>
+        public void SetEngineVibrationPitch(float factor)
+            => _enginePitch = float.IsNaN(factor) ? 1f : Math.Max(0.5f, Math.Min(4f, factor));
+        private volatile float _enginePitch = 1f;
+
+        /// <summary>AI mode: height (mm) of a heave tick-over pulse made by the lane at low revs; 0 = none.</summary>
+        public void SetEngineTickover(float mm)
+            => _tickoverMm = float.IsNaN(mm) ? 0f : Math.Max(0f, Math.Min(3f, mm));
+        private volatile float _tickoverMm;
+        private double _tickPhase;
+        private long _lastStreamMs;
+        private readonly Random _tickRandom = new Random();
+        // AI mode: last pose sent (f0, f1, f6) and the ease between a live pose and neutral frames.
+        private const int PoseBlendMs = 2500;
+        private const float EngineRunningRpm = 500f;
+        private readonly float[] _poseSent = new float[3];
+        private readonly float[] _poseBlendFrom = new float[3];
+        private bool _poseLive;
+        private long _poseBlendStartMs = -100_000;
+        private float _tickHeight = 1f;
+        private double _tickRate = 1.0, _tickDuty = 0.45;
+        private bool _engineWasOn = true;   // armed only once the engine has been seen stopped
+        private long _engineStartMs = -100_000;
+
+        /// <summary>True while frames are being followed as a pose (AI mode reached and streaming).</summary>
+        public bool AiPoseActive => _aiMode && _phase == MotionLanePhase.Game && _modeCurrent == (int)MotionMode.AiPose;
 
         /// <summary>SimHub idle: keep game mode, stream neutral frames with the in-game flag clear.</summary>
         public void SetIdle(bool idle) => _idle = idle;
@@ -639,9 +706,12 @@ namespace MozaPlugin.Devices.Motion
             if (_phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame)
                 StreamTick(now);
             if (_phase == MotionLanePhase.Game)
-                WatchMode(now, MotionMode.Game, "game");
+                WatchMode(now, StreamMode, _aiMode ? "AI" : "game");
             else if (_phase == MotionLanePhase.ManualTest && _manualDriven && _sequence == null)
                 WatchMode(now, MotionMode.ManualTest, "manual");
+            // The output's source changed between game mode and AI mode while streaming: re-enter.
+            if (_sequence == null && _phase == MotionLanePhase.Game && !_manualWanted && _aiWanted != _aiMode)
+                StartSequence(EngageSequence());
             // SimHub's Manual control or Hop-in went on or off: swap game mode for manual mode and back.
             if (_sequence == null)
             {
@@ -722,7 +792,100 @@ namespace MozaPlugin.Devices.Motion
                 frame = MotionTelemetryFrame.Neutral(inGame: true);
             else
                 frame = posted;
-            _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
+            // AI mode: the controller's engine vibration plays at the chosen pitch. With a tick-over
+            // strength set, a heave pulse made here, in step with the frames, covers low revs (gone
+            // between 40 % and 70 % of the redline) and the vibration fades in over it (silent below
+            // 30 %, full from 55 %). A pulse rendered by SimHub's own engine effect is sampled at the
+            // 33 Hz frame rate and arrives uneven (capture 13 Nov 2026), hence the one made here.
+            float level = 1f, pitch = 1f, tickMm = 0f;
+            long dtMs = _lastStreamMs > 0 ? Math.Min(200, now - _lastStreamMs) : _frameIntervalMs;
+            _lastStreamMs = now;
+            // iRacing reports a few hundred rpm for a car that is not running yet (capture 13 Nov 2026),
+            // so in AI mode the engine counts as running from EngineRunningRpm.
+            bool engineRunning = frame.EngineRpm >= EngineRunningRpm;
+            if (_aiMode && !engineRunning) level = 0f;
+            if (_aiMode && engineRunning)
+            {
+                pitch = _enginePitch;
+                if (_tickoverMm > 0f)
+                {
+                    float x = Math.Max(0f, Math.Min(1f, (frame.EngineRpmFraction - 0.30f) / 0.25f));
+                    level = x * x * (3f - 2f * x);
+                }
+                // The tick-over lasts longer than the buzz takes to arrive: gone between 40 % and 70 % of the redline.
+                float y = Math.Max(0f, Math.Min(1f, (frame.EngineRpmFraction - 0.40f) / 0.30f));
+                float amp = _tickoverMm * (1f - y * y * (3f - 2f * y));
+                // Start-up: the first 2.5 s after the engine fires kick up to 2.5 times as hard.
+                if (!_engineWasOn) { _engineStartMs = now; _engineWasOn = true; }
+                long sinceStart = now - _engineStartMs;
+                if (sinceStart < 2500) amp *= 1f + 1.5f * (1f - sinceStart / 2500f);
+                // Load: up to 40 % more with the throttle open.
+                amp *= 1f + 0.4f * Math.Max(0f, Math.Min(1f, frame.Throttle));
+                if (amp > 0f)
+                {
+                    // Pulse rate follows the revs (about 7 Hz at a 1600 rpm idle), within what 33 frames a
+                    // second can draw. Each pulse gets its own height and length so it does not drone.
+                    double hz = Math.Max(4.0, Math.Min(11.0, frame.EngineRpm / 230.0)) * _tickRate;
+                    _tickPhase += hz * dtMs / 1000.0;
+                    if (_tickPhase >= 1.0)
+                    {
+                        _tickPhase %= 1.0;
+                        _tickHeight = 0.65f + 0.5f * (float)_tickRandom.NextDouble();
+                        _tickRate = 0.88 + 0.24 * _tickRandom.NextDouble();
+                        _tickDuty = 0.35 + 0.2 * _tickRandom.NextDouble();
+                    }
+                    if (_tickPhase < _tickDuty) tickMm = Math.Min(4f, amp * _tickHeight);
+                }
+            }
+            // Only a live frame with the engine stopped arms the start-up kick: a pause, a stale feed or
+            // SimHub idle (neutral frames) leaves it as it was, so resuming does not kick again.
+            if (ReferenceEquals(frame, posted) && !engineRunning) _engineWasOn = false;
+            if (_aiMode)
+            {
+                // AI mode follows the pose as sent, so a change of source (live pose <-> neutral: game
+                // start, pause, exit, SimHub idle, stale data) is eased over PoseBlendMs instead of jumping.
+                bool live = ReferenceEquals(frame, posted);
+                if (live != _poseLive)
+                {
+                    _poseLive = live;
+                    _poseBlendStartMs = now;
+                    Array.Copy(_poseSent, _poseBlendFrom, 3);
+                }
+                float p = frame.Fields[0], r = frame.Fields[1], h = frame.Fields[6];
+                float op = p, or = r, oh = h;
+                long since = now - _poseBlendStartMs;
+                if (since < PoseBlendMs)
+                {
+                    float k = since / (float)PoseBlendMs;
+                    k = k * k * (3f - 2f * k);
+                    op = _poseBlendFrom[0] + (p - _poseBlendFrom[0]) * k;
+                    or = _poseBlendFrom[1] + (r - _poseBlendFrom[1]) * k;
+                    oh = _poseBlendFrom[2] + (h - _poseBlendFrom[2]) * k;
+                }
+                _poseSent[0] = op; _poseSent[1] = or; _poseSent[2] = oh;
+                // Travel, speed and acceleration limits (AiPoseLimiter), then heave through the inverse
+                // of the controller's soft limit. The tick-over pulse rides on top, inside the travel.
+                AiRigHalves(out double halfLength, out double halfWidth);
+                if (_aiMaxPerformance)
+                {
+                    // As posted: only each angle's own bound (65 mm at an actuator), no combined travel or rate cap.
+                    double maxPitch = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfLength));
+                    double maxRoll = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfWidth));
+                    _aiLimiter.Reset(Math.Max(-maxPitch, Math.Min(maxPitch, op)), Math.Max(-maxRoll, Math.Min(maxRoll, or)), oh);
+                }
+                else
+                    _aiLimiter.Step(op, or, oh, dtMs / 1000.0, halfLength, halfWidth, AiStrokeShare(),
+                        AiPoseLimiter.SafeMaxSpeedMmS, AiPoseLimiter.SafeMaxAccelMmS2);
+                double mm = _aiLimiter.HeaveMm + tickMm;
+                double u = Math.Max(-AiHeaveMaxShare, Math.Min(AiHeaveMaxShare, mm / AiHeaveScaleMm));
+                frame.Fields[0] = (float)_aiLimiter.Pitch;
+                frame.Fields[1] = (float)_aiLimiter.Roll;
+                frame.Fields[6] = (float)(AiHeaveScaleMm * 0.5 * Math.Log((1.0 + u) / (1.0 - u)));
+                _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
+                frame.Fields[0] = p; frame.Fields[1] = r; frame.Fields[6] = h;
+            }
+            else
+                _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
             Interlocked.Increment(ref _framesSent);
 
             // Engine vibration rides along with live frames; when it stops, one zero-gain
@@ -731,7 +894,7 @@ namespace MozaPlugin.Devices.Motion
             {
                 var (strength, tactile) = VibrationScale();
                 _connection.SendStream(StreamKind.MotionEngineVibration, MozaMotionProtocol.BuildEngineVibration(
-                    MozaMotionProtocol.EngineVibrationHz(frame.EngineRpm), frame.Throttle, strength, tactile));
+                    MozaMotionProtocol.EngineVibrationHz(frame.EngineRpm), frame.Throttle, strength, tactile, pitch, level));
                 _vibrating = true;
             }
             else if (_vibrating)
@@ -945,22 +1108,29 @@ namespace MozaPlugin.Devices.Motion
 
             // Prototype-proven entry: stream neutral frames and repeat set-mode 1 until the
             // controller reports mode 1 (it passes through 5/3); run state 03 after ~300 ms.
+            // AI mode (11) is entered the same way (bench 12 Nov 2026: passes through 3, ~3.5 s).
             _phase = MotionLanePhase.EnteringGame;
+            _aiMode = _aiWanted;
+            var target = StreamMode;
+            // Mode 3 on the way in levels the platform, so the limiter starts from a level pose.
+            _aiLimiter.Reset();
+            Array.Clear(_poseSent, 0, 3);
+            _poseLive = false;
             _nextFrameMs = 0;
             long start = _clock.ElapsedMilliseconds;
             bool runSent = false;
-            while (_modeCurrent != (int)MotionMode.Game)
+            while (_modeCurrent != (int)target)
             {
                 long elapsed = _clock.ElapsedMilliseconds - start;
-                if (elapsed > GameEntryTimeoutMs) { Fault($"controller did not enter game mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
-                Send(MozaMotionProtocol.BuildSetMode(MotionMode.Game));
+                if (elapsed > GameEntryTimeoutMs) { Fault($"controller did not enter {(_aiMode ? "AI" : "game")} mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                Send(MozaMotionProtocol.BuildSetMode(target));
                 if (!runSent && elapsed > 300) { SendRunState(MotionRunState.Run); runSent = true; }
                 yield return 33;
             }
             if (!runSent) SendRunState(MotionRunState.Run);
             _modeLostSinceMs = -1;
             _phase = MotionLanePhase.Game;
-            MozaLog.Info("[AZOM/Motion] Game mode");
+            MozaLog.Info(_aiMode ? "[AZOM/Motion] AI mode (SimHub pose as positions)" : "[AZOM/Motion] Game mode");
         }
 
         private IEnumerator<int> DisengageSequence()

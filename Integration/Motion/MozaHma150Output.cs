@@ -69,6 +69,75 @@ namespace MozaPlugin.Integration.Motion
             }
         }
 
+        private int _engineVibrationPitch = 50;
+        private int _engineTickover;
+        private bool _aiPoseMode;
+        private bool _aiMaxPerformance;
+
+        /// <summary>
+        /// AI mode only, off by default. Off: the pose is kept inside game mode's behaviour (tilt
+        /// scaled to what game mode gives, every actuator within game mode's travel, speed and
+        /// acceleration capped). On: the pose's true angles with no speed or acceleration cap, which
+        /// can make the rig hop or shift.
+        /// </summary>
+        public bool AiMaxPerformance
+        {
+            get => _aiMaxPerformance;
+            set
+            {
+                if (_aiMaxPerformance == value) return;
+                _aiMaxPerformance = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, off by default: run the controller in its AI mode (mode 11), where the pose
+        /// is followed as positions (heave holds, pitch and roll are true angles), instead of game mode.
+        /// </summary>
+        public bool AiPoseMode
+        {
+            get => _aiPoseMode;
+            set
+            {
+                if (_aiPoseMode == value) return;
+                _aiPoseMode = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, 0–100 (0 = off): a heave tick-over pulse of up to 3 mm at idle that fades
+        /// out as the controller's engine vibration fades in (use instead of the profile's engine effect).
+        /// </summary>
+        public int EngineTickover
+        {
+            get => _engineTickover;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_engineTickover == value) return;
+                _engineTickover = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, 0–100, 50 = Motion Manager's frequencies (25–60 Hz): pitch of the controller's
+        /// engine vibration, a factor of 2^((value − 50) / 25), so 100 is four times higher and 25 half.
+        /// </summary>
+        public int EngineVibrationPitch
+        {
+            get => _engineVibrationPitch;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_engineVibrationPitch == value) return;
+                _engineVibrationPitch = value;
+                Output?.ApplySettings();
+            }
+        }
+
         /// <summary>
         /// While SimHub's Manual control or Hop-in position moves the platform, use the controller's
         /// Manual Motion Test (mode 2, <c>0x1E/07</c> setpoints) instead of game mode.
@@ -244,8 +313,21 @@ namespace MozaPlugin.Integration.Motion
                 {
                     // The crest signal belongs to the running game: none without a fresh game frame.
                     double crestPush = game != null ? currentSettings.CrestBoost / 100.0 * feed!.CrestPush : 0.0;
-                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
-                        crestPush));
+                    // AI mode follows the pose as positions; until it is reached the frame keeps the game-mode shape.
+                    if (lane!.AiPoseActive)
+                    {
+                        // A held drop needs speed: none below 5 m/s, full from 15 m/s. A car being placed
+                        // on the track reads as "light" and held the full drop for 10 s (capture 13 Nov 2026).
+                        if (game != null)
+                            crestPush *= Math.Max(0.0, Math.Min(1.0, (Math.Abs(game.Fields[7]) - 5.0) / 10.0));
+                        // Max performance: the pose's true angles. Otherwise the share game mode turns into tilt.
+                        double tiltScale = currentSettings.AiMaxPerformance ? 1.0 : AiPoseLimiter.DefaultTiltShare;
+                        lane.PostFrame(MotionGameFeed.PoseFrameAsPosition(pose.PitchDegrees, pose.RollDegrees,
+                            pose.HeaveMm, game, crestPush, tiltScale));
+                    }
+                    else
+                        lane.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
+                            crestPush));
                 }
                 return;
             }
@@ -265,6 +347,11 @@ namespace MozaPlugin.Integration.Motion
         private void PollManualControl(MozaMotionController? lane)
         {
             if (lane == null) return;
+            // The SimHub pose source runs the controller in AI mode (pose followed as positions).
+            lane.SetAiPoseWanted(Settings?.Source == MozaHma150Source.SimHubPose && Settings.AiPoseMode);
+            lane.SetEngineVibrationPitch((float)Math.Pow(2.0, ((Settings?.EngineVibrationPitch ?? 50) - 50) / 25.0));
+            lane.SetEngineTickover((Settings?.EngineTickover ?? 0) / 100f * 3f);
+            lane.SetAiMaxPerformance(Settings?.AiMaxPerformance == true);
             if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
             // Between plugin instances (SimHub game switch) there is nothing to ask: keep the last answer.
             if (MozaPlugin.Instance == null) return;

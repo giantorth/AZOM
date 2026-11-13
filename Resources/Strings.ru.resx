@@ -921,4 +921,10 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Срабатывание</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Импульс</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Двигатель</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Режим ИИ: платформа следует вертикали, тангажу и крену SimHub как позициям</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Высота вибрации двигателя (50 = обычная)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Сила холостого хода двигателя (0 = выкл.)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>При использовании отключите эффект вибрации двигателя в профиле SimHub Motion, чтобы они не мешали друг другу.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Режим ИИ: максимальная производительность</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Максимальная производительность следует полным углам SimHub без ограничения скорости. Ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.</value></data>
 </root>

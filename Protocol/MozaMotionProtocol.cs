@@ -14,6 +14,14 @@ namespace MozaPlugin.Protocol
         Armed = 5,
         TravelSelfCheck = 7,
         PortSelfTest = 8,
+        /// <summary>
+        /// Motion Manager's "AI mode" (its command table names 11 so; firmware <c>CtrlMode:7</c>): the
+        /// <c>0x22/00</c> frame is followed as a pose. f0/f1 are platform angles 1:1 and f6 is a held
+        /// heave position in mm (soft limit near ±25 mm); the shock fields are ignored. Bench, 12 Nov 2026.
+        /// </summary>
+        AiPose = 11,
+        /// <summary>Flight-sim game mode (<c>0x22/01</c> frame); heave washes out as in <see cref="Game"/>.</summary>
+        FlightGame = 12,
         Standby = 13,
     }
 
@@ -58,6 +66,8 @@ namespace MozaPlugin.Protocol
 
         /// <summary>Engine speed for the <c>0x22/09</c> engine vibration; negative = send none.</summary>
         public float EngineRpm = -1f;
+        /// <summary>Engine speed as a share of the redline (0..1), for the vibration's fade-in with revs.</summary>
+        public float EngineRpmFraction;
         /// <summary>Unrounded throttle (0..1) for the vibration's 4th harmonic.</summary>
         public float Throttle;
 
@@ -360,7 +370,25 @@ namespace MozaPlugin.Protocol
         /// throttle (0..1).
         /// </summary>
         public static byte[] BuildEngineVibration(float f0Hz, float throttle, float strength, float tactile)
+            => BuildEngineVibration(f0Hz, throttle, strength, tactile, 1f, 1f);
+
+        /// <summary>
+        /// As above with the fundamental multiplied by <paramref name="pitch"/> (kept within the
+        /// oscillators' 20–1000 Hz, 4th harmonic included) and every gain by <paramref name="level"/>.
+        /// A raised pitch lowers the amplitude by pitch^1.5, so the buzz gets finer rather than harsher.
+        /// </summary>
+        public static byte[] BuildEngineVibration(float f0Hz, float throttle, float strength, float tactile,
+            float pitch, float level)
         {
+            if (pitch != 1f || level != 1f)
+            {
+                float f = Math.Max(20f, Math.Min(250f, f0Hz * pitch));
+                float eff = f / f0Hz;
+                float k = Math.Max(0f, level) * (eff > 1f ? (float)Math.Pow(eff, -1.5) : 1f);
+                float tt = Math.Max(0f, Math.Min(1f, throttle));
+                float a1 = 0.045f * strength * tactile * k;
+                return EngineVibrationFrame(f, 0.0009f * strength * tactile * k, a1, a1 * 0.5f, a1 * (0.1f + 0.15f * tt));
+            }
             float t = Math.Max(0f, Math.Min(1f, throttle));
             // (float) casts force float32 rounding at each step, matching the captured bits.
             float g0 = (float)((float)(0.0009f * strength) * tactile);
