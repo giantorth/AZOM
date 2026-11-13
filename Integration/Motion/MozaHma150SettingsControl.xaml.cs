@@ -166,6 +166,12 @@ namespace MozaPlugin.Integration.Motion
                 if (s != null) s.AiPoseMode = AiPoseCheck.IsChecked == true;
                 UpdateCornerHapticsEnabled();
             };
+            AiMaxPerformanceCheck.IsChecked = settings?.AiMaxPerformance ?? false;
+            AiMaxPerformanceCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.AiMaxPerformance = AiMaxPerformanceCheck.IsChecked == true;
+            };
             SyncCrestSlider();
             UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
@@ -242,6 +248,8 @@ namespace MozaPlugin.Integration.Motion
             EnginePitchSlider.IsEnabled = ai;
             EngineTickSlider.IsEnabled = ai;
             EngineTickNote.IsEnabled = ai;
+            AiMaxPerformanceCheck.IsEnabled = ai;
+            AiMaxPerformanceWarning.IsEnabled = ai;
         }
 
         // ------------------------------------------------------------ motion effects

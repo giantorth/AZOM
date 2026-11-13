@@ -196,11 +196,48 @@ timed against it (±30 ms from the frame interval):
   a soft limit near ±25 mm. It does not wash out.
 - The step response is a smoothing filter, not a speed limit: the same share of the step at
   0.14 s for 3, 6 and 10 mm (about half), done by ~0.3 s. A 30–50 ms bump is rounded off.
-- f0 / f1 are the platform's angles 1:1 at intensity 1.0 (game mode gives roughly half to
-  three quarters of the angle), and hold. The shock fields are ignored.
+- f0 / f1 are the platform's angles 1:1 at intensity 1.0 while small (game mode gives about
+  three quarters of the angle), and hold; larger angles meet the soft limit below. The shock
+  fields are ignored.
 - `0x22/09` engine vibration is rendered as in game mode (felt at strength 50 / tactile 40).
-- Untested in this mode: f4 / f5, road detail, `0x22/07` / `0x22/08`, how the slots'
-  intensity and smoothness scale it, and whether the firmware limits angles beyond the travel.
+- Untested in this mode: f4 / f5, road detail, `0x22/07` / `0x22/08`, and how the slots'
+  intensity and smoothness scale it.
+
+**Travel envelope of modes 1, 2 and 11** (bench 13 Nov 2026, fw 2.35, 1029 × 700 mm rig, Max
+Available Stroke 1.0 unless noted; every input ramped over 5–8 s and held 4 s; the furthest
+actuator up / down from the `Output Displacement` line):
+
+| Input | Mode 1 (game, Pitch / Roll 1.0 / 0.2) | Mode 2 (manual) | Mode 11 (AI) |
+|-------|----------------------------------------|-----------------|--------------|
+| pitch | 10°: 43.1 / −40.8; 20°: 49.5 / −46.4 | 0.5: 30.4 / −29.3; 1.0: 50.4 / −47.1 | 3.6°: 30.1 / −29.2; 7.2°: 49.5 / −47.0 |
+| roll | 10°: 36.5 / −33.4; 20°: 48.0 / −42.1 | 0.5: 30.7 / −28.6; 1.0: 51.4 / −44.4 | 5.3°: 30.7 / −28.7; 10.6°: 51.0 / −45.7 |
+| pitch + roll | 10° each: 58.1 / −54.2; 20° each: 62.5 / −56.7 | 0.5 each: 50.1 / −47.5; 1.0 each: 63.2 / −56.7 | 3.6° + 5.3°: 57.7 / −54.9 |
+| pitch + roll + heave | — | 1.0 each: 64.7 / −21.8 | not measured; the plugin asks for 62 mm at most |
+| heave | washes out (above) | 1.0: 45.6 | f6 ±40: ±23.41 |
+| 1° pitch step | 1.76 mm at 0.16 s, 6.71 mm at 0.39 s | speed-limited (below) | 1.91 mm at 0.13 s, 8.95 mm at 0.39 s |
+| stroke 0.5 | — | — | pitch 3.6°: 24.4 (30.1 at 1.0); f6 10: 8.68 (9.51 at 1.0) |
+
+- The controller soft-limits tilt in all three modes at the same place: about 50 mm on one axis
+  and about 60 mm with pitch and roll together. Mode 11 was asked for 64.5 mm (7.2° of pitch)
+  and gave 49.5 mm, the figure mode 1 gives at 20° and mode 2 at 1.0.
+- Manual mode with pitch, roll and heave at 1.0 reaches as far as anything measured in modes 1
+  and 11 (64.7 mm against 62.5 mm and 57.7 mm), so SimHub's Manual control in the slow manual
+  mode, sliders at their ends, shows the clearance the rig needs in every mode.
+- Max Available Stroke scales the limit in mode 11 too.
+- Mode 11 reaches the limit at about a third of the angle: game mode turns about 0.75 of an
+  angle into tilt (6.7 mm per degree of pitch here, where 1° is 8.98 mm), mode 11 all of it.
+- The two game modes respond to a step at about the same pace.
+
+**Why AI mode is limited unless *max performance* is ticked** (iRacing, 13 Nov 2026, USB
+captures). With the pose followed 1:1 and a profile at full gains, two laps asked one actuator
+for up to 153 mm (pitch 65 + roll 65 + heave 23; the controller's readings stayed at 52–55 mm)
+and for an 84 mm swing on one axis within 0.3 s, a full pitch reversal. Nothing faulted, but
+the rig hopped on the floor at least once. Game mode laps on the same track never asked for a
+swing above about 23 mm in 0.3 s, and an earlier AI mode lap with a 53 mm swing did not hop.
+Replayed through `AiPoseLimiter` at 210 mm/s and 1080 mm/s², with the 0.9 tilt and the 62 mm
+travel, the largest 0.3 s swing of those laps is 56 mm and of a gentler lap 19 mm (none of
+its frames more than 3 mm behind the pose). The caps come from those replays; that the rig
+no longer hops with them rests on a later drive, not on a measurement of the hop itself.
 
 Mode 12 (flight-sim game) takes `0x22/01` — `7E 2D 22 12 01`, ten floats (pitch, roll,
 heading, angular velocity X/Y/Z, ACCX, ACCY, ACCZ, VelocityX), brake, throttle, `00`, in-game
@@ -211,9 +248,11 @@ What the plugin sends in AI mode (`MotionGameFeed.PoseFrameAsPosition`, `MozaMot
 
 | Part | Rule |
 |------|------|
+| f0 / f1 | the pose angle × 0.9 (game mode turns about 0.75 of an angle into tilt; 0.75 felt tamer than the game mode build from the seat); with *AI mode max performance* the true angle, each held only to the angle that moves an actuator 65 mm |
+| Travel | `AiPoseLimiter`, on the travel the platform is meant to end up with: pitch and roll are each eased off towards Max Available Stroke × 50 mm (where the controller puts one axis in game mode), then \|heave\| + pitch travel + roll travel, the furthest any actuator moves, is held to stroke × 62 mm (game mode's own maximum, above) by scaling the whole pose back. The angles sent are 70 · atanh(travel / 70), which undoes the controller's soft limit on a mode 11 angle, so up to about 72 mm can be asked of one actuator for 62 mm meant. Not with max performance, which leaves it all to the controller |
+| Speed, acceleration | each axis, as the actuator travel it causes, moves at no more than 210 mm/s and changes speed by no more than 1080 mm/s². Not with max performance |
 | f6 | 25.5 · atanh(mm / 25.5), mm held within ±0.9 · 25.5, which undoes the soft limit: the platform sits where the profile's heave asks up to about 23 mm |
 | Crest strength | taken off as a drop in mm (strength 100 = up to 20 mm), none below 5 m/s and full from 15 m/s: a car being placed on track reads as "light" and held the drop for 10 s |
-| f0 / f1 | held to the angle that moves an actuator 65 mm on this rig (asin of 65 mm over half the actuator spacing from `0x1F/08`; 7° / 10° until that is read) |
 | Source changes | f0, f1 and f6 ease over 2.5 s whenever the stream flips between a live pose and neutral frames (game start, pause, exit, SimHub idle, stale data) |
 | Engine tick-over | strength 0–100 = a heave pulse of up to 3 mm added to f6 at rpm / 230 Hz (4–11 Hz), each pulse with its own height, length and timing, +40 % with throttle, up to 2.5× for 2.5 s after the engine fires; gone between 40 % and 70 % of the redline. A pulse rendered by the profile's own engine effect is sampled at the 33 Hz frame rate and arrives uneven (0.15 mm at idle, 0.7 mm at 6000 rpm in a capture), hence this one |
 | `0x22/09` | with a tick-over strength set it fades in over 30–55 % of the redline; *Engine vibration pitch* multiplies f₀ by 2^((value − 50) / 25) (f₀ kept within 20–250 Hz) and divides the gains by that factor^1.5. The engine counts as running from 500 rpm (iRacing reports a few hundred for a car that is not started) |

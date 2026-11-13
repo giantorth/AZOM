@@ -924,4 +924,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tom da vibração do motor (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Força do ralenti do motor (0 = desligado)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Ao usar isto, desligue o efeito de vibração do motor no seu perfil do SimHub Motion, para que os dois não entrem em conflito.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Modo IA: desempenho máximo</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. É provável que o seu rig salte ou se desloque. Use por sua conta e risco.</value></data>
 </root>

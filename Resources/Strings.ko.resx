@@ -924,4 +924,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>엔진 진동 음높이 (50 = 기본)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>엔진 공회전 강도 (0 = 끔)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>이 기능을 사용할 때는 서로 겹치지 않도록 SimHub Motion 프로필의 엔진 진동 효과를 끄세요.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI 모드 최대 성능</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>최대 성능은 속도 제한 없이 SimHub의 전체 각도를 따릅니다. 리그가 튀거나 밀릴 가능성이 높습니다. 사용에 따른 위험은 본인이 부담합니다.</value></data>
 </root>

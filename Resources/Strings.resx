@@ -932,4 +932,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Engine vibration pitch (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Engine tick-over strength (0 = off)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Turn off the engine vibration effect in your SimHub Motion profile when using this, so the two don't clash.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI mode max performance</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Max performance follows SimHub's full angles with no limit on speed. Your rig is likely to hop or shift. Use at your own risk.</value></data>
 </root>

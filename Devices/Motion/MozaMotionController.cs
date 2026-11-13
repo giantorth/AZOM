@@ -280,23 +280,32 @@ namespace MozaPlugin.Devices.Motion
         public void SetAiPoseWanted(bool wanted) => _aiWanted = wanted;
 
         /// <summary>
-        /// AI mode follows pitch and roll 1:1, so the pose is held to the angles that move an actuator
-        /// <see cref="AiPoseTravelMm"/> from centre on this rig (asin(travel / half the actuator spacing));
-        /// 7° / 10° until the rig dimensions have been read. Whether the firmware limits larger
-        /// angles itself in this mode is untested.
+        /// AI mode: false (default) keeps every actuator within game mode's travel and caps speed and
+        /// acceleration (<see cref="AiPoseLimiter"/>); true follows the pose as posted, each of pitch
+        /// and roll held only to the angle that moves an actuator 65 mm, leaving the rest to the
+        /// controller's own soft limit.
         /// </summary>
-        public void GetAiPoseAngleLimits(out double pitchDeg, out double rollDeg)
+        public void SetAiMaxPerformance(bool on) => _aiMaxPerformance = on;
+        private volatile bool _aiMaxPerformance;
+
+        // The controller levels AI mode heave off as 25.5·tanh(f6 / 25.5) mm; f6 = 25.5·atanh(mm / 25.5) undoes it.
+        private const double AiHeaveScaleMm = 25.5, AiHeaveMaxShare = 0.9;
+        private const double MaxPerformanceAxisTravelMm = 65.0;
+        private readonly AiPoseLimiter _aiLimiter = new AiPoseLimiter();
+
+        /// <summary>Max Available Stroke as read from the controller (0.9 until it is), which scales the AI mode travel limits.</summary>
+        private double AiStrokeShare()
         {
-            pitchDeg = AngleLimit(Volatile.Read(ref _rigLength), 7.0);
-            rollDeg = AngleLimit(Volatile.Read(ref _rigWidth), 10.0);
+            float stroke = Volatile.Read(ref _maxStroke);
+            return float.IsNaN(stroke) ? 0.9 : Math.Max(0f, Math.Min(1f, stroke));
         }
 
-        private const double AiPoseTravelMm = 65.0;
-
-        private static double AngleLimit(float spacingMm, double fallbackDeg)
+        /// <summary>Half the actuator spacing along and across the rig (mm); a 1000 × 700 rig until read.</summary>
+        private void AiRigHalves(out double halfLength, out double halfWidth)
         {
-            if (float.IsNaN(spacingMm) || spacingMm < 2 * AiPoseTravelMm) return fallbackDeg;
-            return Math.Asin(AiPoseTravelMm / (spacingMm / 2.0)) * 180.0 / Math.PI;
+            float l = Volatile.Read(ref _rigLength), w = Volatile.Read(ref _rigWidth);
+            halfLength = (float.IsNaN(l) || l < 100f ? 1000f : l) / 2.0;
+            halfWidth = (float.IsNaN(w) || w < 100f ? 700f : w) / 2.0;
         }
 
         /// <summary>AI mode: multiplier on the engine vibration's frequency (1 = Motion Manager's 25–60 Hz).</summary>
@@ -854,7 +863,24 @@ namespace MozaPlugin.Devices.Motion
                     oh = _poseBlendFrom[2] + (h - _poseBlendFrom[2]) * k;
                 }
                 _poseSent[0] = op; _poseSent[1] = or; _poseSent[2] = oh;
-                frame.Fields[0] = op; frame.Fields[1] = or; frame.Fields[6] = oh + tickMm;
+                // Travel, speed and acceleration limits (AiPoseLimiter), then heave through the inverse
+                // of the controller's soft limit. The tick-over pulse rides on top, inside the travel.
+                AiRigHalves(out double halfLength, out double halfWidth);
+                if (_aiMaxPerformance)
+                {
+                    // As posted: only each angle's own bound (65 mm at an actuator), no combined travel or rate cap.
+                    double maxPitch = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfLength));
+                    double maxRoll = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfWidth));
+                    _aiLimiter.Reset(Math.Max(-maxPitch, Math.Min(maxPitch, op)), Math.Max(-maxRoll, Math.Min(maxRoll, or)), oh);
+                }
+                else
+                    _aiLimiter.Step(op, or, oh, dtMs / 1000.0, halfLength, halfWidth, AiStrokeShare(),
+                        AiPoseLimiter.SafeMaxSpeedMmS, AiPoseLimiter.SafeMaxAccelMmS2);
+                double mm = _aiLimiter.HeaveMm + tickMm;
+                double u = Math.Max(-AiHeaveMaxShare, Math.Min(AiHeaveMaxShare, mm / AiHeaveScaleMm));
+                frame.Fields[0] = (float)_aiLimiter.Pitch;
+                frame.Fields[1] = (float)_aiLimiter.Roll;
+                frame.Fields[6] = (float)(AiHeaveScaleMm * 0.5 * Math.Log((1.0 + u) / (1.0 - u)));
                 _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
                 frame.Fields[0] = p; frame.Fields[1] = r; frame.Fields[6] = h;
             }
@@ -1086,6 +1112,10 @@ namespace MozaPlugin.Devices.Motion
             _phase = MotionLanePhase.EnteringGame;
             _aiMode = _aiWanted;
             var target = StreamMode;
+            // Mode 3 on the way in levels the platform, so the limiter starts from a level pose.
+            _aiLimiter.Reset();
+            Array.Clear(_poseSent, 0, 3);
+            _poseLive = false;
             _nextFrameMs = 0;
             long start = _clock.ElapsedMilliseconds;
             bool runSent = false;

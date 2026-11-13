@@ -925,4 +925,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonhöhe der Motorvibration (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Stärke des Leerlaufpulses (0 = aus)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Schalten Sie dabei den Motorvibrationseffekt in Ihrem SimHub-Motion-Profil aus, damit sich beide nicht stören.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>KI-Modus: maximale Leistung</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Maximale Leistung folgt den vollen Winkeln von SimHub ohne Geschwindigkeitsbegrenzung. Ihr Rig wird wahrscheinlich hüpfen oder verrutschen. Benutzung auf eigene Gefahr.</value></data>
 </root>

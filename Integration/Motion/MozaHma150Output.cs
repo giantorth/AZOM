@@ -72,6 +72,24 @@ namespace MozaPlugin.Integration.Motion
         private int _engineVibrationPitch = 50;
         private int _engineTickover;
         private bool _aiPoseMode;
+        private bool _aiMaxPerformance;
+
+        /// <summary>
+        /// AI mode only, off by default. Off: the pose is kept inside game mode's behaviour (tilt
+        /// scaled to what game mode gives, every actuator within game mode's travel, speed and
+        /// acceleration capped). On: the pose's true angles with no speed or acceleration cap, which
+        /// can make the rig hop or shift.
+        /// </summary>
+        public bool AiMaxPerformance
+        {
+            get => _aiMaxPerformance;
+            set
+            {
+                if (_aiMaxPerformance == value) return;
+                _aiMaxPerformance = value;
+                Output?.ApplySettings();
+            }
+        }
 
         /// <summary>
         /// Pose source only, off by default: run the controller in its AI mode (mode 11), where the pose
@@ -302,9 +320,10 @@ namespace MozaPlugin.Integration.Motion
                         // on the track reads as "light" and held the full drop for 10 s (capture 13 Nov 2026).
                         if (game != null)
                             crestPush *= Math.Max(0.0, Math.Min(1.0, (Math.Abs(game.Fields[7]) - 5.0) / 10.0));
-                        lane.GetAiPoseAngleLimits(out double pitchLimit, out double rollLimit);
+                        // Max performance: the pose's true angles. Otherwise the share game mode turns into tilt.
+                        double tiltScale = currentSettings.AiMaxPerformance ? 1.0 : AiPoseLimiter.DefaultTiltShare;
                         lane.PostFrame(MotionGameFeed.PoseFrameAsPosition(pose.PitchDegrees, pose.RollDegrees,
-                            pose.HeaveMm, game, crestPush, pitchLimit, rollLimit));
+                            pose.HeaveMm, game, crestPush, tiltScale));
                     }
                     else
                         lane.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
@@ -332,6 +351,7 @@ namespace MozaPlugin.Integration.Motion
             lane.SetAiPoseWanted(Settings?.Source == MozaHma150Source.SimHubPose && Settings.AiPoseMode);
             lane.SetEngineVibrationPitch((float)Math.Pow(2.0, ((Settings?.EngineVibrationPitch ?? 50) - 50) / 25.0));
             lane.SetEngineTickover((Settings?.EngineTickover ?? 0) / 100f * 3f);
+            lane.SetAiMaxPerformance(Settings?.AiMaxPerformance == true);
             if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
             // Between plugin instances (SimHub game switch) there is nothing to ask: keep the last answer.
             if (MozaPlugin.Instance == null) return;

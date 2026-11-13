@@ -925,4 +925,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>发动机振动音调（50 = 正常）</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>发动机怠速脉冲强度（0 = 关闭）</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>使用此功能时，请关闭 SimHub Motion 配置文件中的发动机振动效果，以免两者冲突。</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI 模式最大性能</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>最大性能会跟随 SimHub 的完整角度，且不限制速度。您的设备很可能会跳动或移位。使用风险自负。</value></data>
 </root>

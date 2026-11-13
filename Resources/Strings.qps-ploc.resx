@@ -915,4 +915,6 @@
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Woof bark grr (50 = arf)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Woof bark-grr arf (0 = woof)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf woof bark grr, arf woof bark grr.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Woof bark grr arf woof</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf. Woof bark grr arf woof.</value></data>
 </root>

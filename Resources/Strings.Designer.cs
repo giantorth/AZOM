@@ -983,5 +983,7 @@ namespace MozaPlugin.Resources
         public static string Motion_Panel_EngineVibrationPitch => Get("Motion_Panel_EngineVibrationPitch");
         public static string Motion_Panel_EngineTickover => Get("Motion_Panel_EngineTickover");
         public static string Motion_Panel_EngineTickoverNote => Get("Motion_Panel_EngineTickoverNote");
+        public static string Motion_Panel_AiMaxPerformance => Get("Motion_Panel_AiMaxPerformance");
+        public static string Motion_Panel_AiMaxPerformanceWarning => Get("Motion_Panel_AiMaxPerformanceWarning");
     }
 }

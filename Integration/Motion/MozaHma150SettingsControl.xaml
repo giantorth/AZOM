@@ -82,6 +82,16 @@
                       Content="{x:Static res:Strings.Motion_Panel_AiPoseMode}"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="AiMaxPerformanceCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_AiMaxPerformance}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <TextBlock x:Name="AiMaxPerformanceWarning" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460"
+                       Foreground="OrangeRed" Text="{x:Static res:Strings.Motion_Panel_AiMaxPerformanceWarning}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_CrestBoost}"/>
             <Slider x:Name="CrestBoostSlider" Width="240" Minimum="0" Maximum="100" TickFrequency="5"
                     IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>

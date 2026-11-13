@@ -930,4 +930,6 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonehøyde for motorvibrasjon (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Styrke på tomgangspuls (0 = av)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Slå av motorvibrasjonseffekten i SimHub Motion-profilen din når du bruker denne, slik at de ikke kolliderer.</value></data>
+  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI-modus: maks ytelse</value></data>
+  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Riggen din vil sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
 </root>

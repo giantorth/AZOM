@@ -25,8 +25,8 @@ namespace MozaPlugin.Devices.Motion
         private const float HeaveAccelPerMm = 17f / 80f;
         // Bound on pose f6 (heave + crest push); travel levels off near 16 m/s².
         private const float PoseHeaveAccelLimit = 30f;
-        // AI mode (PoseFrameAsPosition): the controller levels heave off as 25.5·tanh(f6 / 25.5) mm.
-        private const double AiPoseHeaveScaleMm = 25.5;
+        // AI mode (PoseFrameAsPosition): the controller's heave tops out near 25 mm, so more is never asked.
+        private const double AiPoseHeaveLimitMm = 25.0;
         // Crest strength 100 in AI mode: the full crest push (30) is a 20 mm drop on top of the profile's heave.
         private const double AiPoseCrestDropMm = 20.0;
         private const double CrestPushMax = 30.0;
@@ -212,23 +212,25 @@ namespace MozaPlugin.Devices.Motion
         }
 
         /// <summary>
-        /// The pose frame for the controller's AI mode (mode 11), which follows the frame as positions:
-        /// f0/f1 are platform angles 1:1, held within <paramref name="pitchLimitDeg"/> /
-        /// <paramref name="rollLimitDeg"/> (what the actuators' travel can give), and f6 is a held heave
-        /// position. The controller eases heave off as mm = L·tanh(f6 / L), L = 25.5 (bench 12 Nov 2026);
-        /// sending L·atanh(mm / L) undoes that, so the platform sits where the profile asks up to 0.9 L
-        /// (about 23 mm). <paramref name="crestPush"/> comes off as a drop in mm, a full push being
-        /// <see cref="AiPoseCrestDropMm"/>. The shock fields are ignored in this mode.
+        /// The pose for the controller's AI mode (mode 11), which follows the frame as positions:
+        /// f0/f1 are the platform's angles 1:1 and f6 carries the wanted heave in mm, with
+        /// <paramref name="crestPush"/> taken off as a drop in mm (a full push being
+        /// <see cref="AiPoseCrestDropMm"/>). The lane applies its travel, speed and acceleration
+        /// limits and the inverse of the controller's heave soft limit before sending
+        /// (<see cref="AiPoseLimiter"/>, MozaMotionController.StreamTick). The shock fields are
+        /// ignored in this mode.
         /// </summary>
         public static MotionTelemetryFrame PoseFrameAsPosition(double pitchDegrees, double rollDegrees, double heaveMm,
-            MotionTelemetryFrame? game, double crestPush, double pitchLimitDeg, double rollLimitDeg)
+            MotionTelemetryFrame? game, double crestPush, double tiltScale)
         {
-            double pitch = Math.Max(-pitchLimitDeg, Math.Min(pitchLimitDeg, Finite(pitchDegrees)));
-            double roll = Math.Max(-rollLimitDeg, Math.Min(rollLimitDeg, Finite(rollDegrees)));
+            // tiltScale: share of the pose angle to tilt by (1 = the true angle; AiPoseLimiter.DefaultTiltShare without Max performance).
+            // ±30° only keeps the numbers sane; the lane's travel limit is the real bound.
+            double scale = Math.Max(0.0, Math.Min(1.0, Finite(tiltScale)));
+            double pitch = Math.Max(-30.0, Math.Min(30.0, Finite(pitchDegrees) * scale));
+            double roll = Math.Max(-30.0, Math.Min(30.0, Finite(rollDegrees) * scale));
             var f = PoseFrame(pitch, roll, 0.0, game);
             double mm = Finite(heaveMm) - Math.Max(0.0, Finite(crestPush)) * (AiPoseCrestDropMm / CrestPushMax);
-            double u = Math.Max(-0.9, Math.Min(0.9, mm / AiPoseHeaveScaleMm));
-            f.Fields[6] = (float)(AiPoseHeaveScaleMm * 0.5 * Math.Log((1.0 + u) / (1.0 - u)));
+            f.Fields[6] = (float)Math.Max(-AiPoseHeaveLimitMm, Math.Min(AiPoseHeaveLimitMm, mm));
             return f;
         }
 
