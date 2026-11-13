@@ -159,6 +159,13 @@ namespace MozaPlugin.Integration.Motion
                 if (s != null) s.SlowManualControl = SlowManualCheck.IsChecked == true;
             };
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
+            AiPoseCheck.IsChecked = settings?.AiPoseMode ?? false;
+            AiPoseCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.AiPoseMode = AiPoseCheck.IsChecked == true;
+                UpdateCornerHapticsEnabled();
+            };
             SyncCrestSlider();
             UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
@@ -186,15 +193,41 @@ namespace MozaPlugin.Integration.Motion
                 var s = _output?.Settings;
                 if (s != null) s.CrestBoost = value;
             };
+            EnginePitchSlider.ValueChanged += (_, __) =>
+            {
+                if (_crestSyncing) return;
+                int value = (int)Math.Round(EnginePitchSlider.Value);
+                _crestSyncing = true;
+                try { EnginePitchSlider.Value = value; }
+                finally { _crestSyncing = false; }
+                EnginePitchValue.Text = value.ToString(CultureInfo.CurrentCulture);
+                var s = _output?.Settings;
+                if (s != null) s.EngineVibrationPitch = value;
+            };
+            EngineTickSlider.ValueChanged += (_, __) =>
+            {
+                if (_crestSyncing) return;
+                int value = (int)Math.Round(EngineTickSlider.Value);
+                _crestSyncing = true;
+                try { EngineTickSlider.Value = value; }
+                finally { _crestSyncing = false; }
+                EngineTickValue.Text = value.ToString(CultureInfo.CurrentCulture);
+                var s = _output?.Settings;
+                if (s != null) s.EngineTickover = value;
+            };
         }
 
         private void SyncCrestSlider()
         {
             int value = _output?.Settings?.CrestBoost ?? 0;
+            int pitch = _output?.Settings?.EngineVibrationPitch ?? 50;
+            int tick = _output?.Settings?.EngineTickover ?? 0;
             _crestSyncing = true;
-            try { CrestBoostSlider.Value = value; }
+            try { CrestBoostSlider.Value = value; EnginePitchSlider.Value = pitch; EngineTickSlider.Value = tick; }
             finally { _crestSyncing = false; }
             CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+            EnginePitchValue.Text = pitch.ToString(CultureInfo.CurrentCulture);
+            EngineTickValue.Text = tick.ToString(CultureInfo.CurrentCulture);
         }
 
         /// <summary>The haptics choice and the crest strength only apply to the pose source.</summary>
@@ -203,6 +236,12 @@ namespace MozaPlugin.Integration.Motion
             bool pose = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
             CornerHapticsCheck.IsEnabled = pose;
             CrestBoostSlider.IsEnabled = pose;
+            // AI mode belongs to the pose source; the engine pitch and tick-over only exist in AI mode.
+            bool ai = pose && _output?.Settings?.AiPoseMode == true;
+            AiPoseCheck.IsEnabled = pose;
+            EnginePitchSlider.IsEnabled = ai;
+            EngineTickSlider.IsEnabled = ai;
+            EngineTickNote.IsEnabled = ai;
         }
 
         // ------------------------------------------------------------ motion effects

@@ -921,4 +921,8 @@ Id : {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Déclenchement</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Impulsion</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Moteur</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Mode IA : la plateforme suit le pilonnement, le tangage et le roulis de SimHub comme des positions</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Hauteur de la vibration moteur (50 = normale)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Force du ralenti moteur (0 = désactivé)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Désactivez l'effet de vibration moteur de votre profil SimHub Motion lorsque vous l'utilisez, pour éviter tout conflit.</value></data>
 </root>

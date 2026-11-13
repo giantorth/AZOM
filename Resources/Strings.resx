@@ -928,4 +928,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Trigger</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Pulse</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Engine</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>AI mode: the platform follows SimHub's heave, pitch and roll as positions</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Engine vibration pitch (50 = normal)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Engine tick-over strength (0 = off)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Turn off the engine vibration effect in your SimHub Motion profile when using this, so the two don't clash.</value></data>
 </root>

@@ -25,6 +25,11 @@ namespace MozaPlugin.Devices.Motion
         private const float HeaveAccelPerMm = 17f / 80f;
         // Bound on pose f6 (heave + crest push); travel levels off near 16 m/s².
         private const float PoseHeaveAccelLimit = 30f;
+        // AI mode (PoseFrameAsPosition): the controller levels heave off as 25.5·tanh(f6 / 25.5) mm.
+        private const double AiPoseHeaveScaleMm = 25.5;
+        // Crest strength 100 in AI mode: the full crest push (30) is a 20 mm drop on top of the profile's heave.
+        private const double AiPoseCrestDropMm = 20.0;
+        private const double CrestPushMax = 30.0;
         // Crest signal (docs/protocol/motion/game-stream-0x22.md § Plugin mapping): low-passed
         // vertical accel, one-sided past a dead band, so crests pass and short bumps don't.
         private const double HeaveSlowSeconds = 0.2;
@@ -158,6 +163,7 @@ namespace MozaPlugin.Devices.Motion
             f.ThrottlePercent = Percent(d.Throttle);
             // Engine off: no tone. Motion Manager keeps its 25 Hz idle buzz here; testers prefer silence.
             f.EngineRpm = d.Rpms > EngineOffRpm ? (float)d.Rpms : -1f;
+            f.EngineRpmFraction = d.Rpms > 0 ? (float)Haptics.EngineVibrationMath.RedlineFraction(d.Rpms, d.MaxRpm) : 0f;
             f.Throttle = (float)(d.Throttle / 100.0);
 
             string gear = d.Gear ?? string.Empty;
@@ -192,6 +198,7 @@ namespace MozaPlugin.Devices.Motion
                 f.BrakePercent = game.BrakePercent;
                 f.ThrottlePercent = game.ThrottlePercent;
                 f.EngineRpm = game.EngineRpm;
+                f.EngineRpmFraction = game.EngineRpmFraction;
                 f.Throttle = game.Throttle;
                 f.Flags = game.Flags;
             }
@@ -201,6 +208,27 @@ namespace MozaPlugin.Devices.Motion
             f.Fields[6] = (float)Math.Max(-PoseHeaveAccelLimit, Math.Min(PoseHeaveAccelLimit, heaveAccel));
             for (int k = 0; k < 4; k++)
                 f.Fields[8 + k] = MotionTelemetryFrame.ShockRestMm[k];
+            return f;
+        }
+
+        /// <summary>
+        /// The pose frame for the controller's AI mode (mode 11), which follows the frame as positions:
+        /// f0/f1 are platform angles 1:1, held within <paramref name="pitchLimitDeg"/> /
+        /// <paramref name="rollLimitDeg"/> (what the actuators' travel can give), and f6 is a held heave
+        /// position. The controller eases heave off as mm = L·tanh(f6 / L), L = 25.5 (bench 12 Nov 2026);
+        /// sending L·atanh(mm / L) undoes that, so the platform sits where the profile asks up to 0.9 L
+        /// (about 23 mm). <paramref name="crestPush"/> comes off as a drop in mm, a full push being
+        /// <see cref="AiPoseCrestDropMm"/>. The shock fields are ignored in this mode.
+        /// </summary>
+        public static MotionTelemetryFrame PoseFrameAsPosition(double pitchDegrees, double rollDegrees, double heaveMm,
+            MotionTelemetryFrame? game, double crestPush, double pitchLimitDeg, double rollLimitDeg)
+        {
+            double pitch = Math.Max(-pitchLimitDeg, Math.Min(pitchLimitDeg, Finite(pitchDegrees)));
+            double roll = Math.Max(-rollLimitDeg, Math.Min(rollLimitDeg, Finite(rollDegrees)));
+            var f = PoseFrame(pitch, roll, 0.0, game);
+            double mm = Finite(heaveMm) - Math.Max(0.0, Finite(crestPush)) * (AiPoseCrestDropMm / CrestPushMax);
+            double u = Math.Max(-0.9, Math.Min(0.9, mm / AiPoseHeaveScaleMm));
+            f.Fields[6] = (float)(AiPoseHeaveScaleMm * 0.5 * Math.Log((1.0 + u) / (1.0 - u)));
             return f;
         }
 

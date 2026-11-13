@@ -921,4 +921,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Kích hoạt</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Xung</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Động cơ</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Chế độ AI: bệ chuyển động bám theo heave, pitch và roll của SimHub như các vị trí</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Cao độ rung động cơ (50 = bình thường)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Cường độ nhịp cầm chừng của động cơ (0 = tắt)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Khi dùng tính năng này, hãy tắt hiệu ứng rung động cơ trong hồ sơ SimHub Motion để hai hiệu ứng không xung đột.</value></data>
 </root>

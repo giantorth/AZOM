@@ -921,4 +921,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>触发</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>脉冲</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>引擎</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>AI 模式：平台将 SimHub 的升沉、俯仰和侧倾作为位置跟随</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>发动机振动音调（50 = 正常）</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>发动机怠速脉冲强度（0 = 关闭）</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>使用此功能时，请关闭 SimHub Motion 配置文件中的发动机振动效果，以免两者冲突。</value></data>
 </root>

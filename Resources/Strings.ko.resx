@@ -920,4 +920,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>트리거</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>펄스</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>엔진</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>AI 모드: 플랫폼이 SimHub의 히브, 피치, 롤을 위치로 따라갑니다</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>엔진 진동 음높이 (50 = 기본)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>엔진 공회전 강도 (0 = 끔)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>이 기능을 사용할 때는 서로 겹치지 않도록 SimHub Motion 프로필의 엔진 진동 효과를 끄세요.</value></data>
 </root>

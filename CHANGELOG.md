@@ -15,6 +15,8 @@ All notable changes to the AZOM plugin are documented here.
 - **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
 - **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
+- **HMA150 AI mode (SimHub Motion profile source, off by default);** the platform follows SimHub's heave, pitch and roll as positions, so heave holds and nothing springs back. Heave reaches about 23 mm each way and tilt is the true angle, so it leans more than game mode.
+- **HMA150 engine tick-over strength and engine vibration pitch (AI mode);** a low-rev heave pulse that hands over to the controller's engine vibration as revs rise, and a slider for a finer or coarser buzz. Turn off the SimHub profile's own engine vibration effect when using the tick-over.
 - **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
 - **Linux permission banner;** warns when your user can't open a MOZA serial or HID device node and names the missing udev rule.
 

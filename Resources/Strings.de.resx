@@ -921,4 +921,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Auslöser</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>KI-Modus: Die Plattform folgt Hub, Nicken und Rollen von SimHub als Positionen</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonhöhe der Motorvibration (50 = normal)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Stärke des Leerlaufpulses (0 = aus)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Schalten Sie dabei den Motorvibrationseffekt in Ihrem SimHub-Motion-Profil aus, damit sich beide nicht stören.</value></data>
 </root>

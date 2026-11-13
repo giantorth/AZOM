@@ -926,4 +926,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Disparo</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Pulso</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Modo IA: la plataforma sigue la elevación, el cabeceo y el balanceo de SimHub como posiciones</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tono de la vibración del motor (50 = normal)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Fuerza del ralentí del motor (0 = desactivado)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Al usarlo, desactiva el efecto de vibración del motor en tu perfil de SimHub Motion para que no choquen.</value></data>
 </root>

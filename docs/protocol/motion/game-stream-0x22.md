@@ -173,6 +173,51 @@ judged good, not yet retuned. And because the Heave effect is a washout that lev
 30 mm, the platform answers the start and the end of a push, not its length, and a push of
 30 is already at the top of what f6 can ask for.
 
+### AI mode (controller mode 11): the same frame followed as positions
+
+With *AI mode* ticked (pose source only, off by default) the lane enters mode 11 instead of
+mode 1 and sends the same `0x22/00` frame, which the controller then follows as a pose rather
+than cueing from it. Bench, fw 2.35, 12–13 Nov 2026, slots pitch 1.0 / 0.2, roll 1.0 / 0.2,
+heave 1.0 / 0, f7 40 m/s, displacement read from the 60 s `Output Displacement` line with a step
+timed against it (±30 ms from the frame interval):
+
+| Input held | Time into the step | Displacement |
+|------------|--------------------|--------------|
+| f6 +3 | 0.15 s / 0.48 s / 5.0 s | 1.09 / 2.986 / 2.986 mm, all four actuators |
+| f6 +6 | 0.13 s | 1.87 mm |
+| f6 +10 | 0.15 s / 0.23 s / 0.40 s | 4.58 / 8.97 / 9.51 mm |
+| f6 −10 | 0.38 s | −9.51 mm |
+| f6 ±20 (ramped, held 3 s) | 7 s | ±16.72 mm |
+| f8–f11 all +5 mm | 0.48 s / 5.0 s | 0.00 mm |
+| f0 +2° | 5.0 s | 17.63 / −17.31 / −17.31 / 17.63 mm (1029 mm long rig: 17.96 mm is 2°) |
+| f1 +2° | 5.0 s | −11.90 / −11.90 / 12.23 / 12.23 mm (700 mm wide rig: 12.2 mm is 2°) |
+
+- f6 is a **held heave position**: mm = 25.5 · tanh(f6 / 25.5), so 1 mm per unit near centre and
+  a soft limit near ±25 mm. It does not wash out.
+- The step response is a smoothing filter, not a speed limit: the same share of the step at
+  0.14 s for 3, 6 and 10 mm (about half), done by ~0.3 s. A 30–50 ms bump is rounded off.
+- f0 / f1 are the platform's angles 1:1 at intensity 1.0 (game mode gives roughly half to
+  three quarters of the angle), and hold. The shock fields are ignored.
+- `0x22/09` engine vibration is rendered as in game mode (felt at strength 50 / tactile 40).
+- Untested in this mode: f4 / f5, road detail, `0x22/07` / `0x22/08`, how the slots'
+  intensity and smoothness scale it, and whether the firmware limits angles beyond the travel.
+
+Mode 12 (flight-sim game) takes `0x22/01` — `7E 2D 22 12 01`, ten floats (pitch, roll,
+heading, angular velocity X/Y/Z, ACCX, ACCY, ACCZ, VelocityX), brake, throttle, `00`, in-game
+flag, per Motion Manager's `SuTelemetry_GameTelemtry2` — and washes heave out like mode 1
+(ACCZ +3: 10.75 mm at 0.49 s, 0.0003 mm at 5 s; pitch +2° holds at 13.2 mm).
+
+What the plugin sends in AI mode (`MotionGameFeed.PoseFrameAsPosition`, `MozaMotionController.StreamTick`):
+
+| Part | Rule |
+|------|------|
+| f6 | 25.5 · atanh(mm / 25.5), mm held within ±0.9 · 25.5, which undoes the soft limit: the platform sits where the profile's heave asks up to about 23 mm |
+| Crest strength | taken off as a drop in mm (strength 100 = up to 20 mm), none below 5 m/s and full from 15 m/s: a car being placed on track reads as "light" and held the drop for 10 s |
+| f0 / f1 | held to the angle that moves an actuator 65 mm on this rig (asin of 65 mm over half the actuator spacing from `0x1F/08`; 7° / 10° until that is read) |
+| Source changes | f0, f1 and f6 ease over 2.5 s whenever the stream flips between a live pose and neutral frames (game start, pause, exit, SimHub idle, stale data) |
+| Engine tick-over | strength 0–100 = a heave pulse of up to 3 mm added to f6 at rpm / 230 Hz (4–11 Hz), each pulse with its own height, length and timing, +40 % with throttle, up to 2.5× for 2.5 s after the engine fires; gone between 40 % and 70 % of the redline. A pulse rendered by the profile's own engine effect is sampled at the 33 Hz frame rate and arrives uneven (0.15 mm at idle, 0.7 mm at 6000 rpm in a capture), hence this one |
+| `0x22/09` | with a tick-over strength set it fades in over 30–55 % of the redline; *Engine vibration pitch* multiplies f₀ by 2^((value − 50) / 25) (f₀ kept within 20–250 Hz) and divides the gains by that factor^1.5. The engine counts as running from 500 rpm (iRacing reports a few hundred for a car that is not started) |
+
 The pose is `FinalMotionState` (corner haptics folded in) while *Include SimHub corner haptics*
 is on (default), else `MotionState`; haptics that write heave directly (engine, touchdown) are
 in both. They run at 7–50 Hz against a ~33 Hz frame rate, so the fast ones alias. The
@@ -280,5 +325,8 @@ controller ramps to each setpoint at its own slow rate, also for a −1 → +1 j
 The plugin uses mode 2 as a slow follow target while SimHub's Manual control or Hop-in position
 is the motion source (`MozaMotionController.ManualSetpointTick`): each axis is re-sent when it
 moves by 0.5 %, at most every 100 ms. The controller (fw 2.35) accepts that stream and keeps
-ramping towards the latest target. Rates above 10 Hz per axis are untested. Unlike game mode, a
+ramping towards the latest target. Rates above 10 Hz per axis are untested. The ramp is a speed
+limit with a soft start and stop, about 25 mm/s of heave whatever the step (bench 12 Nov 2026:
+a +0.2 and a +0.5 step both read 7.1–7.2 mm after 0.38 s; +0.5 read 21.7 mm at 0.98 s and
+26.6 mm at 2.5 s; full scale ±1 is about ±56 mm), so mode 2 cannot carry a game's heave. Unlike game mode, a
 held heave setpoint stays put (game mode washes a steady shock offset out).

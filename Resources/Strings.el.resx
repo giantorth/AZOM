@@ -920,4 +920,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Ενεργοποίηση</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Παλμός</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Κινητήρας</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Λειτουργία AI: η πλατφόρμα ακολουθεί την ανύψωση, την κλίση και την περιστροφή του SimHub ως θέσεις</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Τόνος δόνησης κινητήρα (50 = κανονικός)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Ένταση ρελαντί κινητήρα (0 = ανενεργό)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Όταν το χρησιμοποιείτε, απενεργοποιήστε το εφέ δόνησης κινητήρα στο προφίλ SimHub Motion, ώστε να μη συγκρούονται.</value></data>
 </root>

@@ -926,4 +926,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Utløser</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>AI-modus: plattformen følger SimHubs hiv, stamp og rull som posisjoner</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonehøyde for motorvibrasjon (50 = normal)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Styrke på tomgangspuls (0 = av)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Slå av motorvibrasjonseffekten i SimHub Motion-profilen din når du bruker denne, slik at de ikke kolliderer.</value></data>
 </root>

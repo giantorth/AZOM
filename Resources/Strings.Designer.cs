@@ -979,5 +979,9 @@ namespace MozaPlugin.Resources
         public static string Section_ShakeItTrigger => Get("Section_ShakeItTrigger");
         public static string Section_ShakeItPulse => Get("Section_ShakeItPulse");
         public static string Section_ShakeItEngine => Get("Section_ShakeItEngine");
+        public static string Motion_Panel_AiPoseMode => Get("Motion_Panel_AiPoseMode");
+        public static string Motion_Panel_EngineVibrationPitch => Get("Motion_Panel_EngineVibrationPitch");
+        public static string Motion_Panel_EngineTickover => Get("Motion_Panel_EngineTickover");
+        public static string Motion_Panel_EngineTickoverNote => Get("Motion_Panel_EngineTickoverNote");
     }
 }

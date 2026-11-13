@@ -1,0 +1,62 @@
+{
+  "Motion_Panel_AiPoseMode": {
+    "en": "AI mode: the platform follows SimHub's heave, pitch and roll as positions",
+    "de": "KI-Modus: Die Plattform folgt Hub, Nicken und Rollen von SimHub als Positionen",
+    "el": "Λειτουργία AI: η πλατφόρμα ακολουθεί την ανύψωση, την κλίση και την περιστροφή του SimHub ως θέσεις",
+    "es": "Modo IA: la plataforma sigue la elevación, el cabeceo y el balanceo de SimHub como posiciones",
+    "fr": "Mode IA : la plateforme suit le pilonnement, le tangage et le roulis de SimHub comme des positions",
+    "it": "Modalità IA: la piattaforma segue sussulto, beccheggio e rollio di SimHub come posizioni",
+    "ko": "AI 모드: 플랫폼이 SimHub의 히브, 피치, 롤을 위치로 따라갑니다",
+    "nb": "AI-modus: plattformen følger SimHubs hiv, stamp og rull som posisjoner",
+    "pt": "Modo IA: a plataforma segue a elevação, a arfagem e o rolamento do SimHub como posições",
+    "qps-ploc": "Woof bark: grr arf woof bark grr arf woof bark grr",
+    "ru": "Режим ИИ: платформа следует вертикали, тангажу и крену SimHub как позициям",
+    "vi": "Chế độ AI: bệ chuyển động bám theo heave, pitch và roll của SimHub như các vị trí",
+    "zh-Hans": "AI 模式：平台将 SimHub 的升沉、俯仰和侧倾作为位置跟随"
+  },
+  "Motion_Panel_EngineVibrationPitch": {
+    "en": "Engine vibration pitch (50 = normal)",
+    "de": "Tonhöhe der Motorvibration (50 = normal)",
+    "el": "Τόνος δόνησης κινητήρα (50 = κανονικός)",
+    "es": "Tono de la vibración del motor (50 = normal)",
+    "fr": "Hauteur de la vibration moteur (50 = normale)",
+    "it": "Tonalità della vibrazione motore (50 = normale)",
+    "ko": "엔진 진동 음높이 (50 = 기본)",
+    "nb": "Tonehøyde for motorvibrasjon (50 = normal)",
+    "pt": "Tom da vibração do motor (50 = normal)",
+    "qps-ploc": "Woof bark grr (50 = arf)",
+    "ru": "Высота вибрации двигателя (50 = обычная)",
+    "vi": "Cao độ rung động cơ (50 = bình thường)",
+    "zh-Hans": "发动机振动音调（50 = 正常）"
+  },
+  "Motion_Panel_EngineTickover": {
+    "en": "Engine tick-over strength (0 = off)",
+    "de": "Stärke des Leerlaufpulses (0 = aus)",
+    "el": "Ένταση ρελαντί κινητήρα (0 = ανενεργό)",
+    "es": "Fuerza del ralentí del motor (0 = desactivado)",
+    "fr": "Force du ralenti moteur (0 = désactivé)",
+    "it": "Forza del minimo motore (0 = disattivato)",
+    "ko": "엔진 공회전 강도 (0 = 끔)",
+    "nb": "Styrke på tomgangspuls (0 = av)",
+    "pt": "Força do ralenti do motor (0 = desligado)",
+    "qps-ploc": "Woof bark-grr arf (0 = woof)",
+    "ru": "Сила холостого хода двигателя (0 = выкл.)",
+    "vi": "Cường độ nhịp cầm chừng của động cơ (0 = tắt)",
+    "zh-Hans": "发动机怠速脉冲强度（0 = 关闭）"
+  },
+  "Motion_Panel_EngineTickoverNote": {
+    "en": "Turn off the engine vibration effect in your SimHub Motion profile when using this, so the two don't clash.",
+    "de": "Schalten Sie dabei den Motorvibrationseffekt in Ihrem SimHub-Motion-Profil aus, damit sich beide nicht stören.",
+    "el": "Όταν το χρησιμοποιείτε, απενεργοποιήστε το εφέ δόνησης κινητήρα στο προφίλ SimHub Motion, ώστε να μη συγκρούονται.",
+    "es": "Al usarlo, desactiva el efecto de vibración del motor en tu perfil de SimHub Motion para que no choquen.",
+    "fr": "Désactivez l'effet de vibration moteur de votre profil SimHub Motion lorsque vous l'utilisez, pour éviter tout conflit.",
+    "it": "Quando lo usi, disattiva l'effetto vibrazione motore nel tuo profilo SimHub Motion, così i due non si sovrappongono.",
+    "ko": "이 기능을 사용할 때는 서로 겹치지 않도록 SimHub Motion 프로필의 엔진 진동 효과를 끄세요.",
+    "nb": "Slå av motorvibrasjonseffekten i SimHub Motion-profilen din når du bruker denne, slik at de ikke kolliderer.",
+    "pt": "Ao usar isto, desligue o efeito de vibração do motor no seu perfil do SimHub Motion, para que os dois não entrem em conflito.",
+    "qps-ploc": "Woof bark grr arf woof bark grr arf woof bark grr arf woof bark grr, arf woof bark grr.",
+    "ru": "При использовании отключите эффект вибрации двигателя в профиле SimHub Motion, чтобы они не мешали друг другу.",
+    "vi": "Khi dùng tính năng này, hãy tắt hiệu ứng rung động cơ trong hồ sơ SimHub Motion để hai hiệu ứng không xung đột.",
+    "zh-Hans": "使用此功能时，请关闭 SimHub Motion 配置文件中的发动机振动效果，以免两者冲突。"
+  }
+}

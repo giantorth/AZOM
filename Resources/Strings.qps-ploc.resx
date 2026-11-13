@@ -911,4 +911,8 @@
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Bork go!</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Thump-thump!</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Vroom-vroom!</value></data>
+  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Woof bark: grr arf woof bark grr arf woof bark grr</value></data>
+  <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Woof bark grr (50 = arf)</value></data>
+  <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Woof bark-grr arf (0 = woof)</value></data>
+  <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf woof bark grr, arf woof bark grr.</value></data>
 </root>
