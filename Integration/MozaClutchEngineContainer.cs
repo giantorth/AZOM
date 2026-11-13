@@ -168,19 +168,23 @@ namespace MozaPlugin.Integration
 
         protected override UserControl GetEditControl()
         {
+            // Width only shapes the Fade ramp.
+            var width = Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
+                MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct);
+            void ShowWidth() => width.Visibility = ClosedMode == MozaClutchClosedMode.Fade ? Visibility.Visible : Visibility.Collapsed;
+            ShowWidth();
+
             var panel = new StackPanel();
             panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
-            panel.Children.Add(ClosedModePicker());
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
-                MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct));
-            panel.Children.Add(Slider(Strings.SliderLabel_Cylinders, nameof(Cylinders), CylindersMin, CylindersMax));
-            panel.Children.Add(Slider(Strings.SliderLabel_MaxFrequencyHz, nameof(MaxFrequencyHz),
-                MaxFrequencyMinHz, MaxFrequencyMaxHz, 5));
-            panel.Children.Add(Slider(Strings.SliderLabel_IdleStrength, nameof(IdleStrengthPct), 0, 100));
+            panel.Children.Add(EditorSections.Section(Strings.Label_ClutchClosed, ClosedModePicker(ShowWidth), width));
+            panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItEngine,
+                Slider(Strings.SliderLabel_Cylinders, nameof(Cylinders), CylindersMin, CylindersMax),
+                Slider(Strings.SliderLabel_MaxFrequencyHz, nameof(MaxFrequencyHz), MaxFrequencyMinHz, MaxFrequencyMaxHz, 5),
+                Slider(Strings.SliderLabel_IdleStrength, nameof(IdleStrengthPct), 0, 100)));
             return new UserControl { Content = panel, DataContext = this };
         }
 
-        private FrameworkElement ClosedModePicker()
+        private FrameworkElement ClosedModePicker(Action changed)
         {
             var combo = new ComboBox { MinWidth = 160, Margin = new Thickness(8, 0, 0, 0) };
             combo.Items.Add(Strings.Option_ClutchClosedFade);
@@ -189,10 +193,12 @@ namespace MozaPlugin.Integration
             combo.SelectedIndex = (int)ClosedMode;
             combo.SelectionChanged += (s, e) =>
             {
-                if (combo.SelectedIndex >= 0) ClosedMode = (MozaClutchClosedMode)combo.SelectedIndex;
+                if (combo.SelectedIndex < 0) return;
+                ClosedMode = (MozaClutchClosedMode)combo.SelectedIndex;
+                changed();
             };
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
-            row.Children.Add(new TextBlock { Text = Strings.Label_ClutchClosed, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBlock { Text = Strings.SliderLabel_Mode, VerticalAlignment = VerticalAlignment.Center });
             row.Children.Add(combo);
             return row;
         }

@@ -922,4 +922,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Tu usuario de Linux no puede abrir {0}, así que el plugin no puede conectarse a él.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Tu usuario de Linux no puede abrir {0}, así que faltan las entradas de dirección, pedales y botones.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Añade una regla de udev que asigne TAG+="uaccess" a los dispositivos MOZA (idVendor 346e) en el subsistema {0} y luego desconéctalos y vuelve a conectarlos.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Embrague</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Disparo</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Pulso</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
 </root>

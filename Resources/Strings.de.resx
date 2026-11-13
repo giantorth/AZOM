@@ -917,4 +917,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ihr Linux-Benutzer kann {0} nicht öffnen, daher kann das Plugin keine Verbindung herstellen.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Ihr Linux-Benutzer kann {0} nicht öffnen, daher fehlen Lenkungs-, Pedal- und Tasteneingaben.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Fügen Sie eine udev-Regel hinzu, die MOZA-Geräten (idVendor 346e) im Subsystem {0} TAG+="uaccess" zuweist, und stecken Sie sie anschließend ab und wieder an.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Kupplung</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Auslöser</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
 </root>

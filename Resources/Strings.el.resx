@@ -916,4 +916,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ο χρήστης Linux σας δεν μπορεί να ανοίξει το {0}, οπότε το πρόσθετο δεν μπορεί να συνδεθεί σε αυτό.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Ο χρήστης Linux σας δεν μπορεί να ανοίξει το {0}, οπότε λείπουν οι είσοδοι τιμονιού, πεντάλ και κουμπιών.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Προσθέστε έναν κανόνα udev που δίνει στις συσκευές MOZA (idVendor 346e) TAG+="uaccess" στο υποσύστημα {0} και, στη συνέχεια, αποσυνδέστε τις και συνδέστε τις ξανά.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Συμπλέκτης</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Ενεργοποίηση</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Παλμός</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Κινητήρας</value></data>
 </root>

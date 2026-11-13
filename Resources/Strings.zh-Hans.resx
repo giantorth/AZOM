@@ -917,4 +917,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此插件无法连接到该设备。</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此缺少方向盘、踏板和按键输入。</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>添加一条 udev 规则，在 {0} 子系统中为 MOZA 设备（idVendor 346e）设置 TAG+="uaccess"，然后拔下并重新插入设备。</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>离合器</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>触发</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>脉冲</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>引擎</value></data>
 </root>

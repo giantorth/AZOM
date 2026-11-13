@@ -916,4 +916,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux 사용자가 {0}을(를) 열 수 없어 플러그인이 연결할 수 없습니다.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Linux 사용자가 {0}을(를) 열 수 없어 스티어링, 페달 및 버튼 입력이 누락됩니다.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>{0} 서브시스템에서 MOZA 장치(idVendor 346e)에 TAG+="uaccess"를 부여하는 udev 규칙을 추가한 다음 장치를 뽑았다가 다시 연결하세요.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>클러치</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>트리거</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>펄스</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>엔진</value></data>
 </root>

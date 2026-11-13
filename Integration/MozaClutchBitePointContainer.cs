@@ -180,22 +180,24 @@ namespace MozaPlugin.Integration
 
         protected override UserControl GetEditControl()
         {
-            var panel = new StackPanel();
-            // Calibration, the Calibrated/Manual picker and Trigger Input Level.
-            panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
-            panel.Children.Add(DirectionPicker());
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
-                MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct));
             var predict = new CheckBox { Content = Strings.Label_BitePrediction, Margin = new Thickness(0, 0, 0, 6) };
             predict.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(Predict)) { Mode = BindingMode.TwoWay });
-            panel.Children.Add(predict);
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteMinLength, nameof(MinLengthMs),
-                MBoosterUiConstants.BitePointMinLengthMinMs, MBoosterUiConstants.BitePointMinLengthMaxMs, 10));
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteMaxLength, nameof(MaxLengthMs),
-                MBoosterUiConstants.BitePointMaxLengthMinMs, MBoosterUiConstants.BitePointMaxLengthMaxMs, 50));
-            panel.Children.Add(Slider(Strings.SliderLabel_PulseRateHz, nameof(PulseRateHz),
-                MBoosterUiConstants.BitePointPulseRateMinHz, MBoosterUiConstants.BitePointPulseRateMaxHz));
-            panel.Children.Add(Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100));
+
+            var panel = new StackPanel();
+            panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
+            panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItTrigger,
+                DirectionPicker(),
+                Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
+                    MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct),
+                predict));
+            panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItPulse,
+                Slider(Strings.SliderLabel_BiteMinLength, nameof(MinLengthMs),
+                    MBoosterUiConstants.BitePointMinLengthMinMs, MBoosterUiConstants.BitePointMinLengthMaxMs, 10),
+                Slider(Strings.SliderLabel_BiteMaxLength, nameof(MaxLengthMs),
+                    MBoosterUiConstants.BitePointMaxLengthMinMs, MBoosterUiConstants.BitePointMaxLengthMaxMs, 50),
+                Slider(Strings.SliderLabel_PulseRateHz, nameof(PulseRateHz),
+                    MBoosterUiConstants.BitePointPulseRateMinHz, MBoosterUiConstants.BitePointPulseRateMaxHz),
+                Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100)));
             return new UserControl { Content = panel, DataContext = this };
         }
 

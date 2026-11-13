@@ -907,4 +907,8 @@
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Woof Grr {0} Bork Boof Awoo Yowl!</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Woof Grr {0} Bork Yip Wuff Barff Awoo!</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Bork udev Woof MOZA (idVendor 346e) TAG+="uaccess" Grr {0} Boof Yip Awoo!</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Wroof!</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Bork go!</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Thump-thump!</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Vroom-vroom!</value></data>
 </root>

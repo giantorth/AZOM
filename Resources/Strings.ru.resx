@@ -917,4 +917,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому плагин не может к нему подключиться.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому нет данных руля, педалей и кнопок.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Добавьте правило udev, назначающее устройствам MOZA (idVendor 346e) TAG+="uaccess" в подсистеме {0}, затем отключите и снова подключите их.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Сцепление</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Срабатывание</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Импульс</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Двигатель</value></data>
 </root>

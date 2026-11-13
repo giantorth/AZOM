@@ -922,4 +922,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så programtillegget kan ikke koble til.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så ratt-, pedal- og knappeinndata mangler.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Legg til en udev-regel som gir MOZA-enheter (idVendor 346e) TAG+="uaccess" i delsystemet {0}, og koble dem deretter fra og til igjen.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Clutch</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Utløser</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
 </root>

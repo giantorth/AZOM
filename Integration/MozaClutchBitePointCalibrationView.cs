@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Resources;
 using MozaPlugin.UI;
+using SimHub.Plugins.Styles;
 using SimHub.Plugins.UI;
 
 namespace MozaPlugin.Integration
@@ -21,9 +22,20 @@ namespace MozaPlugin.Integration
         int TriggerLevelPct { get; set; }
     }
 
+    /// <summary>Titled sub-sections for the ShakeIt clutch effect editors, as SimHub's own output editors use.</summary>
+    internal static class EditorSections
+    {
+        public static SHSubSection Section(string title, params UIElement[] children)
+        {
+            var panel = new StackPanel();
+            foreach (var child in children) panel.Children.Add(child);
+            return new SHSubSection { Title = title, Content = panel };
+        }
+    }
+
     /// <summary>
-    /// Clutch source, calibration, Calibrated/Manual picker and Trigger Input
-    /// Level for the ShakeIt clutch effect editors — the same plugin state the
+    /// Clutch and Bite Point sections (clutch source, calibration, Calibrated/Manual
+    /// picker and Trigger Input Level) for the ShakeIt clutch effect editors — the same plugin state the
     /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). Trigger Input
     /// Level shows the calibrated value read-only while it is in use, else the
     /// effect's editable fallback. Polls while on screen.
@@ -78,7 +90,7 @@ namespace MozaPlugin.Integration
 
             _useCalibrated.Items.Add(Strings.Option_BitePointCalibrated);
             _useCalibrated.Items.Add(Strings.Option_BitePointManual);
-            _useCalibratedRow.Children.Add(new TextBlock { Text = Strings.SliderLabel_Trigger, VerticalAlignment = VerticalAlignment.Center });
+            _useCalibratedRow.Children.Add(new TextBlock { Text = Strings.SliderLabel_Mode, VerticalAlignment = VerticalAlignment.Center });
             _useCalibratedRow.Children.Add(_useCalibrated);
 
             _trigger = new TitledSlider
@@ -102,14 +114,11 @@ namespace MozaPlugin.Integration
             sourceRow.Children.Add(_sourceFormula);
             sourceRow.Children.Add(_sourceValue);
 
-            var root = new StackPanel { Margin = new Thickness(0, 0, 0, 6) };
-            root.Children.Add(sourceRow);
-            root.Children.Add(_sourceFormulaText);
-            root.Children.Add(_hidPicker);
-            root.Children.Add(header);
-            root.Children.Add(_auto);
-            root.Children.Add(_useCalibratedRow);
-            root.Children.Add(_trigger);
+            var root = new StackPanel();
+            root.Children.Add(EditorSections.Section(Strings.Section_ShakeItClutch,
+                sourceRow, _sourceFormulaText, _hidPicker));
+            root.Children.Add(EditorSections.Section(Strings.Section_BitePoint,
+                header, _auto, _useCalibratedRow, _trigger));
             Content = root;
 
             _calibrate.Click += (s, e) => MozaPlugin.Instance?.ToggleBitePointCalibration();

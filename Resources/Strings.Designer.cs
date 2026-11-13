@@ -975,5 +975,9 @@ namespace MozaPlugin.Resources
         public static string Banner_LinuxAccess_TtyFmt => Get("Banner_LinuxAccess_TtyFmt");
         public static string Banner_LinuxAccess_HidFmt => Get("Banner_LinuxAccess_HidFmt");
         public static string Banner_LinuxAccess_FixFmt => Get("Banner_LinuxAccess_FixFmt");
+        public static string Section_ShakeItClutch => Get("Section_ShakeItClutch");
+        public static string Section_ShakeItTrigger => Get("Section_ShakeItTrigger");
+        public static string Section_ShakeItPulse => Get("Section_ShakeItPulse");
+        public static string Section_ShakeItEngine => Get("Section_ShakeItEngine");
     }
 }

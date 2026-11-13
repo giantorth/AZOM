@@ -917,4 +917,8 @@ Id: {2}</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Người dùng Linux của bạn không thể mở {0}, nên plugin không thể kết nối với nó.</value></data>
   <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Người dùng Linux của bạn không thể mở {0}, nên thiếu tín hiệu vô lăng, bàn đạp và nút bấm.</value></data>
   <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Thêm một quy tắc udev gán TAG+="uaccess" cho thiết bị MOZA (idVendor 346e) trong hệ thống con {0}, sau đó rút ra và cắm lại.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Côn</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Kích hoạt</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Xung</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Động cơ</value></data>
 </root>
