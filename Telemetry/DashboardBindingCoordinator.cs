@@ -630,8 +630,11 @@ namespace MozaPlugin.Telemetry
             {
                 // Skip kind=4 if wheel already on target (or we just emitted for it),
                 // unless the catalog re-sync probe fired (forces Stop+Start to re-advertise).
-                bool wheelOnTargetSlot = sender.WheelReportedSlot == slot;
-                bool weEmittedThisSlot = sender.LastEmittedKind4Slot == slot;
+                // ShowingSlot, not reported-or-emitted: a report not yet updated for our
+                // last switch, or an older kind=4, can both name a slot the wheel has left.
+                bool onTarget = sender.ShowingSlot == slot;
+                bool wheelOnTargetSlot = onTarget && sender.WheelReportedSlot == slot;
+                bool weEmittedThisSlot = onTarget && sender.LastEmittedKind4Slot == slot;
                 // "Already bound" only holds once the host has emitted at least
                 // one kind=4 this session — the display latches our value frames
                 // (test or live) only after a host-initiated switch. At first
@@ -835,11 +838,9 @@ namespace MozaPlugin.Telemetry
                 return true;
             }
 
-            // What the CM2 shows now: its own report wins over our last kind=4, which a
-            // dash-side switch since then has made stale.
+            // What the CM2 shows now: the latest of its own report and our kind=4.
             bool hostEverEngaged = cm2.LastEmittedKind4Slot >= 0;
-            int showing = cm2.WheelReportedSlot >= 0 ? cm2.WheelReportedSlot : cm2.LastEmittedKind4Slot;
-            if (showing == slot && hostEverEngaged)
+            if (cm2.ShowingSlot == slot && hostEverEngaged)
             {
                 MozaLog.Info($"[AZOM] Profile dashboard '{targetName}' (CM2 slot {slot}) already bound; no wire action needed");
                 _plugin.ActiveCm2DashboardName = targetName;

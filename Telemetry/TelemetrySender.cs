@@ -260,6 +260,11 @@ namespace MozaPlugin.Telemetry
         // when the new game's profile targets the same dashboard.
         public int LastEmittedKind4Slot => _slotTracker.LastEmittedKind4Slot;
 
+        /// <summary>Slot the device shows now: the latest of our kind=4 and its own
+        /// report (-1 = unknown). Use this, not either field alone, to decide whether
+        /// a switch is needed.</summary>
+        public int ShowingSlot => _slotTracker.ShowingSlot;
+
         /// <summary>Reset per-instance kind=4 slot tracking on hot-swap.</summary>
         internal void ResetBindingTracking()
         {

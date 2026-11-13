@@ -200,7 +200,8 @@
                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              SelectionMode="Single"
-                             SelectionChanged="TelemetryProfileList_SelectionChanged"/>
+                             SelectionChanged="TelemetryProfileList_SelectionChanged"
+                             PreviewMouseLeftButtonUp="TelemetryProfileList_PreviewMouseLeftButtonUp"/>
                 </Grid>
 
                 <Separator Margin="0,0,0,10"/>

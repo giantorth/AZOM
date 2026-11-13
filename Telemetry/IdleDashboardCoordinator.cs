@@ -431,8 +431,7 @@ namespace MozaPlugin.Telemetry
                 && string.Equals(prev.Name, slotName, StringComparison.OrdinalIgnoreCase);
             // Same rule as the profile apply: the display latches our frames only after
             // a host kind=4 this session.
-            bool bound = sender.LastEmittedKind4Slot >= 0
-                && (sender.WheelReportedSlot == slot || sender.LastEmittedKind4Slot == slot);
+            bool bound = sender.LastEmittedKind4Slot >= 0 && sender.ShowingSlot == slot;
             // Already engaged: only a fresh session (binding tracking reset on wheel
             // loss) needs the kind=4 again. Device-side switches stand the lane down
             // through WheelInitiatedSwitch; never fight one.
@@ -441,9 +440,9 @@ namespace MozaPlugin.Telemetry
 
             if (prev == null || prev.Page != page)
             {
-                int reported = sender.WheelReportedSlot;
-                _wheelPreIdleName = reported >= 0 && reported < list.Count
-                    ? list[reported]
+                int showing = sender.ShowingSlot;
+                _wheelPreIdleName = showing >= 0 && showing < list.Count
+                    ? list[showing]
                     : _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName;
             }
             // Before the switch: it stages settings and mappings through the getters.
@@ -499,7 +498,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
             int slot = IndexOf(list, name!);
-            if (slot < 0 || sender.WheelReportedSlot == slot) return;
+            if (slot < 0 || (sender.LastEmittedKind4Slot >= 0 && sender.ShowingSlot == slot)) return;
             MozaLog.Info($"[AZOM] Idle dashboard (wheel): restoring '{list[slot]}' (slot {slot})");
             if (!bindings.OnDashboardSwitched((uint)slot, sender))
                 _wheelRestorePending = true;
@@ -549,9 +548,8 @@ namespace MozaPlugin.Telemetry
             string slotName = list[slot];
             string? prev = _cm2;
             bool same = string.Equals(prev, slotName, StringComparison.OrdinalIgnoreCase);
-            // The CM2's own report wins over our last kind=4 (see ApplyProfileDashboardToCm2).
-            int showing = cm2.WheelReportedSlot >= 0 ? cm2.WheelReportedSlot : cm2.LastEmittedKind4Slot;
-            bool bound = cm2.LastEmittedKind4Slot >= 0 && showing == slot;
+            // Same rule as ApplyProfileDashboardToCm2.
+            bool bound = cm2.LastEmittedKind4Slot >= 0 && cm2.ShowingSlot == slot;
             // Already engaged: pipeline restarts are re-bound by TickCm2DashboardReassert
             // (which reads the idle name through ActiveCm2DashboardName); dash-side
             // switches stand the lane down through ActiveCm2DashboardName's setter.
@@ -560,7 +558,7 @@ namespace MozaPlugin.Telemetry
 
             if (prev == null)
             {
-                int reported = cm2.WheelReportedSlot;
+                int reported = cm2.ShowingSlot;
                 _cm2PreIdleName = reported >= 0 && reported < list.Count
                     ? list[reported]
                     : _plugin.SavedCm2DashboardName;
@@ -611,7 +609,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
             int slot = IndexOf(list, name!);
-            if (slot < 0 || cm2.WheelReportedSlot == slot) return;
+            if (slot < 0 || (cm2.LastEmittedKind4Slot >= 0 && cm2.ShowingSlot == slot)) return;
             MozaLog.Info($"[AZOM] Idle dashboard (CM2): restoring '{list[slot]}' (slot {slot})");
             if (!_plugin.OnCm2DashboardSwitched((uint)slot))
                 _cm2RestorePending = true;
