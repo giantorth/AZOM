@@ -120,11 +120,6 @@
              profile-not-added, telemetry parked/degraded) — surfaced here so
              users who only visit the device page still see them. -->
         <ui:PluginBanners DockPanel.Dock="Top" Margin="5,5,5,0"/>
-        <!-- This wheel's own profile list (bound in code-behind). -->
-        <StackPanel x:Name="DeviceProfileRow" DockPanel.Dock="Top" Orientation="Horizontal"
-                    HorizontalAlignment="Right" Margin="5,4,5,0" Visibility="Collapsed">
-            <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
-        </StackPanel>
         <!-- Header (always visible) -->
         <StackPanel DockPanel.Dock="Top" Margin="5">
             <!-- Detection status -->
@@ -133,11 +128,16 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Capability-driven tabs (matches the new plugin-pane tab styling:
-             cyan underline on active, transparent header strip). -->
-        <TabControl x:Name="WheelTabs" Style="{StaticResource MozaTabControl}"
+        <!-- Capability-driven tabs; the profile list rides on the right of the strip. -->
+        <TabControl x:Name="WheelTabs" Style="{StaticResource MozaHeaderTabControl}"
                     Margin="0,4,0,0"
                     SelectionChanged="WheelTabs_SelectionChanged">
+            <ctrl:TabStrip.TrailingContent>
+                <!-- This wheel's own profile list (bound in code-behind). -->
+                <StackPanel x:Name="DeviceProfileRow" Orientation="Horizontal" Visibility="Collapsed">
+                    <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ctrl:TabStrip.TrailingContent>
 
             <!-- ==================== INPUTS TAB ==================== -->
             <!-- Migrated from plugin-pane WheelTab in Phase 6. Handlers forward to
