@@ -98,7 +98,8 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Multi-mode thumb dial (wheel cmd <c>28 01</c>): <c>MultiDialKnobOrder[logicalKnob]</c>
         /// = the dial index the firmware takes for that knob — the same firmware knob
-        /// index as the signal mode (<see cref="SignalModeFirmwareIndex"/>). Null = the
+        /// index as the signal mode (<see cref="SignalModeFirmwareIndex"/>), one per
+        /// encoder (VGS: 3 encoders, no knob LEDs). Null = the
         /// wheel doesn't offer the feature.
         /// </summary>
         public int[]? MultiDialKnobOrder { get; }
@@ -270,7 +271,7 @@ namespace MozaPlugin.Devices
             // VGS (Vision GS): has the display-rotation IMU — supportsDisplayRotation:true
             // exposes the off/smooth/immediate rotation-mode control (session-0x02 FF
             // kind=5 push). Verified from VGS PitHouse captures.
-            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true, knobEncoderCount: 3)),
+            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true, knobEncoderCount: 3, supportsMultiDial: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false, knobEncoderCount: 0)),
             // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
             // screenless. The real RS V2 self-reports "RS Leather # W00"
@@ -352,10 +353,10 @@ namespace MozaPlugin.Devices
             MaxLedFps = maxLedFps;
             UsesLegacyRpmTelemetry = usesLegacyRpmTelemetry;
             KnobSignalModeOrder = knobSignalModeOrder;
-            if (supportsMultiDial && knobCount > 0)
+            if (supportsMultiDial && KnobEncoderCount > 0)
             {
-                var order = new int[knobCount];
-                for (int k = 0; k < knobCount; k++) order[k] = SignalModeFirmwareIndex(k);
+                var order = new int[KnobEncoderCount];
+                for (int k = 0; k < order.Length; k++) order[k] = SignalModeFirmwareIndex(k);
                 MultiDialKnobOrder = order;
             }
         }

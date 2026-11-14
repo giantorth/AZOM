@@ -26,7 +26,7 @@ namespace MozaPlugin.Devices.Ui
     //   • "wheel-knob-bg-color{ledIndex+1}" for each ring LED
     public partial class MozaWheelSettingsControl
     {
-        // Per-knob BUTTON / KNOB / MULTI-MODE selector row on the Inputs tab.
+        // Per-knob BUTTON / KNOB / MULTI-MODE selector row; built for the Knobs tab and the Inputs tab.
         private const int SignalChipMultiMode = 2;
 
         private sealed class KnobSignalSet
@@ -44,7 +44,7 @@ namespace MozaPlugin.Devices.Ui
 
         private KnobRingViz[]? _wiKnobViz;
         private Border[]? _wiKnobViewWrappers;       // per-knob colours card (selection highlight)
-        private KnobSignalSet? _wiKnobSignals;
+        private KnobSignalSet[]? _wiKnobSignalSets;
         private int _wiSelectedKnob = -1;
         private int _wiSelectedSlot = -1;       // -2 = centre, 0..(N-1) = ring slot
         private bool _wiKnobsBuilt;
@@ -61,8 +61,11 @@ namespace MozaPlugin.Devices.Ui
             var textDimBrush = (Brush)(TryFindResource("TextDimBrush") ?? Brushes.Gray);
             var textFaintBrush = (Brush)(TryFindResource("TextFaintBrush") ?? Brushes.Gray);
 
-            if (WiInputsSignalModeGrid != null)
-                _wiKnobSignals = BuildKnobSignalSet(WiInputsSignalModeGrid, max, borderBrush, bgCard2Brush, textFaintBrush);
+            var sets = new System.Collections.Generic.List<KnobSignalSet>(2);
+            foreach (var grid in new[] { WiSignalModeGrid, WiInputsSignalModeGrid })
+                if (grid != null)
+                    sets.Add(BuildKnobSignalSet(grid, max, borderBrush, bgCard2Brush, textFaintBrush));
+            _wiKnobSignalSets = sets.ToArray();
 
             for (int k = 0; k < max; k++)
             {
@@ -244,15 +247,15 @@ namespace MozaPlugin.Devices.Ui
         // signal-mode cards for knobs that don't exist on this wheel.
         internal void SyncKnobSignalChips()
         {
-            var set = _wiKnobSignals;
-            if (!_wiKnobsBuilt || set == null || _data == null) return;
+            if (!_wiKnobsBuilt || _wiKnobSignalSets == null || _data == null) return;
             bool perKnob = _data.WheelKnobSignalModeSupported;
             int encoderCount = ResolveKnobEncoderCount();
             var ov = _plugin?.ActiveWheelProfile;
             var model = _plugin?.WheelModelInfo;
-            int dialKnobs = Math.Min(model?.MultiDialKnobOrder?.Length ?? 0, model?.KnobCount ?? 0);
+            int dialKnobs = model?.MultiDialKnobOrder?.Length ?? 0;
             int dialKnob = Hardware.HardwareApplier.MultiDialForcedButtonKnob(_plugin?.ActiveWheelMultiDial, model);
             using (_suppressor.Begin())
+            foreach (var set in _wiKnobSignalSets)
             {
                 // Size the grid to the encoders, not the LED knobs, so a 3-encoder rim
                 // fills the row instead of leaving two phantom columns.

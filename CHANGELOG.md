@@ -37,7 +37,7 @@ All notable changes to the AZOM plugin are documented here.
 ### Wheel
 
 - **Knob breathing colours;** one swatch per knob when the knob sleep light is set to Breathing, saved per wheel.
-- **Multi-mode dial on the Inputs tab (CS Pro, KS Pro, Mustang GTD);** set a knob to MULTI-MODE, include the thumb wheels and set control labels per position, saved per wheel.
+- **Multi-mode dial on the Inputs tab (CS Pro, KS Pro, Mustang GTD, Vision GS);** set a knob to MULTI-MODE, include the thumb wheels and set control labels per position, saved per wheel.
 
 ### Connection and detection
 

@@ -214,16 +214,21 @@ namespace MozaPlugin.Devices.Ui
             _plugin.SaveSettings();
         }
 
-        // Inputs-tab "All Rotaries" combo (firmware without per-knob signal mode).
+        // Shared by the Knobs-tab and Inputs-tab "All Rotaries" combos.
         private void WiKnobModeCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents || _plugin == null || _data == null) return;
-            int val = WiInputsKnobModeCombo.SelectedIndex;
+            int val = ((Selector)sender).SelectedIndex;
             if (val < 0) return;
             _data.WheelKnobMode = val;
             _plugin.UpdateActiveWheelProfile(o => o.WheelKnobMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-mode", val);
             _plugin.SaveSettings();
+            using (_suppressor.Begin())
+            {
+                SetComboSafe(WiKnobModeCombo, val);
+                SetComboSafe(WiInputsKnobModeCombo, val);
+            }
         }
 
         // force = the user clicked the segment that was already selected. That is a
@@ -242,7 +247,7 @@ namespace MozaPlugin.Devices.Ui
             int fwIndex = _plugin.WheelModelInfo?.SignalModeFirmwareIndex(index) ?? index;
             _plugin.HardwareApplier.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value, force);
             _plugin.SaveSettings();
-            SyncKnobSignalChips();
+            SyncKnobSignalChips(); // mirror into the other tab's selector
         }
 
         // Old-protocol stick mode (ES + old-firmware new wheels): 0=Buttons, 1=D-Pad.
@@ -321,12 +326,14 @@ namespace MozaPlugin.Devices.Ui
                     // encoder check, a wheel that answered neither read would still
                     // show a selector that writes nowhere.
                     bool hasEncoders = HasKnobEncoders();
-                    WiInputsKnobModeLegacyPanel.Visibility = (!perKnob && hasEncoders)
-                        ? Visibility.Visible : Visibility.Collapsed;
+                    var legacyVis = (!perKnob && hasEncoders) ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobModeLegacyPanel.Visibility = legacyVis;
+                    WiInputsKnobModeLegacyPanel.Visibility = legacyVis;
                     if (!perKnob)
                     {
                         int knobMode = ov != null && ov.WheelKnobMode >= 0
                             ? ov.WheelKnobMode : _data.WheelKnobMode;
+                        SetComboSafe(WiKnobModeCombo, knobMode);
                         SetComboSafe(WiInputsKnobModeCombo, knobMode);
                     }
                     SyncKnobSignalChips();
