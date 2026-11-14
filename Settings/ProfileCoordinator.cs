@@ -869,6 +869,22 @@ namespace MozaPlugin.Settings
                     SeedIdleBundleField(r);
                     return;
             }
+            if (r.Name.StartsWith("wheel-knob-breath-color", StringComparison.Ordinal))
+                SeedKnobBreathColor(r);
+        }
+
+        private void SeedKnobBreathColor(ParsedResponse r)
+        {
+            if (r.ArrayValue == null || r.ArrayValue.Length < 3) return;
+            if (!int.TryParse(r.Name.Substring("wheel-knob-breath-color".Length), out int knob1)) return;
+            int knob = knob1 - 1;
+            if (knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            var bundle = GetOrCreateActiveWheelIdle();
+            if (bundle == null) return;
+            var saved = bundle.KnobBreathColors;
+            if (saved != null && knob < saved.Length && saved[knob] >= 0) return;
+            bundle.SetKnobBreathColor(knob, (r.ArrayValue[0] << 16) | (r.ArrayValue[1] << 8) | r.ArrayValue[2]);
+            PersistSettings();
         }
 
         private void SeedSleepBundleField(ParsedResponse r)

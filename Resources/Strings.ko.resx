@@ -923,4 +923,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>부드럽게</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>보통</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>강하게</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>대기 색상</value></data>
 </root>

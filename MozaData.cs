@@ -452,6 +452,10 @@ namespace MozaPlugin
         public const int WheelKnobMax = 5;
         public readonly byte[][] WheelKnobPrimaryColors = InitColorArray(WheelKnobMax);
 
+        // Per-knob sleep-light breathing colour (cmd 0x1F 0x03 0x02 [knob]), knob in
+        // visual order. Shown while the knob idle effect is Breathing (2).
+        public readonly byte[][] WheelKnobBreathColors = InitColorArray(WheelKnobMax);
+
         // Per-LED knob ring (Inactive / background) colors. Up to 56 LEDs
         // (CS Pro 48, KS Pro 56). Readable + writable via wheel-knob-bg-color{1..56}.
         // Wire cmd: 0x1F 0x03 0x01 [N-1] [RGB] (cmd 0x1F sub 0x03 sub 0x01).
@@ -1305,6 +1309,13 @@ namespace MozaPlugin
                 int idx = ParseTrailingIndex(commandName, "wheel-knob-bg-color");
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
                     SetColor(KnobRingColors[idx], data);
+            }
+            // Per-knob sleep-light breathing color (cmd 0x1F 0x03 0x02).
+            else if (commandName.StartsWith("wheel-knob-breath-color", StringComparison.Ordinal))
+            {
+                int idx = ParseTrailingIndex(commandName, "wheel-knob-breath-color");
+                if (idx >= 0 && idx < WheelKnobMax && data.Length >= 3)
+                    SetColor(WheelKnobBreathColors[idx], data);
             }
             // Per-knob Active LED color (cmd 0x27, role=0). Command name shape
             // is "wheel-knob{N}-active-color" with N in 1..5. Cheap StartsWith

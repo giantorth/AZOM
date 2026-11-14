@@ -929,4 +929,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Myk</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Sterk</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Tomgangsfarge</value></data>
 </root>

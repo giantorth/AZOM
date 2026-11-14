@@ -924,4 +924,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Mềm</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Bình thường</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Mạnh</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Màu lúc nhàn rỗi</value></data>
 </root>

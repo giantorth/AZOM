@@ -866,6 +866,9 @@ namespace MozaPlugin.Settings
         public int TelemetrySpeedMs { get; set; } = -1;  // cmd 0x1E [0] [BE u16]
         public int ButtonsSpeedMs { get; set; } = -1;    // cmd 0x1E [1] [BE u16]
         public int KnobSpeedMs { get; set; } = -1;       // cmd 0x1E [3] [BE u16]
+        // Per-knob breathing colour, packed 0xRRGGBB, visual knob order (cmd 0x1F 03 02 [k]).
+        // Null = none saved; a slot of -1 = leave that knob's colour alone.
+        public int[]? KnobBreathColors { get; set; }
 
         public WheelIdleSettings Clone()
         {
@@ -877,7 +880,20 @@ namespace MozaPlugin.Settings
                 TelemetrySpeedMs = TelemetrySpeedMs,
                 ButtonsSpeedMs = ButtonsSpeedMs,
                 KnobSpeedMs = KnobSpeedMs,
+                KnobBreathColors = KnobBreathColors != null ? (int[])KnobBreathColors.Clone() : null,
             };
+        }
+
+        /// <summary>Set one knob's saved breathing colour, growing the array
+        /// (unset slots -1) without mutating one a reader may hold.</summary>
+        public void SetKnobBreathColor(int knob, int packedRgb)
+        {
+            if (knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            var next = new int[MozaData.WheelKnobMax];
+            for (int i = 0; i < next.Length; i++)
+                next[i] = KnobBreathColors != null && i < KnobBreathColors.Length ? KnobBreathColors[i] : -1;
+            next[knob] = packedRgb;
+            KnobBreathColors = next;
         }
     }
 

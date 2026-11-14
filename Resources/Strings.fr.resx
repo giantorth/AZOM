@@ -924,4 +924,5 @@ Id : {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Doux</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Fort</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Couleur au repos</value></data>
 </root>

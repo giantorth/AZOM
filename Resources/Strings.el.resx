@@ -923,4 +923,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Μαλακό</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Κανονικό</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Δυνατό</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Χρώμα Αδράνειας</value></data>
 </root>

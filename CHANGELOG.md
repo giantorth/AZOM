@@ -34,6 +34,10 @@ All notable changes to the AZOM plugin are documented here.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
 - **FFB style selector (Soft / Normal / Strong) on the FFB equalizer card;** R16 Ultra, R21 and R25 bases on firmware 1.2.12 or newer, saved per profile.
 
+### Wheel
+
+- **Knob breathing colours;** one swatch per knob when the knob sleep light is set to Breathing, saved per wheel.
+
 ### Connection and detection
 
 - **Linux permission banner;** warns when your user can't open a MOZA serial or HID device node and names the missing udev rule.

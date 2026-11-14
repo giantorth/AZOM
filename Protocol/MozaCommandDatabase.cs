@@ -370,6 +370,10 @@ namespace MozaPlugin.Protocol
             AddCommand("wheel-knob-idle-effect", "wheel", 64, 63, new byte[] { 29, 3 },       1, "int");
             for (byte i = 0; i < 56; i++)
                 AddCommand($"wheel-knob-bg-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x01, i }, 3, "array");
+            // Per-knob sleep-light breathing colour (bank 0x02 = idle effect 2), knob
+            // in visual order. Captured on a 4-knob rim: 1F 03 02 00..03.
+            for (byte i = 0; i < 5; i++)
+                AddCommand($"wheel-knob-breath-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x02, i }, 3, "array");
 
             // Wheel RPM blink colors (write-only, id [15, index])
             for (byte i = 0; i < 10; i++)

@@ -924,4 +924,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Weich</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Stark</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Leerlauf-Farbe</value></data>
 </root>

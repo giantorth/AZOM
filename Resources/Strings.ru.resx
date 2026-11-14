@@ -924,4 +924,5 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Мягкий</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Обычный</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Сильный</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Цвет простоя</value></data>
 </root>

@@ -316,11 +316,13 @@ namespace MozaPlugin.Hardware
             };
 
         /// <summary>Flash-backed per the set above, plus the per-knob signal modes
-        /// (<c>wheel-knob-signal-mode{fwIdx}</c>) whose names carry a firmware index.</summary>
+        /// (<c>wheel-knob-signal-mode{fwIdx}</c>) and sleep-light breathing colours
+        /// (<c>wheel-knob-breath-color{k}</c>) whose names carry an index.</summary>
         private static bool IsFlashBackedWheelCfg(string command) =>
             command != null
             && (s_flashBackedWheelCfg.Contains(command)
-                || command.StartsWith("wheel-knob-signal-mode", System.StringComparison.Ordinal));
+                || command.StartsWith("wheel-knob-signal-mode", System.StringComparison.Ordinal)
+                || command.StartsWith("wheel-knob-breath-color", System.StringComparison.Ordinal));
 
         // ── Coalescing gate for UI-driven flash-backed wheel writes ──
         // A slider raises ValueChanged per tick, so dragging "Sleep speed" or a
@@ -878,6 +880,7 @@ namespace MozaPlugin.Hardware
             int idleSpeed      = idleBundle?.TelemetrySpeedMs ?? -1;
             int btnIdleSpeed   = idleBundle?.ButtonsSpeedMs ?? -1;
             int knobIdleSpeed  = idleBundle?.KnobSpeedMs ?? -1;
+            int[]? knobBreathColors = idleBundle?.KnobBreathColors;
             int knobLedMode    = profile.WheelKnobLedMode;
             int btnLedMode     = profile.WheelButtonsLedMode;
             // Sleep bundle is per-wheel-page (schema v8); null = leave wheel's value alone.
@@ -929,6 +932,15 @@ namespace MozaPlugin.Hardware
             if (idleSpeed      >= 0) _data.WheelTelemetryIdleSpeedMs = idleSpeed;
             if (btnIdleSpeed   >= 0) _data.WheelButtonsIdleSpeedMs = btnIdleSpeed;
             if (knobIdleSpeed  >= 0) _data.WheelKnobIdleSpeedMs    = knobIdleSpeed;
+            if (knobBreathColors != null)
+                for (int i = 0; i < Math.Min(knobBreathColors.Length, MozaData.WheelKnobMax); i++)
+                    if (knobBreathColors[i] >= 0)
+                    {
+                        var rgb = MozaProfile.UnpackColor(knobBreathColors[i]);
+                        _data.WheelKnobBreathColors[i][0] = rgb[0];
+                        _data.WheelKnobBreathColors[i][1] = rgb[1];
+                        _data.WheelKnobBreathColors[i][2] = rgb[2];
+                    }
             if (sleepMode      >= 0) _data.WheelIdleMode           = sleepMode;
             if (sleepTimeout   >= 0) _data.WheelIdleTimeout        = sleepTimeout;
             if (sleepSpeed     >= 0) _data.WheelIdleSpeed          = sleepSpeed;
@@ -1152,6 +1164,21 @@ namespace MozaPlugin.Hardware
                     var p = BuildIdleIntervalPayload(knobIdleEffect, knobIdleSpeed);
                     if (WheelCfgChangedBytesForApply("wheel-knob-idle-interval", p))
                         _deviceManager.WriteArray("wheel-knob-idle-interval", p);
+                }
+                if (knobBreathColors != null && hasKnob && hasIdleLed)
+                {
+                    int knobs = Math.Min(Math.Min(model.KnobCount, MozaData.WheelKnobMax), knobBreathColors.Length);
+                    for (int i = 0; i < knobs; i++)
+                    {
+                        int packed = knobBreathColors[i];
+                        if (packed < 0) continue;
+                        string cmd = $"wheel-knob-breath-color{i + 1}";
+                        if (WheelCfgChangedForApply(cmd, packed & 0xFFFFFF))
+                        {
+                            var rgb = MozaProfile.UnpackColor(packed);
+                            _deviceManager.WriteColor(cmd, rgb[0], rgb[1], rgb[2]);
+                        }
+                    }
                 }
                 if (sleepMode    >= 0 && hasSleepLight && WheelCfgChangedForApply("wheel-idle-mode", sleepMode))       _deviceManager.WriteSetting("wheel-idle-mode", sleepMode);
                 if (sleepTimeout >= 0 && hasSleepLight && WheelCfgChangedForApply("wheel-idle-timeout", sleepTimeout)) _deviceManager.WriteSetting("wheel-idle-timeout", sleepTimeout);

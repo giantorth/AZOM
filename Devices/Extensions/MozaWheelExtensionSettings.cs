@@ -27,6 +27,7 @@ namespace MozaPlugin.Devices.Extensions
         public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
         public int WheelButtonsIdleSpeedMs { get; set; } = -1;
         public int WheelKnobIdleSpeedMs { get; set; } = -1;
+        public int[]? WheelKnobBreathColors { get; set; }
         public int WheelSleepMode { get; set; } = -1;
         public int WheelSleepTimeoutMin { get; set; } = -1;
         public int WheelSleepSpeedMs { get; set; } = -1;
@@ -208,7 +209,8 @@ namespace MozaPlugin.Devices.Extensions
                 // Same fill-only semantics as the sleep bundle above.
                 if (settings != null && (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
                     || WheelKnobIdleEffect >= 0 || WheelTelemetryIdleSpeedMs >= 0
-                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0))
+                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0
+                    || WheelKnobBreathColors != null))
                 {
                     if (settings.WheelIdleByPageGuid == null)
                         settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
@@ -225,6 +227,7 @@ namespace MozaPlugin.Devices.Extensions
                     if (idle.TelemetrySpeedMs < 0 && WheelTelemetryIdleSpeedMs  >= 0) idle.TelemetrySpeedMs = WheelTelemetryIdleSpeedMs;
                     if (idle.ButtonsSpeedMs   < 0 && WheelButtonsIdleSpeedMs    >= 0) idle.ButtonsSpeedMs   = WheelButtonsIdleSpeedMs;
                     if (idle.KnobSpeedMs      < 0 && WheelKnobIdleSpeedMs       >= 0) idle.KnobSpeedMs      = WheelKnobIdleSpeedMs;
+                    if (idle.KnobBreathColors == null && WheelKnobBreathColors != null) idle.KnobBreathColors = (int[])WheelKnobBreathColors.Clone();
                 }
             }
 
@@ -359,6 +362,7 @@ namespace MozaPlugin.Devices.Extensions
                 WheelTelemetryIdleSpeedMs  = idle.TelemetrySpeedMs;
                 WheelButtonsIdleSpeedMs    = idle.ButtonsSpeedMs;
                 WheelKnobIdleSpeedMs       = idle.KnobSpeedMs;
+                WheelKnobBreathColors      = idle.KnobBreathColors;
             }
             WheelRpmBrightness      = ov.WheelRpmBrightness;
             WheelButtonsBrightness  = ov.WheelButtonsBrightness;

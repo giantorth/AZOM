@@ -156,7 +156,12 @@ namespace MozaPlugin.Devices
             {
                 cmds.Add("wheel-knob-led-mode");
                 if (info.HasSleepLight)
+                {
                     cmds.Add("wheel-knob-idle-effect");
+                    int knobs = Math.Min(info.KnobCount, MozaData.WheelKnobMax);
+                    for (int k = 1; k <= knobs; k++)
+                        cmds.Add($"wheel-knob-breath-color{k}");
+                }
             }
 
             // Knob INPUT config (encoder signal mode: BUTTON vs KNOB). Deliberately not
