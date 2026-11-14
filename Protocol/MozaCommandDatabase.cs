@@ -317,6 +317,14 @@ namespace MozaPlugin.Protocol
             // Per-encoder rotary signal mode (newer firmware). Each knob independently: 0=Buttons, 1=Knob.
             for (byte i = 0; i < 5; i++)
                 AddCommand($"wheel-knob-signal-mode{i}", "wheel", 64, 63, new byte[] { 42, i }, 1, "int");
+            // Multi-mode thumb dial (cmd 0x28), write-only: the C0 71 28 read replies
+            // belong to the parity polls (see MozaPlugin.Inbound). Knob index is the
+            // firmware knob index (WheelModelInfo.MultiDialKnobOrder); side value = the
+            // side's own index when included, 0xFF when not.
+            AddCommand("wheel-multifn-enable",     "wheel", 0xFF, 63, new byte[] { 40, 0 },    1, "int");
+            AddCommand("wheel-multifn-knob",       "wheel", 0xFF, 63, new byte[] { 40, 1 },    1, "int");
+            AddCommand("wheel-multifn-left",       "wheel", 0xFF, 63, new byte[] { 40, 2, 0 }, 1, "int");
+            AddCommand("wheel-multifn-right",      "wheel", 0xFF, 63, new byte[] { 40, 2, 1 }, 1, "int");
             AddCommand("wheel-paddle-adaptive-mode","wheel",64, 63, new byte[] { 11 },         1, "int");
             AddCommand("wheel-paddle-button-mode", "wheel", 64, 63, new byte[] { 13 },         1, "int");
             // Clutch-paddle calibration (write-only): 08 01 = start, 08 02 = save.

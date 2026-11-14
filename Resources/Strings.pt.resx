@@ -924,4 +924,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Forte</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Cor de repouso</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>KNOB MULTIMODO</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Rótulos dos controles</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Roda de polegar</value></data>
 </root>

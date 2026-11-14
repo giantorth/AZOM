@@ -840,6 +840,84 @@ namespace MozaPlugin.Settings
             }
         }
 
+        /// <summary>Multi-mode dial bundle for the current wheel page; null = no opinion.</summary>
+        internal WheelMultiDialSettings? ActiveWheelMultiDial
+        {
+            get
+            {
+                var g = _plugin.GetCurrentWheelPageGuid();
+                if (!g.HasValue || _plugin.Settings?.WheelMultiDialByPageGuid == null) return null;
+                return _plugin.Settings.WheelMultiDialByPageGuid.TryGetValue(g.Value, out var v) ? v : null;
+            }
+        }
+
+        /// <summary>Get-or-create the per-page multi-mode dial bundle. Null only if no wheel identified.</summary>
+        internal WheelMultiDialSettings? GetOrCreateActiveWheelMultiDial()
+        {
+            var g = _plugin.GetCurrentWheelPageGuid();
+            var settings = _plugin.Settings;
+            if (!g.HasValue || settings == null) return null;
+            lock (_pageBundleSwapLock)
+            {
+                var dict = settings.WheelMultiDialByPageGuid;
+                if (dict != null && dict.TryGetValue(g.Value, out var bundle) && bundle != null)
+                    return bundle;
+                bundle = new WheelMultiDialSettings();
+                var next = dict == null
+                    ? new Dictionary<Guid, WheelMultiDialSettings>()
+                    : new Dictionary<Guid, WheelMultiDialSettings>(dict);
+                next[g.Value] = bundle;
+                settings.WheelMultiDialByPageGuid = next;
+                return bundle;
+            }
+        }
+
+        /// <summary>
+        /// Adopt the wheel's reported dial labels when none are saved. Returns true
+        /// when the saved table differs from the wheel's, i.e. it needs pushing.
+        /// Serial read thread.
+        /// </summary>
+        internal bool SeedMultiDialLabelsFromWheel(List<(string Left, string Right)> wheel, Devices.WheelModelInfo? model)
+        {
+            var bundle = GetOrCreateActiveWheelMultiDial();
+            if (bundle == null || wheel == null) return false;
+            if (bundle.Labels == null)
+            {
+                var seeded = new List<MultiDialLabel>(wheel.Count);
+                foreach (var (l, r) in wheel)
+                    seeded.Add(new MultiDialLabel { Left = l ?? "", Right = r ?? "" });
+                bundle.Labels = seeded;
+                PersistSettings();
+                return false;
+            }
+            var saved = MultiDialWireLabels(bundle, model);
+            if (saved.Count != wheel.Count) return true;
+            for (int i = 0; i < saved.Count; i++)
+                if (saved[i].Left != (wheel[i].Left ?? "") || saved[i].Right != (wheel[i].Right ?? ""))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The label table as sent: one entry per position of the dial knob (its
+        /// ring LED count), padded with empty labels; the saved length when no
+        /// knob is chosen yet.
+        /// </summary>
+        internal static List<(string Left, string Right)> MultiDialWireLabels(WheelMultiDialSettings bundle, Devices.WheelModelInfo? model)
+        {
+            var labels = bundle.Labels;
+            int n = bundle.Knob >= 0 && model != null
+                ? model.KnobPositionCount(bundle.Knob)
+                : labels?.Count ?? 0;
+            var wire = new List<(string, string)>(n);
+            for (int i = 0; i < n; i++)
+            {
+                var l = labels != null && i < labels.Count ? labels[i] : null;
+                wire.Add((l?.Left ?? "", l?.Right ?? ""));
+            }
+            return wire;
+        }
+
         /// <summary>
         /// Seed wheel-reported sleep-light + idle-effect/speed values into the
         /// per-page bundles. Only fills sentinel (-1/null) fields — user UI

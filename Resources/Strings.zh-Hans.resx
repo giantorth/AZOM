@@ -925,4 +925,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>标准</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>强劲</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>待机颜色</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>多模式旋钮</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>控件标签</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>拇指滚轮</value></data>
 </root>

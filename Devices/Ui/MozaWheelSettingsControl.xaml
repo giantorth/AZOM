@@ -28,6 +28,23 @@
             <Style x:Key="SliderLabel" TargetType="TextBlock" BasedOn="{StaticResource LabelText}">
                 <Setter Property="Width" Value="180"/>
             </Style>
+            <!-- Multi-mode dial control-label inputs (built in MultiDial.cs). -->
+            <Style x:Key="DialLabelBox" TargetType="TextBox">
+                <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                <Setter Property="Background" Value="{StaticResource BgCard2Brush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderBrightBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="8,4"/>
+                <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+            </Style>
+            <Style x:Key="DialText" TargetType="TextBlock" BasedOn="{StaticResource LabelText}"/>
+            <Style x:Key="DialRowLabel" TargetType="TextBlock" BasedOn="{StaticResource DialText}">
+                <Setter Property="Width" Value="120"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
             <Style x:Key="SliderValue" TargetType="TextBlock">
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="Width" Value="60"/>
@@ -217,7 +234,14 @@
                             </Border>
                         </Grid>
 
-                        <ctrl:SectionCard x:Name="WiPaddleSettingsCard" Title="{x:Static res:Strings.Section_PaddleSettings}" Icon="{StaticResource IconPaddle}">
+                        <!-- Paddle settings + joystick side by side -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                        <ctrl:SectionCard x:Name="WiPaddleSettingsCard" Grid.Column="0" Margin="0,0,7,14"
+                                          Title="{x:Static res:Strings.Section_PaddleSettings}" Icon="{StaticResource IconPaddle}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.SliderLabel_PaddlesMode}" Style="{StaticResource SliderLabel}"/>
@@ -252,7 +276,8 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
-                        <ctrl:SectionCard Title="{x:Static res:Strings.Section_Joystick}"
+                        <ctrl:SectionCard x:Name="WiJoystickCard" Grid.Column="1" Margin="7,0,0,14"
+                                          Title="{x:Static res:Strings.Section_Joystick}"
                                           Icon="{StaticResource IconKnob}">
                             <StackPanel>
                                 <!-- Old protocol (incl. ES): left stick as buttons or D-Pad -->
@@ -281,6 +306,7 @@
                                            Visibility="Collapsed"/>
                             </StackPanel>
                         </ctrl:SectionCard>
+                        </Grid>
 
                         <!-- ES (old-protocol) RPM indicator mode. The ES has no tabs,
                              so its single RPM setting lives on this main page. -->
@@ -298,7 +324,7 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
-                        <!-- Clone of the Knobs tab's signal-mode subsection; both stay in sync. -->
+                        <!-- Per-knob BUTTON / KNOB / MULTI-MODE selectors (built in Knobs.cs). -->
                         <ctrl:SectionCard x:Name="WiInputsSignalModeCard" Visibility="Collapsed"
                                           Title="{x:Static res:Strings.Label_SignalMode}"
                                           Subtitle="{x:Static res:Strings.Subtitle_SignalMode}"
@@ -315,6 +341,37 @@
                                     </ctrl:SegmentedControl>
                                 </StackPanel>
                             </StackPanel>
+                        </ctrl:SectionCard>
+
+                        <!-- Multi-mode thumb dial (wheel cmd 0x28 + FF kind=18 labels), per wheel.
+                             Shown while a knob's signal-mode selector is on MULTI-MODE. -->
+                        <ctrl:SectionCard x:Name="WiMultiDialCard" Visibility="Collapsed"
+                                          Title="{x:Static res:Strings.Section_MultiModeDial}"
+                                          Icon="{StaticResource IconKnob}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                                    <TextBlock Text="{x:Static res:Strings.Label_ThumbWheel}" Style="{StaticResource DialText}"
+                                               Margin="0,4,0,4"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="{x:Static res:Strings.Option_Left}" Style="{StaticResource DialRowLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="WiMultiDialLeft" Click="WiMultiDialSide_Click"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="{x:Static res:Strings.Option_Right}" Style="{StaticResource DialRowLabel}"/>
+                                        <ctrl:OffOnToggle x:Name="WiMultiDialRight" Click="WiMultiDialSide_Click"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Header centred over both label column sets. -->
+                                <StackPanel Grid.Column="1" Margin="14,4,0,0" HorizontalAlignment="Left">
+                                    <TextBlock Text="{x:Static res:Strings.Label_ControlLabels}" Style="{StaticResource DialText}"
+                                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                                    <StackPanel x:Name="WiMultiDialLabelRows" Orientation="Horizontal"/>
+                                </StackPanel>
+                            </Grid>
                         </ctrl:SectionCard>
 
                     </StackPanel>
@@ -563,38 +620,10 @@
                         </ctrl:SectionCard>
                     </StackPanel>
 
-                    <!-- Knob settings card — two independently gated subsections:
-                         SIGNAL MODE follows the wheel's rotary-ENCODER capability,
-                         COLOURS follows the knob-LED capability. A rim with encoders
-                         and no knob LEDs shows only the former. -->
+                    <!-- Knob settings card (knob-LED colours). Signal mode lives on the Inputs tab. -->
                     <ctrl:SectionCard x:Name="WiKnobSettingsCard" Visibility="Collapsed"
                                       Title="{x:Static res:Strings.Section_KnobSettings}" Icon="{StaticResource IconKnob}">
                         <StackPanel>
-                            <StackPanel x:Name="WiKnobSignalModeSection" Visibility="Collapsed">
-                                <TextBlock Style="{StaticResource SectionTitleText}" Margin="0,0,0,8">
-                                    <Run Text="{x:Static res:Strings.Label_SignalMode}"/>
-                                    <Run Text="{x:Static res:Strings.Subtitle_SignalMode}"
-                                         Foreground="{DynamicResource TextFaintBrush}"
-                                         FontFamily="{DynamicResource FontMono}"
-                                         FontWeight="Normal"/>
-                                </TextBlock>
-                                <!-- Per-knob Btn/Knob chips (built dynamically when firmware supports
-                                     per-knob signal mode). Each cell is a KNOB N card + 2-segment chip. -->
-                                <UniformGrid x:Name="WiSignalModeGrid" Columns="5" Rows="1" Margin="0,0,0,18"/>
-                                <!-- Legacy combined "All Rotaries" mode — fallback for firmware that
-                                     doesn't support per-knob signal mode. Shown only when per-knob isn't
-                                     reported; the WiSignalModeGrid above is collapsed in that case. -->
-                                <StackPanel x:Name="WiKnobModeLegacyPanel" Orientation="Horizontal"
-                                            Margin="0,0,0,18" Visibility="Collapsed">
-                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_AllRotaries}" Style="{StaticResource SliderLabel}"/>
-                                    <ctrl:SegmentedControl x:Name="WiKnobModeCombo"
-                                                           SelectionChanged="WiKnobModeCombo_Changed">
-                                        <ListBoxItem Content="{x:Static res:Strings.Option_Buttons}"/>
-                                        <ListBoxItem Content="{x:Static res:Strings.Option_Knob}"/>
-                                    </ctrl:SegmentedControl>
-                                </StackPanel>
-                            </StackPanel>
-
                             <StackPanel x:Name="WiKnobColoursSection" Visibility="Collapsed">
                                 <TextBlock Style="{StaticResource SectionTitleText}" Margin="0,0,0,8">
                                     <Run Text="{x:Static res:Strings.Label_Colours}"/>

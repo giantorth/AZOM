@@ -932,4 +932,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Strong</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Idle Color</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>MULTI-MODE DIAL</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Control Labels</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Thumb Wheel</value></data>
 </root>

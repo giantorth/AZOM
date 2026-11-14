@@ -930,4 +930,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Fuerte</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Color en reposo</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>PERILLA MULTIMODO</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Etiquetas de controles</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Rueda de pulgar</value></data>
 </root>

@@ -915,4 +915,7 @@
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Arf!</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Grrr!</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Barff!</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>WOOF WOOF!</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Bark bark!</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Arf woof!</value></data>
 </root>

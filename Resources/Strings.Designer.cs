@@ -983,5 +983,8 @@ namespace MozaPlugin.Resources
         public static string Option_FfbStyleNormal => Get("Option_FfbStyleNormal");
         public static string Option_FfbStyleStrong => Get("Option_FfbStyleStrong");
         public static string SliderLabel_KnobIdleColor => Get("SliderLabel_KnobIdleColor");
+        public static string Section_MultiModeDial => Get("Section_MultiModeDial");
+        public static string Label_ControlLabels => Get("Label_ControlLabels");
+        public static string Label_ThumbWheel => Get("Label_ThumbWheel");
     }
 }

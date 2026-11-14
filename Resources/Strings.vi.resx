@@ -925,4 +925,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Bình thường</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Mạnh</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Màu lúc nhàn rỗi</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>NÚM XOAY ĐA CHẾ ĐỘ</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Nhãn điều khiển</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Bánh xe ngón cái</value></data>
 </root>

@@ -924,4 +924,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Κανονικό</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Δυνατό</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Χρώμα Αδράνειας</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>ΠΟΤΕΝΣΙΟΜΕΤΡΟ ΠΟΛΛΑΠΛΩΝ ΛΕΙΤΟΥΡΓΙΩΝ</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Ετικέτες χειριστηρίων</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Τροχός αντίχειρα</value></data>
 </root>

@@ -925,4 +925,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Обычный</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Сильный</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Цвет простоя</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>МНОГОРЕЖИМНЫЙ ЭНКОДЕР</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Подписи элементов управления</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Колёсико под большой палец</value></data>
 </root>

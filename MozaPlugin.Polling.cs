@@ -424,6 +424,7 @@ namespace MozaPlugin
             TickWheelFwVersionRetry();
             TickTorqueBoostPoll();
             TickBaseFfbStyleProbe();
+            TickMultiDialLabelPush();
 
             // CM2 / dashboard-pipeline reconcile runs REGARDLESS of the wheelbase
             // connection. DECOUPLED: a standalone-USB CM2 is driven by the dedicated

@@ -859,15 +859,11 @@ skipReadByMode:
                     UpdateSwatches(_wheelRpmColorSwatches, rpmOverlay, rpmCount);
 
                     int knobCount = modelInfo?.KnobCount ?? 0;
-                    bool hasEncoders = HasKnobEncoders();
-                    // WheelKnobSection holds the two knob-LED cards (LED mode +
-                    // telemetry restore) — knob-LED capability only. The settings
-                    // card below carries both subsections and shows for either.
-                    WheelKnobSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
-                    WiKnobSettingsCard.Visibility = (knobCount > 0 || hasEncoders)
-                        ? Visibility.Visible : Visibility.Collapsed;
-                    WiKnobSignalModeSection.Visibility = hasEncoders ? Visibility.Visible : Visibility.Collapsed;
-                    WiKnobColoursSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    // Knob-LED capability only; signal mode is on the Inputs tab.
+                    var knobVis = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    WheelKnobSection.Visibility = knobVis;
+                    WiKnobSettingsCard.Visibility = knobVis;
+                    WiKnobColoursSection.Visibility = knobVis;
 
                     // Knob palettes render saved-first like the RPM/button swatches
                     // above: the saved (sparse) arrays win and _data fills the unset

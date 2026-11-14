@@ -930,4 +930,7 @@ Id: {2}</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
   <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Sterk</value></data>
   <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Tomgangsfarge</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>FLERMODUS-BRYTER</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Kontrolletiketter</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Tommelhjul</value></data>
 </root>

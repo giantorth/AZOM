@@ -96,6 +96,46 @@ Each rides the same envelope above and its own chunk CRC. The inner CRC is
 | 1  | display brightness | u32 LE (0–100) | `size=8`  | `BuildU32Body` |
 | 10 | display standby     | u64 LE (ms)   | `size=12` | `BuildU64Body` |
 | 5  | display rotation    | **u8** (0/1/2)| `size=5`  | `BuildU8Body`  |
+| 18 | multi-mode dial position labels | label table | variable | `BuildMultiDialLabelsBody` |
+
+### kind=18 — multi-mode dial position labels
+
+The text labels for the positions of the multi-mode thumb dial (wheel cmd `28`,
+see [`../devices/wheel-0x17.md`](../devices/wheel-0x17.md)). Labels are for
+dashboards that display them, and they don't change the buttons the wheel emits.
+The value is the **whole table**, resent on every edit (PitHouse sends one
+record per keystroke):
+
+```
+repeat for each position (12 on the 4-knob rim captured):
+    [index:u32 BE]
+    [len_a:u32 BE] [text_a: UTF-16BE, len_a bytes]   left control label
+    [len_b:u32 BE] [text_b: UTF-16BE, len_b bytes]   right control label
+```
+
+Note the **big-endian** lengths and text, unlike the LE envelope. Empty labels
+are `len = 0`. An all-empty 12-position table is 144 bytes (`size = 148`). The
+record carries **no knob id**; which knob is the dial is set separately by
+`28 01`. The KS Pro's centre dial has fewer detents
+(owner: 8 labels), which hasn't been captured.
+
+Verified live 2026-11-13 (`usb-capture/r16-ffb-style-20261113-220624.pcapng`,
+t=636–783): 24 h2b records, all with `inner_crc == crc32(kindAndValue)`; the final
+table was `0: ABCD/EFGH, 1: 1234/5555, 2: asdf/asdf`, the rest empty. No b2h
+record echoed the edits.
+
+**The wheel stores the table and reports it at session init:** in the cold-start
+bridge log (`sim/logs/bridge-20261113-215711-r16.jsonl` in the simulator repo,
+t=176.48) the wheel sent a b2h `kind=18` (an empty 12-entry table, `size = 148`)
+right after its `kind=10`/`kind=16` init acks, and PitHouse sent no h2b `kind=18`
+at connect.
+
+Plugin: `SessionPropertyPushBuilder.BuildMultiDialLabelsBody` /
+`TryParseMultiDialLabels` (byte-exact against the four captured tables, CRC
+included). The wheel's init report seeds the per-wheel labels when none are
+saved; a saved table that differs is pushed once the session is Active. Pushes
+are debounced 500 ms after typing and gated on an Active session and a display
+wheel.
 
 ### kind=5 — VGS display-rotation mode
 

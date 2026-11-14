@@ -305,6 +305,7 @@ namespace MozaPlugin.Hardware
                 "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-knob-brightness",
                 "wheel-old-rpm-brightness", "dash-flags-brightness",
                 "wheel-rpm-indicator-mode", "wheel-set-rpm-display-mode", "wheel-knob-mode",
+                "wheel-multifn-enable", "wheel-multifn-knob", "wheel-multifn-left", "wheel-multifn-right",
             };
 
         // Input settings the apply re-asserts and the readback verifies, kept out of
@@ -323,6 +324,19 @@ namespace MozaPlugin.Hardware
             && (s_flashBackedWheelCfg.Contains(command)
                 || command.StartsWith("wheel-knob-signal-mode", System.StringComparison.Ordinal)
                 || command.StartsWith("wheel-knob-breath-color", System.StringComparison.Ordinal));
+
+        /// <summary>Logical knob the multi-mode dial forces into BUTTON mode, or -1
+        /// when the dial is off, unset, or not offered by this wheel.</summary>
+        internal static int MultiDialForcedButtonKnob(WheelMultiDialSettings? dial, WheelModelInfo? model)
+        {
+            var order = model?.MultiDialKnobOrder;
+            if (dial == null || dial.Enabled != 1 || order == null) return -1;
+            return dial.Knob >= 0 && dial.Knob < order.Length && dial.Knob < MozaData.WheelKnobMax ? dial.Knob : -1;
+        }
+
+        /// <summary>Wire value for a dial side (<c>28 02 [side]</c>): the side's own
+        /// index when included, 0xFF when not.</summary>
+        internal static int MultiDialSideValue(int side, int included) => included == 1 ? side : 0xFF;
 
         // ── Coalescing gate for UI-driven flash-backed wheel writes ──
         // A slider raises ValueChanged per tick, so dragging "Sleep speed" or a
@@ -966,6 +980,18 @@ namespace MozaPlugin.Hardware
             // a single value, so a readback alone can't re-assert a different profile's
             // saved mode).
             var signalModes = profile.WheelKnobSignalModes;
+            // Multi-mode dial is per wheel and only works in BUTTON mode, so its knob
+            // is forced to BUTTON over whatever this profile saved for it.
+            var multiDial = _plugin.ActiveWheelMultiDial;
+            int dialKnob = MultiDialForcedButtonKnob(multiDial, _plugin.WheelModelInfo);
+            if (dialKnob >= 0)
+            {
+                var forced = new int[Math.Max(dialKnob + 1, signalModes?.Length ?? 0)];
+                for (int i = 0; i < forced.Length; i++)
+                    forced[i] = signalModes != null && i < signalModes.Length ? signalModes[i] : -1;
+                forced[dialKnob] = 0;
+                signalModes = forced;
+            }
             if (signalModes != null)
                 for (int i = 0; i < Math.Min(_data.WheelKnobSignalModes.Length, signalModes.Length); i++)
                     if (signalModes[i] >= 0) _data.WheelKnobSignalModes[i] = signalModes[i];
@@ -1125,6 +1151,30 @@ namespace MozaPlugin.Hardware
                         if (WheelCfgChangedForApply($"wheel-knob-signal-mode{fwIdx}", sm))
                             _deviceManager.WriteSetting($"wheel-knob-signal-mode{fwIdx}", sm);
                     }
+                }
+                // Multi-mode dial (cmd 0x28), per wheel. Knob and sides before the
+                // enable so the dial never comes up on the wrong knob.
+                var dialOrder = model.MultiDialKnobOrder;
+                if (dialOrder != null && multiDial != null)
+                {
+                    if (multiDial.Knob >= 0 && multiDial.Knob < dialOrder.Length
+                        && WheelCfgChangedForApply("wheel-multifn-knob", dialOrder[multiDial.Knob]))
+                        _deviceManager.WriteSetting("wheel-multifn-knob", dialOrder[multiDial.Knob]);
+                    if (multiDial.Left >= 0)
+                    {
+                        int v = MultiDialSideValue(0, multiDial.Left);
+                        if (WheelCfgChangedForApply("wheel-multifn-left", v))
+                            _deviceManager.WriteSetting("wheel-multifn-left", v);
+                    }
+                    if (multiDial.Right >= 0)
+                    {
+                        int v = MultiDialSideValue(1, multiDial.Right);
+                        if (WheelCfgChangedForApply("wheel-multifn-right", v))
+                            _deviceManager.WriteSetting("wheel-multifn-right", v);
+                    }
+                    if (multiDial.Enabled >= 0
+                        && WheelCfgChangedForApply("wheel-multifn-enable", multiDial.Enabled))
+                        _deviceManager.WriteSetting("wheel-multifn-enable", multiDial.Enabled);
                 }
                 // Paddle input mode + the combined-mode clutch split point —
                 // overlay-only, per-(profile x wheel-page). Re-pushed here for the

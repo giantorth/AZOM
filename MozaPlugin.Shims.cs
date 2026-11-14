@@ -242,6 +242,8 @@ namespace MozaPlugin
         internal WheelSleepSettings? GetOrCreateActiveWheelSleep() => _profileCoordinator.GetOrCreateActiveWheelSleep();
         internal WheelIdleSettings? ActiveWheelIdle => _profileCoordinator.ActiveWheelIdle;
         internal WheelIdleSettings? GetOrCreateActiveWheelIdle() => _profileCoordinator.GetOrCreateActiveWheelIdle();
+        internal WheelMultiDialSettings? ActiveWheelMultiDial => _profileCoordinator.ActiveWheelMultiDial;
+        internal WheelMultiDialSettings? GetOrCreateActiveWheelMultiDial() => _profileCoordinator.GetOrCreateActiveWheelMultiDial();
         internal int GetWheelNaturalInertia(Guid pageGuid) => _profileCoordinator.GetWheelNaturalInertia(pageGuid);
         internal void SetWheelNaturalInertia(Guid pageGuid, int value) => _profileCoordinator.SetWheelNaturalInertia(pageGuid, value);
         internal void SetActiveWheelNaturalInertia(int value) => _profileCoordinator.SetActiveWheelNaturalInertia(value);
