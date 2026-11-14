@@ -46,7 +46,7 @@ namespace MozaPlugin
             if (data.GameRunning && !_lastGameRunningForTorquePeak)
                 _data?.ResetLiveTorquePeak();
             _lastGameRunningForTorquePeak = data.GameRunning;
-            _idleDashboards?.NoteGameData(data.GameRunning,
+            _idleDashboards?.NoteGameData(data.GameRunning, data.RunningGameProcessDetected,
                 !data.GamePaused && !data.GameInMenu && !data.GameReplay && data.NewData?.Spectating != true);
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
