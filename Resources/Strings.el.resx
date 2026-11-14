@@ -688,9 +688,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Ταχύτητα αναπνοής (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>ΕΦΕ ΑΔΡΑΝΕΙΑΣ</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Κίνηση αδράνειας</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Πηγή LFE βάσης τιμονιού</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Καρτέλα LFE του πρόσθετου</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE βάσης τιμονιού</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Καρτέλα πρόσθετου</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Συσκευή</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα LFE του πρόσθετου.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Ο ορισμός συσκευής ενημερώθηκε. Επανεκκινήστε το SimHub για εφαρμογή.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Συμβατότητα Forza Horizon</value></data>
@@ -836,10 +836,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Καθολικές ρυθμίσεις</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Τα εφέ τηλεμετρίας (δόνηση κινητήρα, ABS και αλλαγής ταχυτήτων μέσω της βάσης) απαιτούν υλικολογισμικό βάσης 1.2.10.10 ή νεότερο. Αυτή η βάση έχει {0}. Ενημερώστε το υλικολογισμικό της βάσης στο Pit House για να τα χρησιμοποιήσετε.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Απτική S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Απτική πεντάλ S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Καρτέλα S12 του πρόσθετου</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt ανά πεντάλ</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt ενιαίο</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Απτική πεντάλ</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Καρτέλα πρόσθετου</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Ξεχωριστές συσκευές</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Ενιαία συσκευή</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>Το ShakeIt απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα S12 του πρόσθετου.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Ζωντανή έξοδος</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Διάρκεια παλμού</value></data>
@@ -855,9 +855,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Συσκευή 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>απώλεια {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Προεπιλεγμένη καρτέλα</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Δόνηση mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Καρτέλα mBooster του πρόσθετου</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Καρτέλα πρόσθετου</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Συσκευή</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>Το ShakeIt απαιτεί SimHub 9.12 ή νεότερο — χρησιμοποιείται η καρτέλα mBooster του πρόσθετου.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Το mBooster δεν έχει προστεθεί στο SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Τα πεντάλ mBooster είναι συνδεδεμένα και ρυθμισμένα σε ShakeIt, αλλά η συσκευή mBooster δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>

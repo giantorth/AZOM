@@ -694,9 +694,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Pustehastighet (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>HVILEEFFEKT</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hvileanimasjon</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Kilde for LFE i rattbasen</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>LFE-fanen i programtillegget</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE i rattbasen</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Enhet</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Krever SimHub 9.12 eller nyere – programtilleggets LFE-fane brukes.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
@@ -842,10 +842,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Globale innstillinger</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetrieffekter (motor-, ABS- og girskiftvibrasjon gjennom basen) krever basefastvare 1.2.10.10 eller nyere. Denne basen har {0}. Oppdater basefastvaren i Pit House for å bruke dem.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12-haptikk</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12-pedalhaptikk</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>S12-fanen i programtillegget</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt for hver pedal</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kombinert</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Pedalhaptikk</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Separate enheter</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Kombinert enhet</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets S12-fane brukes.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Sanntidsutdata</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulslengde</value></data>
@@ -861,9 +861,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Enhet 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % tap</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standardfane</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster-vibrasjon</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>mBooster-fanen i programtillegget</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Enhet</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets mBooster-fane brukes.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster-pedalene er tilkoblet og satt til ShakeIt, men mBooster-enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>

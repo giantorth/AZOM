@@ -4198,7 +4198,7 @@
                                                   SelectionChanged="DefaultTabCombo_Changed"/>
                                     </Grid>
                                     <!-- Status line (firmware note) is long and wraps under the selector. -->
-                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4">
+                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4221,7 +4221,7 @@
                                     </Grid>
                                     <!-- What drives the S12: the plugin's S12 tab, or ShakeIt
                                          as one device per pedal / one combined device. -->
-                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4">
+                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4245,7 +4245,7 @@
                                     </Grid>
                                     <!-- What drives the mBooster vibrations: the plugin's mBooster
                                          tab, or ShakeIt as one device with a channel per pedal role. -->
-                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4">
+                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4266,20 +4266,7 @@
                                                    Style="{StaticResource MutedHintText}"
                                                    Margin="0,6,0,0" TextWrapping="Wrap"/>
                                     </Grid>
-                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
-                                         Persistent base-side state, read back from the device
-                                         rather than stored in settings — so the toggle shows what
-                                         the base actually holds, including a value PitHouse set. -->
-                                    <Grid Margin="0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
-                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
-                                    </Grid>
-                                    <Grid Margin="0,8">
+                                    <Grid x:Name="Ab9DetectionRow" Margin="0,8" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4287,6 +4274,19 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
                                         <ctrl:OffOnToggle Grid.Column="1" x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
                                                   Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
+                                    </Grid>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <Grid x:Name="ForzaCompatRow" Margin="0,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
                                     </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>

@@ -689,9 +689,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Tốc độ nhịp thở (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>HIỆU ỨNG CHỜ</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hiệu ứng khi chờ</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Nguồn LFE của đế lái</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Thẻ LFE của plugin</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE của đế lái</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Thiết bị</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Yêu cầu SimHub 9.12 trở lên — đang dùng thẻ LFE của plugin.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
@@ -837,10 +837,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Cài đặt chung</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Hiệu ứng telemetry (rung động cơ, ABS và sang số qua đế vô lăng) cần firmware đế 1.2.10.10 trở lên. Đế này đang có {0}. Hãy cập nhật firmware đế trong Pit House để sử dụng.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Rung S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ S12 của plugin</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt theo từng bàn đạp</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kết hợp</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Thiết bị riêng</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Thiết bị kết hợp</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ S12 của plugin.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Đầu ra trực tiếp</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Độ dài xung</value></data>
@@ -856,9 +856,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Thiết bị 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>mất {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Tab mặc định</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Rung mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ mBooster của plugin</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Thiết bị</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ mBooster của plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Chưa thêm mBooster trong SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Bàn đạp mBooster đang được kết nối và đặt dùng ShakeIt, nhưng thiết bị mBooster chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>

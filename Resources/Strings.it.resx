@@ -692,9 +692,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Velocità respiro (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>EFFETTO INATTIVO</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Animazione inattività</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Sorgente LFE della base</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Scheda LFE del plugin</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE della base</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Richiede SimHub 9.12 o successivo: viene usata la scheda LFE del plugin.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definizione dispositivo aggiornata. Riavvia SimHub per applicarla.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilità Forza Horizon</value></data>
@@ -840,10 +840,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Impostazioni globali</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Gli effetti di telemetria (vibrazione di motore, ABS e cambiata tramite la base) richiedono il firmware della base 1.2.10.10 o successivo. Questa base ha {0}. Aggiorna il firmware della base in Pit House per usarli.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Aptica S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Aptica pedaliera S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Scheda S12 del plugin</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt per pedale</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combinato</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Aptica pedaliera</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Dispositivi separati</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Dispositivo combinato</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt richiede SimHub 9.12 o successivo: viene usata la scheda S12 del plugin.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Uscita in tempo reale</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Durata impulso</value></data>
@@ -859,9 +859,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% di perdita</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Scheda predefinita</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Vibrazione mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Scheda mBooster del plugin</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt richiede SimHub 9.12 o successivo: viene usata la scheda mBooster del plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster non aggiunto in SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>I pedali mBooster sono collegati e impostati su ShakeIt, ma il dispositivo mBooster non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
