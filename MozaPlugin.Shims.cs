@@ -227,6 +227,7 @@ namespace MozaPlugin
             get => _profileCoordinator.ActiveTelemetryProfileName;
             set => _profileCoordinator.ActiveTelemetryProfileName = value;
         }
+        internal string SavedTelemetryProfileName => _profileCoordinator.SavedTelemetryProfileName;
         internal string ActiveTelemetryMzdashPath
         {
             get => _profileCoordinator.ActiveTelemetryMzdashPath;
@@ -241,16 +242,23 @@ namespace MozaPlugin
         internal WheelSleepSettings? GetOrCreateActiveWheelSleep() => _profileCoordinator.GetOrCreateActiveWheelSleep();
         internal WheelIdleSettings? ActiveWheelIdle => _profileCoordinator.ActiveWheelIdle;
         internal WheelIdleSettings? GetOrCreateActiveWheelIdle() => _profileCoordinator.GetOrCreateActiveWheelIdle();
+        internal int GetWheelNaturalInertia(Guid pageGuid) => _profileCoordinator.GetWheelNaturalInertia(pageGuid);
+        internal void SetWheelNaturalInertia(Guid pageGuid, int value) => _profileCoordinator.SetWheelNaturalInertia(pageGuid, value);
+        internal void SetActiveWheelNaturalInertia(int value) => _profileCoordinator.SetActiveWheelNaturalInertia(value);
 
-        // CM2 dash settings are keyed under a fixed page GUID with a single
-        // dashboard key, so the CM2's dashboard/channel config is fully independent
-        // of the wheel's. pageGuid==null means "the current wheel page".
+        // CM2 dash settings are keyed under a fixed page GUID, so the CM2's
+        // dashboard/channel config is fully independent of the wheel's; its channel
+        // mappings are per selected dashboard (Cm2MappingDashKey). pageGuid==null
+        // means "the current wheel page".
         // This literal is the GUID of the retired SHDP "MOZA Dashboard" device; it
         // is retained verbatim as the CM2 persistence key so existing users' saved
         // CM2 dashboard/channel mappings (keyed under it) survive the SHDP removal.
         // It is a persistence key only — not a live SimHub device id.
         internal static readonly Guid Cm2PageGuid = Guid.Parse("c97a4d00-a66d-4e2f-a9b4-e7fc348dcc33");
-        internal const string Cm2DashKey = "cm2";
+        /// <summary>Pre-per-dashboard CM2 mapping bucket (one per profile, shared by every
+        /// dashboard); moved under the profile's dashboard key by
+        /// <see cref="DeviceProfileMigration.MigrateCm2MappingKeys"/>.</summary>
+        internal const string Cm2LegacyDashKey = "cm2";
 
         // CM1 base-bridged dash gets its OWN page GUID so its field mappings,
         // active-dashboard selection and the CM1/CM2 discriminator never share a
@@ -276,6 +284,8 @@ namespace MozaPlugin
         internal Dictionary<string, Dictionary<string, Fsr1FieldMapping>>? GetActiveFsr1Mappings() => _fsr1Cm1Mapping.GetActiveFsr1Mappings();
         internal void SetFsr1FieldMapping(string recordKey, string fieldId, Fsr1FieldMapping? mapping) => _fsr1Cm1Mapping.SetFsr1FieldMapping(recordKey, fieldId, mapping);
         internal int GetActiveFsr1Index() => _fsr1Cm1Mapping.GetActiveFsr1Index();
+        /// <summary>The stored FSR1 page (in-game pick), ignoring a showing idle page.</summary>
+        internal int GetStoredFsr1Index() => _fsr1Cm1Mapping.StoredFsr1Index();
         internal void SetActiveFsr1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveFsr1Index(index, sendToWheel);
         internal int TakePendingFsr1Select() => _fsr1Cm1Mapping.TakePendingFsr1Select();
 
@@ -298,6 +308,8 @@ namespace MozaPlugin
         internal void SetCm1FieldMapping(string fieldId, string property, double? scale) => _fsr1Cm1Mapping.SetCm1FieldMapping(fieldId, property, scale);
         internal void ClearCm1Mappings() => _fsr1Cm1Mapping.ClearCm1Mappings();
         internal int GetActiveCm1Index() => _fsr1Cm1Mapping.GetActiveCm1Index();
+        /// <summary>The stored CM1 page (in-game pick), ignoring a showing idle page.</summary>
+        internal int GetStoredCm1Index() => _fsr1Cm1Mapping.StoredCm1Index();
         internal void SetActiveCm1Index(int index, bool sendToWheel) => _fsr1Cm1Mapping.SetActiveCm1Index(index, sendToWheel);
         internal int TakePendingCm1Select() => _fsr1Cm1Mapping.TakePendingCm1Select();
 

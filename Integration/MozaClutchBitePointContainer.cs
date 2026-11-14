@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using GameReaderCommon;
 using GameReaderCommon.Enums;
@@ -34,7 +35,7 @@ namespace MozaPlugin.Integration
     [ShakeItContainerMetadata(100, "Clutch Bite Point",
         "Pulses as the clutch passes its bite point",
         "AZOM", OutputMode.Any)]
-    public class MozaClutchBitePointContainer : EffectsContainerBase<SingleToneOutput>
+    public class MozaClutchBitePointContainer : EffectsContainerBase<SingleToneOutput>, IClutchBitePointSettings
     {
         private const int DefaultFrequencyHz = 40;
         private const int DefaultTriggerLevelPct = 50;
@@ -74,6 +75,9 @@ namespace MozaPlugin.Integration
 
         /// <summary>Longest pulse, ms (see MBoosterBitePointTrigger).</summary>
         public int MaxLengthMs { get; set; } = MBoosterUiConstants.BitePointMaxLengthDefaultMs;
+
+        /// <summary>Fire ahead of a fast clutch after a touch (see MBoosterBitePointTrigger).</summary>
+        public bool Predict { get; set; }
 
         /// <summary>Ripple depth, 0..100 (see MBoosterEffectSynthesizer.SynthesizeBitePoint).</summary>
         public int SmoothnessPct { get; set; } = DefaultSmoothnessPct;
@@ -139,7 +143,7 @@ namespace MozaPlugin.Integration
             int maxMs = Math.Max(MBoosterUiConstants.BitePointMaxLengthMinMs,
                 Math.Min(MBoosterUiConstants.BitePointMaxLengthMaxMs, MaxLengthMs));
             if (!_trigger.Update(Clamp01(pos), Clamp01(triggerPct / 100.0), widthPct / 100.0,
-                    minMs / 1000.0, maxMs / 1000.0, Direction, now))
+                    minMs / 1000.0, maxMs / 1000.0, Direction, Predict, now))
             {
                 _waveActive = false;
                 return 0;
@@ -176,19 +180,24 @@ namespace MozaPlugin.Integration
 
         protected override UserControl GetEditControl()
         {
+            var predict = new CheckBox { Content = Strings.Label_BitePrediction, Margin = new Thickness(0, 0, 0, 6) };
+            predict.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(Predict)) { Mode = BindingMode.TwoWay });
+
             var panel = new StackPanel();
-            // Calibration, the Calibrated/Manual picker and Trigger Input Level.
             panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
-            panel.Children.Add(DirectionPicker());
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
-                MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct));
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteMinLength, nameof(MinLengthMs),
-                MBoosterUiConstants.BitePointMinLengthMinMs, MBoosterUiConstants.BitePointMinLengthMaxMs, 10));
-            panel.Children.Add(Slider(Strings.SliderLabel_BiteMaxLength, nameof(MaxLengthMs),
-                MBoosterUiConstants.BitePointMaxLengthMinMs, MBoosterUiConstants.BitePointMaxLengthMaxMs, 50));
-            panel.Children.Add(Slider(Strings.SliderLabel_PulseRateHz, nameof(PulseRateHz),
-                MBoosterUiConstants.BitePointPulseRateMinHz, MBoosterUiConstants.BitePointPulseRateMaxHz));
-            panel.Children.Add(Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100));
+            panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItTrigger,
+                DirectionPicker(),
+                Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
+                    MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct),
+                predict));
+            panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItPulse,
+                Slider(Strings.SliderLabel_BiteMinLength, nameof(MinLengthMs),
+                    MBoosterUiConstants.BitePointMinLengthMinMs, MBoosterUiConstants.BitePointMinLengthMaxMs, 10),
+                Slider(Strings.SliderLabel_BiteMaxLength, nameof(MaxLengthMs),
+                    MBoosterUiConstants.BitePointMaxLengthMinMs, MBoosterUiConstants.BitePointMaxLengthMaxMs, 50),
+                Slider(Strings.SliderLabel_PulseRateHz, nameof(PulseRateHz),
+                    MBoosterUiConstants.BitePointPulseRateMinHz, MBoosterUiConstants.BitePointPulseRateMaxHz),
+                Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100)));
             return new UserControl { Content = panel, DataContext = this };
         }
 

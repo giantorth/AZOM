@@ -242,6 +242,13 @@ namespace MozaPlugin
         // High speed damping
         public volatile int SpeedDamping = -1;
         public volatile int SpeedDampingPoint = -1;
+        // Raw boost HighSpeedDampingCoordinator overlays on base-damper (0 = none).
+        // Damper always holds the user's value; the boost lives only on the wire.
+        public volatile int DamperSpeedBoost;
+        // Last boosted base-damper value sent, so its readback isn't adopted as Damper.
+        public volatile int DamperBoostedWire = -1;
+        // Readback showed a leftover boost with none active; coordinator rewrites Damper.
+        public volatile bool DamperWireStale;
 
         // Soft limit
         public volatile int SoftLimitStiffness = -1;
@@ -602,6 +609,19 @@ namespace MozaPlugin
 
         public bool BaseTorqueBoosted => BaseTorqueBoost == 1 && BaseSupportsTorqueBoost;
 
+        // Minimum base firmware carrying the FFB style register (0x36).
+        public const int BaseFwFfbStyleMin = (1 << 24) | (2 << 16) | (12 << 8); // 1.2.12.0
+
+        /// <summary>True when this base has the FFB style register: an R16/R21/R25
+        /// Ultra on firmware >= 1.2.12.0. Gates every 0x36 read and write.</summary>
+        public bool BaseSupportsFfbStyle =>
+            BaseFwVersion >= BaseFwFfbStyleMin
+            && Devices.BaseModelInfo.IsUltra(BaseModelName,
+                Devices.BaseModelInfo.ExtractHardwareCode(BaseSwVersion, BaseHwVersion));
+
+        // FFB style (cmd 0x36): -1 = not read, 0 = soft, 1 = normal, 2 = strong.
+        public volatile int FfbStyle = -1;
+
         /// <summary>The base's peak torque in Nm, including the torque boost once
         /// the base reports it unlocked; 0 when the model isn't established.</summary>
         public double BaseRatedNm
@@ -673,6 +693,13 @@ namespace MozaPlugin
         // Forza Horizon compatibility. Plain polarity: 1=On, 0=Off — do NOT copy
         // BleMode's inverted convention. -1 = not read back yet.
         public volatile int CompatMode = -1;
+
+        // Startup music (group 42 cmd 43/44). -1 = not read back; a base that
+        // never answers has no startup music.
+        public volatile int BaseMusicEnabled = -1;
+        public volatile int BaseMusicIndex = -1;     // 1..10
+        public volatile int BaseMusicVolume = -1;    // 0..255
+        public bool BaseSupportsStartupMusic => BaseMusicEnabled >= 0;
 
         // ===== Pedals settings =====
         public volatile int PedalsThrottleDir;
@@ -948,6 +975,7 @@ namespace MozaPlugin
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
                 case "base-torque-boost":   BaseTorqueBoost = value; break;
+                case "base-ffb-style":      FfbStyle = value; break;
 
                 // Core settings
                 case "base-limit":          Limit = value; BaseSettingsRead = true; break;
@@ -957,7 +985,11 @@ namespace MozaPlugin
                 case "base-speed":          Speed = value; break;
 
                 // Effects
-                case "base-damper":         Damper = value; break;
+                case "base-damper":
+                    if (DamperSpeedBoost > 0) break;
+                    if (value == DamperBoostedWire && value != Damper) { DamperWireStale = true; break; }
+                    Damper = value;
+                    break;
                 case "base-friction":       Friction = value; break;
                 case "base-inertia":        Inertia = value; break;
                 case "base-spring":         Spring = value; break;
@@ -979,6 +1011,11 @@ namespace MozaPlugin
                 case "base-ffb-reverse":    FfbReverse = value; break;
                 case "base-temp-strategy":  TempStrategy = value; break;
                 case "base-gearshift-vibration": GearshiftVibration = value; break;
+
+                // Startup music
+                case "base-music-enabled-get": BaseMusicEnabled = value; break;
+                case "base-music-index-get":   BaseMusicIndex = value; break;
+                case "base-music-volume-get":  BaseMusicVolume = value; break;
 
                 // Game effects
                 case "main-get-damper-gain":   GameDamper = value; break;
@@ -1543,6 +1580,10 @@ namespace MozaPlugin
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
             BaseTorqueBoost = TorqueBoostUnread;
+            FfbStyle = -1;
+            BaseMusicEnabled = -1;
+            BaseMusicIndex = -1;
+            BaseMusicVolume = -1;
             // BaseFwVersion is intentionally NOT cleared — see its field comment.
             // It is static-backed and survives resets so the LFE card doesn't blink
             // out; the prober overwrites it on the next base detect.

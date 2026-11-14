@@ -55,12 +55,19 @@ namespace MozaPlugin.Devices
         public const double TorqueBoostNm = 2;
 
         /// <summary>
-        /// True for the models that carry the torque-boost flag: the R16, R21 and
-        /// R25 Ultras. Firmware reports no "Ultra" marker, so the R16 Ultra is told
-        /// from the V1/V2 R16s by its hardware code (D12). The firmware floor is
-        /// checked separately — see <see cref="MozaData.BaseSupportsTorqueBoost"/>.
+        /// True for the models that carry the torque-boost flag (the Ultras). The
+        /// firmware floor is checked separately — see
+        /// <see cref="MozaData.BaseSupportsTorqueBoost"/>.
         /// </summary>
         public static bool HasTorqueBoost(string? baseModelName, string? hardwareCode)
+            => IsUltra(baseModelName, hardwareCode);
+
+        /// <summary>
+        /// True for the R16, R21 and R25 Ultras. Firmware reports no "Ultra"
+        /// marker, so the R16 Ultra is told from the V1/V2 R16s by its hardware
+        /// code (D12).
+        /// </summary>
+        public static bool IsUltra(string? baseModelName, string? hardwareCode)
         {
             switch (ExtractPrefix(baseModelName))
             {

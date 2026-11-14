@@ -49,16 +49,13 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>강성</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>게임 FFB 유지</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>FFB 이퀄라이저</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 400% = 최대 부스트</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB 출력 커브</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 5개의 노드를 드래그하여 응답 곡선 조정</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>리니어</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 커브</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>지수</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>포물선</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>기타</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>고속 댐핑</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// 이 설정들이 무슨 역할을 하는지는 알 수 없습니다</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>포스 피드백 반전</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>대기 모드</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>대기 시작까지</value></data>
@@ -361,6 +358,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>바이어스</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>렌더링 중…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>대기 시간</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>게임 외 대시보드</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>메뉴에서 표시</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>동기화 LED</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1분</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2분</value></data>
@@ -677,7 +676,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>와이퍼 단계 {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>라이트 단계 {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>입력 힘</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>대기 · 고정</value></data>
@@ -687,9 +685,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>호흡 속도 (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>대기 효과</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>대기 애니메이션</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>휠베이스 LFE 소스</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>플러그인 LFE 탭</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>휠베이스 LFE</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>플러그인 탭</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>장치</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>SimHub 9.12 이상이 필요합니다 — 플러그인의 LFE 탭을 사용합니다.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>장치 정의가 업데이트되었습니다. 적용하려면 SimHub를 다시 시작하세요.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 호환성</value></data>
@@ -795,6 +793,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>정지 중</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>포트 자가 테스트</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>오류</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>수동 모션 테스트</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>SimHub 수동 제어와 Hop-in 위치에 컨트롤러의 느린 수동 모드 사용</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion이 활성화되지 않았습니다</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>MOZA Motion Controller가 연결되어 있지만 SimHub의 Motion 플러그인이 활성화되지 않았습니다. Settings &gt; Plugins에서 활성화한 다음 Motion에서 MOZA HMA150 컨트롤러를 추가하세요.</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150이 SimHub Motion에 추가되지 않았습니다</value></data>
@@ -833,10 +833,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>전역 설정</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>텔레메트리 효과(휠베이스를 통한 엔진, ABS, 기어 변속 진동)에는 휠베이스 펌웨어 1.2.10.10 이상이 필요합니다. 이 베이스는 {0}입니다. 사용하려면 Pit House에서 베이스 펌웨어를 업데이트하세요.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12 햅틱</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12 페달 햅틱</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>플러그인 S12 탭</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>페달별 ShakeIt</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>통합 ShakeIt</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>페달 햅틱</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>플러그인 탭</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>분리된 장치</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>통합 장치</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt에는 SimHub 9.12 이상이 필요합니다 — 플러그인의 S12 탭을 사용합니다.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>실시간 출력</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>펄스 길이</value></data>
@@ -852,9 +852,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>장치 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>손실 {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>기본 탭</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster 진동</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>플러그인 mBooster 탭</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>플러그인 탭</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>장치</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt에는 SimHub 9.12 이상이 필요합니다 — 플러그인의 mBooster 탭을 사용합니다.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster가 SimHub에 추가되지 않음</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 페달이 연결되어 ShakeIt으로 설정되어 있지만 SimHub에 mBooster 장치가 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
@@ -893,4 +893,34 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>슬라이더</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>다이얼</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>휠</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>음악 트랙</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>음악 볼륨</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>시작 음악</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 휠베이스 제어</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>휴대폰이나 태블릿에서 휠베이스 설정을 조정합니다.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>포인트 {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>예측</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>클러치 엔진 진동</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>클러치 연결</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>물림점에서 서서히</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>물림점 아래</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>완전히 뗐을 때</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>항상</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>실린더</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>최대 주파수 (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>공회전 강도 (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>맥동 (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>언덕 정상 강도</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux가 MOZA 장치에 대한 접근을 차단하고 있습니다</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux 사용자가 {0}을(를) 열 수 없어 플러그인이 연결할 수 없습니다.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Linux 사용자가 {0}을(를) 열 수 없어 스티어링, 페달 및 버튼 입력이 누락됩니다.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>{0} 서브시스템에서 MOZA 장치(idVendor 346e)에 TAG+="uaccess"를 부여하는 udev 규칙을 추가한 다음 장치를 뽑았다가 다시 연결하세요.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>클러치</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>트리거</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>펄스</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>엔진</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB 스타일</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>부드럽게</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>보통</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>강하게</value></data>
 </root>

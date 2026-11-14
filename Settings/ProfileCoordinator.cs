@@ -33,7 +33,8 @@ namespace MozaPlugin.Settings
             try
             {
                 var holder = _plugin.DeviceProfiles?.WheelDashboardKeyProfile;
-                if (holder != null)
+                // The idle dashboard is not the profile's pick.
+                if (holder != null && _plugin.IdleDashboards?.WheelEngaged != true)
                 {
                     var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
                     if (cands.Count > 0) holder.TelemetryDashboardKey = cands[0];
@@ -127,6 +128,8 @@ namespace MozaPlugin.Settings
             // telemetry off for new wheels, wheelbase LFE off ShakeIt).
             _plugin._settings = MozaPluginSettings.CreateForNewInstall();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
+            _plugin.ApplyStalksSettings();
+            _plugin.LoadBitePointTravel();
             // InitProfileSystem re-pushes the master-mapper defaults from the
             // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();
@@ -442,6 +445,15 @@ namespace MozaPlugin.Settings
         internal void ApplyCm2SavedDashboard(MozaDashProfile? profile)
         {
             if (profile == null) return;
+            ApplyCm2SavedDashboardCore(profile);
+            // The CM2's mappings follow its profile too, and a switch between profiles on
+            // the same dashboard emits no kind=4 — rebind the live channels (wire-neutral).
+            try { _plugin.Cm2Sender?.ReResolveActiveDashboardMappings(onlyIfChanged: true); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] CM2 mapping re-resolve after profile apply failed: " + ex.Message); }
+        }
+
+        private void ApplyCm2SavedDashboardCore(MozaDashProfile profile)
+        {
             if (string.IsNullOrEmpty(profile.TelemetryDashboardKey))
             {
                 // A profile with no pick yet takes the dashboard the CM2 is on, so the
@@ -662,23 +674,36 @@ namespace MozaPlugin.Settings
             }
         }
 
-        /// <summary>Active wheel's dashboard profile name (cache key / builtin name). "" when unset.</summary>
+        /// <summary>The wheel screen's current dashboard name (cache key / builtin name):
+        /// the idle dashboard while one is showing, else the active wheel profile's pick.
+        /// "" when unset. A write is an explicit pick to the profile and ends the idle
+        /// dashboard until the next game.</summary>
         internal string ActiveTelemetryProfileName
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+            get => _plugin.IdleDashboards?.WheelOverrideName
+                   ?? _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryProfileName = value ?? "";
             }
         }
 
-        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none).</summary>
+        /// <summary>The active wheel profile's own dashboard pick, ignoring a showing idle dashboard.</summary>
+        internal string SavedTelemetryProfileName =>
+            _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+
+        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none, and while
+        /// the idle dashboard — always a wheel slot — is showing).</summary>
         internal string ActiveTelemetryMzdashPath
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
+            get => _plugin.IdleDashboards?.WheelEngaged == true
+                ? ""
+                : _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryMzdashPath = value ?? "";
             }
@@ -709,6 +734,35 @@ namespace MozaPlugin.Settings
                     s.WheelMzdashFolderByPageGuid = next;
                 }
             }
+        }
+
+        /// <summary>Steering Wheel Inertia stored for a wheel page; -1 when none.</summary>
+        internal int GetWheelNaturalInertia(Guid pageGuid)
+        {
+            var dict = _plugin.Settings?.WheelNaturalInertiaByPageGuid;
+            return dict != null && dict.TryGetValue(pageGuid, out var v) ? v : -1;
+        }
+
+        internal void SetWheelNaturalInertia(Guid pageGuid, int value)
+        {
+            var s = _plugin.Settings;
+            if (s == null || value < 0) return;
+            lock (_pageBundleSwapLock)
+            {
+                var cur = s.WheelNaturalInertiaByPageGuid;
+                if (cur != null && cur.TryGetValue(pageGuid, out var prev) && prev == value) return;
+                var next = cur == null ? new Dictionary<Guid, int>() : new Dictionary<Guid, int>(cur);
+                next[pageGuid] = value;
+                s.WheelNaturalInertiaByPageGuid = next;
+            }
+        }
+
+        /// <summary>Record a user-set Steering Wheel Inertia for the attached wheel.
+        /// No-op until the wheel identifies — the base still holds the written value.</summary>
+        internal void SetActiveWheelNaturalInertia(int value)
+        {
+            var g = _plugin.GetCurrentWheelPageGuid();
+            if (g.HasValue) SetWheelNaturalInertia(g.Value, value);
         }
 
         /// <summary>

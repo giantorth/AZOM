@@ -821,9 +821,17 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <ctrl:SectionCard x:Name="FfbEqCard" Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbEqualizer}"
+                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
                                               Icon="{StaticResource IconEq}" Margin="0,0,7,14">
+                                <ctrl:SectionCard.Header>
+                                    <!-- cmd 0x36 FFB style; Ultra bases on fw >= 1.2.12.0 only -->
+                                    <ctrl:SegmentedControl x:Name="FfbStyleSelector" Visibility="Collapsed"
+                                                           SelectionChanged="FfbStyleSelector_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleSoft}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleNormal}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleStrong}"/>
+                                    </ctrl:SegmentedControl>
+                                </ctrl:SectionCard.Header>
                                 <StackPanel>
                                     <ctrl:MozaCurveEditor x:Name="FfbEqualizer"
                                                           Style="{StaticResource MozaEqualizerLineStyle}"
@@ -866,7 +874,6 @@
                             </ctrl:SectionCard>
 
                             <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_FfbOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbOutputCurve}"
                                               Icon="{StaticResource IconCurve}"
                                               AccentBrush="{StaticResource GreenBrush}" Margin="7,0,0,14">
                                 <StackPanel>
@@ -923,8 +930,8 @@
                             <Slider x:Name="FfbCurveY5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="FfbCurveY5Slider_ValueChanged"/>
                         </StackPanel>
 
-                        <!-- Miscellaneous + High Speed Damping sit side-by-side: small
-                             cards that round out the tab at the bottom. -->
+                        <!-- Miscellaneous on the left; High Speed Damping and Startup Music
+                             stacked on the right. -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -969,38 +976,81 @@
                                 </StackPanel>
                             </ctrl:SectionCard>
 
-                            <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_HighSpeedDamping}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_HighSpeedDamping}"
-                                              Icon="{StaticResource IconSpeed}" Margin="7,0,0,14">
-                                <StackPanel>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingLevel}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="SpeedDampingSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="SpeedDampingSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="SpeedDampingValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=SpeedDampingSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="0%"/>
-                                    </Grid>
-                                    <Grid Margin="0,4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerSpeed}" Style="{StaticResource SliderLabel}"/>
-                                        <Slider Grid.Column="1" x:Name="SpeedDampingPointSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="400" TickFrequency="10" ValueChanged="SpeedDampingPointSlider_ValueChanged"/>
-                                        <TextBox Grid.Column="2" x:Name="SpeedDampingPointValue" Style="{StaticResource SliderValueEditBox}"
-                                                 Tag="{Binding ElementName=SpeedDampingPointSlider}"
-                                                 KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
-                                                 Text="120 kph"/>
-                                    </Grid>
-                                </StackPanel>
-                            </ctrl:SectionCard>
+                            <StackPanel Grid.Column="1">
+                                <ctrl:SectionCard Title="{x:Static res:Strings.Section_HighSpeedDamping}"
+                                                  Icon="{StaticResource IconSpeed}" Margin="7,0,0,14">
+                                    <StackPanel>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_DampingLevel}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="SpeedDampingSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="SpeedDampingSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="SpeedDampingValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=SpeedDampingSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="0%"/>
+                                        </Grid>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TriggerSpeed}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="SpeedDampingPointSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="400" TickFrequency="10" ValueChanged="SpeedDampingPointSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="SpeedDampingPointValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=SpeedDampingPointSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="120 kph"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </ctrl:SectionCard>
+                                <!-- Shown once the base answers the music reads. -->
+                                <ctrl:SectionCard x:Name="StartupMusicCard" Visibility="Collapsed"
+                                                  Title="{x:Static res:Strings.Section_StartupMusic}"
+                                                  Icon="{StaticResource IconMusic}" Margin="7,0,0,14">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8">
+                                            <TextBlock Text="{x:Static res:Strings.Label_Enable}" Style="{StaticResource SliderLabel}"/>
+                                            <ctrl:OffOnToggle x:Name="StartupMusicCheck" VerticalAlignment="Center" Click="StartupMusicCheck_Click"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,8">
+                                            <TextBlock Text="{x:Static res:Strings.SliderLabel_StartupMusicTrack}" Style="{StaticResource SliderLabel}"/>
+                                            <ComboBox x:Name="StartupMusicTrackCombo" Width="110" VerticalAlignment="Center"
+                                                      SelectionChanged="StartupMusicTrackCombo_Changed">
+                                                <ComboBoxItem Tag="1" Content="1"/>
+                                                <ComboBoxItem Tag="2" Content="2"/>
+                                                <ComboBoxItem Tag="3" Content="3"/>
+                                                <ComboBoxItem Tag="4" Content="4"/>
+                                                <ComboBoxItem Tag="5" Content="5"/>
+                                                <ComboBoxItem Tag="6" Content="6"/>
+                                                <ComboBoxItem Tag="7" Content="7"/>
+                                                <ComboBoxItem Tag="8" Content="8"/>
+                                                <ComboBoxItem Tag="9" Content="9"/>
+                                                <ComboBoxItem Tag="10" Content="10"/>
+                                            </ComboBox>
+                                            <Button Content="{x:Static res:Strings.Label_Test}" Padding="10,2" Margin="8,0,0,0"
+                                                    VerticalAlignment="Center" Click="StartupMusicTest_Click"/>
+                                        </StackPanel>
+                                        <Grid Margin="0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_StartupMusicVolume}" Style="{StaticResource SliderLabel}"/>
+                                            <Slider Grid.Column="1" x:Name="StartupMusicVolumeSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="StartupMusicVolumeSlider_ValueChanged"/>
+                                            <TextBox Grid.Column="2" x:Name="StartupMusicVolumeValue" Style="{StaticResource SliderValueEditBox}"
+                                                     Tag="{Binding ElementName=StartupMusicVolumeSlider}"
+                                                     KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                     Text="9%"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </ctrl:SectionCard>
+                            </StackPanel>
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>
@@ -3067,6 +3117,7 @@
                                                  KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                  Text="5"/>
                                     </Grid>
+                                    <ctrl:OffOnToggle x:Name="MBoosterBitePointPredict" Content="{x:Static res:Strings.Label_BitePrediction}" HorizontalAlignment="Left" Margin="0,4" Checked="MBoosterBitePointPredict_Changed" Unchecked="MBoosterBitePointPredict_Changed"/>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -4154,7 +4205,7 @@
                                                   SelectionChanged="DefaultTabCombo_Changed"/>
                                     </Grid>
                                     <!-- Status line (firmware note) is long and wraps under the selector. -->
-                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4">
+                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4177,7 +4228,7 @@
                                     </Grid>
                                     <!-- What drives the S12: the plugin's S12 tab, or ShakeIt
                                          as one device per pedal / one combined device. -->
-                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4">
+                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4201,7 +4252,7 @@
                                     </Grid>
                                     <!-- What drives the mBooster vibrations: the plugin's mBooster
                                          tab, or ShakeIt as one device with a channel per pedal role. -->
-                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4">
+                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4222,20 +4273,7 @@
                                                    Style="{StaticResource MutedHintText}"
                                                    Margin="0,6,0,0" TextWrapping="Wrap"/>
                                     </Grid>
-                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
-                                         Persistent base-side state, read back from the device
-                                         rather than stored in settings — so the toggle shows what
-                                         the base actually holds, including a value PitHouse set. -->
-                                    <Grid Margin="0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
-                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
-                                    </Grid>
-                                    <Grid Margin="0,8">
+                                    <Grid x:Name="Ab9DetectionRow" Margin="0,8" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4243,6 +4281,19 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
                                         <ctrl:OffOnToggle Grid.Column="1" x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
                                                   Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
+                                    </Grid>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <Grid x:Name="ForzaCompatRow" Margin="0,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
                                     </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>

@@ -820,6 +820,15 @@ namespace MozaPlugin.UI
             (s.BitePoint ??= new MBoosterEffectSettings()).BitePointMaxLengthMs = v;
             _plugin.SaveSettings();
         }
+        // Prediction. See MBoosterBitePointTrigger.
+        private void MBoosterBitePointPredict_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            var s = CurrentMBoosterEffectTarget();
+            if (s == null) return;
+            (s.BitePoint ??= new MBoosterEffectSettings()).BitePointPredict = MBoosterBitePointPredict.IsChecked == true;
+            _plugin.SaveSettings();
+        }
         // Fixed vibration frequency (2-100Hz). See MBoosterEffectSettings
         // .FrequencyHz and MBoosterEffectWorker.UpdateBitePointRequest.
         private void MBoosterBitePointFrequencySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

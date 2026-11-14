@@ -80,6 +80,8 @@ namespace MozaPlugin.Settings
             MBoosterHapticsSource = MBoosterHapticsSource.ShakeIt,
             DeviceProfilesSplit = true,
             Cm2DashboardKeysReset = true,
+            StalksMode = StalkMode.TruckSim,
+            StalksTruckSim = StalkTruckSimSettings.CreateEts2Defaults(),
         };
 
         // Wheel LED mode settings (-1 = not yet saved).
@@ -233,13 +235,16 @@ namespace MozaPlugin.Settings
         public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
 
         // Clutch position the Bite Point trigger and calibration read.
-        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.MBoosterPedal;
+        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.Game;
 
         // Formula for MBoosterBitePointSource.Formula: a property path, NCalc, or js:-prefixed, 0..100.
         public string MBoosterBitePointSourceFormula { get; set; } = "";
 
         // Axis for MBoosterBitePointSource.HidAxis; null = none chosen.
         public Protocol.HidAxisSelection? MBoosterBitePointHidAxis { get; set; }
+
+        // Clutch travel times Prediction learns (MBoosterBitePointTravel); null = none yet.
+        public Devices.MBooster.MBoosterBitePointTravelTimes? MBoosterBitePointTravelTimes { get; set; }
 
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
@@ -666,6 +671,13 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, WheelIdleSettings> WheelIdleByPageGuid { get; set; }
             = new Dictionary<Guid, WheelIdleSettings>();
 
+        // Per-wheel-page Steering Wheel Inertia (hands-off protection, base cmd 0x13,
+        // raw 100..4000). It describes the rim, so it follows the attached wheel and
+        // is shared across profiles; the Hands-off Protection toggle stays on the
+        // profile. Absence = base keeps its stored value (seeded from it on first apply).
+        public Dictionary<Guid, int> WheelNaturalInertiaByPageGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
         // ===== Dashboard Telemetry =====
         public bool TelemetryEnabled { get; set; } = false;
 
@@ -778,11 +790,28 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, int> Cm1ActiveDashboardByGuid { get; set; }
             = new Dictionary<Guid, int>();
 
+        /// <summary>Dashboard shown while no game runs, per device page (wheel page GUID,
+        /// <c>Cm2PageGuid</c>): a dashboard name from that device's list. Per device, not
+        /// per profile. Absent = off. See <c>IdleDashboardCoordinator</c>.</summary>
+        public Dictionary<Guid, string> IdleDashboardByPageGuid { get; set; }
+            = new Dictionary<Guid, string>();
+
+        /// <summary>Index form of <see cref="IdleDashboardByPageGuid"/> for the fixed-page
+        /// screens: FSR V1 (wheel page GUID, 0..18) and CM1 (<c>Cm1PageGuid</c>, 1-based).</summary>
+        public Dictionary<Guid, int> IdleDashboardIndexByPageGuid { get; set; }
+            = new Dictionary<Guid, int>();
+
+        /// <summary>Pages whose idle dashboard also shows in game while not driving
+        /// (paused, menus, replay, spectating). Absent = only when no game runs.</summary>
+        public Dictionary<Guid, bool> IdleDashboardWhenNotDrivingByPageGuid { get; set; }
+            = new Dictionary<Guid, bool>();
+
         // --- MOZA Multi-Function Stalks: truck-sim keyboard emulation ---
 
-        /// <summary>Stalks operating mode. Default <see cref="StalkMode.ButtonBox"/>
-        /// = the plugin does nothing (raw HID buttons). <see cref="StalkMode.TruckSim"/>
-        /// enables ETS2/ATS keyboard emulation from the button map below.</summary>
+        /// <summary>Stalks operating mode. <see cref="StalkMode.ButtonBox"/> = the plugin
+        /// does nothing (raw HID buttons). <see cref="StalkMode.TruckSim"/> enables
+        /// ETS2/ATS keyboard emulation from the button map below; new installs start
+        /// in TruckSim (<see cref="CreateForNewInstall"/>).</summary>
         public StalkMode StalksMode { get; set; } = StalkMode.ButtonBox;
 
         /// <summary>Per-button map + wiper/light stage config used when
@@ -801,7 +830,10 @@ namespace MozaPlugin.Settings
     /// </summary>
     public sealed class WheelSleepSettings
     {
-        public int Mode { get; set; } = -1;          // cmd 0x20 mode enum
+        // cmd 0x20: 0 = Off, 1 = Breathing. Older builds stored 2-6, which the
+        // wheel never keeps (reads back 1), so those load as Breathing.
+        private int _mode = -1;
+        public int Mode { get => _mode; set => _mode = value > 1 ? 1 : value; }
         public int TimeoutMin { get; set; } = -1;    // cmd 0x21 BE u16 minutes
         public int SpeedMs { get; set; } = -1;       // cmd 0x22 BE u16 ms
         public int[]? Color { get; set; }            // packed R<<16|G<<8|B (single)
@@ -851,9 +883,9 @@ namespace MozaPlugin.Settings
 
     /// <summary>
     /// Truck-sim keyboard-mapping config for the MOZA Multi-Function Stalks. Stored
-    /// on <see cref="MozaPluginSettings.StalksTruckSim"/>. The per-button map is
-    /// assigned interactively in the Stalks settings tab — there is no default map.
-    /// Cycle keys / stage counts start at ETS2 defaults and are user-adjustable.
+    /// on <see cref="MozaPluginSettings.StalksTruckSim"/>. New installs start from
+    /// <see cref="CreateEts2Defaults"/>; the field initializers keep the button map
+    /// empty so an existing settings file's map is never merged with defaults.
     /// </summary>
     public sealed class StalkTruckSimSettings
     {
@@ -916,6 +948,14 @@ namespace MozaPlugin.Settings
         /// <summary>Populate the ETS2/ATS default button map (0-based button indices,
         /// i.e. HID button number − 1): light knob 1–3, high beam 4/5, turn signals
         /// 8/9/10, wipers single-swipe 20 and stages 21–24.</summary>
+        public static StalkTruckSimSettings CreateEts2Defaults()
+        {
+            var s = new StalkTruckSimSettings();
+            s.ApplyEts2Defaults();
+            return s;
+        }
+
+        /// <summary>Reset to the ETS2/ATS defaults; see <see cref="CreateEts2Defaults"/>.</summary>
         public void ApplyEts2Defaults()
         {
             WiperForwardKey = "P";

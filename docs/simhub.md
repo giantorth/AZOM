@@ -67,6 +67,57 @@ this.AttachDelegate("MyPlugin.SomeValue", () => _data.SomeValue);
 this.AddAction("MyPlugin.DoSomething", (a, b) => { ... });
 ```
 
+### Published names
+
+`AddAction` / `AttachDelegate` (the `IPlugin` extensions) register under `PluginManager.GetName(name, typeof(T))` = `typeof(T).Name + "." + name`. `[PluginName]` plays no part, so the MOZA plugin's `AZOM.FfbStrengthUp` is published as **`MozaPlugin.AZOM.FfbStrengthUp`**. `TriggerAction(name)` silently ignores unknown names and does not check `Hidden`. The extension drops any `actionEnd` callback: a triggered action is one atomic call.
+
+## Dash Studio Dashboards (`.djson`)
+
+Verified by decompiling `SimHub.Plugins.dll` / `SimHub.Plugins.Web.dll` (9.13) and reading the stock `DashTemplates`.
+
+### Folder layout and install
+
+- `DashTemplates/<Name>/<Name>.djson` is the only file SimHub requires; `GraphicalDashPluginList.AddModels` lists every subfolder that has it. `DashTemplates` is resolved **relative to the process working directory** (SimHub's install dir).
+- Optional siblings: `<Name>.djson.metadata` (same object as the embedded `Metadata`), `<Name>.djson.png` / `.00.png`… previews, `<Name>.djson.ressources` (zip of the `Images[]` entries), `_SHFonts/`, `JavascriptExtensions/`. Dash Studio saves back up into `_Backups/`.
+- A `ChangeNotifier("DashTemplates")` watcher refreshes the list ~2 s after a change — copying a folder in is a complete install.
+- `.simhubdash` = zip of the dashboard folder with the folder itself at the root. `ImportDashWindow(path)` (public) is SimHub's importer.
+
+### Schema essentials
+
+Top level: `Version` 2, `Id`, `BaseWidth`/`BaseHeight`, `BackgroundColor`, `Screens[]`, `Images[]`, `Metadata`, `IsOverlay`, `EnableClickThroughOverlay` (defaults true — an overlay with buttons must set false). Screens: `Name`, `ScreenId` (GUID), `InGameScreen`/`IdleScreen`/`PitScreen`, `Items[]`.
+
+Items are polymorphic via `"$type": "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.<X>, SimHub.Plugins"` (must be the first key). Group items (`Layer`, `ButtonItem` — it derives from `GroupItem`) hold `Childrens[]`; child coordinates are **absolute canvas coordinates**, not relative to the parent.
+
+Bindings: `"Bindings": { "<Property>": { "Formula": { "Expression": "...", "Interpreter": 1 }, "Mode": 2, "TargetPropertyName": "<Property>" } }`. `Interpreter` absent = NCalc (`[Plugin.Prop]`), 1 = JavaScript (`$prop('Plugin.Prop')`). `FormatString` is a .NET numeric format (`0`, `0.0`, `0\%`). Any public item property can be a target (`Text`, `Visible`, `Opacity` 0–100, `BackgroundColor`, `TextColor`, `IsEnabled`, `TriggerAction`, …).
+
+### Touch controls: `ButtonItem`
+
+`ButtonItem` is the only touch control (no slider or numeric input). `DoAtion(state)` returns immediately when `IsEnabled` is false; otherwise:
+
+| Field | Effect | When |
+|---|---|---|
+| `TriggerAction` | `PluginManager.TriggerAction(name, preventEvents: true)` — any plugin action by full name | release |
+| `TriggerSimHubInputName` | `TriggerInputPress/Release` as `GraphicalDashPlugin.<name>` | press / release |
+| `TriggerControlMapperRoleName` | `ControlMapperPlugin.StartRole/StopRole` | press / release |
+| `SimulateKey` + `SimulatedKeyV2` | keyboard press/release | press / release |
+| `Behavior` | e.g. `...Behaviors.Buttons.GotoScreenBehavior` `{ScreenId, DisableButtonIfCurrentScreen, ClearNavigationHistory}`, `Next/PreviousScreenBehavior`, `TriggerDashActionBehavior` | after release |
+
+**Gotcha:** the constructor defaults are `SimulateKey = true` and `TriggerSimHubInputName = "MyButton"`; generated JSON must set `false` / `""` explicitly.
+
+Actions take no value. Absolute values need one action per value, optionally chosen by binding `TriggerAction` to a formula.
+
+Web dash (phone/tablet): `Web/controls.js` `renderButtonItem` sends `pressed`/`released` over the dashboard WebSocket; `RemoteDash` routes them to `ButtonItem.IncomingData` → `DoAtion`, the same path as a desktop click. `PressedOpacity`/`DisabledOpacity` only apply to the button image. No licence check was found on buttons, the web dash, or `TriggerAction`.
+
+**Labels:** a `TextItem` nested in a `ButtonItem`'s `Childrens` does not render, even though `ButtonItem` derives from `GroupItem` (observed on a generated dashboard; no stock dashboard nests children in a button). Use the stock pattern instead: draw a `RectangleItem` and a `TextItem`, then put a transparent `ButtonItem` over them as the hit area. Within a `Childrens`/`Items` list, later items draw on top.
+
+### MOZA control dashboard
+
+`Integration/ControlDash/ControlDashBuilder.cs` generates "MOZA Wheelbase Control" from `BaseSettingCatalog`. Each setting is one row: label, then `◄◄` `◄` value `►` `►►` → `MozaPlugin.AZOM.<Name>{DownCoarse,Down,Up,UpCoarse}`; toggles → `<Name>Toggle`. Labels are in the plugin's UI language. Rows are hidden when the property reads -1. Buttons are disabled while `AZOM.BaseConnected` is false, and step buttons are also disabled at the setting's bounds; settings with live bounds (`MinFor`/`MaxFor`: EQ band mode, curve X neighbours) publish them as `AZOM.<Name>Min` / `AZOM.<Name>Max`.
+
+- **FFB Equalizer:** a vertical `LinearGaugeItem` (`GaugeOrientation` 1, `GaugeAlignment` 0 = fill from the bottom) per band with ▲▲ ▲ / ▼ ▼▼, in frequency order. Two layers: 10-band (scale 500 %) and 6-band (400 %), switched on `AZOM.Equalizer7 >= 0`.
+- **FFB Output Curve:** a plot of (0,0) → points 1–4 → (100, Y5), drawn as rectangles whose `Left`/`Top` are bound to the point properties (no line item exists), plus one card per point: ◄ ► = input (X), ▼ ▲ = output (Y). Point 5 is output-only. X steps are clamped 1 unit inside the neighbouring points, as the curve editor's drag is.
+- Roboto has no ▲►▼◄; arrow glyphs use Cousine, which is also in `DashFonts` (the web dash serves `DashFonts` through `/FontFaces.css`). `ControlDashInstaller` writes it to `DashTemplates` at Init when the bytes change; the SHA-256 of the last write is kept in `<Name>.djson.azom`, and a `.djson` that no longer matches it (edited in Dash Studio) is left alone.
+
 ## Logging
 
 ```csharp
@@ -834,14 +885,15 @@ Per-frame flow (`ShakeITV3PluginBase.DataUpdate`, SimHub data thread, once per g
 
 The 10 Hz `DispatcherTimer` in the base is **UI preview only** (runs while the settings control is visible); all real output happens on the data-update tick. Effect *containers* are discovered by assembly scanning (`PluginFinder.GetResolver(…, typeof(EffectsContainerBase))`, filtered by `[ShakeItContainerMetadata]` + `OutputMode`/`DeviceTarget`), so custom effect types are third-party-extensible — that is the effect side, distinct from the output-device side below.
 
-**Plugin-supplied effect types** (verified 9.13.3; the MOZA plugin ships `MozaClutchBitePointContainer`):
+**Plugin-supplied effect types** (verified 9.13.3; the MOZA plugin ships `MozaClutchBitePointContainer` and `MozaClutchEngineContainer`):
 
 - The scan covers every root-folder DLL (`AssemblyHelper.GetDlls`), so a plugin assembly is included. Subclass `EffectsContainerBase<SingleToneOutput>` with a public parameterless ctor and `[ShakeItContainerMetadata]`; the add-effect list keeps it when `EffectPlatform` is `Any` or matches the output manager's `OutputMode`.
 - Saved profiles store `ContainerType = GetType().Name`, and `EffectsContainerJsonConverter` resolves it by **short** type name — renaming the class orphans saved effects, and the name must not collide with any other loaded container.
 - Settings are plain public properties (default Newtonsoft serialization, restored via `Populate`); mark effect instances `[JsonIgnore]`. `GetEditControl()` supplies the editor; SimHub's public `SimHub.Plugins.UI.TitledSlider` (`Value` binds two-way by default) matches the stock look.
 - `ProcessEffects` runs every data tick, in game or not; with `Filter == null` the effect value 0..1 becomes `LastOutput` ×100. Unless `IsAllowedOutOfGame`, the base zeroes effects when not `GameRunning && !GamePaused && !GameInMenu && !Spectating`. Disabled containers return early without calling the effect, so effect-held state must be reset in an override.
 - `ShakeItProfile.AddEffect` runs `SetDefaults` → `LoadDefaultSettings` → `LoadDefaultPlatformSettings`, the last one ending in the channels provider's hook (also on Reset effect), which can seed per-channel activations through the public `SettingsStore.GetSettings<DeviceChannelActivationSettings>().Channels` dictionaries.
-- A `MotorsWithFrequency` channel's gain is `globalGain/100 × LastOutput/100 × effectiveGain/100`, maxed across effects; its frequency is the gain²-weighted mean of the effects' `SingleToneOutput.Frequency`.
+- A `MotorsWithFrequency` channel's gain is `globalGain/100 × LastOutput/100 × effectiveGain/100`, maxed across effects; its frequency is the gain²-weighted mean of the effects' tone frequencies (`IToneRenderer.GetCurrentFrequency()`, which is also what the bass-shaker FMOD channel plays).
+- A per-frame frequency: with a `ToneOutput` (or subclass) the container gets a `ToneRenderer`, whose `GetCurrentFrequency()` returns `CustomEffect.TargetFrequency` when the effect (or any effect in its `EffectAggregator`) is a `CustomEffect` with one set; otherwise the `Frequency`→`HighFrequency` map. `CustomEffect` is public and unsealed with a public ctor, so a plugin effect can derive from it, override `GetEffectValue` and set `TargetFrequency` each frame (`MozaClutchEngineContainer`). Overriding the output's `GetEditControl`/`GetTitleControl` to return null hides the stock frequency controls, as SimHub's `NoToneOutput` does.
 
 Two output-layer concepts that are easy to confuse:
 

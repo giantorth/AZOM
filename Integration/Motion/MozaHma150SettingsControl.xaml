@@ -77,6 +77,17 @@
                       Content="{x:Static res:Strings.Motion_Panel_CornerHaptics}"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_CrestBoost}"/>
+            <Slider x:Name="CrestBoostSlider" Width="240" Minimum="0" Maximum="100" TickFrequency="5"
+                    IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="CrestBoostValue" Width="40" Margin="8,0,0,0"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="SlowManualCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_SlowManualControl}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_MaxStroke}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="MaxStrokeBox"/>
             <Button x:Name="MaxStrokeApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="MaxStrokeApply_Click"/>

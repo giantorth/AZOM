@@ -314,6 +314,26 @@ namespace MozaPlugin
             owner.ReadSettingUntracked("base-torque-boost");
         }
 
+        /// <summary>
+        /// One-shot apply+read of the FFB style register once the base is known to
+        /// carry it. Support needs the firmware, model and hardware-code replies,
+        /// which arrive in no fixed order, so it is resolved here rather than in a
+        /// single reply handler. Old or non-Ultra bases never see cmd 0x36.
+        /// </summary>
+        private void TickBaseFfbStyleProbe()
+        {
+            if (!DetectionState.BaseDetected || DetectionState.BaseFfbStyleProbed) return;
+            var data = _data;
+            if (data == null || !data.BaseSupportsFfbStyle) return;
+            var owner = DetectionState.BaseOwner ?? _deviceManager;
+            if (owner == null || !owner.IsConnected) return;
+
+            DetectionState.BaseFfbStyleProbed = true;
+            // Write before read so the read-back reflects the profile value.
+            _hardwareApplier?.ApplyBaseToHardware(_settings?.ProfileStore?.CurrentProfile);
+            owner.ReadSetting("base-ffb-style");
+        }
+
         // Same budget as the base: ~25 s past wheel detect, one frame per round.
         private const int WheelFwVersionProbeRetryLimit = 5;
 
@@ -403,6 +423,7 @@ namespace MozaPlugin
             TickBaseFwVersionRetry();
             TickWheelFwVersionRetry();
             TickTorqueBoostPoll();
+            TickBaseFfbStyleProbe();
 
             // CM2 / dashboard-pipeline reconcile runs REGARDLESS of the wheelbase
             // connection. DECOUPLED: a standalone-USB CM2 is driven by the dedicated
@@ -417,6 +438,10 @@ namespace MozaPlugin
             // below passes anyway — running them here only adds the USB-only case.
             _dualDisplay?.EnsureCm2Pipeline();
             _dualDisplay?.TickCm2LaneHygiene();
+            // Before the profile retries / CM2 re-assert: when the idle dashboard
+            // applies it binds first and they find nothing left to switch.
+            try { _idleDashboards?.Tick(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Idle dashboard tick failed: {ex.Message}"); }
             _dashboardBindingCoordinator?.TickPendingDashboardRetry();
             _dualDisplay?.TickCm2DashboardReassert();
             _dashboardBindingCoordinator?.TickPendingCm2DashboardRetry();
@@ -429,6 +454,9 @@ namespace MozaPlugin
             // dark screen with nothing to restart it. Reconcile it here like the
             // CM2/CM1 drivers above. Idempotent: no-op unless a stopped FSR1.
             _dualDisplay?.StartFsr1DriverIfNeeded();
+
+            // Before the primary-connection gate: the base may be on the base-aux pipe.
+            _highSpeedDamping?.Reconcile();
 
             if (!_connection.IsConnected) return;
 

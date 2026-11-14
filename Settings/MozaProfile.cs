@@ -625,12 +625,13 @@ namespace MozaPlugin.Settings
         public int Spring { get; set; } = -1;               // raw = percent * 10
         public int SpeedDamping { get; set; } = -1;
         public int SpeedDampingPoint { get; set; } = -1;
-        public int NaturalInertia { get; set; } = -1;
+        // Steering Wheel Inertia is per wheel: MozaPluginSettings.WheelNaturalInertiaByPageGuid.
         public int SoftLimitStiffness { get; set; } = -1;   // raw uses formula
         public int SoftLimitStrength { get; set; } = -1;    // % of max: 50/75/100
         public int SoftLimitRetain { get; set; } = -1;      // 0 = off, 20 = on
         public int FfbReverse { get; set; } = -1;           // 0/1
         public int Protection { get; set; } = -1;           // 0/1
+        public int FfbStyle { get; set; } = -1;             // 0 soft, 1 normal, 2 strong (Ultra, fw >= 1.2.12.0)
 
         // ===== Game effect gains (raw = percent * 2.55) =====
         public int GameDamper { get; set; } = -1;
@@ -896,10 +897,11 @@ namespace MozaPlugin.Settings
             Speed = p.Speed; Damper = p.Damper; Friction = p.Friction;
             Inertia = p.Inertia; Spring = p.Spring;
             SpeedDamping = p.SpeedDamping; SpeedDampingPoint = p.SpeedDampingPoint;
-            NaturalInertia = p.NaturalInertia; SoftLimitStiffness = p.SoftLimitStiffness;
+            SoftLimitStiffness = p.SoftLimitStiffness;
             SoftLimitStrength = p.SoftLimitStrength;
             SoftLimitRetain = p.SoftLimitRetain; FfbReverse = p.FfbReverse;
             Protection = p.Protection;
+            FfbStyle = p.FfbStyle;
 
             // Game effects
             GameDamper = p.GameDamper; GameFriction = p.GameFriction;
@@ -1098,10 +1100,13 @@ namespace MozaPlugin.Settings
             Speed = data.Speed; Damper = data.Damper; Friction = data.Friction;
             Inertia = data.Inertia; Spring = data.Spring;
             SpeedDamping = data.SpeedDamping; SpeedDampingPoint = data.SpeedDampingPoint;
-            NaturalInertia = data.NaturalInertia; SoftLimitStiffness = data.SoftLimitStiffness;
+            SoftLimitStiffness = data.SoftLimitStiffness;
             SoftLimitStrength = data.SoftLimitStrength;
             SoftLimitRetain = data.SoftLimitRetain; FfbReverse = data.FfbReverse;
             Protection = data.Protection;
+            // A base without the register must not wipe a value saved on one that has it.
+            if (data.BaseSupportsFfbStyle)
+                FfbStyle = data.FfbStyle;
 
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;

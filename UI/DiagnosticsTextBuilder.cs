@@ -37,6 +37,22 @@ namespace MozaPlugin.UI
                 default: return $"raw {d.BaseTorqueBoost}";
             }
         }
+        private static string FfbStyleText(MozaData d)
+        {
+            if (!Devices.BaseModelInfo.IsUltra(d.BaseModelName,
+                    Devices.BaseModelInfo.ExtractHardwareCode(d.BaseSwVersion, d.BaseHwVersion)))
+                return "n/a (model)";
+            if (!d.BaseSupportsFfbStyle)
+                return "n/a (needs >= 1.2.12.0)";
+            switch (d.FfbStyle)
+            {
+                case -1: return "unread";
+                case 0: return "soft";
+                case 1: return "normal";
+                case 2: return "strong";
+                default: return $"raw {d.FfbStyle}";
+            }
+        }
         public static string JoinList(IReadOnlyList<string> l)
             => l == null || l.Count == 0 ? "(empty)" : string.Join(", ", l);
         public static string TruncateId(string id)
@@ -154,6 +170,10 @@ namespace MozaPlugin.UI
                 sb.AppendLine($"Wine HID:       hidraw=[{Pids(hid.Hidraw.Keys)}] open=[{Pids(hid.OpenPids)}] dead=[{Pids(hid.DeadPids)}]");
                 sb.AppendLine($"winebus:        {hid.Winebus}");
             }
+            if (Protocol.WineHost.IsWine && Protocol.WineHost.UnixRoot != null)
+                sb.AppendLine("Node access:    " + (Protocol.LinuxDeviceAccess.Supported
+                    ? Protocol.LinuxDeviceAccess.Describe(Protocol.LinuxDeviceAccess.Current)
+                    : "(unavailable: no native exec)"));
 
             if (ports.Count == 0)
             {
@@ -786,6 +806,7 @@ namespace MozaPlugin.UI
             sb.AppendLine($"LFE support:    {(d.BaseSupportsLfe ? "yes" : "no")}  (needs >= 1.2.10.10)");
             sb.AppendLine($"EQ bands:       {(d.BaseSupportsEq10 ? 10 : 6)}  (same firmware gate as LFE)");
             sb.AppendLine($"Torque boost:   {TorqueBoostText(d)}  rated {d.BaseRatedNm:0.#} Nm");
+            sb.AppendLine($"FFB style:      {FfbStyleText(d)}");
 
             if (plugin != null)
             {
@@ -904,12 +925,20 @@ namespace MozaPlugin.UI
                 // The saved name the re-assert resolves to a slot; a value absent from
                 // the list above is why a re-assert silently does nothing.
                 sb.AppendLine();
-                sb.Append($"CM2 saved dash:    {Blank(plugin!.ActiveCm2DashboardName)}");
+                sb.Append($"CM2 saved dash:    {Blank(plugin!.SavedCm2DashboardName)}");
             }
             else if (cm2Present)
             {
                 sb.AppendLine();
                 sb.Append("CM2 dash lane:     (not started)");
+            }
+
+            // Out-of-game dashboards (per device) and which screens show one now.
+            string? idleDash = plugin?.IdleDashboards?.DescribeState();
+            if (idleDash != null)
+            {
+                sb.AppendLine();
+                sb.Append($"Idle dashboards:   {idleDash}");
             }
 
             // Dash LED driver (SimHub effects → CM2 bitmask/colour bridge).

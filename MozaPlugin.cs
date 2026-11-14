@@ -49,6 +49,8 @@ namespace MozaPlugin
         // Auto-standby (idle-timeout Work Mode standby) + the HID-activity
         // baseline that feeds it — see Devices/StandbyCoordinator.cs.
         private StandbyCoordinator? _standby;
+        // Speed-triggered damper boost — see Devices/HighSpeedDampingCoordinator.cs.
+        private HighSpeedDampingCoordinator? _highSpeedDamping;
         // Per-channel + global-default SimHub property mapping —
         // see Telemetry/ChannelMappingCoordinator.cs.
         private ChannelMappingCoordinator _channelMapping = null!;
@@ -303,6 +305,9 @@ namespace MozaPlugin
         // Each device page's own profile store — see Settings/DeviceProfileCoordinator.cs.
         private DeviceProfileCoordinator _deviceProfiles = null!;
         internal DeviceProfileCoordinator? DeviceProfiles => _deviceProfiles;
+        // Per-device dashboard shown while no game runs — see Telemetry/IdleDashboardCoordinator.cs.
+        private IdleDashboardCoordinator? _idleDashboards;
+        internal IdleDashboardCoordinator? IdleDashboards => _idleDashboards;
         // Startup GitHub Releases check (24h throttle + per-process dedupe) —
         // see UI/UpdateCheck/UpdateCheckCoordinator.cs.
         private UpdateCheckCoordinator _updateCheck = null!;

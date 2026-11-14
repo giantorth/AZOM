@@ -207,6 +207,9 @@ namespace MozaPlugin.Devices
             // KS Pro 3/12/3 LED strip appears to live entirely in group 0 (Shift/RPM),
             // not split across RPM + Meter flag sub-device. Driving all 18 as one RPM strip.
             ("W18",     "KS Pro",     new WheelModelInfo(18, 10, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 4, 3, 1, 2 })),
+            // Ford Mustang GTD (firmware "W20"): a CS Pro style wheel with 12 button LEDs instead
+            // of 8; same knobs and knob signal-mode order. 
+            ("W20",     "Ford Mustang GTD", new WheelModelInfo(16, 12, false, null, 4, new[] { 12, 12, 12, 12 }, hasDisplay: true, browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 3, 2, 1 })),
             // KS: 3 rotary encoders, none with LED rings (knobCount stays 0). The
             // encoder count is explicit because the firmware answers ALL FIVE
             // wheel-knob-signal-mode indices regardless of how many knobs exist, so

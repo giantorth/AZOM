@@ -72,6 +72,7 @@ namespace MozaPlugin.Devices.Ui
             try
             {
                 RefreshDashboardManagement();
+                PopulateIdleDashboardCombo();
                 UpdateDashboardPreview();
             }
             catch (Exception ex) { MozaLog.DebugIfChanged("ui-tick-dashmgmt", $"[AZOM] Dashboard tab tick failed: {ex}"); }
@@ -229,7 +230,7 @@ namespace MozaPlugin.Devices.Ui
                 {
                     // Repopulate only on a page change: every rebuild re-selects, and
                     // the selection handler's ScrollIntoView snaps the list back.
-                    if ((_plugin?.GetActiveCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
+                    if ((_plugin?.GetStoredCm1Index() ?? int.MinValue) != _lastPopulatedCm1Index
                         || TelemetryProfileList.Items.Count == 0)
                         PopulateDashboardCombo();
                     long sigc = ComputeMappingDataSignature();
@@ -380,12 +381,18 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
+        private void PopulateDashboardCombo()
+        {
+            PopulateDashboardComboCore();
+            PopulateIdleDashboardCombo();
+        }
+
         /// <summary>
         /// Populate the dashboard dropdown from the wheel's reported dashboard
         /// list (session 0x09 configJson state push). Falls back to builtin
         /// profile names if the wheel hasn't pushed state yet.
         /// </summary>
-        private void PopulateDashboardCombo()
+        private void PopulateDashboardComboCore()
         {
             if (_plugin == null) return;
             // Any non-CM1 list invalidates the CM1 page snapshot.
@@ -402,7 +409,8 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex;
                     for (int i = min; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i}");
-                    int active = _plugin.GetActiveCm1Index();
+                    // The stored pick, not an idle page showing.
+                    int active = _plugin.GetStoredCm1Index();
                     int idx = active - min;
                     TelemetryProfileList.SelectedIndex = (idx >= 0 && idx < TelemetryProfileList.Items.Count) ? idx : 0;
                     _lastPopulatedWheelSlot = -1;
@@ -426,7 +434,10 @@ namespace MozaPlugin.Devices.Ui
                     int max = global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
                     for (int i = 0; i <= max; i++)
                         TelemetryProfileList.Items.Add($"Dashboard {i + 1}");
-                    int active = _plugin.GetActiveFsr1Index();
+                    // The stored pick, not an idle page showing.
+                    int active = (_plugin.IdleDashboards?.Fsr1OverrideIndex ?? -1) >= 0
+                        ? _plugin.GetStoredFsr1Index()
+                        : _plugin.GetActiveFsr1Index();
                     TelemetryProfileList.SelectedIndex = (active >= 0 && active <= max) ? active : 0;
                     _lastPopulatedWheelSlot = -1;
                 }
@@ -468,7 +479,12 @@ namespace MozaPlugin.Devices.Ui
                 // never writes device switches to the saved name); otherwise the saved
                 // name, so a fresh pick doesn't snap back to the pre-switch dash
                 // before the echo lands; the stale reported slot as last resort.
-                string? savedName = IsCm2Target ? _plugin.ActiveCm2DashboardName : _plugin.ActiveTelemetryProfileName;
+                // The profile's own pick: while an idle dashboard shows, the
+                // list keeps the profile's selection rather than the screen's.
+                string? savedName = IsCm2Target ? _plugin.SavedCm2DashboardName : _plugin.SavedTelemetryProfileName;
+                bool idleShowing = IsCm2Target
+                    ? _plugin.IdleDashboards?.Cm2OverrideName != null
+                    : _plugin.IdleDashboards?.WheelEngaged == true;
                 bool savedInList = false;
                 if (!string.IsNullOrEmpty(savedName))
                 {
@@ -488,10 +504,11 @@ namespace MozaPlugin.Devices.Ui
                     reportedName = state.ConfigJsonList[sender.WheelReportedSlot];
                 bool reportedCurrent = !string.IsNullOrEmpty(reportedName)
                     && sender!.WheelReportedSlot == sender.LastEmittedKind4Slot;
-                string? selectedName = reportedCurrent ? reportedName
+                string? selectedName = idleShowing ? (savedInList ? savedName : null)
+                    : reportedCurrent ? reportedName
                     : savedInList ? savedName
                     : reportedName;
-                if (string.IsNullOrEmpty(selectedName))
+                if (string.IsNullOrEmpty(selectedName) && !idleShowing)
                     selectedName = savedName;
                 if (!string.IsNullOrEmpty(selectedName))
                 {
@@ -509,7 +526,7 @@ namespace MozaPlugin.Devices.Ui
                         }
                     }
                 }
-                if (TelemetryProfileList.SelectedIndex < 0 && TelemetryProfileList.Items.Count > 0)
+                if (TelemetryProfileList.SelectedIndex < 0 && TelemetryProfileList.Items.Count > 0 && !idleShowing)
                     TelemetryProfileList.SelectedIndex = 0;
 
                 // Snapshot the wheel-reported slot we just populated against,
@@ -821,6 +838,106 @@ namespace MozaPlugin.Devices.Ui
             WheelDisplayStandbyCombo.SelectedIndex = -1;
         }
 
+        // ===== Idle dashboard =====
+
+        private string _idleComboSignature = "\0";
+
+        /// <summary>Page the idle pick is saved under, and whether it is a fixed page
+        /// index (FSR V1 / CM1) rather than a dashboard name. Null page = no device.</summary>
+        private (Guid? Page, bool ByIndex) IdleTarget()
+        {
+            if (_plugin == null) return (null, false);
+            if (IsCm1) return (MozaPlugin.Cm1PageGuid, true);
+            if (IsCm2Target) return (MozaPlugin.Cm2PageGuid, false);
+            return (_plugin.GetCurrentWheelPageGuid(), _plugin.IsFsr1DisplayWheel);
+        }
+
+        // Same list as the dashboard list above, plus Off; a saved name the device
+        // doesn't list (yet) stays shown.
+        private void PopulateIdleDashboardCombo()
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_plugin == null || idle == null) return;
+            var (page, byIndex) = IdleTarget();
+            var items = new List<(object Tag, string Label)>();
+            object? selectedTag = null;
+            if (page.HasValue && byIndex)
+            {
+                bool cm1 = IsCm1;
+                int min = cm1 ? global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MinDashboardIndex : 0;
+                int max = cm1
+                    ? global::MozaPlugin.Telemetry.Display.Cm1DisplayEmitter.MaxDashboardIndex
+                    : global::MozaPlugin.Telemetry.Display.Fsr1DisplayEmitter.MaxDashboardIndex;
+                for (int i = min; i <= max; i++)
+                    items.Add((i, $"Dashboard {(cm1 ? i : i + 1)}"));
+                int saved = idle.IdleIndex(page.Value);
+                if (saved >= min && saved <= max) selectedTag = saved;
+            }
+            else if (page.HasValue)
+            {
+                var list = ActiveSender?.WheelState?.ConfigJsonList;
+                if (list != null)
+                    foreach (var n in list)
+                        if (!string.IsNullOrEmpty(n)) items.Add((n, n));
+                string? saved = idle.IdleName(page.Value);
+                if (saved != null)
+                {
+                    selectedTag = items.Select(t => t.Tag).FirstOrDefault(t =>
+                        string.Equals((string)t, saved, StringComparison.OrdinalIgnoreCase));
+                    if (selectedTag == null)
+                    {
+                        items.Add((saved, saved));
+                        selectedTag = saved;
+                    }
+                }
+            }
+
+            using (_suppressor.Begin())
+            {
+                IdleWhenNotDrivingToggle.IsChecked = page.HasValue && idle.WhenNotDriving(page.Value);
+                IdleWhenNotDrivingToggle.IsEnabled = page.HasValue && selectedTag != null;
+            }
+
+            string sig = $"{page}|{byIndex}|{selectedTag}|" + string.Join("\n", items.Select(t => t.Tag));
+            if (sig == _idleComboSignature) return;
+            _idleComboSignature = sig;
+            using (_suppressor.Begin())
+            {
+                IdleDashboardCombo.Items.Clear();
+                IdleDashboardCombo.Items.Add(new ComboBoxItem { Tag = null, Content = Strings.Option_Off });
+                int sel = 0;
+                foreach (var (tag, label) in items)
+                {
+                    if (Equals(tag, selectedTag)) sel = IdleDashboardCombo.Items.Count;
+                    IdleDashboardCombo.Items.Add(new ComboBoxItem { Tag = tag, Content = label });
+                }
+                IdleDashboardCombo.SelectedIndex = sel;
+                IdleDashboardCombo.IsEnabled = page.HasValue;
+            }
+        }
+
+        private void IdleDashboardCombo_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_suppressEvents || idle == null) return;
+            var (page, byIndex) = IdleTarget();
+            if (!page.HasValue) return;
+            var tag = (IdleDashboardCombo.SelectedItem as ComboBoxItem)?.Tag;
+            // Switches now only while idle; otherwise it waits for idle.
+            if (byIndex) idle.SetIdleIndex(page.Value, tag is int i ? i : -1);
+            else idle.SetIdleName(page.Value, tag as string);
+            IdleWhenNotDrivingToggle.IsEnabled = tag != null;
+        }
+
+        private void IdleWhenNotDrivingToggle_Click(object sender, RoutedEventArgs e)
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (_suppressEvents || idle == null) return;
+            var (page, _) = IdleTarget();
+            if (!page.HasValue) return;
+            idle.SetWhenNotDriving(page.Value, IdleWhenNotDrivingToggle.IsChecked == true);
+        }
+
         // VGS display-rotation mode (0=off, 1=smooth, 2=immediate). Wheel-only
         // feature: always routes to the main TelemetrySender (never the CM2 sender)
         // and the row is only visible for VGS wheels on the wheel page.
@@ -860,6 +977,33 @@ namespace MozaPlugin.Devices.Ui
                 TelemetryProfileList.ScrollIntoView(TelemetryProfileList.SelectedItem);
             if (_suppressEvents || _plugin == null) return;
             UpdateDashboardPreview();
+            ApplyListSelection();
+        }
+
+        // While an idle dashboard shows, the list keeps the profile's pick selected, so
+        // clicking that item raises no SelectionChanged: take the click as the pick.
+        // MouseUp runs after a click on another item has already switched (and ended idle).
+        private void TelemetryProfileList_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null || !IdleShowingOnTarget()) return;
+            if (ItemsControl.ContainerFromElement(TelemetryProfileList, e.OriginalSource as DependencyObject)
+                    is not ListBoxItem item || !item.IsSelected) return;
+            ApplyListSelection();
+        }
+
+        private bool IdleShowingOnTarget()
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (idle == null) return false;
+            if (IsCm1) return idle.Cm1OverrideIndex >= 0;
+            if (IsCm2Target) return idle.Cm2OverrideName != null;
+            if (_plugin!.IsFsr1DisplayWheel) return idle.Fsr1OverrideIndex >= 0;
+            return idle.WheelEngaged;
+        }
+
+        private void ApplyListSelection()
+        {
+            if (_plugin == null) return;
             var selected = TelemetryProfileList.SelectedItem?.ToString();
             if (selected == null) return;
 
@@ -1291,7 +1435,7 @@ namespace MozaPlugin.Devices.Ui
             foreach (var row in _channelRows)
                 _plugin.ChannelMapping.UpdateActive(row.Url, "", resetSender);
             if (IsCm2Target)
-                _plugin.ChannelMapping.ClearCurrentDashboard(MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey);
+                _plugin.ChannelMapping.ClearCurrentDashboard(MozaPlugin.Cm2PageGuid, _plugin.Cm2MappingDashKey);
             else
                 _plugin.ChannelMapping.ClearCurrentDashboard();
             PopulateChannelMappingList();
@@ -1516,7 +1660,7 @@ namespace MozaPlugin.Devices.Ui
             if (string.IsNullOrEmpty(row.Url)) return;
             if (IsCm2Target)
                 _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty,
-                    MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
+                    MozaPlugin.Cm2PageGuid, _plugin.Cm2MappingDashKey, _plugin.ActiveCm2Sender);
             else
                 _plugin.ChannelMapping.Set(row.Url, row.SimHubProperty);
             TelemetryMappingStatus.Text = $"Saved at {DateTime.Now:HH:mm:ss}";

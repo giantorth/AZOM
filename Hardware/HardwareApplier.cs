@@ -793,6 +793,46 @@ namespace MozaPlugin.Hardware
         // Pedals/Handbrake resolvers above.
         private MozaDeviceManager BaseManager => _detectionState.BaseOwner ?? _deviceManager;
 
+        // ── High-speed damping overlay ──
+        // Every base-damper write goes through WriteBaseSetting so the active speed
+        // boost rides on top of the user's value; _data.Damper never holds the boost.
+        private readonly object _damperWireLock = new object();
+        private const int DamperRawMax = 1000;
+
+        private bool WriteBaseSetting(string command, int value)
+        {
+            if (command != "base-damper") return BaseManager.WriteSetting(command, value);
+            lock (_damperWireLock) return WriteBaseDamperLocked(value);
+        }
+
+        private bool WriteBaseDamperLocked(int userRaw)
+        {
+            int boost = _data.DamperSpeedBoost;
+            if (boost <= 0) return BaseManager.WriteSetting("base-damper", userRaw);
+            int wire = Math.Min(DamperRawMax, userRaw + boost);
+            _data.DamperBoostedWire = wire;
+            return BaseManager.WriteSetting("base-damper", wire);
+        }
+
+        /// <summary>Set the high-speed damping boost (raw tenths, 0 = off) and push
+        /// Damper plus boost. True iff the write was dispatched.</summary>
+        internal bool SetDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock)
+            {
+                _data.DamperSpeedBoost = boostRaw;
+                int user = _data.Damper;
+                if (user < 0 || !_detectionState.BaseDetected) return false;
+                return WriteBaseDamperLocked(user);
+            }
+        }
+
+        /// <summary>Set the overlay without a write, for when the wire already matches.</summary>
+        internal void SyncDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock) _data.DamperSpeedBoost = boostRaw;
+        }
+
         // All-sentinel stand-in while the attached wheel has no store yet (not
         // identified, or its store is still being seeded): mirrors nothing, writes
         // nothing saved, but the per-wheel bundles and display-rotation still run.
@@ -1718,9 +1758,16 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.SpeedDampingPoint,  v => profile.SpeedDampingPoint  = v,
                   () => _data.SpeedDampingPoint,    v => _data.SpeedDampingPoint    = v,
                   "base-speed-damping-point");
-            Apply(() => profile.NaturalInertia,     v => profile.NaturalInertia     = v,
-                  () => _data.NaturalInertia,       v => _data.NaturalInertia       = v,
-                  "base-natural-inertia");
+            // Steering Wheel Inertia is per wheel, not per profile. Page resolved once
+            // so a hot-swap can't split the read and the seed across two wheels.
+            var wheelPage = _plugin.GetCurrentWheelPageGuid();
+            if (wheelPage.HasValue)
+            {
+                var page = wheelPage.Value;
+                Apply(() => _plugin.GetWheelNaturalInertia(page), v => _plugin.SetWheelNaturalInertia(page, v),
+                      () => _data.NaturalInertia,               v => _data.NaturalInertia = v,
+                      "base-natural-inertia");
+            }
             Apply(() => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v,
                   () => _data.SoftLimitStiffness,   v => _data.SoftLimitStiffness   = v,
                   "base-soft-limit-stiffness");
@@ -1760,6 +1807,12 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.RoadSensitivity,    v => profile.RoadSensitivity    = v,
                   () => _data.RoadSensitivity,      v => _data.RoadSensitivity      = v,
                   "base-road-sensitivity");
+            // Ultra bases on fw >= 1.2.12.0 only; others must never see cmd 0x36.
+            // Until support resolves, the poll's one-shot probe re-runs this apply.
+            if (_data.BaseSupportsFfbStyle)
+                Apply(() => profile.FfbStyle,       v => profile.FfbStyle           = v,
+                      () => _data.FfbStyle,         v => _data.FfbStyle             = v,
+                      "base-ffb-style");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
@@ -1791,7 +1844,7 @@ namespace MozaPlugin.Hardware
                     {
                         if (deviceVal >= 0) BaseCfgPrime(cmd, deviceVal);
                         if (BaseCfgChanged(cmd, val))
-                            BaseManager.WriteSetting(cmd, val);
+                            WriteBaseSetting(cmd, val);
                     }
             }
 
@@ -1908,8 +1961,9 @@ namespace MozaPlugin.Hardware
                 profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
-                profile.NaturalInertia = -1; profile.SoftLimitStiffness = -1;
+                profile.SoftLimitStiffness = -1;
                 profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
+                profile.FfbStyle = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
             }
@@ -2120,7 +2174,7 @@ namespace MozaPlugin.Hardware
         public bool WriteIfBaseConnected(string command, int value)
         {
             if (value < 0) return false;
-            return _detectionState.BaseDetected && BaseManager.WriteSetting(command, value);
+            return _detectionState.BaseDetected && WriteBaseSetting(command, value);
         }
         public void WriteFloatIfBaseConnected(string command, int value)
         {

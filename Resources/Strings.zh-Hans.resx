@@ -49,16 +49,13 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>刚度</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>保留游戏力反馈</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>力反馈均衡器</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 400% = 最大增益</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>力反馈输出曲线</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 拖动 5 个节点以调整响应</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>线性</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 曲线</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>指数</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>抛物线</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>杂项</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>高速阻尼</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// 不清楚这些设置具体作用</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>力反馈反向</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>待机模式</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>待机延时</value></data>
@@ -361,6 +358,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>偏置</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>正在渲染…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>待机时间</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>非游戏时仪表盘</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>菜单中显示</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>同步指示灯</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 分钟</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 分钟</value></data>
@@ -678,7 +677,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>雨刮挡位 {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>灯光挡位 {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>输入力值</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>待机 · 常亮</value></data>
@@ -688,9 +686,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>呼吸速度 (毫秒)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>待机效果</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>待机动画</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>轮基 LFE 来源</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>插件 LFE 选项卡</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>轮基 LFE</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>插件选项卡</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>设备</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>需要 SimHub 9.12 或更高版本 — 当前使用插件的 LFE 选项卡。</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>设备定义已更新。请重启 SimHub 以应用。</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon 兼容性</value></data>
@@ -796,6 +794,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>正在停止</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>端口自检</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>故障</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>手动运动测试</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>SimHub 手动控制和 Hop-in 位置使用控制器的慢速手动模式</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion 未启用</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>已连接 MOZA Motion Controller，但 SimHub 的 Motion 插件未启用。请在 Settings &gt; Plugins 中启用它，然后在 Motion 中添加 MOZA HMA150 控制器。</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>未在 SimHub Motion 中添加 MOZA HMA150</value></data>
@@ -834,10 +834,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>全局设置</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>遥测效果（通过底座输出的引擎、ABS 和换挡振动）需要底座固件 1.2.10.10 或更高版本。此底座为 {0}。请在 Pit House 中更新底座固件以使用这些效果。</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12 触觉</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12 踏板触觉</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>插件 S12 选项卡</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt 按踏板</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt 合并</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>踏板触觉</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>插件选项卡</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>分离设备</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>合并设备</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt 需要 SimHub 9.12 或更高版本 — 当前使用插件的 S12 选项卡。</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>实时输出</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>脉冲长度</value></data>
@@ -853,9 +853,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>设备 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>丢包 {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>默认选项卡</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster 振动</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>插件 mBooster 选项卡</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>插件选项卡</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>设备</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt 需要 SimHub 9.12 或更高版本 — 当前使用插件的 mBooster 选项卡。</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster 未在 SimHub 中添加</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster 踏板已连接并设置为 ShakeIt，但尚未在 SimHub 中添加 mBooster 设备。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
@@ -894,4 +894,34 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>滑块</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>旋钮</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>滚轮</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>音乐曲目</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>音乐音量</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>开机音乐</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>MOZA 基座控制</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>通过手机或平板调整基座设置。</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>点 {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>预测</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>离合器引擎振动</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>离合器闭合</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>在接合点渐变</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>低于接合点</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>完全松开</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>始终</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>气缸数</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>最高频率 (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>怠速强度 (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>脉动 (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>坡顶强度</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux 正在阻止访问 MOZA 设备</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此插件无法连接到该设备。</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此缺少方向盘、踏板和按键输入。</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>添加一条 udev 规则，在 {0} 子系统中为 MOZA 设备（idVendor 346e）设置 TAG+="uaccess"，然后拔下并重新插入设备。</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>离合器</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>触发</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>脉冲</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>引擎</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB 风格</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>柔和</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>标准</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>强劲</value></data>
 </root>

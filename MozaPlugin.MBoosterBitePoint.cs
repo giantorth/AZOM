@@ -23,10 +23,11 @@ namespace MozaPlugin
     /// </summary>
     public partial class MozaPlugin
     {
-        // Automatic samples are only trusted from a slow release: the bite is
-        // detected from a lagging speed signal, so a fast release reads low.
-        // Pedal fraction per second (1.0 = full travel in one second).
-        private const double MaxAutoReleaseRatePerSec = 1.0;
+        // Automatic samples are only trusted from a slow release: detection
+        // can't see delay in the game's own speed output, which a fast release
+        // turns into a low reading.
+        // Pedal fraction per second: full travel in 0.6 s.
+        private const double MaxAutoReleaseRatePerSec = 1.0 / 0.6;
 
         // Clutch travel (%) within which an automatic sample agrees with an
         // inherited game calibration.
@@ -102,10 +103,23 @@ namespace MozaPlugin
             }
         }
 
+        /// <summary>Load the saved Prediction travel times and save each new one.
+        /// Init and Clear all settings.</summary>
+        internal void LoadBitePointTravel()
+        {
+            MBoosterBitePointTravel.Load(_settings?.MBoosterBitePointTravelTimes);
+            MBoosterBitePointTravel.Changed = () =>
+            {
+                if (_settings == null) return;
+                _settings.MBoosterBitePointTravelTimes = MBoosterBitePointTravel.Snapshot();
+                PersistSettings();
+            };
+        }
+
         /// <summary>Where the trigger and calibration read the clutch. Changing it stops any run.</summary>
         internal MBoosterBitePointSource BitePointSource
         {
-            get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.MBoosterPedal;
+            get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.Game;
             set
             {
                 if (_settings == null || _settings.MBoosterBitePointSource == value) return;
@@ -349,22 +363,24 @@ namespace MozaPlugin
 
         // A user-started run: the key's own calibration restarts from this sample,
         // and a game with no calibration yet takes it too.
-        private void StoreRunSample(string key, int pct)
+        private void StoreRunSample(string key, BitePointSample sample)
         {
             string gameKey = GameKeyOf(key);
+            int pct = sample.Pct;
             UpdateCalibrations(map =>
             {
                 map[key] = SingleSample(pct);
                 if (!map.ContainsKey(gameKey)) map[gameKey] = SingleSample(pct);
                 return true;
             });
-            MozaLog.Info($"[AZOM/mBooster] Clutch bite point for {key} calibrated at {pct}%");
+            MozaLog.Info($"[AZOM/mBooster] Clutch bite point for {key} calibrated at {pct}% (released at {sample.ReleaseRatePerSec * 100:F0}%/s)");
         }
 
         // An automatic sample. See the class summary for how a vehicle inherits.
-        private void StoreAutoSample(string key, int pct)
+        private void StoreAutoSample(string key, BitePointSample sample)
         {
             string gameKey = GameKeyOf(key);
+            int pct = sample.Pct;
             string note = "";
             UpdateCalibrations(map =>
             {
@@ -404,7 +420,7 @@ namespace MozaPlugin
                 }
                 return true;
             });
-            MozaLog.Info($"[AZOM/mBooster] Clutch bite point sample for {key}: {pct}%{note}, now {ClutchBitePointInfo().Pct}%");
+            MozaLog.Info($"[AZOM/mBooster] Clutch bite point sample for {key}: {pct}% at {sample.ReleaseRatePerSec * 100:F0}%/s{note}, now {ClutchBitePointInfo().Pct}%");
         }
 
         // Data thread: the Game/Formula source's position this tick (0..1), NaN when none.
@@ -472,7 +488,7 @@ namespace MozaPlugin
             double speedKmh = nd?.SpeedKmh ?? double.NaN;
 
             if (_bitePointCalibrator.Update(key, ready, speedKmh, clutch01, out string runKey, out var runSample))
-                StoreRunSample(runKey, runSample.Pct);
+                StoreRunSample(runKey, runSample);
 
             if (_bitePointCalibrator.IsActive || !BitePointAutoCalibrate || key == null)
             {
@@ -491,7 +507,7 @@ namespace MozaPlugin
                 MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
                 return;
             }
-            StoreAutoSample(key, sample.Pct);
+            StoreAutoSample(key, sample);
         }
     }
 }

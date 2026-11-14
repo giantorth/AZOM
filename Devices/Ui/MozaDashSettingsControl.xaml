@@ -66,13 +66,13 @@
                  users who only visit the device page still see them. -->
             <ui:PluginBanners/>
 
-            <!-- This dash's own profile list (bound in code-behind). -->
-            <StackPanel x:Name="DeviceProfileRow" Orientation="Horizontal"
-                        HorizontalAlignment="Right" Margin="0,4,0,8" Visibility="Collapsed">
-                <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <TabControl x:Name="DashTabs" Style="{StaticResource MozaTabControl}" Margin="0,4,0,0">
+            <TabControl x:Name="DashTabs" Style="{StaticResource MozaHeaderTabControl}" Margin="0,4,0,0">
+            <ctrl:TabStrip.TrailingContent>
+                <!-- This dash's own profile list (bound in code-behind). -->
+                <StackPanel x:Name="DeviceProfileRow" Orientation="Horizontal" Visibility="Collapsed">
+                    <profilescommon:ProfileList x:Name="DeviceProfileList" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ctrl:TabStrip.TrailingContent>
 
             <TabItem x:Name="DashLedsTab" Header="{x:Static res:Strings.TabHeader_Leds}">
                 <StackPanel>

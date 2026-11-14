@@ -69,6 +69,8 @@ namespace MozaPlugin.Protocol
             // cmd 0x39 Ultra-base +2 Nm torque boost (fw >= 1.2.12.4): 0 = stock,
             // 1 = unlocked. Read-only here.
             AddCommand("base-torque-boost",       "base", 40, 0xFF, new byte[] { 0x39 }, 2, "int");
+            // cmd 0x36 FFB style, Ultra bases on fw >= 1.2.12.0: 0 = soft, 1 = normal, 2 = strong.
+            AddCommand("base-ffb-style",          "base", 40, 41, new byte[] { 0x36 }, 2, "int");
 
             // FFB curve (read group 40, write group 41)
             AddCommand("base-ffb-curve-x1", "base", 40, 41, new byte[] { 34, 1 }, 1, "int");
@@ -94,6 +96,16 @@ namespace MozaPlugin.Protocol
 
             // Wheelbase calibration (write group 42)
             AddCommand("base-calibration", "base", 0xFF, 42, new byte[] { 1 }, 2, "int");
+
+            // Startup music (group 42). Reads carry one zero byte; replies echo the
+            // cmd id on 0xAA. Index 1..10, volume 0..255.
+            AddCommand("base-music-preview",     "base", 0xFF, 42, new byte[] { 0x43, 0x00 }, 1, "int");
+            AddCommand("base-music-index-set",   "base", 0xFF, 42, new byte[] { 0x43, 0x01 }, 1, "int");
+            AddCommand("base-music-index-get",   "base", 42, 0xFF, new byte[] { 0x43, 0x02 }, 1, "int");
+            AddCommand("base-music-enabled-set", "base", 0xFF, 42, new byte[] { 0x43, 0x03 }, 1, "int");
+            AddCommand("base-music-enabled-get", "base", 42, 0xFF, new byte[] { 0x43, 0x04 }, 1, "int");
+            AddCommand("base-music-volume-set",  "base", 0xFF, 42, new byte[] { 0x44, 0x00 }, 1, "int");
+            AddCommand("base-music-volume-get",  "base", 42, 0xFF, new byte[] { 0x44, 0x01 }, 1, "int");
 
             // Partner-SDK (iRacing-MOZA bridge). iRacing POSTs each of these
             // CoAP URIs exactly once per session as a capability probe; the

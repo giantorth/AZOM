@@ -52,16 +52,13 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Rigidità</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Mantieni FFB di Gioco</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>EQUALIZZATORE FFB</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// guadagno per banda · 100% = neutro · 400% = amplificazione massima</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>CURVA DI USCITA FFB</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// trascina i 5 nodi per modellare la risposta</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEARE</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>CURVA S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>ESPONENZIALE</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOLICA</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>VARIE</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>SMORZAMENTO AD ALTA VELOCITÀ</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// aggiunge una percentuale di smorzamento sopra una certa velocità in gioco</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Inversione Force Feedback</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Modalità Standby</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Standby dopo</value></data>
@@ -364,6 +361,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Offset</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Generazione anteprima…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Tempo Standby</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Dashboard fuori gioco</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Mostra nei menu</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED sincronizzazione</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 minuto</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 minuti</value></data>
@@ -681,7 +680,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Stadio tergicristalli {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Stadio luci {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR chiusa — passato a Stabile</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// guadagno per banda · 100% = neutro · 500% = amplificazione massima</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILITÀ</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Forza in ingresso</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Inattivo · Costante</value></data>
@@ -691,9 +689,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Velocità respiro (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>EFFETTO INATTIVO</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Animazione inattività</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Sorgente LFE della base</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Scheda LFE del plugin</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE della base</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Richiede SimHub 9.12 o successivo: viene usata la scheda LFE del plugin.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definizione dispositivo aggiornata. Riavvia SimHub per applicarla.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilità Forza Horizon</value></data>
@@ -799,6 +797,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Arresto</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Autotest delle porte</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Guasto</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>Test di movimento manuale</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>Usa la modalità manuale lenta del controller per il controllo manuale e la posizione Hop-in di SimHub</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion non è attivato</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>È collegato un MOZA Motion Controller, ma il plugin Motion di SimHub non è attivato. Attivalo in Settings &gt; Plugins, quindi aggiungi il controller MOZA HMA150 in Motion.</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 non aggiunto in SimHub Motion</value></data>
@@ -837,10 +837,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Impostazioni globali</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Gli effetti di telemetria (vibrazione di motore, ABS e cambiata tramite la base) richiedono il firmware della base 1.2.10.10 o successivo. Questa base ha {0}. Aggiorna il firmware della base in Pit House per usarli.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Aptica S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Aptica pedaliera S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Scheda S12 del plugin</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt per pedale</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combinato</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Aptica pedaliera</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Dispositivi separati</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Dispositivo combinato</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt richiede SimHub 9.12 o successivo: viene usata la scheda S12 del plugin.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Uscita in tempo reale</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Durata impulso</value></data>
@@ -856,9 +856,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% di perdita</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Scheda predefinita</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Vibrazione mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Scheda mBooster del plugin</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Scheda del plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt richiede SimHub 9.12 o successivo: viene usata la scheda mBooster del plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster non aggiunto in SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>I pedali mBooster sono collegati e impostati su ShakeIt, ma il dispositivo mBooster non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
@@ -897,4 +897,34 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>Cursore</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>Manopola</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>Rotella</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Brano</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Volume musica</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>MUSICA DI AVVIO</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>Controllo base MOZA</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>Regola la base da smartphone o tablet.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Punto {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Anticipo</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Vibrazione motore sulla frizione</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Frizione chiusa</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Graduale al punto di stacco</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Sotto il punto di stacco</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Completamente rilasciata</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Sempre</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindri</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frequenza max (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensità al minimo (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsazione (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Forza sui dossi</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux sta bloccando l'accesso ai dispositivi MOZA</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Il tuo utente Linux non può aprire {0}, quindi il plugin non può connettersi.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Il tuo utente Linux non può aprire {0}, quindi mancano gli input di sterzo, pedali e pulsanti.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Aggiungi una regola udev che assegni TAG+="uaccess" ai dispositivi MOZA (idVendor 346e) nel sottosistema {0}, poi scollegali e ricollegali.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Frizione</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Attivazione</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Impulso</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motore</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Stile FFB</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Morbido</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normale</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Forte</value></data>
 </root>

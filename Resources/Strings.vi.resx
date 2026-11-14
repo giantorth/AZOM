@@ -49,16 +49,13 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Độ cứng</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Giữ FFB của game</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>BỘ CÂN BẰNG FFB</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 400% = tăng tối đa</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA FFB</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// kéo 5 điểm nút để định hình phản hồi</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>TUYẾN TÍNH</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>ĐƯỜNG CONG S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>HÀM MŨ</value></data>
   <data name="Button_Parabolic" xml:space="preserve"><value>PARABOL</value></data>
   <data name="Section_Miscellaneous" xml:space="preserve"><value>KHÁC</value></data>
   <data name="Section_HighSpeedDamping" xml:space="preserve"><value>GIẢM CHẤN TỐC ĐỘ CAO</value></data>
-  <data name="Subtitle_HighSpeedDamping" xml:space="preserve"><value>// tôi không biết các tùy chọn này dùng để làm gì</value></data>
   <data name="SliderLabel_ForceFeedbackReversal" xml:space="preserve"><value>Đảo chiều phản hồi lực</value></data>
   <data name="SliderLabel_StandbyMode" xml:space="preserve"><value>Chế độ chờ</value></data>
   <data name="SliderLabel_AutoStandbyTimeout" xml:space="preserve"><value>Chờ sau</value></data>
@@ -361,6 +358,8 @@
   <data name="Edit_Bias" xml:space="preserve"><value>Độ lệch</value></data>
   <data name="Status_RenderingPreview" xml:space="preserve"><value>Đang kết xuất…</value></data>
   <data name="SliderLabel_StandbyTime" xml:space="preserve"><value>Thời gian chờ</value></data>
+  <data name="SliderLabel_IdleDashboard" xml:space="preserve"><value>Bảng điều khiển ngoài trò chơi</value></data>
+  <data name="SliderLabel_IdleWhenNotDriving" xml:space="preserve"><value>Hiện trong menu</value></data>
   <data name="SliderLabel_SyncStatusLed" xml:space="preserve"><value>LED đồng bộ</value></data>
   <data name="Option_Time1Min" xml:space="preserve"><value>1 phút</value></data>
   <data name="Option_Time2Min" xml:space="preserve"><value>2 phút</value></data>
@@ -678,7 +677,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Cấp gạt mưa {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Cấp đèn {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Lực đầu vào</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Chờ · Cố định</value></data>
@@ -688,9 +686,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Tốc độ nhịp thở (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>HIỆU ỨNG CHỜ</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hiệu ứng khi chờ</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Nguồn LFE của đế lái</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Thẻ LFE của plugin</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE của đế lái</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Thiết bị</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Yêu cầu SimHub 9.12 trở lên — đang dùng thẻ LFE của plugin.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Đã cập nhật định nghĩa thiết bị. Khởi động lại SimHub để áp dụng.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Khả năng tương thích Forza Horizon</value></data>
@@ -796,6 +794,8 @@ Id: {2}</value></data>
   <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Đang dừng</value></data>
   <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Tự kiểm tra cổng</value></data>
   <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Lỗi</value></data>
+  <data name="Motion_Phase_ManualTest" xml:space="preserve"><value>Kiểm tra chuyển động thủ công</value></data>
+  <data name="Motion_Panel_SlowManualControl" xml:space="preserve"><value>Dùng chế độ thủ công chậm của bộ điều khiển cho điều khiển thủ công và vị trí Hop-in của SimHub</value></data>
   <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion chưa được bật</value></data>
   <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>MOZA Motion Controller đã kết nối nhưng plugin Motion của SimHub chưa được bật. Hãy bật trong Settings &gt; Plugins, sau đó thêm bộ điều khiển MOZA HMA150 trong Motion.</value></data>
   <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>Chưa thêm MOZA HMA150 trong SimHub Motion</value></data>
@@ -834,10 +834,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Cài đặt chung</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Hiệu ứng telemetry (rung động cơ, ABS và sang số qua đế vô lăng) cần firmware đế 1.2.10.10 trở lên. Đế này đang có {0}. Hãy cập nhật firmware đế trong Pit House để sử dụng.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Rung S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ S12 của plugin</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt theo từng bàn đạp</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kết hợp</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Rung bàn đạp</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Thiết bị riêng</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Thiết bị kết hợp</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ S12 của plugin.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Đầu ra trực tiếp</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Độ dài xung</value></data>
@@ -853,9 +853,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Thiết bị 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>mất {0:0.#}%</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Tab mặc định</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Rung mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ mBooster của plugin</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Thẻ plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Thiết bị</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt yêu cầu SimHub 9.12 trở lên — đang dùng thẻ mBooster của plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>Chưa thêm mBooster trong SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Bàn đạp mBooster đang được kết nối và đặt dùng ShakeIt, nhưng thiết bị mBooster chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
@@ -894,4 +894,34 @@ Id: {2}</value></data>
   <data name="HidAxis_Slider" xml:space="preserve"><value>Thanh trượt</value></data>
   <data name="HidAxis_Dial" xml:space="preserve"><value>Núm xoay</value></data>
   <data name="HidAxis_Wheel" xml:space="preserve"><value>Bánh xe</value></data>
+  <data name="SliderLabel_StartupMusicTrack" xml:space="preserve"><value>Bản nhạc</value></data>
+  <data name="SliderLabel_StartupMusicVolume" xml:space="preserve"><value>Âm lượng nhạc</value></data>
+  <data name="Section_StartupMusic" xml:space="preserve"><value>NHẠC KHỞI ĐỘNG</value></data>
+  <data name="ControlDash_Title" xml:space="preserve"><value>Điều khiển đế MOZA</value></data>
+  <data name="ControlDash_Description" xml:space="preserve"><value>Điều chỉnh cài đặt đế từ điện thoại hoặc máy tính bảng.</value></data>
+  <data name="ControlDash_CurvePoint" xml:space="preserve"><value>Điểm {0}</value></data>
+  <data name="Label_BitePrediction" xml:space="preserve"><value>Dự đoán</value></data>
+  <data name="Section_ClutchEngine" xml:space="preserve"><value>Rung động cơ qua côn</value></data>
+  <data name="Label_ClutchClosed" xml:space="preserve"><value>Côn đóng</value></data>
+  <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Chuyển dần tại điểm bám</value></data>
+  <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Dưới điểm bám</value></data>
+  <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Nhả hoàn toàn</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Luôn luôn</value></data>
+  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Số xi-lanh</value></data>
+  <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Tần số tối đa (Hz)</value></data>
+  <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Cường độ không tải (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Nhịp đập (%)</value></data>
+  <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Cường độ khi qua đỉnh dốc</value></data>
+  <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux đang chặn quyền truy cập vào thiết bị MOZA</value></data>
+  <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Người dùng Linux của bạn không thể mở {0}, nên plugin không thể kết nối với nó.</value></data>
+  <data name="Banner_LinuxAccess_HidFmt" xml:space="preserve"><value>Người dùng Linux của bạn không thể mở {0}, nên thiếu tín hiệu vô lăng, bàn đạp và nút bấm.</value></data>
+  <data name="Banner_LinuxAccess_FixFmt" xml:space="preserve"><value>Thêm một quy tắc udev gán TAG+="uaccess" cho thiết bị MOZA (idVendor 346e) trong hệ thống con {0}, sau đó rút ra và cắm lại.</value></data>
+  <data name="Section_ShakeItClutch" xml:space="preserve"><value>Côn</value></data>
+  <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Kích hoạt</value></data>
+  <data name="Section_ShakeItPulse" xml:space="preserve"><value>Xung</value></data>
+  <data name="Section_ShakeItEngine" xml:space="preserve"><value>Động cơ</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Kiểu FFB</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Mềm</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Bình thường</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Mạnh</value></data>
 </root>

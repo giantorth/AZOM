@@ -26,6 +26,7 @@ namespace MozaPlugin.Devices
             "main-get-damper-gain", "main-get-friction-gain",
             "main-get-inertia-gain", "main-get-spring-gain",
             "main-get-ble-mode",
+            "base-music-enabled-get", "base-music-index-get", "base-music-volume-get",
             "base-equalizer1", "base-equalizer2", "base-equalizer3",
             "base-equalizer4", "base-equalizer5", "base-equalizer6",
             "base-road-sensitivity",
@@ -860,6 +861,7 @@ namespace MozaPlugin.Devices
                 // their replies is enough to re-run the ambient and EQ10 re-reads).
                 _detectionState.BaseAmbientLedSupported = false;
                 _detectionState.BaseEq10Probed = false;
+                _detectionState.BaseFfbStyleProbed = false;
                 _detectionState.BaseFwVersionLogged = false;
                 // A prior instance that exhausted the retry budget would otherwise
                 // leave TickBaseFwVersionRetry gated off forever, so BaseSupportsLfe
