@@ -433,7 +433,7 @@ namespace MozaPlugin.UI
             SoftLimitStrengthCombo.SelectedIndex = sls < 0 ? -1
                 : sls < 63 ? 0 : sls < 88 ? 1 : 2;
 
-            // FFB style (cmd 0x36): Ultra bases on fw >= 1.2.12.0 only;
+            // FFB style (cmd 0x36): bases on fw >= 1.2.12.0 only;
             // nothing selected until the base has reported it.
             bool ffbStyle = _data.BaseSupportsFfbStyle;
             FfbStyleSelector.Visibility = ffbStyle ? Visibility.Visible : Visibility.Collapsed;

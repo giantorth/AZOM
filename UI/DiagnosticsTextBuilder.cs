@@ -39,9 +39,6 @@ namespace MozaPlugin.UI
         }
         private static string FfbStyleText(MozaData d)
         {
-            if (!Devices.BaseModelInfo.IsUltra(d.BaseModelName,
-                    Devices.BaseModelInfo.ExtractHardwareCode(d.BaseSwVersion, d.BaseHwVersion)))
-                return "n/a (model)";
             if (!d.BaseSupportsFfbStyle)
                 return "n/a (needs >= 1.2.12.0)";
             switch (d.FfbStyle)

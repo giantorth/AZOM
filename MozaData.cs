@@ -616,12 +616,9 @@ namespace MozaPlugin
         // Minimum base firmware carrying the FFB style register (0x36).
         public const int BaseFwFfbStyleMin = (1 << 24) | (2 << 16) | (12 << 8); // 1.2.12.0
 
-        /// <summary>True when this base has the FFB style register: an R16/R21/R25
-        /// Ultra on firmware >= 1.2.12.0. Gates every 0x36 read and write.</summary>
-        public bool BaseSupportsFfbStyle =>
-            BaseFwVersion >= BaseFwFfbStyleMin
-            && Devices.BaseModelInfo.IsUltra(BaseModelName,
-                Devices.BaseModelInfo.ExtractHardwareCode(BaseSwVersion, BaseHwVersion));
+        /// <summary>True when this base has the FFB style register: any base on
+        /// firmware >= 1.2.12.0. Gates every 0x36 read and write.</summary>
+        public bool BaseSupportsFfbStyle => BaseFwVersion >= BaseFwFfbStyleMin;
 
         // FFB style (cmd 0x36): -1 = not read, 0 = soft, 1 = normal, 2 = strong.
         public volatile int FfbStyle = -1;
