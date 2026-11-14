@@ -37,6 +37,7 @@
 | soft-limit-stiffness | `1F` | 2 | int | PitHouse UI 1–10 maps linearly to raw 100–500: raw = round(100 + (n−1)·400/9), giving 100, 144, 189, 233, 278, 322, 367, 411, 456, 500. Base echoes the write on `A9`/`31`. Verified live for all 10 steps on 2026-10-05 (`pithouse-r16-shim-20261005-164127.jsonl`). |
 | temp-strategy / performance-output | `1E` | 2 | int | "Performance output" in newer PitHouse builds. 0 = Reserved, 1 = Full. Verified live 2026-05-10 (`bridge-20260510-115644.jsonl` t=41902.486 `1E 00 01`, t=42166.594 `1E 00 00`). |
 | torque-boost | `39` | 2 | int | Ultra-base "+2 Nm" unlock, base fw ≥ 1.2.12.4. 1 = unlocked; 0 = stock. See [Torque boost](#torque-boost-39) below. |
+| ffb-style | `36` | 2 | int | PitHouse 1.4.2.7 "FFB style": 0 = Soft, 1 = Standard, 2 = Strong. One write per change, base echoes on `A9`/`31`; PitHouse re-reads it ~1 Hz. Stored as `Table 5, Param 57` (main-MCU debug log). Plugin: `base-ffb-style`, gated on `MozaData.BaseSupportsFfbStyle` (R16 Ultra / R21 / R25 on fw >= 1.2.12.0). Verified live on an R16 2026-11-13 (`usb-capture/r16-ffb-style-20261113-220624.pcapng`, `29 13 36 00 00` / `36 00 01` / `36 00 02`). |
 | ffb-curve-x1 | `22 01` | 1 | int | FFB linearization curve X point 1 |
 | ffb-curve-x2 | `22 02` | 1 | int | |
 | ffb-curve-x3 | `22 03` | 1 | int | |

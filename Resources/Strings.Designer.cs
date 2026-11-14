@@ -116,9 +116,7 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_Stiffness => Get("SliderLabel_Stiffness");
         public static string SliderLabel_RetainGameFfb => Get("SliderLabel_RetainGameFfb");
         public static string Section_FfbEqualizer => Get("Section_FfbEqualizer");
-        public static string Subtitle_FfbEqualizer => Get("Subtitle_FfbEqualizer");
         public static string Section_FfbOutputCurve => Get("Section_FfbOutputCurve");
-        public static string Subtitle_FfbOutputCurve => Get("Subtitle_FfbOutputCurve");
         public static string Button_Linear => Get("Button_Linear");
         public static string Button_SCurve => Get("Button_SCurve");
         public static string Button_Exponential => Get("Button_Exponential");
@@ -750,7 +748,6 @@ namespace MozaPlugin.Resources
         public static string StalkKind_WiperStage => Get("StalkKind_WiperStage");
         public static string StalkKind_LightStage => Get("StalkKind_LightStage");
         public static string Status_UpdatePrChannelGone => Get("Status_UpdatePrChannelGone");
-        public static string Subtitle_FfbEqualizer10 => Get("Subtitle_FfbEqualizer10");
         public static string Label_EqSensitivity => Get("Label_EqSensitivity");
         public static string Label_IdleConstant => Get("Label_IdleConstant");
         public static string Label_IdleBreathing => Get("Label_IdleBreathing");
@@ -981,5 +978,9 @@ namespace MozaPlugin.Resources
         public static string Section_ShakeItTrigger => Get("Section_ShakeItTrigger");
         public static string Section_ShakeItPulse => Get("Section_ShakeItPulse");
         public static string Section_ShakeItEngine => Get("Section_ShakeItEngine");
+        public static string Label_FfbStyle => Get("Label_FfbStyle");
+        public static string Option_FfbStyleSoft => Get("Option_FfbStyleSoft");
+        public static string Option_FfbStyleNormal => Get("Option_FfbStyleNormal");
+        public static string Option_FfbStyleStrong => Get("Option_FfbStyleStrong");
     }
 }

@@ -49,9 +49,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>강성</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>게임 FFB 유지</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>FFB 이퀄라이저</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 400% = 최대 부스트</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB 출력 커브</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 5개의 노드를 드래그하여 응답 곡선 조정</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>리니어</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 커브</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>지수</value></data>
@@ -678,7 +676,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>와이퍼 단계 {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>라이트 단계 {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 종료됨 — 안정 채널로 전환됨</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 대역별 게인 · 100% = 중립 · 500% = 최대 부스트</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>감도</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>입력 힘</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>대기 · 고정</value></data>
@@ -922,4 +919,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>트리거</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>펄스</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>엔진</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB 스타일</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>부드럽게</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>보통</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>강하게</value></data>
 </root>

@@ -55,9 +55,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Woof!</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>BARK!!</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>Ruff Bark Grrowl!</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>BARK!!</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>Grr Howl!</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>YOWL!!</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>WROOF!!</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>RUFF!!</value></data>
@@ -669,7 +667,6 @@
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Bork {0}!</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Grrowl {0}!</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>Bark Arf!</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>Ruff Bark Grrowl Wuff!</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Nap · Barff!</value></data>
@@ -913,4 +910,8 @@
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Bork go!</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Thump-thump!</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Vroom-vroom!</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Woof bark!</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Arf!</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Grrr!</value></data>
 </root>

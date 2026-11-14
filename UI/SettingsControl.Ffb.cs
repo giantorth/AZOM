@@ -75,7 +75,6 @@ namespace MozaPlugin.UI
             Eq4Slider.Maximum = eq10 ? 500 : 400;
             Eq5Slider.Maximum = eq10 ? 500 : 400;
             Eq6Slider.Maximum = eq10 ? 100 : 400;
-            FfbEqCard.Subtitle = eq10 ? Strings.Subtitle_FfbEqualizer10 : Strings.Subtitle_FfbEqualizer;
         }
 
         // Apply a 6-band value set (10/15/25/40/60/100 Hz register order).

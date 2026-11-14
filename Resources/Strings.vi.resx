@@ -49,9 +49,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Độ cứng</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Giữ FFB của game</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>BỘ CÂN BẰNG FFB</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 400% = tăng tối đa</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>ĐƯỜNG CONG ĐẦU RA FFB</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// kéo 5 điểm nút để định hình phản hồi</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>TUYẾN TÍNH</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>ĐƯỜNG CONG S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>HÀM MŨ</value></data>
@@ -679,7 +677,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Cấp gạt mưa {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Cấp đèn {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR đã đóng — đã chuyển về Ổn định</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// khuếch đại từng dải · 100% = trung tính · 500% = tăng tối đa</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>ĐỘ NHẠY</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Lực đầu vào</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Chờ · Cố định</value></data>
@@ -923,4 +920,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Kích hoạt</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Xung</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Động cơ</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Kiểu FFB</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Mềm</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Bình thường</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Mạnh</value></data>
 </root>

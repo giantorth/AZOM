@@ -47,6 +47,8 @@ namespace MozaPlugin.UI
                 "base-music-enabled-get", "base-music-index-get", "base-music-volume-get",
                 "base-mcu-temp", "base-mosfet-temp", "base-motor-temp"
             );
+            if (_data.BaseSupportsFfbStyle)
+                _device.ReadSettings("base-ffb-style");
         }
 
         // Issued from Loaded rather than the constructor: SimHub builds this
@@ -430,6 +432,13 @@ namespace MozaPlugin.UI
             int sls = _data.SoftLimitStrength;
             SoftLimitStrengthCombo.SelectedIndex = sls < 0 ? -1
                 : sls < 63 ? 0 : sls < 88 ? 1 : 2;
+
+            // FFB style (cmd 0x36): Ultra bases on fw >= 1.2.12.0 only;
+            // nothing selected until the base has reported it.
+            bool ffbStyle = _data.BaseSupportsFfbStyle;
+            FfbStyleSelector.Visibility = ffbStyle ? Visibility.Visible : Visibility.Collapsed;
+            int style = _data.FfbStyle;
+            FfbStyleSelector.SelectedIndex = ffbStyle && style >= 0 && style <= 2 ? style : -1;
 
             StandbyCheck.IsChecked = _data.WorkMode > 0;
             SyncAutoStandbyCombo();

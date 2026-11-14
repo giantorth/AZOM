@@ -54,9 +54,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Rigidez</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Mantener FFB del juego</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>ECUALIZADOR FFB</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// ganancia por banda · 100% = neutro · 400% = realce máximo</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>CURVA DE SALIDA FFB</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// arrastra los 5 nodos para definir la respuesta</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAL</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>CURVA S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENCIAL</value></data>
@@ -684,7 +682,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Etapa de limpiaparabrisas {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Etapa de luces {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR cerrado — se cambió a Estable</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganancia por banda · 100% = neutro · 500% = realce máximo</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDAD</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Fuerza de entrada</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Reposo · Constante</value></data>
@@ -928,4 +925,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Disparo</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Pulso</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Estilo de FFB</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Suave</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Fuerte</value></data>
 </root>

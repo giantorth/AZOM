@@ -37,6 +37,22 @@ namespace MozaPlugin.UI
                 default: return $"raw {d.BaseTorqueBoost}";
             }
         }
+        private static string FfbStyleText(MozaData d)
+        {
+            if (!Devices.BaseModelInfo.IsUltra(d.BaseModelName,
+                    Devices.BaseModelInfo.ExtractHardwareCode(d.BaseSwVersion, d.BaseHwVersion)))
+                return "n/a (model)";
+            if (!d.BaseSupportsFfbStyle)
+                return "n/a (needs >= 1.2.12.0)";
+            switch (d.FfbStyle)
+            {
+                case -1: return "unread";
+                case 0: return "soft";
+                case 1: return "normal";
+                case 2: return "strong";
+                default: return $"raw {d.FfbStyle}";
+            }
+        }
         public static string JoinList(IReadOnlyList<string> l)
             => l == null || l.Count == 0 ? "(empty)" : string.Join(", ", l);
         public static string TruncateId(string id)
@@ -790,6 +806,7 @@ namespace MozaPlugin.UI
             sb.AppendLine($"LFE support:    {(d.BaseSupportsLfe ? "yes" : "no")}  (needs >= 1.2.10.10)");
             sb.AppendLine($"EQ bands:       {(d.BaseSupportsEq10 ? 10 : 6)}  (same firmware gate as LFE)");
             sb.AppendLine($"Torque boost:   {TorqueBoostText(d)}  rated {d.BaseRatedNm:0.#} Nm");
+            sb.AppendLine($"FFB style:      {FfbStyleText(d)}");
 
             if (plugin != null)
             {

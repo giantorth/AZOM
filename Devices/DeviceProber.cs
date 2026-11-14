@@ -861,6 +861,7 @@ namespace MozaPlugin.Devices
                 // their replies is enough to re-run the ambient and EQ10 re-reads).
                 _detectionState.BaseAmbientLedSupported = false;
                 _detectionState.BaseEq10Probed = false;
+                _detectionState.BaseFfbStyleProbed = false;
                 _detectionState.BaseFwVersionLogged = false;
                 // A prior instance that exhausted the retry budget would otherwise
                 // leave TickBaseFwVersionRetry gated off forever, so BaseSupportsLfe

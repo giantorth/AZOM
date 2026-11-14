@@ -32,6 +32,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
+- **FFB style selector (Soft / Normal / Strong) on the FFB equalizer card;** R16 Ultra, R21 and R25 bases on firmware 1.2.12 or newer, saved per profile.
 
 ### Connection and detection
 

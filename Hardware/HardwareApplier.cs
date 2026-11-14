@@ -1807,6 +1807,12 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.RoadSensitivity,    v => profile.RoadSensitivity    = v,
                   () => _data.RoadSensitivity,      v => _data.RoadSensitivity      = v,
                   "base-road-sensitivity");
+            // Ultra bases on fw >= 1.2.12.0 only; others must never see cmd 0x36.
+            // Until support resolves, the poll's one-shot probe re-runs this apply.
+            if (_data.BaseSupportsFfbStyle)
+                Apply(() => profile.FfbStyle,       v => profile.FfbStyle           = v,
+                      () => _data.FfbStyle,         v => _data.FfbStyle             = v,
+                      "base-ffb-style");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
@@ -1957,6 +1963,7 @@ namespace MozaPlugin.Hardware
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
                 profile.SoftLimitStiffness = -1;
                 profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
+                profile.FfbStyle = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
             }

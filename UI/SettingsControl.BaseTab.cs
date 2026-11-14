@@ -207,6 +207,17 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        // cmd 0x36: the selector index is the wire value (0 soft, 1 normal, 2 strong).
+        private void FfbStyleSelector_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            int val = FfbStyleSelector.SelectedIndex;
+            if (val < 0 || val > 2 || !_data.BaseSupportsFfbStyle) return;
+            _data.FfbStyle = val;
+            _plugin.HardwareApplier.WriteIfBaseConnected("base-ffb-style", val);
+            _plugin.SaveSettings();
+        }
+
         private void StandbyCheck_Click(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;

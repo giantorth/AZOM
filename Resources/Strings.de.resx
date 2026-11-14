@@ -49,9 +49,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Steifigkeit</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Original-FFB erhalten</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>FFB-EQUALIZER</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 400 % = max. Boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-AUSGABEKURVE</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// die 5 Knoten ziehen, um den Verlauf zu formen</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENTIELL</value></data>
@@ -679,7 +677,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Wischerstufe {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lichtstufe {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR geschlossen — auf Stabil umgestellt</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// Verstärkung pro Band · 100 % = neutral · 500 % = max. Boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>EMPFINDLICHKEIT</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Eingabekraft</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Ruhe · Konstant</value></data>
@@ -923,4 +920,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Auslöser</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB-Stil</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Weich</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Stark</value></data>
 </root>

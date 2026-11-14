@@ -821,9 +821,17 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <ctrl:SectionCard x:Name="FfbEqCard" Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbEqualizer}"
+                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
                                               Icon="{StaticResource IconEq}" Margin="0,0,7,14">
+                                <ctrl:SectionCard.Header>
+                                    <!-- cmd 0x36 FFB style; Ultra bases on fw >= 1.2.12.0 only -->
+                                    <ctrl:SegmentedControl x:Name="FfbStyleSelector" Visibility="Collapsed"
+                                                           SelectionChanged="FfbStyleSelector_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleSoft}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleNormal}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleStrong}"/>
+                                    </ctrl:SegmentedControl>
+                                </ctrl:SectionCard.Header>
                                 <StackPanel>
                                     <ctrl:MozaCurveEditor x:Name="FfbEqualizer"
                                                           Style="{StaticResource MozaEqualizerLineStyle}"
@@ -866,7 +874,6 @@
                             </ctrl:SectionCard>
 
                             <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_FfbOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbOutputCurve}"
                                               Icon="{StaticResource IconCurve}"
                                               AccentBrush="{StaticResource GreenBrush}" Margin="7,0,0,14">
                                 <StackPanel>

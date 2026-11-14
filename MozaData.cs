@@ -609,6 +609,19 @@ namespace MozaPlugin
 
         public bool BaseTorqueBoosted => BaseTorqueBoost == 1 && BaseSupportsTorqueBoost;
 
+        // Minimum base firmware carrying the FFB style register (0x36).
+        public const int BaseFwFfbStyleMin = (1 << 24) | (2 << 16) | (12 << 8); // 1.2.12.0
+
+        /// <summary>True when this base has the FFB style register: an R16/R21/R25
+        /// Ultra on firmware >= 1.2.12.0. Gates every 0x36 read and write.</summary>
+        public bool BaseSupportsFfbStyle =>
+            BaseFwVersion >= BaseFwFfbStyleMin
+            && Devices.BaseModelInfo.IsUltra(BaseModelName,
+                Devices.BaseModelInfo.ExtractHardwareCode(BaseSwVersion, BaseHwVersion));
+
+        // FFB style (cmd 0x36): -1 = not read, 0 = soft, 1 = normal, 2 = strong.
+        public volatile int FfbStyle = -1;
+
         /// <summary>The base's peak torque in Nm, including the torque boost once
         /// the base reports it unlocked; 0 when the model isn't established.</summary>
         public double BaseRatedNm
@@ -962,6 +975,7 @@ namespace MozaPlugin
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
                 case "base-torque-boost":   BaseTorqueBoost = value; break;
+                case "base-ffb-style":      FfbStyle = value; break;
 
                 // Core settings
                 case "base-limit":          Limit = value; BaseSettingsRead = true; break;
@@ -1566,6 +1580,7 @@ namespace MozaPlugin
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
             BaseTorqueBoost = TorqueBoostUnread;
+            FfbStyle = -1;
             BaseMusicEnabled = -1;
             BaseMusicIndex = -1;
             BaseMusicVolume = -1;

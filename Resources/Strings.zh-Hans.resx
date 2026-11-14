@@ -49,9 +49,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>刚度</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>保留游戏力反馈</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>力反馈均衡器</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 400% = 最大增益</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>力反馈输出曲线</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// 拖动 5 个节点以调整响应</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>线性</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S 曲线</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>指数</value></data>
@@ -679,7 +677,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>雨刮挡位 {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>灯光挡位 {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR 已关闭 — 已切换到稳定版</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// 各频段增益 · 100% = 中性 · 500% = 最大增益</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>灵敏度</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>输入力值</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>待机 · 常亮</value></data>
@@ -923,4 +920,8 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>触发</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>脉冲</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>引擎</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB 风格</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>柔和</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>标准</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>强劲</value></data>
 </root>
