@@ -139,6 +139,18 @@
                 </StackPanel>
             </ctrl:TabStrip.TrailingContent>
 
+            <!-- ==================== DASHBOARD TAB ==================== -->
+            <!-- Hosts the shared DashboardManagementControl (set in code-behind). -->
+            <TabItem x:Name="DashboardTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
+                <ContentControl x:Name="DashMgmtHost" HorizontalContentAlignment="Stretch"/>
+            </TabItem>
+
+            <!-- ==================== FILES TAB ==================== -->
+            <!-- Hosts the shared DashboardFilesControl (set in code-behind). -->
+            <TabItem x:Name="FilesTab" Header="{x:Static res:Strings.TabHeader_Files}" Visibility="Collapsed">
+                <ContentControl x:Name="DashFilesHost" HorizontalContentAlignment="Stretch"/>
+            </TabItem>
+
             <!-- ==================== INPUTS TAB ==================== -->
             <!-- Migrated from plugin-pane WheelTab in Phase 6. Handlers forward to
                  SettingsControl.Instance.{matching control} so the plugin pane's
@@ -286,20 +298,27 @@
                             </StackPanel>
                         </ctrl:SectionCard>
 
+                        <!-- Clone of the Knobs tab's signal-mode subsection; both stay in sync. -->
+                        <ctrl:SectionCard x:Name="WiInputsSignalModeCard" Visibility="Collapsed"
+                                          Title="{x:Static res:Strings.Label_SignalMode}"
+                                          Subtitle="{x:Static res:Strings.Subtitle_SignalMode}"
+                                          Icon="{StaticResource IconKnob}">
+                            <StackPanel>
+                                <UniformGrid x:Name="WiInputsSignalModeGrid" Columns="5" Rows="1"/>
+                                <StackPanel x:Name="WiInputsKnobModeLegacyPanel" Orientation="Horizontal"
+                                            Margin="0,4" Visibility="Collapsed">
+                                    <TextBlock Text="{x:Static res:Strings.SliderLabel_AllRotaries}" Style="{StaticResource SliderLabel}"/>
+                                    <ctrl:SegmentedControl x:Name="WiInputsKnobModeCombo"
+                                                           SelectionChanged="WiKnobModeCombo_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_Buttons}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_Knob}"/>
+                                    </ctrl:SegmentedControl>
+                                </StackPanel>
+                            </StackPanel>
+                        </ctrl:SectionCard>
+
                     </StackPanel>
                 <!-- /ScrollViewer -->
-            </TabItem>
-
-            <!-- ==================== DASHBOARD TAB ==================== -->
-            <!-- Hosts the shared DashboardManagementControl (set in code-behind). -->
-            <TabItem x:Name="DashboardTab" Header="{x:Static res:Strings.TabHeader_Dashboard}" Visibility="Collapsed">
-                <ContentControl x:Name="DashMgmtHost" HorizontalContentAlignment="Stretch"/>
-            </TabItem>
-
-            <!-- ==================== FILES TAB ==================== -->
-            <!-- Hosts the shared DashboardFilesControl (set in code-behind). -->
-            <TabItem x:Name="FilesTab" Header="{x:Static res:Strings.TabHeader_Files}" Visibility="Collapsed">
-                <ContentControl x:Name="DashFilesHost" HorizontalContentAlignment="Stretch"/>
             </TabItem>
 
             <!-- ==================== RPM TAB ==================== -->
