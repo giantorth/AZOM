@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -29,16 +30,24 @@ namespace MozaPlugin.Integration
         BelowBitePoint,
         // Only with the pedal (nearly) fully released.
         Released,
+        // Regardless of the clutch; no clutch source needed.
+        Always,
     }
 
     /// <summary>
     /// Engine vibration at the firing frequency (RPM / 60 × cylinders / 2),
     /// played only while the clutch is closed, so the engine is felt through
-    /// the pedal when it's connected to the drivetrain. Clutch position and bite
+    /// the pedal when it's connected to the drivetrain, or always if chosen. Clutch position and bite
     /// point are the ones Clutch Bite Point uses (MozaPlugin.MBoosterBitePoint.cs).
     /// Strength rises from Idle strength at 0 RPM to full at redline; the effect
     /// gain scales it. The tone follows the firing frequency exactly: SimHub's
     /// tone renderer plays a CustomEffect's TargetFrequency.
+    ///
+    /// On top of the tone, strength is shaped once per engine cycle (RPM / 120):
+    /// Lope pulses it, and below 100 % Smoothness each cycle gets a random
+    /// strength. Outputs only take a new strength each frame, so the lope fades
+    /// out before it would alias into buzz, and roughness never varies faster
+    /// than that limit.
     ///
     /// SimHub saves the class name as ContainerType — renaming it orphans
     /// saved effects.
@@ -59,9 +68,30 @@ namespace MozaPlugin.Integration
         private const double ReleasedLevel = 0.05;
         // Extra travel on the way out of a closed state, so a pedal resting on the edge doesn't chatter.
         private const double Hysteresis = 0.01;
+        public const int LopeDefaultPct = 0;
+        public const int SmoothnessDefaultPct = 100;
+        // Fastest cycle-rate shaping: the mBooster takes a new strength every
+        // 20 ms, and four frames per cycle still reads as a pulse.
+        private const double ShapeMaxHz = 12.5;
+        // Lope is at full depth up to this fraction of the limit, gone at it.
+        private const double LopeFadeStart = 0.6;
+        // Frames per cycle needed at the measured ShakeIt frame rate.
+        private const double FramesPerShapeCycle = 4;
+        // A longer gap between frames is a pause, not elapsed engine time.
+        private const double MaxFrameSec = 0.1;
+        // Weight of each new frame interval in the frame-rate average.
+        private const double FrameAverageWeight = 0.05;
 
         // SimHub data thread only.
         private bool _closed;
+        private long _lastFrameTicks;
+        // Average frame interval, 0 until measured.
+        private double _frameSec;
+        // Position within the current shaping cycle, 0..1.
+        private double _cyclePhase;
+        // Random strength dips (0..1) of the previous and current cycle.
+        private double _roughFrom, _roughTo;
+        private readonly Random _random = new Random();
 
         public MozaClutchEngineContainer()
         {
@@ -85,6 +115,12 @@ namespace MozaPlugin.Integration
 
         /// <summary>Strength (%) at 0 RPM, rising to 100 at redline.</summary>
         public int IdleStrengthPct { get; set; } = IdleStrengthDefaultPct;
+
+        /// <summary>Depth (%) of the once-per-cycle pulse; 0 = steady.</summary>
+        public int LopePct { get; set; } = LopeDefaultPct;
+
+        /// <summary>100 = every cycle the same; lower = random cycle-to-cycle strength.</summary>
+        public int SmoothnessPct { get; set; } = SmoothnessDefaultPct;
 
         [JsonIgnore]
         public MozaClutchEngineEffect Vibration { get; } = new MozaClutchEngineEffect();
@@ -119,11 +155,14 @@ namespace MozaPlugin.Integration
         /// <returns>Strength 0..1 for this ShakeIt frame.</returns>
         internal double Evaluate(GameData data, out double frequencyHz)
         {
+            double dt = FrameSeconds();
             frequencyHz = MinFrequencyHz;
             var plugin = MozaPlugin.Instance;
             var nd = data?.NewData;
+            bool always = ClosedMode == MozaClutchClosedMode.Always;
+            double pos = 0;
             if (data == null || !data.GameRunning || nd == null || plugin == null
-                || !plugin.TryGetBitePointClutchPosition(out double pos))
+                || (!always && !plugin.TryGetBitePointClutchPosition(out pos)))
             {
                 _closed = false;
                 return 0;
@@ -131,10 +170,14 @@ namespace MozaPlugin.Integration
             double rpm = nd.Rpms;
             if (double.IsNaN(rpm) || rpm < EngineOffRpm) return 0;
 
-            int calibrated = plugin.CurrentClutchBitePointPct;
-            double bite = Clamp01((UseCalibratedBitePoint && calibrated >= 0 ? calibrated : TriggerLevelPct) / 100.0);
-            double closed = ClosedFactor(Clamp01(pos), bite);
-            if (closed <= 0) return 0;
+            double closed = 1;
+            if (!always)
+            {
+                int calibrated = plugin.CurrentClutchBitePointPct;
+                double bite = Clamp01((UseCalibratedBitePoint && calibrated >= 0 ? calibrated : TriggerLevelPct) / 100.0);
+                closed = ClosedFactor(Clamp01(pos), bite);
+                if (closed <= 0) return 0;
+            }
 
             int cylinders = Math.Max(CylindersMin, Math.Min(CylindersMax, Cylinders));
             double maxHz = Math.Max(MaxFrequencyMinHz, Math.Min(MaxFrequencyMaxHz, MaxFrequencyHz));
@@ -142,7 +185,46 @@ namespace MozaPlugin.Integration
 
             double idle = Clamp01(IdleStrengthPct / 100.0);
             double strength = idle + (1 - idle) * EngineVibrationMath.RedlineFraction(rpm, nd.MaxRpm);
-            return strength * closed;
+            return strength * closed * CycleShape(rpm, dt);
+        }
+
+        // Seconds since the previous frame; 0 on the first one and after a pause.
+        private double FrameSeconds()
+        {
+            long now = Stopwatch.GetTimestamp();
+            long last = _lastFrameTicks;
+            _lastFrameTicks = now;
+            if (last == 0) return 0;
+            double dt = (now - last) / (double)Stopwatch.Frequency;
+            if (dt <= 0 || dt > MaxFrameSec) return 0;
+            _frameSec = _frameSec > 0 ? _frameSec + FrameAverageWeight * (dt - _frameSec) : dt;
+            return dt;
+        }
+
+        // Strength factor (0..1) from Lope and Smoothness for this frame.
+        private double CycleShape(double rpm, double dt)
+        {
+            double maxHz = _frameSec > 0 ? Math.Min(ShapeMaxHz, 1 / (_frameSec * FramesPerShapeCycle)) : ShapeMaxHz;
+            double cycleHz = rpm / 120.0;
+            _cyclePhase += Math.Min(cycleHz, maxHz) * dt;
+            if (_cyclePhase >= 1)
+            {
+                _cyclePhase -= Math.Floor(_cyclePhase);
+                _roughFrom = _roughTo;
+                _roughTo = _random.NextDouble();
+            }
+
+            double lope = Clamp01(LopePct / 100.0) * (1 - SmoothStep(LopeFadeStart * maxHz, maxHz, cycleHz));
+            double pulse = 0.5 - 0.5 * Math.Cos(2 * Math.PI * _cyclePhase);
+            double rough = 1 - Clamp01(SmoothnessPct / 100.0);
+            double dip = _roughFrom + (_roughTo - _roughFrom) * SmoothStep(0, 1, _cyclePhase);
+            return (1 - lope * (1 - pulse)) * (1 - rough * dip);
+        }
+
+        private static double SmoothStep(double edge0, double edge1, double x)
+        {
+            double t = Clamp01((x - edge0) / (edge1 - edge0));
+            return t * t * (3 - 2 * t);
         }
 
         // 1 with the clutch closed, 0 open; Fade ramps across the bite zone.
@@ -159,7 +241,10 @@ namespace MozaPlugin.Integration
                 default:
                     double width = Math.Max(MBoosterUiConstants.BitePointWidthMinPct,
                         Math.Min(MBoosterUiConstants.BitePointWidthMaxPct, WidthPct)) / 100.0;
-                    return Clamp01((bite + width - pos) / (2 * width));
+                    double top = MBoosterBitePointTrigger.ZoneTop(bite, width);
+                    double bottom = MBoosterBitePointTrigger.ZoneBottom(bite, width);
+                    if (top <= bottom) return pos < top ? 1 : 0;
+                    return Clamp01((top - pos) / (top - bottom));
             }
         }
 
@@ -171,16 +256,24 @@ namespace MozaPlugin.Integration
             // Width only shapes the Fade ramp.
             var width = Slider(Strings.SliderLabel_BiteWidth, nameof(WidthPct),
                 MBoosterUiConstants.BitePointWidthMinPct, MBoosterUiConstants.BitePointWidthMaxPct);
-            void ShowWidth() => width.Visibility = ClosedMode == MozaClutchClosedMode.Fade ? Visibility.Visible : Visibility.Collapsed;
-            ShowWidth();
+            // The bite point is unused when the effect always runs.
+            var calibration = new MozaClutchBitePointCalibrationView(this);
+            void ShowForMode()
+            {
+                width.Visibility = ClosedMode == MozaClutchClosedMode.Fade ? Visibility.Visible : Visibility.Collapsed;
+                calibration.Visibility = ClosedMode == MozaClutchClosedMode.Always ? Visibility.Collapsed : Visibility.Visible;
+            }
+            ShowForMode();
 
             var panel = new StackPanel();
-            panel.Children.Add(new MozaClutchBitePointCalibrationView(this));
-            panel.Children.Add(EditorSections.Section(Strings.Label_ClutchClosed, ClosedModePicker(ShowWidth), width));
+            panel.Children.Add(calibration);
+            panel.Children.Add(EditorSections.Section(Strings.Label_ClutchClosed, ClosedModePicker(ShowForMode), width));
             panel.Children.Add(EditorSections.Section(Strings.Section_ShakeItEngine,
                 Slider(Strings.SliderLabel_Cylinders, nameof(Cylinders), CylindersMin, CylindersMax),
                 Slider(Strings.SliderLabel_MaxFrequencyHz, nameof(MaxFrequencyHz), MaxFrequencyMinHz, MaxFrequencyMaxHz, 5),
-                Slider(Strings.SliderLabel_IdleStrength, nameof(IdleStrengthPct), 0, 100)));
+                Slider(Strings.SliderLabel_IdleStrength, nameof(IdleStrengthPct), 0, 100),
+                Slider(Strings.SliderLabel_Lope, nameof(LopePct), 0, 100),
+                Slider(Strings.SliderLabel_Smoothness, nameof(SmoothnessPct), 0, 100)));
             return new UserControl { Content = panel, DataContext = this };
         }
 
@@ -190,6 +283,7 @@ namespace MozaPlugin.Integration
             combo.Items.Add(Strings.Option_ClutchClosedFade);
             combo.Items.Add(Strings.Option_ClutchClosedBelowBite);
             combo.Items.Add(Strings.Option_ClutchClosedReleased);
+            combo.Items.Add(Strings.Option_ClutchClosedAlways);
             combo.SelectedIndex = (int)ClosedMode;
             combo.SelectionChanged += (s, e) =>
             {

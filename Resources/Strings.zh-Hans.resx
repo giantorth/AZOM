@@ -909,9 +909,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>在接合点渐变</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>低于接合点</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>完全松开</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>始终</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>气缸数</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>最高频率 (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>怠速强度 (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>脉动 (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>坡顶强度</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux 正在阻止访问 MOZA 设备</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>您的 Linux 用户无法打开 {0}，因此插件无法连接到该设备。</value></data>

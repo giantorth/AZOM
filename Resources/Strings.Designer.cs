@@ -967,9 +967,11 @@ namespace MozaPlugin.Resources
         public static string Option_ClutchClosedFade => Get("Option_ClutchClosedFade");
         public static string Option_ClutchClosedBelowBite => Get("Option_ClutchClosedBelowBite");
         public static string Option_ClutchClosedReleased => Get("Option_ClutchClosedReleased");
+        public static string Option_ClutchClosedAlways => Get("Option_ClutchClosedAlways");
         public static string SliderLabel_Cylinders => Get("SliderLabel_Cylinders");
         public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
         public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
+        public static string SliderLabel_Lope => Get("SliderLabel_Lope");
         public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
         public static string Banner_LinuxAccess_Title => Get("Banner_LinuxAccess_Title");
         public static string Banner_LinuxAccess_TtyFmt => Get("Banner_LinuxAccess_TtyFmt");

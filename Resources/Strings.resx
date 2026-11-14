@@ -916,9 +916,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Fade at bite point</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Below bite point</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Fully released</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Always</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylinders</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max frequency (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Idle strength (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Lope (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Crest strength</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux is blocking access to MOZA devices</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Your Linux user can't open {0}, so the plugin can't connect to it.</value></data>

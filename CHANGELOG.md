@@ -10,7 +10,7 @@ All notable changes to the AZOM plugin are documented here.
 - **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
 - **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
 - **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
-- **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed.
+- **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed (or Always), plus Lope and Smoothness for a lumpy, uneven idle.
 - **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
 - **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
@@ -28,6 +28,8 @@ All notable changes to the AZOM plugin are documented here.
 
 - **Clutch Bite Point pulses when the clutch jumps past the bite point between readings** instead of staying silent.
 - **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
+- **Clutch bite point auto-calibration learns from normal launches;** releases taking 0.6 s or more over the whole travel now count, down from 1 s.
+- **Clutch bite zone stays between 5 % and 95 % travel;** a wide zone near either end no longer reaches the fully released or pressed clutch.
 - **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
 - **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
 - **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.

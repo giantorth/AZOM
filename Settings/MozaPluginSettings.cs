@@ -235,7 +235,7 @@ namespace MozaPlugin.Settings
         public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
 
         // Clutch position the Bite Point trigger and calibration read.
-        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.MBoosterPedal;
+        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.Game;
 
         // Formula for MBoosterBitePointSource.Formula: a property path, NCalc, or js:-prefixed, 0..100.
         public string MBoosterBitePointSourceFormula { get; set; } = "";

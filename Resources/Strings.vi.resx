@@ -909,9 +909,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Chuyển dần tại điểm bám</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Dưới điểm bám</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Nhả hoàn toàn</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Luôn luôn</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Số xi-lanh</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Tần số tối đa (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Cường độ không tải (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Nhịp đập (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Cường độ khi qua đỉnh dốc</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux đang chặn quyền truy cập vào thiết bị MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Người dùng Linux của bạn không thể mở {0}, nên plugin không thể kết nối với nó.</value></data>

@@ -914,9 +914,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradual en el punto de mordida</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Bajo el punto de mordida</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Totalmente suelto</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Siempre</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindros</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frecuencia máx. (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensidad en ralentí (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsación (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Fuerza en rasantes</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux está bloqueando el acceso a los dispositivos MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Tu usuario de Linux no puede abrir {0}, así que el plugin no puede conectarse a él.</value></data>

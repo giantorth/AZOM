@@ -899,9 +899,11 @@
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Fade at chomp!</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under chomp!</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Paw all off!</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Every bork!</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Barky-pots!</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Top woof-rate (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Snooze rumble (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Wub-wub (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Woof Arf</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Grr Woof Bork MOZA Yip!</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Woof Grr {0} Bork Boof Awoo Yowl!</value></data>

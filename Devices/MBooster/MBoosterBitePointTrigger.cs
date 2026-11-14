@@ -16,7 +16,7 @@ namespace MozaPlugin.Devices.MBooster
     /// <summary>
     /// Bite Point trigger, shared by the plugin-tab worker and the ShakeIt effect.
     /// A pulse starts when the clutch enters the zone within Width of the bite
-    /// point moving the chosen way, lasts at least the minimum length even if the
+    /// point (kept between 5 % and the pressed-in level) moving the chosen way, lasts at least the minimum length even if the
     /// clutch passes straight through (or jumps across it between samples), ends
     /// once the clutch leaves (after the minimum) or at the maximum length, and
     /// re-arms only after the clutch leaves the zone. The direction is the side
@@ -93,13 +93,12 @@ namespace MozaPlugin.Devices.MBooster
             }
 
             bool wasInZone = _inZone;
-            double halfWidth = _inZone ? width01 + EdgeHysteresis : width01;
-            _inZone = Math.Abs(pos - bitePoint01) <= halfWidth;
+            _inZone = InZone(pos, bitePoint01, width01, _inZone ? EdgeHysteresis : 0);
             int prevSide = _outsideSide;
             if (!_inZone)
             {
                 _spent = false;
-                _outsideSide = pos > bitePoint01 ? 1 : -1;
+                _outsideSide = pos > ZoneTop(bitePoint01, width01) ? 1 : -1;
             }
 
             // Jumped across the whole zone between two samples.
@@ -139,6 +138,23 @@ namespace MozaPlugin.Devices.MBooster
             return _pulsing;
         }
 
+        /// <summary>Top of the bite zone: Width above the bite point, capped at
+        /// <see cref="MBoosterBitePointDetector.ClutchInLevel"/>.</summary>
+        public static double ZoneTop(double bitePoint01, double width01) =>
+            Math.Min(bitePoint01 + width01, MBoosterBitePointDetector.ClutchInLevel);
+
+        /// <summary>Bottom of the bite zone: Width below the bite point, floored at
+        /// <see cref="ZoneFloor"/>.</summary>
+        public static double ZoneBottom(double bitePoint01, double width01) =>
+            Math.Max(bitePoint01 - width01, ZoneFloor);
+
+        /// <summary>Lowest travel (0..1) the bite zone reaches.</summary>
+        public const double ZoneFloor = 0.05;
+
+        // In the zone, widened by margin at both edges.
+        private static bool InZone(double pos, double bite, double width, double margin) =>
+            pos >= ZoneBottom(bite, width) - margin && pos <= ZoneTop(bite, width) + margin;
+
         // Within the arm window of the last touch.
         private bool Armed(long now)
         {
@@ -175,7 +191,7 @@ namespace MozaPlugin.Devices.MBooster
                 _timingTravel = true;
                 _restSide = 0;
             }
-            if (_timingTravel && Math.Abs(pos - bite) <= width)
+            if (_timingTravel && InZone(pos, bite, width, 0))
             {
                 _timingTravel = false;
                 MBoosterBitePointTravel.Add(_touchSide > 0, (now - _touchTicks) / (double)Stopwatch.Frequency);
