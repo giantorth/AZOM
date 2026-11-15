@@ -287,6 +287,7 @@ namespace MozaPlugin.Devices.Motion
         /// </summary>
         public void SetAiMaxPerformance(bool on) => _aiMaxPerformance = on;
         private volatile bool _aiMaxPerformance;
+        private bool _aiMaxPerformanceApplied;   // lane tick only: the setting AiPose last streamed with
 
         // The controller levels AI mode heave off as 25.5·tanh(f6 / 25.5) mm; f6 = 25.5·atanh(mm / 25.5) undoes it.
         private const double AiHeaveScaleMm = 25.5, AiHeaveMaxShare = 0.9;
@@ -907,6 +908,20 @@ namespace MozaPlugin.Devices.Motion
                 _poseBlendStartMs = now;
                 Array.Copy(_poseSent, _poseBlendFrom, 3);
             }
+            bool maxPerformance = _aiMaxPerformance;
+            if (maxPerformance != _aiMaxPerformanceApplied)
+            {
+                _aiMaxPerformanceApplied = maxPerformance;
+                // Into Max performance: ease from the pose last sent to the unlimited one. Back out, the
+                // limiter carries on from the pose and speed Follow kept.
+                if (maxPerformance)
+                {
+                    _poseBlendStartMs = now;
+                    _poseBlendFrom[0] = (float)_aiLimiter.Pitch;
+                    _poseBlendFrom[1] = (float)_aiLimiter.Roll;
+                    _poseBlendFrom[2] = (float)_aiLimiter.HeaveMm;
+                }
+            }
             float p = frame.Fields[0], r = frame.Fields[1], h = frame.Fields[6];
             long since = now - _poseBlendStartMs;
             if (since < PoseBlendMs)
@@ -919,16 +934,22 @@ namespace MozaPlugin.Devices.Motion
             _poseSent[0] = p; _poseSent[1] = r; _poseSent[2] = h;
 
             AiRigHalves(out double halfLength, out double halfWidth);
-            if (_aiMaxPerformance)
+            double stroke = AiStrokeShare();
+            if (maxPerformance)
             {
                 // As posted: only each angle's own bound (65 mm at an actuator), no combined travel or rate cap.
                 double maxPitch = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfLength));
                 double maxRoll = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfWidth));
-                _aiLimiter.Reset(Math.Max(-maxPitch, Math.Min(maxPitch, p)), Math.Max(-maxRoll, Math.Min(maxRoll, r)), h);
+                _aiLimiter.Follow(Math.Max(-maxPitch, Math.Min(maxPitch, p)), Math.Max(-maxRoll, Math.Min(maxRoll, r)), h,
+                    dtMs / 1000.0, halfLength, halfWidth, stroke);
             }
             else
-                _aiLimiter.Step(p, r, h, dtMs / 1000.0, halfLength, halfWidth, AiStrokeShare(),
+            {
+                _aiLimiter.Step(p, r, h, dtMs / 1000.0, halfLength, halfWidth, stroke,
                     AiPoseLimiter.SafeMaxSpeedMmS, AiPoseLimiter.SafeMaxAccelMmS2, tickCeilingMm);
+                // While a shrunk travel is still being moved into, the pulse gets only the room left.
+                tickMm = Math.Min(tickMm, (float)_aiLimiter.FreeTravelMm(stroke));
+            }
             f0 = (float)_aiLimiter.Pitch;
             f1 = (float)_aiLimiter.Roll;
             f6 = (float)AiPoseLimiter.Inverse(_aiLimiter.HeaveMm + tickMm, AiHeaveScaleMm, AiHeaveMaxShare);
@@ -1149,6 +1170,7 @@ namespace MozaPlugin.Devices.Motion
             _aiLimiter.Reset();
             Array.Clear(_poseSent, 0, 3);
             _poseLive = false;
+            _aiMaxPerformanceApplied = _aiMaxPerformance;
             _nextFrameMs = 0;
             long start = _clock.ElapsedMilliseconds;
             bool runSent = false;

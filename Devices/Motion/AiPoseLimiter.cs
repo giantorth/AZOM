@@ -117,7 +117,8 @@ namespace MozaPlugin.Devices.Motion
             double stroke = Math.Max(0.0, Math.Min(1.0, strokeShare));
             double axis = AxisTravelMm * stroke, scale = ControllerTiltScaleMm * stroke;
             // reserveMm: travel kept free for something added to heave after the limiter (the engine tick-over pulse).
-            double travel = Math.Max(0.0, FullTravelMm * stroke - Math.Max(0.0, reserveMm));
+            double full = FullTravelMm * stroke;
+            double travel = Math.Max(0.0, full - Math.Max(0.0, reserveMm));
 
             // Each axis as the actuator travel it is meant to cause, so one mm/s figure covers all three.
             double tp = Forward(halfLengthMm * Math.Sin(pitch), axis);
@@ -137,17 +138,54 @@ namespace MozaPlugin.Devices.Motion
                 _seeded = true;
             }
             double dt = Math.Max(0.001, Math.Min(MaxStepSeconds, dtSeconds));
-            Advance(0, tp, dt, maxSpeedMmS, maxAccelMmS2);
-            Advance(1, tr, dt, maxSpeedMmS, maxAccelMmS2);
-            Advance(2, th, dt, maxSpeedMmS, maxAccelMmS2);
+            double dv = maxAccelMmS2 * dt;
+            double v0 = NextSpeed(0, tp, dt, maxSpeedMmS, maxAccelMmS2);
+            double v1 = NextSpeed(1, tr, dt, maxSpeedMmS, maxAccelMmS2);
+            double v2 = NextSpeed(2, th, dt, maxSpeedMmS, maxAccelMmS2);
+            double[] v = { v0, v1, v2 };
 
-            // The axes move at their own pace, so on the way between two poses that are each inside
-            // the travel their sum can pass it (one axis still leaving while another arrives): hold
-            // the sum to the travel here too, pulling all three back in proportion.
-            double sum = Math.Abs(_x[0]) + Math.Abs(_x[1]) + Math.Abs(_x[2]);
-            if (sum > travel && sum > 0.0)
+            // The axes move at their own pace, so on the way between two poses that are each inside the
+            // travel their sum can pass it (one axis still leaving while another arrives). The sum is the
+            // largest of the eight corner combinations ±pitch ±roll ±heave, each braked towards the full
+            // travel like an axis of its own: when one grows faster than can still stop there, the excess
+            // is taken off the axes, each within its own speed and acceleration caps. (The sum itself has a
+            // kink where an axis crosses zero; the combinations are straight, so braking them looks ahead.)
+            // The reserve is left out (the pulse gets only the room left, FreeTravelMm), so a change in
+            // it moves only the targets; a shrunk stroke only stops the sum growing.
+            double before = Math.Abs(_x[0]) + Math.Abs(_x[1]) + Math.Abs(_x[2]);
+            double limit = Math.Max(full, before);
+            double[] slack = new double[3];
+            for (int pass = 0; pass < 3; pass++)
             {
-                double k = travel / sum;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    double s0 = (corner & 1) != 0 ? -1.0 : 1.0, s1 = (corner & 2) != 0 ? -1.0 : 1.0, s2 = (corner & 4) != 0 ? -1.0 : 1.0;
+                    double room = limit - (s0 * _x[0] + s1 * _x[1] + s2 * _x[2]);
+                    double grow = s0 * v[0] + s1 * v[1] + s2 * v[2];
+                    double growMax = Math.Min(BrakeSpeed(room, dv, maxAccelMmS2), Math.Max(0.0, room) / dt);
+                    if (grow <= growMax) continue;
+                    double give = 0.0;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        double s = i == 0 ? s0 : i == 1 ? s1 : s2;
+                        // How much further this axis can turn against the corner this tick within its caps.
+                        slack[i] = Math.Max(0.0, s * v[i] - Math.Max(s * _v[i] - dv, -maxSpeedMmS));
+                        give += slack[i];
+                    }
+                    if (give <= 0.0) continue;
+                    double f = Math.Min(1.0, (grow - growMax) / give);
+                    v[0] -= s0 * slack[0] * f;
+                    v[1] -= s1 * slack[1] * f;
+                    v[2] -= s2 * slack[2] * f;
+                }
+            }
+            for (int i = 0; i < 3; i++) { _x[i] += v[i] * dt; _v[i] = v[i]; }
+
+            // Backstop for what the caps could not brake in time (a stroke cut while moving out).
+            double sum = Math.Abs(_x[0]) + Math.Abs(_x[1]) + Math.Abs(_x[2]);
+            if (sum > limit && sum > 0.0)
+            {
+                double k = limit / sum;
                 for (int i = 0; i < 3; i++) { _x[i] *= k; _v[i] *= k; }
             }
 
@@ -161,22 +199,67 @@ namespace MozaPlugin.Devices.Motion
         public double IntendedPitchMm { get; private set; }
         public double IntendedRollMm { get; private set; }
 
-        private void Advance(int i, double target, double dt, double vMax, double aMax)
+        /// <summary>
+        /// Max performance: the pose goes out as given, and the motion state follows it (position and
+        /// speed) so that a return to <see cref="Step"/> carries on from where the platform is and how
+        /// fast it is moving.
+        /// </summary>
+        public void Follow(double pitch, double roll, double heaveMm, double dtSeconds,
+            double halfLengthMm, double halfWidthMm, double strokeShare)
+        {
+            if (double.IsNaN(pitch) || double.IsInfinity(pitch)) pitch = 0.0;
+            if (double.IsNaN(roll) || double.IsInfinity(roll)) roll = 0.0;
+            if (double.IsNaN(heaveMm) || double.IsInfinity(heaveMm)) heaveMm = 0.0;
+            double scale = ControllerTiltScaleMm * Math.Max(0.0, Math.Min(1.0, strokeShare));
+            double dt = Math.Max(0.001, Math.Min(MaxStepSeconds, dtSeconds));
+            double x0 = Forward(halfLengthMm * Math.Sin(pitch), scale);
+            double x1 = Forward(halfWidthMm * Math.Sin(roll), scale);
+            if (_seeded)
+            {
+                _v[0] = (x0 - _x[0]) / dt;
+                _v[1] = (x1 - _x[1]) / dt;
+                _v[2] = (heaveMm - _x[2]) / dt;
+            }
+            else
+            {
+                Array.Clear(_v, 0, 3);
+                _seeded = true;
+            }
+            _x[0] = x0; _x[1] = x1; _x[2] = heaveMm;
+            Pitch = pitch; Roll = roll; HeaveMm = heaveMm;
+        }
+
+        /// <summary>
+        /// Travel (mm at an actuator) left between the pose last returned and the full travel at this
+        /// Max Available Stroke: room for something added to heave afterwards (the tick-over pulse).
+        /// </summary>
+        public double FreeTravelMm(double strokeShare)
+        {
+            double travel = FullTravelMm * Math.Max(0.0, Math.Min(1.0, strokeShare));
+            return Math.Max(0.0, travel - (Math.Abs(_x[0]) + Math.Abs(_x[1]) + Math.Abs(_x[2])));
+        }
+
+        /// <summary>
+        /// Fastest speed that can still brake to rest within <paramref name="distance"/> at
+        /// <paramref name="aMax"/>, counted in whole ticks of speed change <paramref name="dv"/> (one tick
+        /// of travel before braking starts), so a still target is met without overshoot.
+        /// </summary>
+        private static double BrakeSpeed(double distance, double dv, double aMax)
+            => Math.Sqrt(dv * dv / 4.0 + 2.0 * aMax * Math.Max(0.0, distance)) - dv / 2.0;
+
+        private double NextSpeed(int i, double target, double dt, double vMax, double aMax)
         {
             double err = target - _x[i];
-            // The speed that reaches the target this tick, no faster than the cap, and no faster than
-            // can still be braked to rest at the target within the acceleration cap.
-            double want = err / dt;
-            double brake = Math.Sqrt(2.0 * aMax * Math.Abs(err));
-            double cap = Math.Min(vMax, brake);
-            want = Math.Max(-cap, Math.Min(cap, want));
             double dv = aMax * dt;
+            // Towards the target: no further than reaches it this tick, no faster than the cap or than
+            // can still brake to rest on it.
+            double cap = Math.Min(vMax, Math.Min(BrakeSpeed(Math.Abs(err), dv, aMax), Math.Abs(err) / dt));
+            double want = Math.Sign(err) * cap;
+            // Speed changes by at most dv a tick. A target that moves back towards an axis faster than it
+            // can brake is passed and come back to, never stopped on dead. Above the speed cap (coming
+            // from Max performance) the speed is brought down to it at once.
             double v = Math.Max(_v[i] - dv, Math.Min(_v[i] + dv, want));
-            double next = _x[i] + v * dt;
-            // Never step past the target.
-            if ((target - _x[i]) * (target - next) < 0.0) { next = target; v = 0.0; }
-            _x[i] = next;
-            _v[i] = v;
+            return Math.Max(-vMax, Math.Min(vMax, v));
         }
     }
 }
