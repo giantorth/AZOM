@@ -51,6 +51,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **mBooster Sensor Output Ratio and Max Threshold show on active Throttle and Clutch pedals;** a threshold above Max Force no longer caps output below 100%.
 - **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
 - **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
 - **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.

@@ -2608,11 +2608,10 @@
                                             <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterCurvePreset_Parabolic"/>
                                         </StackPanel>
 
-                                        <!-- Sensor Output Ratio + Max Threshold are load-cell / pressure-
-                                             sensor settings that only a BRAKE has — hidden for throttle/
-                                             clutch pedals (see UpdateMBoosterConfigVisibilityForRole). The
-                                             output curve above applies to every pedal mode. -->
-                                        <StackPanel x:Name="MBoosterBrakeOnlyPanel">
+                                        <!-- Sensor Output Ratio + Max Threshold: load-cell settings, shown for
+                                             any active pedal, hidden for passive ones (see
+                                             UpdateMBoosterConfigVisibilityForRole). -->
+                                        <StackPanel x:Name="MBoosterLoadCellPanel">
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -2648,7 +2647,7 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="100"/>
                                         </Grid>
-                                        </StackPanel><!-- MBoosterBrakeOnlyPanel -->
+                                        </StackPanel><!-- MBoosterLoadCellPanel -->
 
                                         <!-- Data-store sliders, driven by MBoosterCurveEditor: Y1 is the
                                              start point (pinned 0), Y2..Y6 = device y1..y5, X1/X6 = Min/Max. -->

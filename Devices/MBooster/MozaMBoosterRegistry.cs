@@ -676,9 +676,13 @@ namespace MozaPlugin.Devices.MBooster
                 // (-1) or non-positive Threshold is a no-op (ratio 1, same as
                 // Threshold == Max Force) so an uncustomized profile keeps
                 // its previous raw-passthrough behavior unchanged.
+                // Raw HID saturates at Max Force, so a Threshold above it is
+                // unreachable and counts as Max Force (VYNRCAZ1: 50 kg over
+                // 21 kg capped output at 42%). A passive pedal has no load
+                // cell; its stored Threshold is hidden and never applies.
                 double maxForceKg = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200.0;
-                double thresholdKg = cfg.MaxThresholdKg > 0 ? cfg.MaxThresholdKg : maxForceKg;
-                if (Math.Abs(thresholdKg - maxForceKg) > 0.0001)
+                double thresholdKg = cfg.MaxThresholdKg;
+                if (thresholdKg > 0 && thresholdKg < maxForceKg && c.IsAxisMotorized(axisIndex))
                     posPct = Math.Min(100.0, posPct * (maxForceKg / thresholdKg));
             }
 

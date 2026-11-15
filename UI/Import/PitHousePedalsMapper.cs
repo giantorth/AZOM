@@ -398,17 +398,15 @@ namespace MozaPlugin.UI.Import
             m.Float("softlimit_hardness_release", "Endstop end stiffness *", 1f, 10f, "F0",
                     c => c.EndstopEndStiffness, (c, v) => c.EndstopEndStiffness = v);
 
-            if (target.Role == MBoosterRole.Brake)
+            if (!target.IsPassive)
             {
                 m.Float("press_combine", "Sensor output ratio (%) *", 0f, 100f, "F0",
                         c => c.SensorOutputRatioPct, (c, v) => c.SensorOutputRatioPct = v);
             }
             else
             {
-                // mbooster-brake-angle-ratio is written only for the brake role
-                // (MozaPlugin.ApplyMBoosterToHardware), so importing it onto a
-                // throttle/clutch pedal would never reach the device.
-                PitHouseMotorMapper.AddSkipped(plan, dp, prefix + "_press_combine", "brake-only");
+                // Load-cell register on the motorized unit; a passive pedal has none.
+                PitHouseMotorMapper.AddSkipped(plan, dp, prefix + "_press_combine", "passive pedal — no motor");
             }
 
             // ----- Motor-only: Pedal Feel, damping, friction, G-Force -----
