@@ -54,9 +54,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Stivhet</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Behold spill-FFB</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>FFB-EQUALIZER</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 400 % = maks boost</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>FFB-UTGANGSKURVE</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// dra de 5 nodene for å forme responsen</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEÆR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>S-KURVE</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EKSPONENTIELL</value></data>
@@ -684,7 +682,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Viskertrinn {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Lystrinn {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR lukket — byttet til Stabil</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// forsterkning per bånd · 100 % = nøytral · 500 % = maks boost</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>FØLSOMHET</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Inngangskraft</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Hvile · Konstant</value></data>
@@ -694,9 +691,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Pustehastighet (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>HVILEEFFEKT</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Hvileanimasjon</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Kilde for LFE i rattbasen</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>LFE-fanen i programtillegget</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE i rattbasen</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Enhet</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Krever SimHub 9.12 eller nyere – programtilleggets LFE-fane brukes.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Enhetsdefinisjonen er oppdatert. Start SimHub på nytt for å bruke den.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Forza Horizon-kompatibilitet</value></data>
@@ -842,10 +839,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Globale innstillinger</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Telemetrieffekter (motor-, ABS- og girskiftvibrasjon gjennom basen) krever basefastvare 1.2.10.10 eller nyere. Denne basen har {0}. Oppdater basefastvaren i Pit House for å bruke dem.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>S12-haptikk</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>S12-pedalhaptikk</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>S12-fanen i programtillegget</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt for hver pedal</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt kombinert</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Pedalhaptikk</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Separate enheter</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Kombinert enhet</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets S12-fane brukes.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Sanntidsutdata</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Pulslengde</value></data>
@@ -861,9 +858,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Enhet 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#} % tap</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Standardfane</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster-vibrasjon</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>mBooster-fanen i programtillegget</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Fanen i programtillegget</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Enhet</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>ShakeIt krever SimHub 9.12 eller nyere – programtilleggets mBooster-fane brukes.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster er ikke lagt til i SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>mBooster-pedalene er tilkoblet og satt til ShakeIt, men mBooster-enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
@@ -914,9 +911,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradvis ved bitepunktet</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under bitepunktet</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Helt sluppet</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Alltid</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Sylindere</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsering (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Styrke over bakketopper</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blokkerer tilgang til MOZA-enheter</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så programtillegget kan ikke koble til.</value></data>
@@ -932,4 +931,12 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Slå av motorvibrasjonseffekten i SimHub Motion-profilen din når du bruker denne, slik at de ikke kolliderer.</value></data>
   <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI-modus: maks ytelse</value></data>
   <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>FFB-stil</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Myk</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Sterk</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Tomgangsfarge</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>FLERMODUS-BRYTER</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Kontrolletiketter</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Tommelhjul</value></data>
 </root>

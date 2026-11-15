@@ -284,6 +284,14 @@ namespace MozaPlugin.Settings
                 Min = 50, Max = 100, Fine = 25, Coarse = 25,
                 Label = () => Strings.SliderLabel_SoftLimitStrength, Unit = "%" },
 
+            // 0 soft / 1 normal / 2 strong. Ultra bases on fw >= 1.2.12.0 only.
+            new NumericSetting {
+                Name = "FfbStyle", Commands = new[] { "base-ffb-style" },
+                GetRaw = d => d.FfbStyle, SetRaw = (d, v) => d.FfbStyle = v,
+                Min = 0, Max = 2, Fine = 1, Coarse = 1,
+                Supported = d => d.BaseSupportsFfbStyle,
+                Label = () => Strings.Label_FfbStyle },
+
             new NumericSetting {
                 Name = "SpeedDamping", Commands = new[] { "base-speed-damping" },
                 GetRaw = d => d.SpeedDamping, SetRaw = (d, v) => d.SpeedDamping = v,

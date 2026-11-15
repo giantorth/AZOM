@@ -48,19 +48,29 @@ namespace MozaPlugin.Telemetry.Display
         private int _lastEmittedKind4Slot = -1;
         public int LastEmittedKind4Slot => _lastEmittedKind4Slot;
 
+        // Slot the device shows now: the latest of our kind=4 and a device report. Until
+        // the report of our switch lands, WheelReportedSlot still names the old slot.
+        private volatile int _showingSlot = -1;
+        public int ShowingSlot => _showingSlot;
+
         public WheelSlotTracker(TelemetrySender sender)
         {
             _sender = sender;
         }
 
         /// <summary>Set when the host emits FF kind=4 (SendDashboardSwitch).</summary>
-        public void NoteHostEmittedKind4(int slot) => _lastEmittedKind4Slot = slot;
+        public void NoteHostEmittedKind4(int slot)
+        {
+            _lastEmittedKind4Slot = slot;
+            _showingSlot = slot;
+        }
 
         /// <summary>Reset on wheel hot-swap: new wheel may not be bound to the prior slot.</summary>
         public void Reset()
         {
             _lastEmittedKind4Slot = -1;
             _wheelReportedSlot = -1;
+            _showingSlot = -1;
             _pendingSwitchSlot = -1;
             _pendingSwitchFromKind4 = false;
             _detectedSlotFieldA = -1;
@@ -155,13 +165,15 @@ namespace MozaPlugin.Telemetry.Display
             if (slot == _wheelReportedSlot) return;
 
             int prevSlot = _wheelReportedSlot;
+            int prevShowing = _showingSlot;
             _wheelReportedSlot = slot;
+            _showingSlot = slot;
             MozaLog.Debug($"[AZOM] Wheel reported active dashboard slot={slot} (was {prevSlot})");
 
             // _lastEmittedKind4Slot match = echo of our kind=4; mismatch = device-side
             // switch. prevSlot == -1 is the cold-start first push, not a user switch.
             if (prevSlot < 0) return;
-            FollowDeviceSwitch(slot, prevSlot, deviceSentKind4: false);
+            FollowDeviceSwitch(slot, prevSlot, prevShowing, deviceSentKind4: false);
         }
 
         /// <summary>
@@ -169,7 +181,7 @@ namespace MozaPlugin.Telemetry.Display
         /// <paramref name="slot"/> and raise WheelInitiatedSwitch. No kind=4 is
         /// emitted — the device already switched.
         /// </summary>
-        private void FollowDeviceSwitch(int slot, int prevSlot, bool deviceSentKind4)
+        private void FollowDeviceSwitch(int slot, int prevSlot, int prevShowing, bool deviceSentKind4)
         {
             // EnableHotRenegotiation gates this too: legacy Stop+Start mode handles
             // device switches via catalog-resync probe + RestartForSwitch.
@@ -203,6 +215,7 @@ namespace MozaPlugin.Telemetry.Display
                     $"[AZOM] WheelSlotTracker: slot={slot} out of " +
                     $"configJsonList range (count={listCount}) — not arming wheel-init burst");
                 _wheelReportedSlot = prevSlot;
+                _showingSlot = prevShowing;
                 return;
             }
 
@@ -241,15 +254,18 @@ namespace MozaPlugin.Telemetry.Display
             if (slot != _lastEmittedKind4Slot)
             {
                 int prev = _wheelReportedSlot;
+                int prevShowing = _showingSlot;
                 _wheelReportedSlot = slot;
+                _showingSlot = slot;
                 MozaLog.Debug($"[AZOM] device kind=4 slot={slot} (not an echo; lastEmitted={_lastEmittedKind4Slot}, was {prev})");
-                FollowDeviceSwitch(slot, prev, deviceSentKind4: true);
+                FollowDeviceSwitch(slot, prev, prevShowing, deviceSentKind4: true);
                 return;
             }
             _sender.NotePostSwitchKind4Confirmed(slot);
             if (slot == _wheelReportedSlot) return;
             int prevSlot = _wheelReportedSlot;
             _wheelReportedSlot = slot;
+            _showingSlot = slot;
             MozaLog.Debug($"[AZOM] kind=4 echo confirmed slot={slot} (was {prevSlot})");
         }
 

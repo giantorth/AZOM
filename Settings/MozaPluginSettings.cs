@@ -235,7 +235,7 @@ namespace MozaPlugin.Settings
         public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
 
         // Clutch position the Bite Point trigger and calibration read.
-        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.MBoosterPedal;
+        public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.Game;
 
         // Formula for MBoosterBitePointSource.Formula: a property path, NCalc, or js:-prefixed, 0..100.
         public string MBoosterBitePointSourceFormula { get; set; } = "";
@@ -671,6 +671,11 @@ namespace MozaPlugin.Settings
         public Dictionary<Guid, WheelIdleSettings> WheelIdleByPageGuid { get; set; }
             = new Dictionary<Guid, WheelIdleSettings>();
 
+        // Per-wheel-page multi-mode thumb dial (wheel cmd 0x28 + session FF kind=18
+        // labels). A property of the rim, shared across profiles.
+        public Dictionary<Guid, WheelMultiDialSettings> WheelMultiDialByPageGuid { get; set; }
+            = new Dictionary<Guid, WheelMultiDialSettings>();
+
         // Per-wheel-page Steering Wheel Inertia (hands-off protection, base cmd 0x13,
         // raw 100..4000). It describes the rim, so it follows the attached wheel and
         // is shared across profiles; the Hands-off Protection toggle stays on the
@@ -866,6 +871,9 @@ namespace MozaPlugin.Settings
         public int TelemetrySpeedMs { get; set; } = -1;  // cmd 0x1E [0] [BE u16]
         public int ButtonsSpeedMs { get; set; } = -1;    // cmd 0x1E [1] [BE u16]
         public int KnobSpeedMs { get; set; } = -1;       // cmd 0x1E [3] [BE u16]
+        // Per-knob breathing colour, packed 0xRRGGBB, visual knob order (cmd 0x1F 03 02 [k]).
+        // Null = none saved; a slot of -1 = leave that knob's colour alone.
+        public int[]? KnobBreathColors { get; set; }
 
         public WheelIdleSettings Clone()
         {
@@ -877,6 +885,56 @@ namespace MozaPlugin.Settings
                 TelemetrySpeedMs = TelemetrySpeedMs,
                 ButtonsSpeedMs = ButtonsSpeedMs,
                 KnobSpeedMs = KnobSpeedMs,
+                KnobBreathColors = KnobBreathColors != null ? (int[])KnobBreathColors.Clone() : null,
+            };
+        }
+
+        /// <summary>Set one knob's saved breathing colour, growing the array
+        /// (unset slots -1) without mutating one a reader may hold.</summary>
+        public void SetKnobBreathColor(int knob, int packedRgb)
+        {
+            if (knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            var next = new int[MozaData.WheelKnobMax];
+            for (int i = 0; i < next.Length; i++)
+                next[i] = KnobBreathColors != null && i < KnobBreathColors.Length ? KnobBreathColors[i] : -1;
+            next[knob] = packedRgb;
+            KnobBreathColors = next;
+        }
+    }
+
+    /// <summary>One dial position's left/right control labels.</summary>
+    public sealed class MultiDialLabel
+    {
+        public string Left { get; set; } = "";
+        public string Right { get; set; } = "";
+    }
+
+    /// <summary>
+    /// Per-wheel-page multi-mode thumb dial stored on
+    /// <see cref="MozaPluginSettings.WheelMultiDialByPageGuid"/>. -1 / null = no
+    /// opinion (the wheel keeps its own value). Replace <see cref="Labels"/> with a
+    /// new list rather than editing it — readers may hold the old one.
+    /// </summary>
+    public sealed class WheelMultiDialSettings
+    {
+        public int Enabled { get; set; } = -1;   // cmd 0x28 00
+        public int Knob { get; set; } = -1;      // logical knob; wire index via WheelModelInfo.MultiDialKnobOrder
+        public int Left { get; set; } = -1;      // cmd 0x28 02 00, 1 = included
+        public int Right { get; set; } = -1;     // cmd 0x28 02 01, 1 = included
+        public List<MultiDialLabel>? Labels { get; set; }   // FF kind=18, by position
+
+        public WheelMultiDialSettings Clone()
+        {
+            List<MultiDialLabel>? labels = null;
+            if (Labels != null)
+            {
+                labels = new List<MultiDialLabel>(Labels.Count);
+                foreach (var l in Labels)
+                    labels.Add(new MultiDialLabel { Left = l?.Left ?? "", Right = l?.Right ?? "" });
+            }
+            return new WheelMultiDialSettings
+            {
+                Enabled = Enabled, Knob = Knob, Left = Left, Right = Right, Labels = labels,
             };
         }
     }

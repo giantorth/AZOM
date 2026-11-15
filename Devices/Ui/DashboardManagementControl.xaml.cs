@@ -977,6 +977,33 @@ namespace MozaPlugin.Devices.Ui
                 TelemetryProfileList.ScrollIntoView(TelemetryProfileList.SelectedItem);
             if (_suppressEvents || _plugin == null) return;
             UpdateDashboardPreview();
+            ApplyListSelection();
+        }
+
+        // While an idle dashboard shows, the list keeps the profile's pick selected, so
+        // clicking that item raises no SelectionChanged: take the click as the pick.
+        // MouseUp runs after a click on another item has already switched (and ended idle).
+        private void TelemetryProfileList_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null || !IdleShowingOnTarget()) return;
+            if (ItemsControl.ContainerFromElement(TelemetryProfileList, e.OriginalSource as DependencyObject)
+                    is not ListBoxItem item || !item.IsSelected) return;
+            ApplyListSelection();
+        }
+
+        private bool IdleShowingOnTarget()
+        {
+            var idle = _plugin?.IdleDashboards;
+            if (idle == null) return false;
+            if (IsCm1) return idle.Cm1OverrideIndex >= 0;
+            if (IsCm2Target) return idle.Cm2OverrideName != null;
+            if (_plugin!.IsFsr1DisplayWheel) return idle.Fsr1OverrideIndex >= 0;
+            return idle.WheelEngaged;
+        }
+
+        private void ApplyListSelection()
+        {
+            if (_plugin == null) return;
             var selected = TelemetryProfileList.SelectedItem?.ToString();
             if (selected == null) return;
 

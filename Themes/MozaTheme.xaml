@@ -713,6 +713,107 @@
         </Setter>
     </Style>
 
+    <!-- Arrow button for MozaHeaderTabControl's overflowing tab strip; Content
+         is the chevron Geometry. -->
+    <Geometry x:Key="TabScrollLeftGeometry">M15,4 L7,12 L15,20</Geometry>
+    <Geometry x:Key="TabScrollRightGeometry">M9,4 L17,12 L9,20</Geometry>
+    <Style x:Key="MozaTabScrollButton" TargetType="RepeatButton">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Delay" Value="400"/>
+        <Setter Property="Interval" Value="120"/>
+        <Setter Property="Foreground" Value="{StaticResource TextFaintBrush}"/>
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="3">
+                        <Path Data="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}" Width="9" Height="12" Stretch="Uniform"
+                              Stroke="{TemplateBinding Foreground}" StrokeThickness="1.8"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource CyanBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgCardHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.3"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Device-page tab control: one scrolling row of tabs (arrows appear on
+         overflow, wheel scrolls it) with controls:TabStrip.TrailingContent
+         pinned at the right end of the strip, or on its own row above the tabs
+         when the tab area would drop below TabHeaderPanel.MinTabsWidth. -->
+    <Style x:Key="MozaHeaderTabControl" TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="ItemContainerStyle" Value="{StaticResource MozaTabItem}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <DockPanel LastChildFill="True">
+                        <Border x:Name="HeaderBorder" DockPanel.Dock="Top"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                BorderThickness="0,0,0,1">
+                            <controls:TabHeaderPanel Margin="16,0,10,0">
+                                <Grid x:Name="TabsArea">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <RepeatButton x:Name="PART_TabScrollLeft" Grid.Column="0"
+                                                  Style="{StaticResource MozaTabScrollButton}"
+                                                  Content="{StaticResource TabScrollLeftGeometry}"/>
+                                    <ScrollViewer x:Name="PART_TabScroll" Grid.Column="1"
+                                                  HorizontalScrollBarVisibility="Hidden"
+                                                  VerticalScrollBarVisibility="Disabled"
+                                                  CanContentScroll="False"
+                                                  Focusable="False"
+                                                  controls:TabStrip.IsScrollHost="True">
+                                        <StackPanel x:Name="HeaderPanel"
+                                                    Orientation="Horizontal"
+                                                    IsItemsHost="True"
+                                                    KeyboardNavigation.TabIndex="1"
+                                                    Background="Transparent"/>
+                                    </ScrollViewer>
+                                    <RepeatButton x:Name="PART_TabScrollRight" Grid.Column="2"
+                                                  Style="{StaticResource MozaTabScrollButton}"
+                                                  Content="{StaticResource TabScrollRightGeometry}"/>
+                                </Grid>
+                                <ContentPresenter Content="{TemplateBinding controls:TabStrip.TrailingContent}"/>
+                            </controls:TabHeaderPanel>
+                        </Border>
+                        <Border Background="Transparent"
+                                BorderThickness="0">
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="True"/>
+                        </Border>
+                    </DockPanel>
+                    <ControlTemplate.Triggers>
+                        <!-- Headerless (tab-less ES wheel): drop the tabs and the
+                             divider but keep the trailing content. -->
+                        <Trigger Property="Tag" Value="headerless">
+                            <Setter TargetName="TabsArea" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="HeaderBorder" Property="BorderThickness" Value="0"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============================================================ -->
     <!-- ScrollViewer / ScrollBar — slim dark scroll                   -->
     <!-- ============================================================ -->

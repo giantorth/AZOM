@@ -631,6 +631,7 @@ namespace MozaPlugin.Settings
         public int SoftLimitRetain { get; set; } = -1;      // 0 = off, 20 = on
         public int FfbReverse { get; set; } = -1;           // 0/1
         public int Protection { get; set; } = -1;           // 0/1
+        public int FfbStyle { get; set; } = -1;             // 0 soft, 1 normal, 2 strong (Ultra, fw >= 1.2.12.0)
 
         // ===== Game effect gains (raw = percent * 2.55) =====
         public int GameDamper { get; set; } = -1;
@@ -900,6 +901,7 @@ namespace MozaPlugin.Settings
             SoftLimitStrength = p.SoftLimitStrength;
             SoftLimitRetain = p.SoftLimitRetain; FfbReverse = p.FfbReverse;
             Protection = p.Protection;
+            FfbStyle = p.FfbStyle;
 
             // Game effects
             GameDamper = p.GameDamper; GameFriction = p.GameFriction;
@@ -1102,6 +1104,9 @@ namespace MozaPlugin.Settings
             SoftLimitStrength = data.SoftLimitStrength;
             SoftLimitRetain = data.SoftLimitRetain; FfbReverse = data.FfbReverse;
             Protection = data.Protection;
+            // A base without the register must not wipe a value saved on one that has it.
+            if (data.BaseSupportsFfbStyle)
+                FfbStyle = data.FfbStyle;
 
             GameDamper = data.GameDamper; GameFriction = data.GameFriction;
             GameInertia = data.GameInertia; GameSpring = data.GameSpring;

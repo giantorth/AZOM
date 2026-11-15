@@ -100,6 +100,9 @@ namespace MozaPlugin
                 // switches. See docs/protocol/devices/wheel-0x17.md § Group 0x42.
                 if (rawDeviceId == 0x71 && IsFsr1DisplayWheel)
                     _fsr1Cm1Mapping.TryFollowFsr1DashboardLog(text);
+                // Wheel heartbeat reports the multi-mode dial word (Table 2 Param 62).
+                if (rawDeviceId == 0x71)
+                    TryFollowMultiDialHeartbeat(text);
                 // A CM1 base-bridged dash reports its current page via the byte-identical
                 // "Table 7, Param 6 Written: N" log on dev 0x41 (0x14 swapped). Follow it.
                 if (rawDeviceId == 0x41 && DashIsCm1)

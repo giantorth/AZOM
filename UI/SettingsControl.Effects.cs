@@ -276,21 +276,19 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Show the load-cell-only Sim Input controls (Sensor Output Ratio + Max
-        /// Threshold) only when the selected pedal is a BRAKE — a throttle/clutch
-        /// has no pressure sensor. Pedal travel, endstop, the output curve and
-        /// Pedal Feel all stay visible for every pedal mode.
+        /// Show the load-cell Sim Input controls (Sensor Output Ratio + Max
+        /// Threshold) for any active pedal, whatever its role. Pedal travel,
+        /// endstop, the output curve and Pedal Feel stay visible for every pedal.
         /// </summary>
         private void UpdateMBoosterConfigVisibilityForRole()
         {
             string? rolePrefix = MBoosterSelectedPedalRolePrefix();
-            bool isBrake = rolePrefix == "brake";
             bool isThrottle = rolePrefix == "throttle";
             bool isClutch = rolePrefix == "clutch";
-            // A passive Brake-role pedal has no load cell of its own; these
-            // would set the active pedal's.
+            // A passive pedal has no load cell of its own; these would set the
+            // active pedal's.
             bool ownsLoadCell = CurrentMBoosterController()?.OwnsSingletonRegisters(_mboosterEffectPedalIndex) ?? false;
-            MBoosterBrakeOnlyPanel.Visibility = isBrake && ownsLoadCell ? Visibility.Visible : Visibility.Collapsed;
+            MBoosterLoadCellPanel.Visibility = ownsLoadCell ? Visibility.Visible : Visibility.Collapsed;
 
             // Max Force/Deadzone slider bounds are role-scoped: Throttle and
             // Clutch are both much lighter springs than a brake's load cell,
@@ -354,7 +352,7 @@ namespace MozaPlugin.UI
 
         // Force every device-gated mBooster panel visible for the no-hardware
         // demo case (Show-all-tabs with nothing connected). Deliberately shows
-        // the role-specific panels too (effects cards, brake-only Sim Input) so
+        // the role-specific panels too (effects cards, load-cell Sim Input) so
         // the whole surface is demonstrable — the normal device-driven path
         // (RefreshMBoosterTab + the role/passive updaters) re-gates them the
         // moment a real device appears, so this never fights real functionality.
@@ -366,7 +364,7 @@ namespace MozaPlugin.UI
             MBoosterDeviceRowsList.IsEnabled = true;
             MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
-            MBoosterBrakeOnlyPanel.Visibility = Visibility.Visible;
+            MBoosterLoadCellPanel.Visibility = Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = Visibility.Visible;
             MBoosterDeadzoneMaxForcePanel.Visibility = Visibility.Visible;
             MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;

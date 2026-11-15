@@ -45,7 +45,7 @@ namespace MozaPlugin.Devices.MBooster
         public enum Phase { Waiting, Armed, Releasing }
 
         // Pedal position (0..1) counted as "clutch fully in".
-        internal const double ClutchInLevel = 0.9;
+        internal const double ClutchInLevel = 0.95;
         // Below this the car counts as stopped.
         internal const double StandstillKmh = 0.5;
         // Rise over the standstill speed that starts the fitted window...
@@ -105,6 +105,8 @@ namespace MozaPlugin.Devices.MBooster
                         _baselineKmh = speedKmh;
                         _onsetPedal = double.NaN;
                         _histCount = 0;
+                        // Anchors the release rate even when the onset comes on the next frame.
+                        Record(Stopwatch.GetTimestamp(), pedal01, 0);
                         Current = Phase.Releasing;
                     }
                     break;

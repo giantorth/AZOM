@@ -821,9 +821,17 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
 
-                            <ctrl:SectionCard x:Name="FfbEqCard" Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbEqualizer}"
+                            <ctrl:SectionCard Grid.Column="0" Title="{x:Static res:Strings.Section_FfbEqualizer}"
                                               Icon="{StaticResource IconEq}" Margin="0,0,7,14">
+                                <ctrl:SectionCard.Header>
+                                    <!-- cmd 0x36 FFB style; Ultra bases on fw >= 1.2.12.0 only -->
+                                    <ctrl:SegmentedControl x:Name="FfbStyleSelector" Visibility="Collapsed"
+                                                           SelectionChanged="FfbStyleSelector_Changed">
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleSoft}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleNormal}"/>
+                                        <ListBoxItem Content="{x:Static res:Strings.Option_FfbStyleStrong}"/>
+                                    </ctrl:SegmentedControl>
+                                </ctrl:SectionCard.Header>
                                 <StackPanel>
                                     <ctrl:MozaCurveEditor x:Name="FfbEqualizer"
                                                           Style="{StaticResource MozaEqualizerLineStyle}"
@@ -866,7 +874,6 @@
                             </ctrl:SectionCard>
 
                             <ctrl:SectionCard Grid.Column="1" Title="{x:Static res:Strings.Section_FfbOutputCurve}"
-                                              Subtitle="{x:Static res:Strings.Subtitle_FfbOutputCurve}"
                                               Icon="{StaticResource IconCurve}"
                                               AccentBrush="{StaticResource GreenBrush}" Margin="7,0,0,14">
                                 <StackPanel>
@@ -2601,11 +2608,10 @@
                                             <Button Content="{x:Static res:Strings.Button_Parabolic}" Click="MBoosterCurvePreset_Parabolic"/>
                                         </StackPanel>
 
-                                        <!-- Sensor Output Ratio + Max Threshold are load-cell / pressure-
-                                             sensor settings that only a BRAKE has — hidden for throttle/
-                                             clutch pedals (see UpdateMBoosterConfigVisibilityForRole). The
-                                             output curve above applies to every pedal mode. -->
-                                        <StackPanel x:Name="MBoosterBrakeOnlyPanel">
+                                        <!-- Sensor Output Ratio + Max Threshold: load-cell settings, shown for
+                                             any active pedal, hidden for passive ones (see
+                                             UpdateMBoosterConfigVisibilityForRole). -->
+                                        <StackPanel x:Name="MBoosterLoadCellPanel">
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
@@ -2641,7 +2647,7 @@
                                                      KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                      Text="100"/>
                                         </Grid>
-                                        </StackPanel><!-- MBoosterBrakeOnlyPanel -->
+                                        </StackPanel><!-- MBoosterLoadCellPanel -->
 
                                         <!-- Data-store sliders, driven by MBoosterCurveEditor: Y1 is the
                                              start point (pinned 0), Y2..Y6 = device y1..y5, X1/X6 = Min/Max. -->
@@ -4198,7 +4204,7 @@
                                                   SelectionChanged="DefaultTabCombo_Changed"/>
                                     </Grid>
                                     <!-- Status line (firmware note) is long and wraps under the selector. -->
-                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4">
+                                    <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4221,7 +4227,7 @@
                                     </Grid>
                                     <!-- What drives the S12: the plugin's S12 tab, or ShakeIt
                                          as one device per pedal / one combined device. -->
-                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4">
+                                    <Grid x:Name="PedalHapticsSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4245,7 +4251,7 @@
                                     </Grid>
                                     <!-- What drives the mBooster vibrations: the plugin's mBooster
                                          tab, or ShakeIt as one device with a channel per pedal role. -->
-                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4">
+                                    <Grid x:Name="MBoosterSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4266,20 +4272,7 @@
                                                    Style="{StaticResource MutedHintText}"
                                                    Margin="0,6,0,0" TextWrapping="Wrap"/>
                                     </Grid>
-                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
-                                         Persistent base-side state, read back from the device
-                                         rather than stored in settings — so the toggle shows what
-                                         the base actually holds, including a value PitHouse set. -->
-                                    <Grid Margin="0,8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
-                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
-                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
-                                    </Grid>
-                                    <Grid Margin="0,8">
+                                    <Grid x:Name="Ab9DetectionRow" Margin="0,8" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
                                             <ColumnDefinition Width="*"/>
@@ -4287,6 +4280,19 @@
                                         <TextBlock Text="{x:Static res:Strings.SliderLabel_Ab9Detection}" Style="{StaticResource SliderLabel}"/>
                                         <ctrl:OffOnToggle Grid.Column="1" x:Name="Ab9DetectionCheck" VerticalAlignment="Center"
                                                   Checked="Ab9DetectionCheck_Changed" Unchecked="Ab9DetectionCheck_Changed"/>
+                                    </Grid>
+                                    <!-- Wheelbase compat mode (main dev 0x12, group 0x1F cmd 19/23).
+                                         Persistent base-side state, read back from the device
+                                         rather than stored in settings — so the toggle shows what
+                                         the base actually holds, including a value PitHouse set. -->
+                                    <Grid x:Name="ForzaCompatRow" Margin="0,8" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_ForzaCompatMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="ForzaCompatCheck" VerticalAlignment="Center"
+                                                  Checked="ForzaCompatCheck_Changed" Unchecked="ForzaCompatCheck_Changed"/>
                                     </Grid>
                                     <Grid Margin="0,4">
                                         <Grid.ColumnDefinitions>

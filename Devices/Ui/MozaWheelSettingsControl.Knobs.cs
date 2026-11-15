@@ -26,10 +26,25 @@ namespace MozaPlugin.Devices.Ui
     //   • "wheel-knob-bg-color{ledIndex+1}" for each ring LED
     public partial class MozaWheelSettingsControl
     {
+        // Per-knob BUTTON / KNOB / MULTI-MODE selector row; built for the Knobs tab and the Inputs tab.
+        private const int SignalChipMultiMode = 2;
+
+        private sealed class KnobSignalSet
+        {
+            public readonly UniformGrid Grid;
+            public readonly Border[] Cards;
+            public readonly SegmentedControl[] Chips;
+            public KnobSignalSet(UniformGrid grid, int max)
+            {
+                Grid = grid;
+                Cards = new Border[max];
+                Chips = new SegmentedControl[max];
+            }
+        }
+
         private KnobRingViz[]? _wiKnobViz;
         private Border[]? _wiKnobViewWrappers;       // per-knob colours card (selection highlight)
-        private Border[]? _wiKnobSignalCardWrappers; // per-knob signal-mode card (no selection state)
-        private SegmentedControl[]? _wiKnobSignalChips;  // Btn/Knob chip inside each signal-mode card
+        private KnobSignalSet[]? _wiKnobSignalSets;
         private int _wiSelectedKnob = -1;
         private int _wiSelectedSlot = -1;       // -2 = centre, 0..(N-1) = ring slot
         private bool _wiKnobsBuilt;
@@ -40,89 +55,21 @@ namespace MozaPlugin.Devices.Ui
             int max = MozaData.WheelKnobMax;
             _wiKnobViz = new KnobRingViz[max];
             _wiKnobViewWrappers = new Border[max];
-            _wiKnobSignalCardWrappers = new Border[max];
-            _wiKnobSignalChips = new SegmentedControl[max];
 
             var borderBrush = (Brush)(TryFindResource("BorderBrush") ?? Brushes.Transparent);
             var bgCard2Brush = (Brush)(TryFindResource("BgCard2Brush") ?? Brushes.Transparent);
             var textDimBrush = (Brush)(TryFindResource("TextDimBrush") ?? Brushes.Gray);
             var textFaintBrush = (Brush)(TryFindResource("TextFaintBrush") ?? Brushes.Gray);
 
+            var sets = new System.Collections.Generic.List<KnobSignalSet>(2);
+            foreach (var grid in new[] { WiSignalModeGrid, WiInputsSignalModeGrid })
+                if (grid != null)
+                    sets.Add(BuildKnobSignalSet(grid, max, borderBrush, bgCard2Brush, textFaintBrush));
+            _wiKnobSignalSets = sets.ToArray();
+
             for (int k = 0; k < max; k++)
             {
                 int knobIdx = k;
-
-                // ===== Signal-mode card (top grid) =====
-                // Override the default ItemsPanel (Horizontal StackPanel) with a
-                // 2-column UniformGrid so the two segments split the chip width
-                // equally — the chip itself stretches to the card width.
-                var chip = new SegmentedControl
-                {
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    ItemsPanel = (ItemsPanelTemplate)XamlReader.Parse(
-                        "<ItemsPanelTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">" +
-                            "<UniformGrid Columns=\"2\" Rows=\"1\"/>" +
-                        "</ItemsPanelTemplate>"),
-                };
-                chip.Items.Add(new ListBoxItem
-                {
-                    Content = "BUTTON",
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                });
-                chip.Items.Add(new ListBoxItem
-                {
-                    Content = "KNOB",
-                    HorizontalContentAlignment = HorizontalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                });
-                chip.SelectionChanged += (_, __) =>
-                {
-                    if (_suppressEvents) return;
-                    int v = chip.SelectedIndex;
-                    if (v < 0) return;
-                    WriteWiKnobSignalMode(knobIdx, v);
-                };
-                // A ListBox raises SelectionChanged only when the selection MOVES, so
-                // clicking the segment that is already lit is silent — no event, no
-                // frame, nothing. That is precisely the click a user makes when the
-                // wheel disagrees with what the tab shows, and it is the one that has
-                // to reach the wheel. Tunnelled Down (not Up) so SelectedIndex is still
-                // the pre-click value: equal means the selection is about to not move,
-                // which is the case SelectionChanged will not cover.
-                chip.PreviewMouseLeftButtonDown += (s, e) =>
-                {
-                    if (_suppressEvents) return;
-                    int clicked = SegmentIndexFromSource(chip, e.OriginalSource);
-                    if (clicked < 0 || clicked != chip.SelectedIndex) return;
-                    WriteWiKnobSignalMode(knobIdx, clicked, force: true);
-                };
-                _wiKnobSignalChips[k] = chip;
-
-                var signalCard = new Border
-                {
-                    Margin = new Thickness(4),
-                    Padding = new Thickness(10),
-                    CornerRadius = new CornerRadius(5),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = borderBrush,
-                    Background = bgCard2Brush,
-                };
-                var signalStack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
-                signalStack.Children.Add(new TextBlock
-                {
-                    Text = $"KNOB {knobIdx + 1}",
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    FontSize = 10,
-                    FontWeight = FontWeights.SemiBold,
-                    Foreground = textFaintBrush,
-                    Margin = new Thickness(0, 0, 0, 8),
-                });
-                signalStack.Children.Add(chip);
-                signalCard.Child = signalStack;
-                _wiKnobSignalCardWrappers[k] = signalCard;
-                if (WiSignalModeGrid != null)
-                    WiSignalModeGrid.Children.Add(signalCard);
 
                 // ===== Colours card (bottom grid) =====
                 // Seed with 12 slots so the viz renders something before the
@@ -171,6 +118,82 @@ namespace MozaPlugin.Devices.Ui
             if (WiKnobPalette != null)
                 WiKnobPalette.ColorChanged += (_, c) => OnPaletteColorPicked(c);
             _wiKnobsBuilt = true;
+        }
+
+        private KnobSignalSet BuildKnobSignalSet(UniformGrid grid, int max,
+            Brush borderBrush, Brush bgCard2Brush, Brush textFaintBrush)
+        {
+            var set = new KnobSignalSet(grid, max);
+            for (int k = 0; k < max; k++)
+            {
+                int knobIdx = k;
+
+                // Vertical stack of full-width segments (one-column UniformGrid; a
+                // collapsed MULTI-MODE item takes no row on wheels without the dial).
+                var chip = new SegmentedControl
+                {
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    ItemsPanel = (ItemsPanelTemplate)XamlReader.Parse(
+                        "<ItemsPanelTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">" +
+                            "<UniformGrid Columns=\"1\"/>" +
+                        "</ItemsPanelTemplate>"),
+                };
+                foreach (var label in new[] { "BUTTON", "KNOB", "MULTI-MODE" })
+                    chip.Items.Add(new ListBoxItem
+                    {
+                        Content = label,
+                        Margin = new Thickness(0, 1, 0, 1),
+                        HorizontalContentAlignment = HorizontalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                    });
+                chip.SelectionChanged += (_, __) =>
+                {
+                    if (_suppressEvents) return;
+                    int v = chip.SelectedIndex;
+                    if (v < 0) return;
+                    SelectKnobSignalChip(knobIdx, v);
+                };
+                // A ListBox raises SelectionChanged only when the selection MOVES, so
+                // clicking the segment that is already lit is silent — no event, no
+                // frame, nothing. That is precisely the click a user makes when the
+                // wheel disagrees with what the tab shows, and it is the one that has
+                // to reach the wheel. Tunnelled Down (not Up) so SelectedIndex is still
+                // the pre-click value: equal means the selection is about to not move,
+                // which is the case SelectionChanged will not cover.
+                chip.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    if (_suppressEvents) return;
+                    int clicked = SegmentIndexFromSource(chip, e.OriginalSource);
+                    if (clicked < 0 || clicked != chip.SelectedIndex) return;
+                    SelectKnobSignalChip(knobIdx, clicked, force: true);
+                };
+                set.Chips[k] = chip;
+
+                var card = new Border
+                {
+                    Margin = new Thickness(4),
+                    Padding = new Thickness(10),
+                    CornerRadius = new CornerRadius(5),
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = borderBrush,
+                    Background = bgCard2Brush,
+                };
+                var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
+                stack.Children.Add(new TextBlock
+                {
+                    Text = $"KNOB {knobIdx + 1}",
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    FontSize = 10,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = textFaintBrush,
+                    Margin = new Thickness(0, 0, 0, 8),
+                });
+                stack.Children.Add(chip);
+                card.Child = stack;
+                set.Cards[k] = card;
+                grid.Children.Add(card);
+            }
+            return set;
         }
 
         // How many BUTTON/KNOB selectors this wheel gets. The catalogued
@@ -224,36 +247,38 @@ namespace MozaPlugin.Devices.Ui
         // signal-mode cards for knobs that don't exist on this wheel.
         internal void SyncKnobSignalChips()
         {
-            if (!_wiKnobsBuilt || _wiKnobSignalChips == null
-                || _wiKnobSignalCardWrappers == null || _data == null) return;
+            if (!_wiKnobsBuilt || _wiKnobSignalSets == null || _data == null) return;
             bool perKnob = _data.WheelKnobSignalModeSupported;
             int encoderCount = ResolveKnobEncoderCount();
-            // Size the grid to the encoders, not the LED knobs, so a 3-encoder rim
-            // fills the row instead of leaving two phantom columns.
-            if (WiSignalModeGrid != null)
-            {
-                int cols = Math.Max(1, encoderCount);
-                if (WiSignalModeGrid.Columns != cols) WiSignalModeGrid.Columns = cols;
-                // Legacy mode hides the grid; the WiKnobModeLegacyPanel takes over
-                // (managed in MozaWheelSettingsControl.Inputs.cs).
-                WiSignalModeGrid.Visibility = (perKnob && encoderCount > 0)
-                    ? Visibility.Visible : Visibility.Collapsed;
-            }
             var ov = _plugin?.ActiveWheelProfile;
+            var model = _plugin?.WheelModelInfo;
+            int dialKnobs = model?.MultiDialKnobOrder?.Length ?? 0;
+            int dialKnob = Hardware.HardwareApplier.MultiDialForcedButtonKnob(_plugin?.ActiveWheelMultiDial, model);
             using (_suppressor.Begin())
+            foreach (var set in _wiKnobSignalSets)
             {
-                for (int k = 0; k < _wiKnobSignalChips.Length; k++)
+                // Size the grid to the encoders, not the LED knobs, so a 3-encoder rim
+                // fills the row instead of leaving two phantom columns.
+                int cols = Math.Max(1, encoderCount);
+                if (set.Grid.Columns != cols) set.Grid.Columns = cols;
+                // Legacy mode hides the grid; the legacy "All Rotaries" panel takes
+                // over (managed in MozaWheelSettingsControl.Inputs.cs).
+                set.Grid.Visibility = (perKnob && encoderCount > 0)
+                    ? Visibility.Visible : Visibility.Collapsed;
+
+                for (int k = 0; k < set.Chips.Length; k++)
                 {
-                    var chip = _wiKnobSignalChips[k];
-                    var card = _wiKnobSignalCardWrappers[k];
-                    int v = ResolveKnobSignalMode(ov, k);
+                    var chip = set.Chips[k];
+                    var multi = (ListBoxItem)chip.Items[SignalChipMultiMode];
+                    multi.Visibility = k < dialKnobs ? Visibility.Visible : Visibility.Collapsed;
+                    int v = k == dialKnob ? SignalChipMultiMode : ResolveKnobSignalMode(ov, k);
                     bool present = k < encoderCount;
                     // Show every present knob's selector once firmware reports
                     // per-knob support. A not-yet-read value (-1) leaves the chip
                     // unselected rather than hidden, so a partial/late read can't
                     // leave the trailing knob boxes blank (only the first drawn).
                     bool show = perKnob && present;
-                    card.Visibility = present ? Visibility.Visible : Visibility.Collapsed;
+                    set.Cards[k].Visibility = present ? Visibility.Visible : Visibility.Collapsed;
                     chip.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                     int want = v >= 0 ? v : -1;
                     if (show && chip.SelectedIndex != want) chip.SelectedIndex = want;

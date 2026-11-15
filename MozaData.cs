@@ -452,6 +452,10 @@ namespace MozaPlugin
         public const int WheelKnobMax = 5;
         public readonly byte[][] WheelKnobPrimaryColors = InitColorArray(WheelKnobMax);
 
+        // Per-knob sleep-light breathing colour (cmd 0x1F 0x03 0x02 [knob]), knob in
+        // visual order. Shown while the knob idle effect is Breathing (2).
+        public readonly byte[][] WheelKnobBreathColors = InitColorArray(WheelKnobMax);
+
         // Per-LED knob ring (Inactive / background) colors. Up to 56 LEDs
         // (CS Pro 48, KS Pro 56). Readable + writable via wheel-knob-bg-color{1..56}.
         // Wire cmd: 0x1F 0x03 0x01 [N-1] [RGB] (cmd 0x1F sub 0x03 sub 0x01).
@@ -608,6 +612,16 @@ namespace MozaPlugin
         public volatile int BaseTorqueBoost = TorqueBoostUnread;
 
         public bool BaseTorqueBoosted => BaseTorqueBoost == 1 && BaseSupportsTorqueBoost;
+
+        // Minimum base firmware carrying the FFB style register (0x36).
+        public const int BaseFwFfbStyleMin = (1 << 24) | (2 << 16) | (12 << 8); // 1.2.12.0
+
+        /// <summary>True when this base has the FFB style register: any base on
+        /// firmware >= 1.2.12.0. Gates every 0x36 read and write.</summary>
+        public bool BaseSupportsFfbStyle => BaseFwVersion >= BaseFwFfbStyleMin;
+
+        // FFB style (cmd 0x36): -1 = not read, 0 = soft, 1 = normal, 2 = strong.
+        public volatile int FfbStyle = -1;
 
         /// <summary>The base's peak torque in Nm, including the torque boost once
         /// the base reports it unlocked; 0 when the model isn't established.</summary>
@@ -962,6 +976,7 @@ namespace MozaPlugin
                 case "base-state":          BaseState = value; break;
                 case "base-state-err":      BaseStateError = value; break;
                 case "base-torque-boost":   BaseTorqueBoost = value; break;
+                case "base-ffb-style":      FfbStyle = value; break;
 
                 // Core settings
                 case "base-limit":          Limit = value; BaseSettingsRead = true; break;
@@ -1292,6 +1307,13 @@ namespace MozaPlugin
                 if (idx >= 0 && idx < KnobRingLedMax && data.Length >= 3)
                     SetColor(KnobRingColors[idx], data);
             }
+            // Per-knob sleep-light breathing color (cmd 0x1F 0x03 0x02).
+            else if (commandName.StartsWith("wheel-knob-breath-color", StringComparison.Ordinal))
+            {
+                int idx = ParseTrailingIndex(commandName, "wheel-knob-breath-color");
+                if (idx >= 0 && idx < WheelKnobMax && data.Length >= 3)
+                    SetColor(WheelKnobBreathColors[idx], data);
+            }
             // Per-knob Active LED color (cmd 0x27, role=0). Command name shape
             // is "wheel-knob{N}-active-color" with N in 1..5. Cheap StartsWith
             // gate keeps the parse off the hot path for unrelated frames.
@@ -1566,6 +1588,7 @@ namespace MozaPlugin
             BaseMcuUid = System.Array.Empty<byte>();
             BaseIdentity11 = System.Array.Empty<byte>();
             BaseTorqueBoost = TorqueBoostUnread;
+            FfbStyle = -1;
             BaseMusicEnabled = -1;
             BaseMusicIndex = -1;
             BaseMusicVolume = -1;

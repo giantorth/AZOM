@@ -4,21 +4,46 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.4]
 
-## Added
+## Highlights
 
 - **Ford Mustang GTD wheel (W20) recognized;** correct RPM, button and knob-ring LED layout, dashboard telemetry and device picture.
-- **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
-- **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
+- **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game is open (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
 - **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
-- **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed.
-- **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
-- **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game runs (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
+- **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed (or Always), plus Lope and Smoothness for a lumpy, uneven idle.
+
+## Added
+
+### HMA150 motion platform
+
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
 - **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
 - **HMA150 AI mode (SimHub Motion profile source, off by default);** the platform follows SimHub's heave, pitch and roll as positions, so heave holds and nothing springs back. Tilt, travel and speed are kept to what game mode does.
 - **HMA150 AI mode max performance (off by default);** follows the profile's full angles with no speed limit. The rig is likely to hop or shift with SimHub's settings at or close to maximum, so it carries a warning.
 - **HMA150 engine tick-over strength and engine vibration pitch (AI mode);** a low-rev heave pulse that hands over to the controller's engine vibration as revs rise, and a slider for a finer or coarser buzz. Turn off the SimHub profile's own engine vibration effect when using the tick-over.
 - **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
+- **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
+
+### Clutch bite point
+
+- **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
+- **Clutch Bite Point pulses when the clutch jumps past the bite point between readings** instead of staying silent.
+- **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
+- **Clutch bite point auto-calibration learns from normal launches;** releases taking 0.6 s or more over the whole travel now count, down from 1 s.
+- **Clutch bite zone stays between 5 % and 95 % travel;** a wide zone near either end no longer reaches the fully released or pressed clutch.
+
+### Wheelbase
+
+- **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
+- **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
+- **FFB style selector (Soft / Normal / Strong) on the FFB equalizer card;** bases on firmware 1.2.12 or newer, saved per profile.
+
+### Wheel
+
+- **Knob breathing colours;** one swatch per knob when the knob sleep light is set to Breathing, saved per wheel.
+- **Multi-mode dial on the Inputs tab (CS Pro, KS Pro, Mustang GTD, Vision GS);** set a knob to MULTI-MODE, include the thumb wheels and set control labels per position, saved per wheel.
+
+### Connection and detection
+
 - **Linux permission banner;** warns when your user can't open a MOZA serial or HID device node and names the missing udev rule.
 
 ## Changed
@@ -29,13 +54,11 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
-- **Clutch Bite Point pulses when the clutch jumps past the bite point between readings** instead of staying silent.
-- **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
+- **mBooster Sensor Output Ratio and Max Threshold show on active Throttle and Clutch pedals;** a threshold above Max Force no longer caps output below 100%.
 - **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
 - **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
 - **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.
 - **Wheel sleep light offers Off and Breathing only,** matching Pit House; the speed slider shows for Breathing.
-- **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
 
 ## [1.7.3]
 

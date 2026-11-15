@@ -69,6 +69,8 @@ namespace MozaPlugin.Protocol
             // cmd 0x39 Ultra-base +2 Nm torque boost (fw >= 1.2.12.4): 0 = stock,
             // 1 = unlocked. Read-only here.
             AddCommand("base-torque-boost",       "base", 40, 0xFF, new byte[] { 0x39 }, 2, "int");
+            // cmd 0x36 FFB style, Ultra bases on fw >= 1.2.12.0: 0 = soft, 1 = normal, 2 = strong.
+            AddCommand("base-ffb-style",          "base", 40, 41, new byte[] { 0x36 }, 2, "int");
 
             // FFB curve (read group 40, write group 41)
             AddCommand("base-ffb-curve-x1", "base", 40, 41, new byte[] { 34, 1 }, 1, "int");
@@ -315,6 +317,14 @@ namespace MozaPlugin.Protocol
             // Per-encoder rotary signal mode (newer firmware). Each knob independently: 0=Buttons, 1=Knob.
             for (byte i = 0; i < 5; i++)
                 AddCommand($"wheel-knob-signal-mode{i}", "wheel", 64, 63, new byte[] { 42, i }, 1, "int");
+            // Multi-mode thumb dial (cmd 0x28), write-only: the C0 71 28 read replies
+            // belong to the parity polls (see MozaPlugin.Inbound). Knob index is the
+            // firmware knob index (WheelModelInfo.MultiDialKnobOrder); side value = the
+            // side's own index when included, 0xFF when not.
+            AddCommand("wheel-multifn-enable",     "wheel", 0xFF, 63, new byte[] { 40, 0 },    1, "int");
+            AddCommand("wheel-multifn-knob",       "wheel", 0xFF, 63, new byte[] { 40, 1 },    1, "int");
+            AddCommand("wheel-multifn-left",       "wheel", 0xFF, 63, new byte[] { 40, 2, 0 }, 1, "int");
+            AddCommand("wheel-multifn-right",      "wheel", 0xFF, 63, new byte[] { 40, 2, 1 }, 1, "int");
             AddCommand("wheel-paddle-adaptive-mode","wheel",64, 63, new byte[] { 11 },         1, "int");
             AddCommand("wheel-paddle-button-mode", "wheel", 64, 63, new byte[] { 13 },         1, "int");
             // Clutch-paddle calibration (write-only): 08 01 = start, 08 02 = save.
@@ -368,6 +378,10 @@ namespace MozaPlugin.Protocol
             AddCommand("wheel-knob-idle-effect", "wheel", 64, 63, new byte[] { 29, 3 },       1, "int");
             for (byte i = 0; i < 56; i++)
                 AddCommand($"wheel-knob-bg-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x01, i }, 3, "array");
+            // Per-knob sleep-light breathing colour (bank 0x02 = idle effect 2), knob
+            // in visual order. Captured on a 4-knob rim: 1F 03 02 00..03.
+            for (byte i = 0; i < 5; i++)
+                AddCommand($"wheel-knob-breath-color{i + 1}", "wheel", 64, 63, new byte[] { 31, 3, 0x02, i }, 3, "array");
 
             // Wheel RPM blink colors (write-only, id [15, index])
             for (byte i = 0; i < 10; i++)

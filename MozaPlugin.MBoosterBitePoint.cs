@@ -26,8 +26,8 @@ namespace MozaPlugin
         // Automatic samples are only trusted from a slow release: detection
         // can't see delay in the game's own speed output, which a fast release
         // turns into a low reading.
-        // Pedal fraction per second (1.0 = full travel in one second).
-        private const double MaxAutoReleaseRatePerSec = 1.0;
+        // Pedal fraction per second: full travel in 0.6 s.
+        private const double MaxAutoReleaseRatePerSec = 1.0 / 0.6;
 
         // Clutch travel (%) within which an automatic sample agrees with an
         // inherited game calibration.
@@ -119,7 +119,7 @@ namespace MozaPlugin
         /// <summary>Where the trigger and calibration read the clutch. Changing it stops any run.</summary>
         internal MBoosterBitePointSource BitePointSource
         {
-            get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.MBoosterPedal;
+            get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.Game;
             set
             {
                 if (_settings == null || _settings.MBoosterBitePointSource == value) return;

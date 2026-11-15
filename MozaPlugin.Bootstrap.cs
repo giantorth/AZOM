@@ -894,6 +894,7 @@ namespace MozaPlugin
                 // Re-bound on every plugin reload so a reused persistent sender
                 // never holds a closure over a disposed plugin instance.
                 _telemetrySender.WheelModelInfoProvider = () => WheelModelInfo;
+                _telemetrySender.MultiDialLabelsReceived = OnWheelMultiDialLabels;
                 // Reset the start-request gate when the dashboard pipeline parks
                 // itself (sess=0x09 retry exhaust). Without this clear, the next
                 // wheel hot-swap or user toggle would early-out in

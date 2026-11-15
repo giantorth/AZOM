@@ -749,9 +749,9 @@ namespace MozaPlugin.Integration
                 return;
             }
 
-            // Prefer the wheel's reported slot; fall back to matching the active
-            // profile name against the slot list when the wheel slot is unknown.
-            int cur = _plugin.TelemetrySender?.WheelReportedSlot ?? -1;
+            // Prefer the slot on screen; fall back to matching the active profile name
+            // against the slot list when it is unknown.
+            int cur = _plugin.TelemetrySender?.ShowingSlot ?? -1;
             if (cur < 0 || cur >= n)
             {
                 cur = -1;

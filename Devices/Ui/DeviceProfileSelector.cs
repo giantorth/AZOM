@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 
 namespace MozaPlugin.Devices.Ui
 {
@@ -13,6 +14,12 @@ namespace MozaPlugin.Devices.Ui
     {
         internal static void Bind(FrameworkElement row, FrameworkElement list, object? store)
         {
+            // ProfileList's root wrapper carries a 30,15,30,0 margin sized for SimHub's
+            // own pages; drop it so the list sits flush in the tab strip.
+            if (list is ContentControl cc && cc.Content is FrameworkElement inner
+                && inner.Margin != default)
+                inner.Margin = default;
+
             if (!ReferenceEquals(list.DataContext, store))
             {
                 // ProfileList wires its inner combobox on DataContext change; clear first

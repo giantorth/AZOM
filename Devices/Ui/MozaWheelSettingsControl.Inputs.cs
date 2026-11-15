@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -13,9 +14,9 @@ namespace MozaPlugin.Devices.Ui
     // plugin-pane WheelTab. The plugin pane keeps its controls hidden so its
     // existing handlers don't fire; this file owns the per-device behaviour.
     //
-    // Per-knob rotary signal-mode rows belong on the Knobs sub-tab (since they
-    // describe knobs) — also driven from here so all knob/encoder UI ships
-    // through a single refresh path.
+    // Per-knob rotary signal-mode rows live on the Knobs sub-tab, with a clone
+    // at the bottom of this tab — also driven from here so all knob/encoder UI
+    // ships through a single refresh path.
     //
     // No forwarding to SettingsControl.Instance: all reads come from `_data`,
     // all writes go to `_plugin.WriteIfWheelDetected` + `_plugin.SaveSettings`
@@ -213,14 +214,21 @@ namespace MozaPlugin.Devices.Ui
             _plugin.SaveSettings();
         }
 
+        // Shared by the Knobs-tab and Inputs-tab "All Rotaries" combos.
         private void WiKnobModeCombo_Changed(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents || _plugin == null || _data == null) return;
-            int val = WiKnobModeCombo.SelectedIndex;
+            int val = ((Selector)sender).SelectedIndex;
+            if (val < 0) return;
             _data.WheelKnobMode = val;
             _plugin.UpdateActiveWheelProfile(o => o.WheelKnobMode = val);
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-knob-mode", val);
             _plugin.SaveSettings();
+            using (_suppressor.Begin())
+            {
+                SetComboSafe(WiKnobModeCombo, val);
+                SetComboSafe(WiInputsKnobModeCombo, val);
+            }
         }
 
         // force = the user clicked the segment that was already selected. That is a
@@ -239,6 +247,7 @@ namespace MozaPlugin.Devices.Ui
             int fwIndex = _plugin.WheelModelInfo?.SignalModeFirmwareIndex(index) ?? index;
             _plugin.HardwareApplier.WriteIfWheelDetected($"wheel-knob-signal-mode{fwIndex}", value, force);
             _plugin.SaveSettings();
+            SyncKnobSignalChips(); // mirror into the other tab's selector
         }
 
         // Old-protocol stick mode (ES + old-firmware new wheels): 0=Buttons, 1=D-Pad.
@@ -283,6 +292,10 @@ namespace MozaPlugin.Devices.Ui
                     Grid.SetColumnSpan(WiActiveButtonsCard, esWheel ? 2 : 1);
                     WiActiveButtonsCard.Margin = esWheel
                         ? new Thickness(0) : new Thickness(7, 0, 0, 0);
+                    Grid.SetColumn(WiJoystickCard, esWheel ? 0 : 1);
+                    Grid.SetColumnSpan(WiJoystickCard, esWheel ? 2 : 1);
+                    WiJoystickCard.Margin = esWheel
+                        ? new Thickness(0, 0, 0, 14) : new Thickness(7, 0, 0, 14);
                     // ES RPM indicator mode lives on this main page (the ES has no tabs).
                     EsIndicatorCard.Visibility = esWheel ? Visibility.Visible : Visibility.Collapsed;
                 }
@@ -308,21 +321,27 @@ namespace MozaPlugin.Devices.Ui
                     WiClutchPointValue.Text   = $"{clutchPoint}%";
 
                     bool perKnob = _data.WheelKnobSignalModeSupported;
-                    // Legacy "All Rotaries" panel lives in the knob settings card;
-                    // visible only when the wheel HAS encoders but does NOT support
-                    // per-knob signal mode. The encoder check is load-bearing now that
-                    // the card is no longer hidden wholesale on knob-LED-less rims —
-                    // without it, a wheel that answered neither read would still show
-                    // a selector that writes nowhere.
-                    WiKnobModeLegacyPanel.Visibility = (!perKnob && HasKnobEncoders())
-                        ? Visibility.Visible : Visibility.Collapsed;
+                    // Legacy "All Rotaries" panel: visible only when the wheel HAS
+                    // encoders but does NOT support per-knob signal mode. Without the
+                    // encoder check, a wheel that answered neither read would still
+                    // show a selector that writes nowhere.
+                    bool hasEncoders = HasKnobEncoders();
+                    var legacyVis = (!perKnob && hasEncoders) ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobModeLegacyPanel.Visibility = legacyVis;
+                    WiInputsKnobModeLegacyPanel.Visibility = legacyVis;
                     if (!perKnob)
                     {
-                        SetComboSafe(WiKnobModeCombo, ov != null && ov.WheelKnobMode >= 0
-                            ? ov.WheelKnobMode : _data.WheelKnobMode);
+                        int knobMode = ov != null && ov.WheelKnobMode >= 0
+                            ? ov.WheelKnobMode : _data.WheelKnobMode;
+                        SetComboSafe(WiKnobModeCombo, knobMode);
+                        SetComboSafe(WiInputsKnobModeCombo, knobMode);
                     }
                     SyncKnobSignalChips();
                 }
+                // Set outside the new-wheel branch: the ES keeps the Inputs tab visible.
+                WiInputsSignalModeCard.Visibility = newWheelDetected && HasKnobEncoders()
+                    ? Visibility.Visible : Visibility.Collapsed;
+                RefreshMultiDial(newWheelDetected);
 
                 // Left stick mode — shown for any detected wheel. The ES + old
                 // firmware report the 2-byte form (Buttons/D-Pad segmented); newer

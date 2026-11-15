@@ -141,9 +141,37 @@ namespace MozaPlugin.UI
         private void RefreshOptionsTab()
         {
             if (!OptionsTab.IsSelected) return;
+            ApplyOptionsDeviceRowVisibility();
             if (ForzaCompatCheck != null)
                 ForzaCompatCheck.IsChecked = _data.CompatMode == 1;
             UpdateWheelbaseLfeSourceStatus();
+        }
+
+        // Device-specific rows show only while their device is attached;
+        // ShowAllTabs forces them all on, like the device tabs.
+        private void ApplyOptionsDeviceRowVisibility()
+        {
+            bool all = _plugin.Settings?.ShowAllTabs == true;
+            bool baseOn = all || _plugin.IsBaseDetected;
+            SetRowVisible(WheelbaseLfeSourceRow, baseOn);
+            SetRowVisible(ForzaCompatRow, baseOn);
+            SetRowVisible(PedalHapticsSourceRow, all || _plugin.PedalHapticsRegistry?.AnyDetected == true);
+            SetRowVisible(MBoosterSourceRow, all || _plugin.MBoosterRegistry?.Devices.Count > 0);
+            SetRowVisible(Ab9DetectionRow, all || IsAb9Attached());
+        }
+
+        private static void SetRowVisible(UIElement row, bool visible)
+            => row.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        // Port enumeration too: with detection off the lane never opens the
+        // port, and the toggle must stay reachable to turn it back on.
+        private bool IsAb9Attached()
+        {
+            if (_plugin.IsAb9Detected || _plugin.Ab9Manager?.IsConnected == true) return true;
+            var ports = Protocol.MozaPortDiscovery.Instance.Enumerate();
+            for (int i = 0; i < ports.Count; i++)
+                if (Protocol.MozaUsbIds.IsAb9Pid(ports[i].Pid)) return true;
+            return false;
         }
 
         private void RedeployDefinitionsButton_Click(object sender, RoutedEventArgs e)

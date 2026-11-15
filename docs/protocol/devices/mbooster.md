@@ -362,12 +362,14 @@ registers instead: in KY3HK4QP the passive throttle page's 3.8/35.9 mm
 travel is exactly what the brake unit committed as Params 48/49. The UI
 hides them for a passive pedal, and `ApplyMBoosterToHardware` skips them
 for a non-motorized axis so values saved before that gate existed aren't
-still replayed on every connect. Max Threshold and Sensor Ratio used to be
-gated by role only (Brake), which let a PASSIVE Brake-role pedal — the
-active pedal's role set to something else — push its ratio/threshold onto
-the active pedal's load cell; they now need the Brake role AND load-cell
-ownership, in the apply, the UI write path and `MBoosterBrakeOnlyPanel`'s
-visibility.
+still replayed on every connect. Max Threshold and Sensor Ratio are gated
+on load-cell ownership alone, in the apply, the UI write path and
+`MBoosterLoadCellPanel`'s visibility. Every active pedal has a load cell
+whatever its role, and Pit House exports `<role>_press_combine` for each
+role. They used to also require the Brake role, which hid them on an
+active Throttle/Clutch pedal while the host-side Max Threshold rescale
+still applied the stored value (VYNRCAZ1: a hidden 50 kg threshold over a
+21 kg Max Force capped clutch output at 42%).
 
 Ownership (`OwnsSingletonRegisters`) follows Pit House's model rather than
 the once-a-minute type diagnostic: a unit's motor pedal is always its local
@@ -1811,7 +1813,9 @@ Threshold's effect is applied host-side.
   instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
   position — already 0–100% of Max Force's span — into 0–100% of
   Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
-  for AZOM's own telemetry; like any host-side remap it never reaches the
+  for AZOM's own telemetry. A Threshold at or above Max Force is a no-op:
+  the raw axis saturates at Max Force, so a higher Threshold could never
+  reach 100% (VYNRCAZ1). Passive pedals (no load cell) skip it; like any host-side remap it never reaches the
   game's view of the axis. The `mbooster-brake-threshold` write is still sent
   (harmless, matches whatever Pit House itself does with the field even if
   it isn't the mechanism that matters) but AZOM no longer depends on it.

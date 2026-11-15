@@ -49,9 +49,7 @@
   <data name="SliderLabel_Stiffness" xml:space="preserve"><value>Rigidez</value></data>
   <data name="SliderLabel_RetainGameFfb" xml:space="preserve"><value>Manter FFB do jogo</value></data>
   <data name="Section_FfbEqualizer" xml:space="preserve"><value>EQUALIZADOR DE FFB</value></data>
-  <data name="Subtitle_FfbEqualizer" xml:space="preserve"><value>// ganho por banda · 100% = neutro · 400% = reforço máx.</value></data>
   <data name="Section_FfbOutputCurve" xml:space="preserve"><value>CURVA DE SAÍDA DO FFB</value></data>
-  <data name="Subtitle_FfbOutputCurve" xml:space="preserve"><value>// arraste os 5 nós para moldar a resposta</value></data>
   <data name="Button_Linear" xml:space="preserve"><value>LINEAR</value></data>
   <data name="Button_SCurve" xml:space="preserve"><value>CURVA S</value></data>
   <data name="Button_Exponential" xml:space="preserve"><value>EXPONENCIAL</value></data>
@@ -678,7 +676,6 @@ Id: {2}</value></data>
   <data name="StalkKind_WiperStage" xml:space="preserve"><value>Estágio do limpador {0}</value></data>
   <data name="StalkKind_LightStage" xml:space="preserve"><value>Estágio dos faróis {0}</value></data>
   <data name="Status_UpdatePrChannelGone" xml:space="preserve"><value>PR fechado — alterado para Estável</value></data>
-  <data name="Subtitle_FfbEqualizer10" xml:space="preserve"><value>// ganho por banda · 100% = neutro · 500% = reforço máx.</value></data>
   <data name="Label_EqSensitivity" xml:space="preserve"><value>SENSIBILIDADE</value></data>
   <data name="Label_InputForce" xml:space="preserve"><value>Força de entrada</value></data>
   <data name="Label_IdleConstant" xml:space="preserve"><value>Inativo · Constante</value></data>
@@ -688,9 +685,9 @@ Id: {2}</value></data>
   <data name="SliderLabel_SleepSpeedMs" xml:space="preserve"><value>Velocidade da respiração (ms)</value></data>
   <data name="Section_IdleEffect" xml:space="preserve"><value>EFEITO INATIVO</value></data>
   <data name="SliderLabel_IdleAnimation" xml:space="preserve"><value>Animação inativa</value></data>
-  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>Fonte de LFE da base</value></data>
-  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Separador LFE do plugin</value></data>
-  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_WheelbaseLfeSource" xml:space="preserve"><value>LFE da base</value></data>
+  <data name="Option_WheelbaseLfeSourcePlugin" xml:space="preserve"><value>Separador do plugin</value></data>
+  <data name="Option_WheelbaseLfeSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_WheelbaseLfeShakeItUnavailable" xml:space="preserve"><value>Requer o SimHub 9.12 ou mais recente — está a ser usado o separador LFE do plug-in.</value></data>
   <data name="Status_WheelbaseLfeSourceRestartRequired" xml:space="preserve"><value>Definição de dispositivo atualizada. Reinicie o SimHub para aplicar.</value></data>
   <data name="SliderLabel_ForzaCompatMode" xml:space="preserve"><value>Compatibilidade com Forza Horizon</value></data>
@@ -836,10 +833,10 @@ Id: {2}</value></data>
   <data name="Label_GlobalSettings" xml:space="preserve"><value>Configurações globais</value></data>
   <data name="Status_WheelbaseLfeFirmwareTooOldFmt" xml:space="preserve"><value>Os efeitos de telemetria (vibração do motor, ABS e mudanças de velocidade através da base) requerem o firmware da base 1.2.10.10 ou mais recente. Esta base tem {0}. Atualize o firmware da base no Pit House para os usar.</value></data>
   <data name="TabHeader_PedalHaptics" xml:space="preserve"><value>Háptica S12</value></data>
-  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Háptica de pedais S12</value></data>
-  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Separador S12 do plugin</value></data>
-  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>ShakeIt por pedal</value></data>
-  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>ShakeIt combinado</value></data>
+  <data name="SliderLabel_PedalHapticsSource" xml:space="preserve"><value>Háptica de pedais</value></data>
+  <data name="Option_PedalHapticsSourcePlugin" xml:space="preserve"><value>Separador do plugin</value></data>
+  <data name="Option_PedalHapticsSourceShakeIt" xml:space="preserve"><value>Dispositivos separados</value></data>
+  <data name="Option_PedalHapticsSourceCombined" xml:space="preserve"><value>Dispositivo combinado</value></data>
   <data name="Status_PedalHapticsShakeItUnavailable" xml:space="preserve"><value>O ShakeIt requer o SimHub 9.12 ou mais recente — está a ser usado o separador S12 do plugin.</value></data>
   <data name="Section_PedalHapticsOutput" xml:space="preserve"><value>Saída em direto</value></data>
   <data name="SliderLabel_PulseLength" xml:space="preserve"><value>Duração do impulso</value></data>
@@ -855,9 +852,9 @@ Id: {2}</value></data>
   <data name="HubDevice_Unknown" xml:space="preserve"><value>Dispositivo 0x{0:X2}</value></data>
   <data name="HubPort_LossFormat" xml:space="preserve"><value>{0:0.#}% de perda</value></data>
   <data name="SliderLabel_DefaultTab" xml:space="preserve"><value>Aba padrão</value></data>
-  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>Vibração mBooster</value></data>
-  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Separador mBooster do plugin</value></data>
-  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>SimHub ShakeIt</value></data>
+  <data name="SliderLabel_MBoosterSource" xml:space="preserve"><value>mBooster</value></data>
+  <data name="Option_MBoosterSourcePlugin" xml:space="preserve"><value>Separador do plugin</value></data>
+  <data name="Option_MBoosterSourceShakeIt" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Status_MBoosterShakeItUnavailable" xml:space="preserve"><value>O ShakeIt requer o SimHub 9.12 ou mais recente — está a ser usado o separador mBooster do plugin.</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Title" xml:space="preserve"><value>mBooster não adicionado no SimHub</value></data>
   <data name="Banner_ProfileNotAddedMBooster_Body" xml:space="preserve"><value>Os pedais mBooster estão conectados e configurados para ShakeIt, mas o dispositivo mBooster não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
@@ -908,9 +905,11 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedFade" xml:space="preserve"><value>Gradual no ponto de engate</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Abaixo do ponto de engate</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Totalmente solta</value></data>
+  <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Sempre</value></data>
   <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindros</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frequência máx. (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensidade em marcha lenta (%)</value></data>
+  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsação (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Força em lombas</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>O Linux está bloqueando o acesso aos dispositivos MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Seu usuário do Linux não consegue abrir {0}, então o plugin não consegue se conectar a ele.</value></data>
@@ -926,4 +925,12 @@ Id: {2}</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Ao usar isto, desligue o efeito de vibração do motor no seu perfil do SimHub Motion, para que os dois não entrem em conflito.</value></data>
   <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Modo IA: desempenho máximo</value></data>
   <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. Com as definições do SimHub no máximo ou perto dele, é provável que o seu rig salte ou se desloque. Use por sua conta e risco.</value></data>
+  <data name="Label_FfbStyle" xml:space="preserve"><value>Estilo de FFB</value></data>
+  <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Suave</value></data>
+  <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Option_FfbStyleStrong" xml:space="preserve"><value>Forte</value></data>
+  <data name="SliderLabel_KnobIdleColor" xml:space="preserve"><value>Cor de repouso</value></data>
+  <data name="Section_MultiModeDial" xml:space="preserve"><value>KNOB MULTIMODO</value></data>
+  <data name="Label_ControlLabels" xml:space="preserve"><value>Rótulos dos controles</value></data>
+  <data name="Label_ThumbWheel" xml:space="preserve"><value>Roda de polegar</value></data>
 </root>

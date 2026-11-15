@@ -7,8 +7,9 @@ using MozaPlugin.Settings;
 namespace MozaPlugin.Telemetry
 {
     /// <summary>
-    /// Idle dashboard: a per-device dashboard shown while no game runs (optionally also
-    /// in game while not driving: paused, menus, replay, spectating), stored per
+    /// Idle dashboard: a per-device dashboard shown while no game is open (optionally
+    /// also in game while not driving: paused, menus, replay, spectating, or no
+    /// telemetry between stages), stored per
     /// device page (<see cref="MozaPluginSettings.IdleDashboardByPageGuid"/> /
     /// <see cref="MozaPluginSettings.IdleDashboardIndexByPageGuid"/> /
     /// <see cref="MozaPluginSettings.IdleDashboardWhenNotDrivingByPageGuid"/>), never on
@@ -20,8 +21,8 @@ namespace MozaPlugin.Telemetry
     /// <c>GetActiveFsr1Index</c>, <c>GetActiveCm1Index</c>) return the idle pick, so
     /// channel mappings, the dashboard list and the re-asserts follow the screen, while
     /// the profile's own pick stays untouched. Profile applies arriving while engaged are
-    /// held (<see cref="HoldWheel"/> / <see cref="HoldCm2"/>). When idle ends (game
-    /// starts, or driving resumes) the lane disengages and the profile's pick is
+    /// held (<see cref="HoldWheel"/> / <see cref="HoldCm2"/>). When idle ends (a game
+    /// opens, or driving resumes) the lane disengages and the profile's pick is
     /// re-applied.</para>
     ///
     /// <para>An explicit pick while engaged (dashboard list, cycle action, a switch made
@@ -73,15 +74,22 @@ namespace MozaPlugin.Telemetry
 
         private int _tickQueued;
 
+        // Game open = SimHub sees its process or its telemetry (the test SimHub's own
+        // "game process detected" dash start mode uses). GameRunning alone is telemetry
+        // only: RBR / DiRT drop it in their menus, which are "not driving", not "no game".
+        private volatile bool _gameOpen;
+        private long _lastFeedTicks;
+        private static readonly long FeedStaleTicks = TimeSpan.FromSeconds(3).Ticks;
+        private bool _lastGameOpen; // DataUpdate thread only
+
         // Not-driving clock from DataUpdate (0 = driving or no game). Settled after
         // NotDrivingSettleTicks so a brief menu/pause flag doesn't swap dashboards.
         private long _notDrivingSinceTicks;
         private int _notDrivingTickSent;
-        private bool _lastGameRunning; // DataUpdate thread only
         private static readonly long NotDrivingSettleTicks = TimeSpan.FromSeconds(3).Ticks;
 
-        // IsGameActive reads false until the first DataUpdate stamps the feed, so right
-        // after Init (a reload mid-game included) "no game" can't be trusted yet.
+        // The game-open flag reads false until the first DataUpdate stamps the feed, so
+        // right after Init (a reload mid-game included) "no game" can't be trusted yet.
         private readonly long _createdTicks = DateTime.UtcNow.Ticks;
         private static readonly long GameStateSettleTicks = TimeSpan.FromSeconds(5).Ticks;
         private bool GameStateKnown => DateTime.UtcNow.Ticks - _createdTicks >= GameStateSettleTicks;
@@ -321,16 +329,21 @@ namespace MozaPlugin.Telemetry
         }
 
         /// <summary>
-        /// DataUpdate: the game-start edge and the not-driving clock. A game that starts
-        /// in its menus counts as not driving at once, so the idle dashboard doesn't
-        /// drop and come back.
+        /// DataUpdate: the game open/close edges and the not-driving clock. Driving needs
+        /// live telemetry; an open game without it (menus between stages) is not driving.
+        /// A game that opens in its menus counts as not driving at once, so the idle
+        /// dashboard doesn't drop and come back.
         /// </summary>
-        internal void NoteGameData(bool gameRunning, bool driving)
+        internal void NoteGameData(bool gameRunning, bool processDetected, bool driving)
         {
-            bool started = gameRunning && !_lastGameRunning;
-            _lastGameRunning = gameRunning;
-            bool tick = started;
-            if (!gameRunning || driving)
+            bool open = gameRunning || processDetected;
+            Interlocked.Exchange(ref _lastFeedTicks, DateTime.UtcNow.Ticks);
+            _gameOpen = open;
+            bool started = open && !_lastGameOpen;
+            bool tick = open != _lastGameOpen;
+            _lastGameOpen = open;
+            driving &= gameRunning;
+            if (!open || driving)
             {
                 Interlocked.Exchange(ref _notDrivingSinceTicks, 0);
                 // Back to driving after a settled stop: swap now, not on the next poll.
@@ -360,10 +373,13 @@ namespace MozaPlugin.Telemetry
             }
         }
 
-        /// <summary>The page's idle dashboard applies now: no game, or (when enabled) in
-        /// game but not driving.</summary>
+        private bool GameOpen =>
+            _gameOpen && DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastFeedTicks) <= FeedStaleTicks;
+
+        /// <summary>The page's idle dashboard applies now: no game open, or (when enabled)
+        /// in game but not driving.</summary>
         private bool LaneIdle(Guid page) =>
-            !_plugin.IsGameActive || (NotDriving && WhenNotDriving(page));
+            !GameOpen || (NotDriving && WhenNotDriving(page));
 
         /// <summary>PollStatus: engage while idle, disengage and restore otherwise.</summary>
         internal void Tick()
@@ -431,8 +447,7 @@ namespace MozaPlugin.Telemetry
                 && string.Equals(prev.Name, slotName, StringComparison.OrdinalIgnoreCase);
             // Same rule as the profile apply: the display latches our frames only after
             // a host kind=4 this session.
-            bool bound = sender.LastEmittedKind4Slot >= 0
-                && (sender.WheelReportedSlot == slot || sender.LastEmittedKind4Slot == slot);
+            bool bound = sender.LastEmittedKind4Slot >= 0 && sender.ShowingSlot == slot;
             // Already engaged: only a fresh session (binding tracking reset on wheel
             // loss) needs the kind=4 again. Device-side switches stand the lane down
             // through WheelInitiatedSwitch; never fight one.
@@ -441,9 +456,9 @@ namespace MozaPlugin.Telemetry
 
             if (prev == null || prev.Page != page)
             {
-                int reported = sender.WheelReportedSlot;
-                _wheelPreIdleName = reported >= 0 && reported < list.Count
-                    ? list[reported]
+                int showing = sender.ShowingSlot;
+                _wheelPreIdleName = showing >= 0 && showing < list.Count
+                    ? list[showing]
                     : _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName;
             }
             // Before the switch: it stages settings and mappings through the getters.
@@ -499,7 +514,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
             int slot = IndexOf(list, name!);
-            if (slot < 0 || sender.WheelReportedSlot == slot) return;
+            if (slot < 0 || (sender.LastEmittedKind4Slot >= 0 && sender.ShowingSlot == slot)) return;
             MozaLog.Info($"[AZOM] Idle dashboard (wheel): restoring '{list[slot]}' (slot {slot})");
             if (!bindings.OnDashboardSwitched((uint)slot, sender))
                 _wheelRestorePending = true;
@@ -549,9 +564,8 @@ namespace MozaPlugin.Telemetry
             string slotName = list[slot];
             string? prev = _cm2;
             bool same = string.Equals(prev, slotName, StringComparison.OrdinalIgnoreCase);
-            // The CM2's own report wins over our last kind=4 (see ApplyProfileDashboardToCm2).
-            int showing = cm2.WheelReportedSlot >= 0 ? cm2.WheelReportedSlot : cm2.LastEmittedKind4Slot;
-            bool bound = cm2.LastEmittedKind4Slot >= 0 && showing == slot;
+            // Same rule as ApplyProfileDashboardToCm2.
+            bool bound = cm2.LastEmittedKind4Slot >= 0 && cm2.ShowingSlot == slot;
             // Already engaged: pipeline restarts are re-bound by TickCm2DashboardReassert
             // (which reads the idle name through ActiveCm2DashboardName); dash-side
             // switches stand the lane down through ActiveCm2DashboardName's setter.
@@ -560,7 +574,7 @@ namespace MozaPlugin.Telemetry
 
             if (prev == null)
             {
-                int reported = cm2.WheelReportedSlot;
+                int reported = cm2.ShowingSlot;
                 _cm2PreIdleName = reported >= 0 && reported < list.Count
                     ? list[reported]
                     : _plugin.SavedCm2DashboardName;
@@ -611,7 +625,7 @@ namespace MozaPlugin.Telemetry
                 return;
             }
             int slot = IndexOf(list, name!);
-            if (slot < 0 || cm2.WheelReportedSlot == slot) return;
+            if (slot < 0 || (cm2.LastEmittedKind4Slot >= 0 && cm2.ShowingSlot == slot)) return;
             MozaLog.Info($"[AZOM] Idle dashboard (CM2): restoring '{list[slot]}' (slot {slot})");
             if (!_plugin.OnCm2DashboardSwitched((uint)slot))
                 _cm2RestorePending = true;
@@ -732,7 +746,7 @@ namespace MozaPlugin.Telemetry
             if (parts.Count == 0 && engaged.Length == 0) return null;
             return $"{(parts.Count == 0 ? "(none set)" : string.Join(" ", parts))} | engaged: {(engaged.Length == 0 ? "none" : engaged)}"
                    + (yielded.Length > 0 ? $" | yielded: {yielded}" : "")
-                   + $" | game={(_plugin.IsGameActive ? (NotDriving ? "not driving" : "driving") : "no")}";
+                   + $" | game={(GameOpen ? (NotDriving ? "not driving" : "driving") : "no")}";
         }
     }
 }

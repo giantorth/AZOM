@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace MozaPlugin.Telemetry.Sessions
 {
@@ -140,6 +142,68 @@ namespace MozaPlugin.Telemetry.Sessions
             WriteU32LE(kv, 8, 0u);
             return WrapFfRecord(kv);
         }
+
+        /// <summary>Multi-mode dial label table (wheel stores it; sent b2h at session init).</summary>
+        public const uint MultiDialLabelsKind = 18;
+
+        /// <summary>
+        /// kind=18 multi-mode dial labels: the whole table, per position
+        /// <c>[idx:u32 BE] [len:u32 BE][left UTF-16BE] [len:u32 BE][right UTF-16BE]</c>.
+        /// Lengths and text are big-endian, unlike the LE envelope.
+        /// </summary>
+        public static byte[] BuildMultiDialLabelsBody(IReadOnlyList<(string Left, string Right)> labels)
+        {
+            var enc = Encoding.BigEndianUnicode;
+            var kv = new List<byte>(4 + labels.Count * 12);
+            kv.Add((byte)MultiDialLabelsKind); kv.Add(0); kv.Add(0); kv.Add(0);
+            for (int i = 0; i < labels.Count; i++)
+            {
+                AddU32BE(kv, (uint)i);
+                foreach (var text in new[] { labels[i].Left, labels[i].Right })
+                {
+                    byte[] b = enc.GetBytes(text ?? "");
+                    AddU32BE(kv, (uint)b.Length);
+                    kv.AddRange(b);
+                }
+            }
+            return WrapFfRecord(kv.ToArray());
+        }
+
+        /// <summary>Parse a kind=18 value (bytes after the kind) back into its label table.</summary>
+        public static bool TryParseMultiDialLabels(byte[] value, out List<(string Left, string Right)> labels)
+        {
+            labels = new List<(string, string)>();
+            var enc = Encoding.BigEndianUnicode;
+            int p = 0;
+            while (p < value.Length)
+            {
+                if (p + 4 > value.Length) return false;
+                p += 4; // index
+                var pair = new string[2];
+                for (int f = 0; f < 2; f++)
+                {
+                    if (p + 4 > value.Length) return false;
+                    uint len = ReadU32BE(value, p);
+                    p += 4;
+                    if (len > (uint)(value.Length - p) || (len & 1) != 0) return false;
+                    pair[f] = enc.GetString(value, p, (int)len);
+                    p += (int)len;
+                }
+                labels.Add((pair[0], pair[1]));
+            }
+            return true;
+        }
+
+        private static void AddU32BE(List<byte> buf, uint value)
+        {
+            buf.Add((byte)(value >> 24));
+            buf.Add((byte)(value >> 16));
+            buf.Add((byte)(value >> 8));
+            buf.Add((byte)value);
+        }
+
+        private static uint ReadU32BE(byte[] buf, int offset)
+            => (uint)(buf[offset] << 24 | buf[offset + 1] << 16 | buf[offset + 2] << 8 | buf[offset + 3]);
 
         /// <summary>Constant carried by the kind=7 init record.</summary>
         private const uint InitEnumValue = 3;
