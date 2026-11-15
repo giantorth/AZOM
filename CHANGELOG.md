@@ -17,6 +17,9 @@ All notable changes to the AZOM plugin are documented here.
 
 - **HMA150 heave from a SimHub Motion profile;** now sent as vertical acceleration, so bumps move the platform.
 - **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
+- **HMA150 AI mode (SimHub Motion profile source, off by default);** the platform follows SimHub's heave, pitch and roll as positions, so heave holds and nothing springs back. Tilt, travel and speed are kept to what game mode does.
+- **HMA150 AI mode max performance (off by default);** follows the profile's full angles with no speed limit. The rig is likely to hop or shift with SimHub's settings at or close to maximum, so it carries a warning.
+- **HMA150 engine tick-over strength and engine vibration pitch (AI mode);** a low-rev heave pulse that hands over to the controller's engine vibration as revs rise, and a slider for a finer or coarser buzz. Turn off the SimHub profile's own engine vibration effect when using the tick-over.
 - **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
 - **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
 

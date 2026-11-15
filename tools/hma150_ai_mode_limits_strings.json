@@ -1,0 +1,32 @@
+{
+  "Motion_Panel_AiMaxPerformance": {
+    "en": "AI mode max performance",
+    "de": "KI-Modus: maximale Leistung",
+    "el": "Λειτουργία AI: μέγιστη απόδοση",
+    "es": "Modo IA: máximo rendimiento",
+    "fr": "Mode IA : performances maximales",
+    "it": "Modalità IA: prestazioni massime",
+    "ko": "AI 모드 최대 성능",
+    "nb": "AI-modus: maks ytelse",
+    "pt": "Modo IA: desempenho máximo",
+    "qps-ploc": "Woof bark grr arf woof",
+    "ru": "Режим ИИ: максимальная производительность",
+    "vi": "Chế độ AI: hiệu năng tối đa",
+    "zh-Hans": "AI 模式最大性能"
+  },
+  "Motion_Panel_AiMaxPerformanceWarning": {
+    "en": "Max performance follows SimHub's full angles with no limit on speed. Your rig is likely to hop or shift with SimHub's settings at or close to maximum. Use at your own risk.",
+    "de": "Maximale Leistung folgt den vollen Winkeln von SimHub ohne Geschwindigkeitsbegrenzung. Bei SimHub-Einstellungen am oder nahe am Maximum wird Ihr Rig wahrscheinlich hüpfen oder verrutschen. Benutzung auf eigene Gefahr.",
+    "el": "Η μέγιστη απόδοση ακολουθεί τις πλήρεις γωνίες του SimHub χωρίς όριο ταχύτητας. Με τις ρυθμίσεις του SimHub στο μέγιστο ή κοντά σε αυτό, το rig σας είναι πιθανό να αναπηδήσει ή να μετακινηθεί. Χρήση με δική σας ευθύνη.",
+    "es": "El máximo rendimiento sigue los ángulos completos de SimHub sin límite de velocidad. Con los ajustes de SimHub al máximo o cerca de él, es probable que tu rig salte o se desplace. Úsalo bajo tu propia responsabilidad.",
+    "fr": "Les performances maximales suivent les angles complets de SimHub sans limite de vitesse. Avec les réglages de SimHub au maximum ou proches du maximum, votre rig risque de sauter ou de se déplacer. À utiliser à vos risques et périls.",
+    "it": "Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.",
+    "ko": "최대 성능은 속도 제한 없이 SimHub의 전체 각도를 따릅니다. SimHub 설정이 최대이거나 최대에 가까우면 리그가 튀거나 밀릴 가능성이 높습니다. 사용에 따른 위험은 본인이 부담합니다.",
+    "nb": "Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.",
+    "pt": "O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. Com as definições do SimHub no máximo ou perto dele, é provável que o seu rig salte ou se desloque. Use por sua conta e risco.",
+    "qps-ploc": "Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf woof bark grr arf woof bark. Woof bark grr arf woof.",
+    "ru": "Максимальная производительность следует полным углам SimHub без ограничения скорости. При настройках SimHub на максимуме или близко к нему ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.",
+    "vi": "Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.",
+    "zh-Hans": "最大性能会跟随 SimHub 的完整角度，且不限制速度。当 SimHub 的设置处于或接近最大值时，您的设备很可能会跳动或移位。使用风险自负。"
+  }
+}

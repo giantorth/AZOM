@@ -159,6 +159,19 @@ namespace MozaPlugin.Integration.Motion
                 if (s != null) s.SlowManualControl = SlowManualCheck.IsChecked == true;
             };
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
+            AiPoseCheck.IsChecked = settings?.AiPoseMode ?? false;
+            AiPoseCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.AiPoseMode = AiPoseCheck.IsChecked == true;
+                UpdateCornerHapticsEnabled();
+            };
+            AiMaxPerformanceCheck.IsChecked = settings?.AiMaxPerformance ?? false;
+            AiMaxPerformanceCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.AiMaxPerformance = AiMaxPerformanceCheck.IsChecked == true;
+            };
             SyncCrestSlider();
             UpdateCornerHapticsEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
@@ -173,28 +186,40 @@ namespace MozaPlugin.Integration.Motion
                 var s = _output?.Settings;
                 if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
             };
-            CrestBoostSlider.ValueChanged += (_, __) =>
+            WireIntSlider(CrestBoostSlider, CrestBoostValue, (st, v) => st.CrestBoost = v);
+            WireIntSlider(EnginePitchSlider, EnginePitchValue, (st, v) => st.EngineVibrationPitch = v);
+            WireIntSlider(EngineTickSlider, EngineTickValue, (st, v) => st.EngineTickover = v);
+        }
+
+        /// <summary>A whole-number slider with its value label, stored into the output's settings.</summary>
+        private void WireIntSlider(Slider slider, TextBlock label, Action<MozaHma150OutputSettings, int> store)
+        {
+            slider.ValueChanged += (_, __) =>
             {
                 if (_crestSyncing) return;
-                int value = (int)Math.Round(CrestBoostSlider.Value);
+                int value = (int)Math.Round(slider.Value);
                 // Re-set as the local value: WPF drops a drag's "current" value when the page
                 // unloads and raises ValueChanged with the stale local one, which got saved.
                 _crestSyncing = true;
-                try { CrestBoostSlider.Value = value; }
+                try { slider.Value = value; }
                 finally { _crestSyncing = false; }
-                CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+                label.Text = value.ToString(CultureInfo.CurrentCulture);
                 var s = _output?.Settings;
-                if (s != null) s.CrestBoost = value;
+                if (s != null) store(s, value);
             };
         }
 
         private void SyncCrestSlider()
         {
             int value = _output?.Settings?.CrestBoost ?? 0;
+            int pitch = _output?.Settings?.EngineVibrationPitch ?? 50;
+            int tick = _output?.Settings?.EngineTickover ?? 0;
             _crestSyncing = true;
-            try { CrestBoostSlider.Value = value; }
+            try { CrestBoostSlider.Value = value; EnginePitchSlider.Value = pitch; EngineTickSlider.Value = tick; }
             finally { _crestSyncing = false; }
             CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+            EnginePitchValue.Text = pitch.ToString(CultureInfo.CurrentCulture);
+            EngineTickValue.Text = tick.ToString(CultureInfo.CurrentCulture);
         }
 
         /// <summary>The haptics choice and the crest strength only apply to the pose source.</summary>
@@ -203,6 +228,15 @@ namespace MozaPlugin.Integration.Motion
             bool pose = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
             CornerHapticsCheck.IsEnabled = pose;
             CrestBoostSlider.IsEnabled = pose;
+            // AI mode belongs to the pose source; the engine pitch and tick-over only exist in AI mode.
+            bool ai = pose && _output?.Settings?.AiPoseMode == true;
+            AiPoseCheck.IsEnabled = pose;
+            EnginePitchSlider.IsEnabled = ai;
+            EngineTickSlider.IsEnabled = ai;
+            EngineTickNote.IsEnabled = ai;
+            AiMaxPerformanceCheck.IsEnabled = ai;
+            // The warning's own colour ignores IsEnabled, so it is dimmed by hand.
+            AiMaxPerformanceWarning.Opacity = ai ? 1.0 : 0.4;
         }
 
         // ------------------------------------------------------------ motion effects

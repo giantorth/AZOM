@@ -26,7 +26,19 @@ mode:N`; every actuator follows with `Actuator Set curr mode:N`.
 | `5` | armed (transitional) | never written directly; the controller passes through 5 on the way to 1, 7, 8 or 13 (`Controller Set curr mode:5` always precedes the target) | — | all captures |
 | `7` | travel self-check | host write 3–10 s after the config push on connect (`100_STROKE` begins mid-session with one) | `CtrlMode:6`; error 259 "Travel Not Check" raised then cleared on `selfCheckSuccess`; firmware prints `pitch_offset / roll_offset`; flag `0x80` while running; ~1.6–2 s | `Startup-Shutdown` 37.3 s, `nurburgring` 7.0 s, `100_STROKE` 2.9 s |
 | `8` | port self-test | host write after the user clicks *Configure to Self-Test* (preceded by mode 5 + the `0x1E/02` role writes) | each actuator moves in turn so the user can confirm the port mapping; ~14 s; flag `0x20` | `Selftest` 5.9 s, `ports and self test` 22.6 s |
+| `11` (`0x0B`) | **AI mode** | host write; never sent by Motion Manager in our captures (its "AI Motion" feature was off). Entered like game mode: `set mode 11` passes through 3 and arrives ~3.5 s later, with or without a `0x22/00` stream | `ModelMode Set CtrlMode:7`; the `0x22/00` frame is followed as a pose — f0/f1 as platform angles 1:1, f6 as a held heave position — see [`game-stream-0x22.md`](game-stream-0x22.md) | bench 12–13 Nov 2026 (fw 2.35), then track sessions |
+| `12` (`0x0C`) | flight-sim game | host write, entered like game mode with the `0x22/01` frame | `ModelMode Set CtrlMode:8`; heave washes out as in mode 1, pitch holds | bench 12 Nov 2026 |
 | `13` (`0x0D`) | standby | host write on *Close* (and the controller's own power-on state) | motors disabled: actuators log `Set MotorMode to:0` / `MotorMode From 12 to 0`; `CtrlMode:1` | `Startup-Shutdown` 49.1 s, `100_STROKE` 64.9 s |
+
+Motion Manager's embedded command table (`SuSetCfg_SafetyControl`, `requestCmdIds` `[30, 3]` =
+`0x1E/03`) names every value of the mode byte: 0 idle, 1 racing-sim game, 2 manual pose control,
+3 return to centre, 4 emergency stop, 5 return to zero, 6 pose calibration, 7 travel self-check
+calibration, 8 port calibration, 9 power-loss soft descent, 10 fault (unused on this controller),
+11 AI mode, 12 flight-sim game, 13 sleep. Only 0–3, 7, 8 and 11–13 have been written by a host
+here; 4, 5, 6, 9 and 10 are safety and calibration states and have not been tried. The same table
+gives `SuSetCfg_Performace_Mode` `[30, 9]` (0 high, 1 low; this rig reads 0) and
+`Su_GetPlatformGesture` `[33, 4]` (heave, pitch, roll floats "for VR compensation"), which fw 2.35
+does not answer in modes 0, 11 or 12.
 
 Leaving 13 (power-on, or Motion Manager connecting) logs the reverse: `Set MotorMode to:12`,
 `MotorMode From 0 to 12`, then `Controller Set curr mode:5` → `0`.
