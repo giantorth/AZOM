@@ -189,6 +189,61 @@ namespace MozaPlugin.Integration.Motion
             WireIntSlider(CrestBoostSlider, CrestBoostValue, (st, v) => st.CrestBoost = v);
             WireIntSlider(EnginePitchSlider, EnginePitchValue, (st, v) => st.EngineVibrationPitch = v);
             WireIntSlider(EngineTickSlider, EngineTickValue, (st, v) => st.EngineTickover = v);
+            WireMcSettings(settings);
+        }
+
+        // ------------------------------------------------------------ VR motion compensation
+
+        /// <summary>Rig measurements for SimHub's VR MC: SimHub-side output settings, nothing goes to the controller.</summary>
+        private void WireMcSettings(MozaHma150OutputSettings? settings)
+        {
+            WireMmBox(McRigLengthBox, settings?.McRigLengthMm, (st, v) => st.McRigLengthMm = v);
+            WireMmBox(McRigWidthBox, settings?.McRigWidthMm, (st, v) => st.McRigWidthMm = v);
+            WireMmBox(McSeatFromFrontBox, settings?.McSeatFromFrontMm, (st, v) => st.McSeatFromFrontMm = v);
+            WireMmBox(McSeatHeightBox, settings?.McSeatHeightMm, (st, v) => st.McSeatHeightMm = v);
+            McDrivenPoseCheck.IsEnabled = settings != null;
+            McDrivenPoseCheck.IsChecked = settings?.McUseDrivenPose ?? true;
+            McDrivenPoseCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.McUseDrivenPose = McDrivenPoseCheck.IsChecked == true;
+            };
+            ShowMcPivot();
+        }
+
+        /// <summary>A millimetre box stored on every valid edit (empty = 0, not set); an invalid entry is left unsaved.</summary>
+        private void WireMmBox(TextBox box, double? value, Action<MozaHma150OutputSettings, double> store)
+        {
+            box.IsEnabled = value.HasValue;
+            box.Text = value.HasValue && value.Value > 0 ? value.Value.ToString("0", CultureInfo.CurrentCulture) : "";
+            box.TextChanged += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s == null) return;
+                double mm = 0.0;
+                bool ok = string.IsNullOrWhiteSpace(box.Text) || (TryParse(box.Text, out mm) && mm >= 0 && mm <= 5000);
+                box.ClearValue(TextBox.BorderBrushProperty);
+                if (!ok)
+                {
+                    box.BorderBrush = Brushes.OrangeRed;
+                    return;
+                }
+                store(s, mm);
+                ShowMcPivot();
+            };
+        }
+
+        private void ShowMcPivot()
+        {
+            var s = _output?.Settings;
+            if (!Hma150MotionCompensation.HasPivot(s))
+            {
+                McPivotValue.Text = Strings.Motion_Panel_VrMcPivotUnset;
+                return;
+            }
+            Hma150MotionCompensation.Pivot(s!.McRigLengthMm, s.McSeatFromFrontMm, s.McSeatHeightMm,
+                out double surge, out _, out double heave);
+            McPivotValue.Text = string.Format(CultureInfo.CurrentCulture, Strings.Motion_Panel_VrMcPivotFmt, surge, heave);
         }
 
         /// <summary>A whole-number slider with its value label, stored into the output's settings.</summary>

@@ -953,6 +953,34 @@ namespace MozaPlugin.Devices.Motion
             f0 = (float)_aiLimiter.Pitch;
             f1 = (float)_aiLimiter.Roll;
             f6 = (float)AiPoseLimiter.Inverse(_aiLimiter.HeaveMm + tickMm, AiHeaveScaleMm, AiHeaveMaxShare);
+
+            // What the platform is expected to do, for SimHub's VR motion compensation. Heave as the
+            // controller levels it off (Inverse holds the ask within AiHeaveMaxShare); the tick-over
+            // pulse is a vibration, not a pose, so it is left out.
+            double heaveCap = AiHeaveScaleMm * AiHeaveMaxShare;
+            Volatile.Write(ref _drivenPose, new MotionDrivenPose
+            {
+                PitchTravelMm = _aiLimiter.IntendedPitchMm,
+                RollTravelMm = _aiLimiter.IntendedRollMm,
+                HeaveMm = Math.Max(-heaveCap, Math.Min(heaveCap, _aiLimiter.HeaveMm)),
+                ControllerHalfLengthMm = halfLength,
+                ControllerHalfWidthMm = halfWidth,
+                AtMs = now,
+            });
+        }
+
+        private MotionDrivenPose? _drivenPose;
+
+        /// <summary>
+        /// AI mode only: the pose last driven, if the lane streams AI mode and sent it within
+        /// <paramref name="maxAgeMs"/>; null otherwise (game mode, manual mode, not streaming).
+        /// </summary>
+        public MotionDrivenPose? LatestDrivenPose(int maxAgeMs)
+        {
+            if (!_aiMode || _phase != MotionLanePhase.Game) return null;
+            var p = Volatile.Read(ref _drivenPose);
+            if (p == null || _clock.ElapsedMilliseconds - p.AtMs > maxAgeMs) return null;
+            return p;
         }
 
         private void SilenceVibration()
@@ -1168,6 +1196,7 @@ namespace MozaPlugin.Devices.Motion
             var target = StreamMode;
             // Mode 3 on the way in levels the platform, so the limiter starts from a level pose.
             _aiLimiter.Reset();
+            Volatile.Write(ref _drivenPose, null);
             Array.Clear(_poseSent, 0, 3);
             _poseLive = false;
             _aiMaxPerformanceApplied = _aiMaxPerformance;

@@ -992,5 +992,14 @@ namespace MozaPlugin.Resources
         public static string Section_MultiModeDial => Get("Section_MultiModeDial");
         public static string Label_ControlLabels => Get("Label_ControlLabels");
         public static string Label_ThumbWheel => Get("Label_ThumbWheel");
+        public static string Motion_Panel_VrMc => Get("Motion_Panel_VrMc");
+        public static string Motion_Panel_VrMcNote => Get("Motion_Panel_VrMcNote");
+        public static string Motion_Panel_VrMcRigLength => Get("Motion_Panel_VrMcRigLength");
+        public static string Motion_Panel_VrMcRigWidth => Get("Motion_Panel_VrMcRigWidth");
+        public static string Motion_Panel_VrMcSeatFromFront => Get("Motion_Panel_VrMcSeatFromFront");
+        public static string Motion_Panel_VrMcSeatHeight => Get("Motion_Panel_VrMcSeatHeight");
+        public static string Motion_Panel_VrMcDrivenPose => Get("Motion_Panel_VrMcDrivenPose");
+        public static string Motion_Panel_VrMcPivotUnset => Get("Motion_Panel_VrMcPivotUnset");
+        public static string Motion_Panel_VrMcPivotFmt => Get("Motion_Panel_VrMcPivotFmt");
     }
 }

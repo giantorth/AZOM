@@ -57,6 +57,7 @@ namespace MozaPlugin.Devices.Motion
             Pitch = pitch; Roll = roll; HeaveMm = heaveMm;
             Array.Clear(_x, 0, 3);
             Array.Clear(_v, 0, 3);
+            IntendedPitchMm = IntendedRollMm = 0.0;
             _seeded = false;
         }
 
@@ -195,7 +196,10 @@ namespace MozaPlugin.Devices.Motion
             HeaveMm = _x[2];
         }
 
-        /// <summary>Tilt travel (mm at an actuator) the last <see cref="Step"/> meant pitch and roll to cause.</summary>
+        /// <summary>
+        /// Tilt travel (mm at an actuator) the last <see cref="Step"/> or <see cref="Follow"/> meant pitch
+        /// and roll to cause: what the controller is expected to drive, after its own soft limit.
+        /// </summary>
         public double IntendedPitchMm { get; private set; }
         public double IntendedRollMm { get; private set; }
 
@@ -226,6 +230,7 @@ namespace MozaPlugin.Devices.Motion
                 _seeded = true;
             }
             _x[0] = x0; _x[1] = x1; _x[2] = heaveMm;
+            IntendedPitchMm = x0; IntendedRollMm = x1;
             Pitch = pitch; Roll = roll; HeaveMm = heaveMm;
         }
 

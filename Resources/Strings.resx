@@ -941,4 +941,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>MULTI-MODE DIAL</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Control Labels</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Thumb Wheel</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>VR motion compensation</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Measurements of your rig for SimHub's VR motion compensation. Stored in SimHub only, nothing is sent to the controller. Length, seat position and seat height place the pivot; width is optional.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Actuator distance front to rear (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Actuator distance left to right (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Front actuators to seat centre (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Seat bottom above floor, platform parked (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>In AI mode, compensate the angles the platform is driven to</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Enter length, seat position and seat height to set the pivot (SimHub uses the seat as the pivot until then).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Pivot from the seat: {0:0} mm forward, {1:0} mm down</value></data>
 </root>

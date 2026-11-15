@@ -934,4 +934,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>МНОГОРЕЖИМНЫЙ ЭНКОДЕР</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Подписи элементов управления</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Колёсико под большой палец</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Компенсация движения VR</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Размеры вашего стенда для компенсации движения VR в SimHub. Хранятся только в SimHub, на контроллер ничего не отправляется. Длина, положение и высота сиденья задают точку вращения; ширина необязательна.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Расстояние между актуаторами спереди–сзади (мм)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Расстояние между актуаторами слева–справа (мм)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>От передних актуаторов до центра сиденья (мм)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Низ сиденья над полом, платформа запаркована (мм)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>В режиме ИИ компенсировать углы, в которые фактически выводится платформа</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Введите длину, положение и высоту сиденья, чтобы задать точку вращения (до этого SimHub использует сиденье).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Точка вращения от сиденья: {0:0} мм вперёд, {1:0} мм вниз</value></data>
 </root>

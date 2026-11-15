@@ -933,4 +933,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>ΠΟΤΕΝΣΙΟΜΕΤΡΟ ΠΟΛΛΑΠΛΩΝ ΛΕΙΤΟΥΡΓΙΩΝ</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Ετικέτες χειριστηρίων</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Τροχός αντίχειρα</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Αντιστάθμιση κίνησης VR</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Διαστάσεις του rig σας για την αντιστάθμιση κίνησης VR του SimHub. Αποθηκεύονται μόνο στο SimHub, τίποτα δεν στέλνεται στον ελεγκτή. Το μήκος, η θέση και το ύψος του καθίσματος ορίζουν το σημείο περιστροφής· το πλάτος είναι προαιρετικό.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Απόσταση ενεργοποιητών εμπρός–πίσω (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Απόσταση ενεργοποιητών αριστερά–δεξιά (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Εμπρός ενεργοποιητές έως κέντρο καθίσματος (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Βάση καθίσματος από το δάπεδο, πλατφόρμα σε στάθμευση (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Σε λειτουργία AI, αντιστάθμιση των γωνιών στις οποίες οδηγείται η πλατφόρμα</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Εισαγάγετε μήκος, θέση και ύψος καθίσματος για να οριστεί το σημείο περιστροφής (μέχρι τότε το SimHub χρησιμοποιεί το κάθισμα).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Σημείο περιστροφής από το κάθισμα: {0:0} mm εμπρός, {1:0} mm κάτω</value></data>
 </root>

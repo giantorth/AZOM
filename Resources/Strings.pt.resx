@@ -933,4 +933,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>KNOB MULTIMODO</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Rótulos dos controles</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Roda de polegar</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Compensação de movimento VR</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Medidas do seu rig para a compensação de movimento VR do SimHub. Guardadas apenas no SimHub, nada é enviado ao controlador. O comprimento, a posição e a altura do banco definem o pivô; a largura é opcional.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Distância entre atuadores frente–trás (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Distância entre atuadores esquerda–direita (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Atuadores dianteiros ao centro do banco (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Base do banco acima do chão, plataforma estacionada (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>No modo IA, compensar os ângulos para os quais a plataforma é levada</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Introduza o comprimento, a posição e a altura do banco para definir o pivô (até lá o SimHub usa o banco como pivô).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Pivô a partir do banco: {0:0} mm para a frente, {1:0} mm para baixo</value></data>
 </root>
