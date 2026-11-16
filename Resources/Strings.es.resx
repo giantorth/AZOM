@@ -939,4 +939,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>PERILLA MULTIMODO</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Etiquetas de controles</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Rueda de pulgar</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Compensación de movimiento VR</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Medidas de su rig para la compensación de movimiento VR de SimHub. Se guardan solo en SimHub, no se envía nada al controlador. La longitud, la posición y la altura del asiento sitúan el pivote; el ancho es opcional.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Distancia entre actuadores delante–detrás (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Distancia entre actuadores izquierda–derecha (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Actuadores delanteros al centro del asiento (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Base del asiento sobre el suelo, plataforma aparcada (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>En modo IA, compensar los ángulos a los que se lleva la plataforma</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Introduzca la longitud, la posición y la altura del asiento para fijar el pivote (hasta entonces SimHub usa el asiento como pivote).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Pivote desde el asiento: {0:0} mm hacia delante, {1:0} mm hacia abajo</value></data>
 </root>

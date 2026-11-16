@@ -934,4 +934,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>MULTIMODUS-DREHREGLER</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Steuerungsbezeichnungen</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Daumenrad</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>VR-Bewegungskompensation</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Maße Ihres Rigs für die VR-Bewegungskompensation von SimHub. Nur in SimHub gespeichert, nichts wird an den Controller gesendet. Länge, Sitzposition und Sitzhöhe legen den Drehpunkt fest; die Breite ist optional.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Aktuatorabstand vorne–hinten (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Aktuatorabstand links–rechts (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Vordere Aktuatoren bis Sitzmitte (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Sitzfläche über dem Boden, Plattform geparkt (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Im KI-Modus die Winkel kompensieren, auf die die Plattform gefahren wird</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Länge, Sitzposition und Sitzhöhe eingeben, um den Drehpunkt festzulegen (bis dahin nutzt SimHub den Sitz als Drehpunkt).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Drehpunkt vom Sitz aus: {0:0} mm nach vorne, {1:0} mm nach unten</value></data>
 </root>

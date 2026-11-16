@@ -138,6 +138,50 @@ namespace MozaPlugin.Integration.Motion
             }
         }
 
+        private double _mcRigLengthMm, _mcRigWidthMm, _mcSeatFromFrontMm, _mcSeatHeightMm;
+        private bool _mcUseDrivenPose = true;
+
+        /// <summary>
+        /// VR motion compensation, rig measurements entered by hand (mm, 0 = not set): distance between
+        /// the front and rear actuator centres. With <see cref="McSeatFromFrontMm"/> and
+        /// <see cref="McSeatHeightMm"/> it places SimHub's MC pivot (<see cref="Hma150MotionCompensation"/>);
+        /// it also turns AI mode travel into the real pitch angle.
+        /// </summary>
+        public double McRigLengthMm { get => _mcRigLengthMm; set => SetMm(ref _mcRigLengthMm, value); }
+
+        /// <summary>VR MC: distance between the left and right actuator centres (mm, 0 = the controller's own figure); turns AI mode travel into the real roll angle.</summary>
+        public double McRigWidthMm { get => _mcRigWidthMm; set => SetMm(ref _mcRigWidthMm, value); }
+
+        /// <summary>VR MC: distance from the front actuators' line back to the centre of the seat (mm).</summary>
+        public double McSeatFromFrontMm { get => _mcSeatFromFrontMm; set => SetMm(ref _mcSeatFromFrontMm, value); }
+
+        /// <summary>VR MC: height of the seat bottom above the floor with the platform parked, actuators fully retracted (mm).</summary>
+        public double McSeatHeightMm { get => _mcSeatHeightMm; set => SetMm(ref _mcSeatHeightMm, value); }
+
+        /// <summary>
+        /// VR MC, on by default: in AI mode, give SimHub's motion compensation the pitch, roll and heave the
+        /// controller is driven to instead of SimHub's pose (they differ by the tilt share, the limiter
+        /// and the controller's own soft limits). Game mode always leaves SimHub's pose as it is.
+        /// </summary>
+        public bool McUseDrivenPose
+        {
+            get => _mcUseDrivenPose;
+            set
+            {
+                if (_mcUseDrivenPose == value) return;
+                _mcUseDrivenPose = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        private void SetMm(ref double field, double value)
+        {
+            value = double.IsNaN(value) || double.IsInfinity(value) ? 0.0 : Math.Max(0.0, Math.Min(5000.0, value));
+            if (field == value) return;
+            field = value;
+            Output?.ApplySettings();
+        }
+
         /// <summary>
         /// While SimHub's Manual control or Hop-in position moves the platform, use the controller's
         /// Manual Motion Test (mode 2, <c>0x1E/07</c> setpoints) instead of game mode.
@@ -286,6 +330,13 @@ namespace MozaPlugin.Integration.Motion
         protected override void UpdateInternal(CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
         {
             var lane = Lane;
+            Stream(lane, geometryResult, currentSettings);
+            // SimHub's VR motion compensation reads this same result right after this call.
+            Hma150MotionCompensation.Apply(geometryResult, currentSettings, lane);
+        }
+
+        private void Stream(MozaMotionController? lane, CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
+        {
             PollManualControl(lane);
             if (!CheckLane(lane)) return;
             if (lane!.ManualDriven)

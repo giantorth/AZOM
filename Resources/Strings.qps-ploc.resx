@@ -924,4 +924,13 @@
   <data name="Section_MultiModeDial" xml:space="preserve"><value>WOOF WOOF!</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Bark bark!</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Arf woof!</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Woof Arf Grr</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Woof bark grr arf woof bark. Grr arf woof bark grr. Woof arf grr bark woof.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Woof Arf Grr Bark (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Woof Arf Grr Bark (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Woof Arf Grr Bark (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Woof Arf Grr Bark Woof (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Woof bark grr arf woof bark grr</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof.</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Woof bark: {0:0} mm grr, {1:0} mm arf</value></data>
 </root>

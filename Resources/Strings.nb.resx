@@ -939,4 +939,13 @@ Id: {2}</value></data>
   <data name="Section_MultiModeDial" xml:space="preserve"><value>FLERMODUS-BRYTER</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Kontrolletiketter</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Tommelhjul</value></data>
+  <data name="Motion_Panel_VrMc" xml:space="preserve"><value>VR-bevegelseskompensasjon</value></data>
+  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Mål av riggen din for SimHubs VR-bevegelseskompensasjon. Lagres bare i SimHub, ingenting sendes til kontrolleren. Lengde, seteposisjon og setehøyde plasserer dreiepunktet; bredde er valgfritt.</value></data>
+  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Aktuatoravstand foran–bak (mm)</value></data>
+  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Aktuatoravstand venstre–høyre (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Fremre aktuatorer til setets midtpunkt (mm)</value></data>
+  <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Setebunn over gulvet, plattform parkert (mm)</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>I AI-modus, kompenser vinklene plattformen kjøres til</value></data>
+  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Angi lengde, seteposisjon og setehøyde for å sette dreiepunktet (til da bruker SimHub setet som dreiepunkt).</value></data>
+  <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Dreiepunkt fra setet: {0:0} mm fremover, {1:0} mm ned</value></data>
 </root>

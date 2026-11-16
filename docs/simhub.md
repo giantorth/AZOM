@@ -2049,6 +2049,52 @@ own kinematics"). What the decompile requires of such an output:
 All Motion-typed calls in the plugin go through `Integration/Motion/MotionIntegration`, which
 catches a type-load mismatch once and disables the integration rather than the plugin.
 
+### Motion compensation with the HMA150
+
+SimHub's VR motion compensation (`SixDofsMotionCompensation.Update`) builds the seat pose from
+the primary `GeometryResult`, and `MotionDevice.Update` calls it **after** `Output.Update` on the
+same result: geometry → output → MC. `Geometry6DOFsBypass` gives the MC nothing about the rig:
+
+- `Update` hard-codes `MotionCompensationRotationCenter = (0, 0, 0)` and sets
+  `MotionCompensationHasPrimaryYaw`; its settings hold only per-axis capacities (no length, width,
+  seat position or stroke).
+- `Has3DView = false` (the MC monitor's geometry tab stays empty) and `HasHardwareMCReport = false`.
+
+What the MC reads for the primary platform: `MotionState` pitch / roll / yaw / heave / surge / sway
+as the estimate; `MotionCompensationExternal{Pitch,Roll,Yaw}` blended in only when the filter's
+`EnablePlatformSensor` is set, a toggle the MC UI shows only when the geometry reports
+`HasHardwareMCReport` (Yaw VR); and the pivot
+`CreateOptionnalCor(EnablePrimaryPlatformCor, xLateral = RC.Sway, yForward = RC.Surge,
+zUp = −(SeatToPivotHeightMm + RC.Heave))` from the seat. `EnablePrimaryPlatformCor` defaults to
+true; `SeatToPivotHeightMm` comes from the geometry's `MotionCompensationSettings` (0 for the bypass,
+which has no UI for it).
+
+`Geometry3Dof4Linear` ("3 DOFs / 4 corners") sets `Surge = COR front offset +
+MotionCompensationRearOffset`, where the seat sits `RigLength / 2 + MotionCompensationRearOffset`
+behind the front actuators, `Sway = COR right offset`, `Heave = ActuatorsStroke / 2 + heave
+offset`, and its "Seat height" (`SeatToPivotHeightMm`) is the seat above the floor with the
+actuators retracted.
+
+The HMA150 keeps the bypass (switching to the 4-corner geometry would drop the corner haptics
+folded into `FinalMotionState`, add its 50°/s angular spike limiter and stroke down-scaling to the
+pose, and change the Manual control scale). Instead `MozaHma150Output.UpdateInternal`, after
+streaming, calls `Hma150MotionCompensation.Apply`:
+
+- **Pivot**, from the output settings `McRigLengthMm`, `McSeatFromFrontMm`, `McSeatHeightMm`
+  (entered by hand in the HMA150 panel's *VR motion compensation* section), in the 4-corner
+  convention: `Surge = seat-from-front − length / 2`, `Sway = 0`, `Heave = seat height + 80 mm`
+  (the controller logs −80 mm per actuator parked and 0 at the centre position). Not written until
+  all three are set.
+- **Driven pose (AI mode, `McUseDrivenPose`, on by default):** `MotionState` is replaced by a copy
+  with the pitch, roll and heave the controller is driven to (`MozaMotionController.LatestDrivenPose`,
+  published each AI-mode tick from `AiPoseLimiter.IntendedPitchMm / IntendedRollMm / HeaveMm`, at
+  most 200 ms old). The controller converts an angle to actuator travel with its own stored
+  dimensions (often the 500 × 500 mm default), so the real tilt is `asin(travel / (spacing / 2))`
+  on the measured spacing (`McRigLengthMm`, `McRigWidthMm`; 0 falls back to the controller's).
+  Game mode leaves SimHub's pose: the controller's own cueing there is not modelled.
+
+The geometry tab of the MC monitor stays empty: it is drawn from the geometry's 3D view.
+
 ### Generic template language (`GenericSerialOutputV2` / `GenericUDPOutputV2`)
 
 Source: `SimHub.Plugins.Motion.Outputs.GenericCommon/GenericCommand.cs` (`UpdateRegEx`,
