@@ -1,19 +1,4 @@
 {
-  "Motion_Panel_AiPoseMode": {
-    "en": "AI mode: the platform follows SimHub's heave, pitch and roll as positions",
-    "de": "KI-Modus: Die Plattform folgt Hub, Nicken und Rollen von SimHub als Positionen",
-    "el": "Λειτουργία AI: η πλατφόρμα ακολουθεί την κατακόρυφη κίνηση, την πρόνευση και τον διατοιχισμό του SimHub ως θέσεις",
-    "es": "Modo IA: la plataforma sigue el desplazamiento vertical, el cabeceo y el balanceo de SimHub como posiciones",
-    "fr": "Mode IA : la plateforme suit le pilonnement, le tangage et le roulis de SimHub comme des positions",
-    "it": "Modalità IA: la piattaforma segue sussulto, beccheggio e rollio di SimHub come posizioni",
-    "ko": "AI 모드: 플랫폼이 SimHub의 히브, 피치, 롤을 위치로 따라갑니다",
-    "nb": "AI-modus: plattformen følger SimHubs hiv, stamping og rulling som posisjoner",
-    "pt": "Modo IA: a plataforma segue o movimento vertical, a arfagem e a rolagem do SimHub como posições",
-    "qps-ploc": "Woof bark: grr arf woof bark grr arf woof bark grr",
-    "ru": "Режим ИИ: платформа следует вертикальному смещению, тангажу и крену SimHub как позициям",
-    "vi": "Chế độ AI: bệ chuyển động bám theo nhấp nhô, chúi và lắc ngang của SimHub như các vị trí",
-    "zh-Hans": "AI 模式：平台将 SimHub 的升降、俯仰和横滚作为位置跟随"
-  },
   "Motion_Panel_EngineVibrationPitch": {
     "en": "Engine vibration pitch (50 = normal)",
     "de": "Tonhöhe der Motorvibration (50 = normal)",

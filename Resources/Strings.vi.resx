@@ -920,12 +920,9 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Kích hoạt</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Xung</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Động cơ</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Chế độ AI: bệ chuyển động bám theo nhấp nhô, chúi và lắc ngang của SimHub như các vị trí</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Cao độ rung động cơ (50 = bình thường)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Cường độ nhịp cầm chừng của động cơ (0 = tắt)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Khi dùng tính năng này, hãy tắt hiệu ứng rung động cơ trong hồ sơ SimHub Motion để hai hiệu ứng không xung đột.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Chế độ AI: hiệu năng tối đa</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>Kiểu FFB</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Mềm</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Bình thường</value></data>
@@ -940,7 +937,9 @@ Id: {2}</value></data>
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Khoảng cách bộ truyền động trái–phải (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Bộ truyền động trước tới tâm ghế (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Đáy ghế cách sàn, nền tảng ở vị trí đỗ (mm)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Ở chế độ AI, bù theo góc mà nền tảng thực sự được điều khiển tới</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Bù theo góc mà nền tảng thực sự được điều khiển tới</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Nhập chiều dài, vị trí ghế và chiều cao ghế để đặt tâm xoay (trước đó SimHub dùng ghế làm tâm xoay).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Tâm xoay so với ghế: {0:0} mm về trước, {1:0} mm xuống dưới</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Hiệu năng tối đa</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.</value></data>
 </root>

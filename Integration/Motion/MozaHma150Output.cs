@@ -17,18 +17,19 @@ namespace MozaPlugin.Integration.Motion
     {
         /// <summary>Raw game physics, as Motion Manager sends; the controller's effects do the cueing.</summary>
         GameTelemetry = 0,
-        /// <summary>SimHub Motion's pose (its effects profile) as attitude and heave.</summary>
+        /// <summary>SimHub Motion's pose (its effects profile), followed as positions in the controller's full control mode.</summary>
         SimHubPose = 1,
     }
 
     /// <summary>Persisted output settings; the controller stores its own setup.</summary>
     public class MozaHma150OutputSettings : OutputSettingsBase
     {
-        private MozaHma150Source _source;
+        private MozaHma150Source _source = MozaHma150Source.SimHubPose;
         private bool _includeCornerHaptics = true;
         private int _crestBoost;
         private bool _slowManualControl = true;
 
+        /// <summary>Defaults to the SimHub pose.</summary>
         public MozaHma150Source Source
         {
             get => _source;
@@ -71,37 +72,21 @@ namespace MozaPlugin.Integration.Motion
 
         private int _engineVibrationPitch = 50;
         private int _engineTickover;
-        private bool _aiPoseMode;
-        private bool _aiMaxPerformance;
+        private bool _maxPerformance;
 
         /// <summary>
-        /// AI mode only, off by default. Off: the pose is kept inside game mode's behaviour (tilt
+        /// Pose source only, off by default. Off: the pose is kept inside game mode's behaviour (tilt
         /// scaled to what game mode gives, every actuator within game mode's travel, speed and
         /// acceleration capped). On: the pose's true angles with no speed or acceleration cap, which
         /// can make the rig hop or shift.
         /// </summary>
-        public bool AiMaxPerformance
+        public bool MaxPerformance
         {
-            get => _aiMaxPerformance;
+            get => _maxPerformance;
             set
             {
-                if (_aiMaxPerformance == value) return;
-                _aiMaxPerformance = value;
-                Output?.ApplySettings();
-            }
-        }
-
-        /// <summary>
-        /// Pose source only, off by default: run the controller in its AI mode (mode 11), where the pose
-        /// is followed as positions (heave holds, pitch and roll are true angles), instead of game mode.
-        /// </summary>
-        public bool AiPoseMode
-        {
-            get => _aiPoseMode;
-            set
-            {
-                if (_aiPoseMode == value) return;
-                _aiPoseMode = value;
+                if (_maxPerformance == value) return;
+                _maxPerformance = value;
                 Output?.ApplySettings();
             }
         }
@@ -145,11 +130,11 @@ namespace MozaPlugin.Integration.Motion
         /// VR motion compensation, rig measurements entered by hand (mm, 0 = not set): distance between
         /// the front and rear actuator centres. With <see cref="McSeatFromFrontMm"/> and
         /// <see cref="McSeatHeightMm"/> it places SimHub's MC pivot (<see cref="Hma150MotionCompensation"/>);
-        /// it also turns AI mode travel into the real pitch angle.
+        /// it also turns the driven travel into the real pitch angle.
         /// </summary>
         public double McRigLengthMm { get => _mcRigLengthMm; set => SetMm(ref _mcRigLengthMm, value); }
 
-        /// <summary>VR MC: distance between the left and right actuator centres (mm, 0 = the controller's own figure); turns AI mode travel into the real roll angle.</summary>
+        /// <summary>VR MC: distance between the left and right actuator centres (mm, 0 = the controller's own figure); turns the driven travel into the real roll angle.</summary>
         public double McRigWidthMm { get => _mcRigWidthMm; set => SetMm(ref _mcRigWidthMm, value); }
 
         /// <summary>VR MC: distance from the front actuators' line back to the centre of the seat (mm).</summary>
@@ -159,9 +144,9 @@ namespace MozaPlugin.Integration.Motion
         public double McSeatHeightMm { get => _mcSeatHeightMm; set => SetMm(ref _mcSeatHeightMm, value); }
 
         /// <summary>
-        /// VR MC, on by default: in AI mode, give SimHub's motion compensation the pitch, roll and heave the
-        /// controller is driven to instead of SimHub's pose (they differ by the tilt share, the limiter
-        /// and the controller's own soft limits). Game mode always leaves SimHub's pose as it is.
+        /// VR MC, on by default, pose source only: give SimHub's motion compensation the pitch, roll and
+        /// heave the controller is driven to instead of SimHub's pose (they differ by the tilt share, the
+        /// limiter and the controller's own soft limits). Game telemetry always leaves SimHub's pose as it is.
         /// </summary>
         public bool McUseDrivenPose
         {
@@ -204,19 +189,20 @@ namespace MozaPlugin.Integration.Motion
     /// <c>TypeName</c> from this assembly). Pairs with the 6DOF pose-bypass geometry, which
     /// has no corner channels to map.
     ///
-    /// By default, like Motion Manager, it streams the game's raw telemetry (<see cref="MotionGameFeed"/>)
-    /// and leaves cueing and strength to the controller's own Motion Effects sliders; with
-    /// <see cref="MozaHma150Source.SimHubPose"/> it streams SimHub Motion's pose instead
-    /// (<see cref="MotionGameFeed.PoseFrame"/>). SimHub Motion supplies the lifecycle: start,
-    /// idle, stop and failure.
+    /// By default it streams SimHub Motion's pose, which the controller's full control mode follows
+    /// as positions (<see cref="MotionGameFeed.PoseFrame"/>); with
+    /// <see cref="MozaHma150Source.GameTelemetry"/> it streams the game's raw telemetry instead, like
+    /// Motion Manager (<see cref="MotionGameFeed"/>), and leaves cueing and strength to the
+    /// controller's own Motion Effects sliders. SimHub Motion supplies the lifecycle: start, idle,
+    /// stop and failure.
     ///
     /// The port belongs to the plugin's motion lane (<see cref="MozaMotionController"/>),
     /// which this output holds while started:
     /// <list type="bullet">
-    /// <item>Start — connect if needed, engage (self-check, game mode); returns at once, and
-    /// <see cref="IsReadyForLiveMotionData"/> stays false ("Starting") until the
-    /// controller reports game mode.</item>
-    /// <item>Idle — stay in game mode, neutral frames with the in-game flag clear.</item>
+    /// <item>Start — connect if needed, engage (self-check, game or full control mode); returns at
+    /// once, and <see cref="IsReadyForLiveMotionData"/> stays false ("Starting") until the
+    /// controller reports that mode.</item>
+    /// <item>Idle — stay in that mode, neutral frames with the in-game flag clear.</item>
     /// <item>Stop — run state stop, standby, then the port is released.</item>
     /// <item>Lane fault or disconnect — <c>ConnectionState.Failure</c>; SimHub freezes the pose.</item>
     /// </list>
@@ -364,22 +350,15 @@ namespace MozaPlugin.Integration.Motion
                 {
                     // The crest signal belongs to the running game: none without a fresh game frame.
                     double crestPush = game != null ? currentSettings.CrestBoost / 100.0 * feed!.CrestPush : 0.0;
-                    // AI mode follows the pose as positions. The lane says which shape it streams, and
-                    // drops any frame whose own shape (IsPosition) is not that one.
-                    if (lane!.StreamsAiPose)
-                    {
-                        // A held drop needs speed: none below 5 m/s, full from 15 m/s. A car being placed
-                        // on the track reads as "light" and held the full drop for 10 s (capture 13 Nov 2026).
-                        if (game != null)
-                            crestPush *= Math.Max(0.0, Math.Min(1.0, (Math.Abs(game.Fields[7]) - 5.0) / 10.0));
-                        // Max performance: the pose's true angles. Otherwise the share game mode turns into tilt.
-                        double tiltScale = currentSettings.AiMaxPerformance ? 1.0 : AiPoseLimiter.DefaultTiltShare;
-                        lane.PostFrame(MotionGameFeed.PoseFrameAsPosition(pose.PitchDegrees, pose.RollDegrees,
-                            pose.HeaveMm, game, crestPush, tiltScale));
-                    }
-                    else
-                        lane.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game,
-                            crestPush));
+                    // A held drop needs speed: none below 5 m/s, full from 15 m/s. A car being placed
+                    // on the track reads as "light" and held the full drop for 10 s (capture 13 Nov 2026).
+                    if (game != null)
+                        crestPush *= Math.Max(0.0, Math.Min(1.0, (Math.Abs(game.Fields[7]) - 5.0) / 10.0));
+                    // Max performance: the pose's true angles. Otherwise the share game mode turns into tilt.
+                    double tiltScale = currentSettings.MaxPerformance ? 1.0 : PoseLimiter.DefaultTiltShare;
+                    // Until the lane has entered full control mode it drops this frame (IsPosition) and streams neutral.
+                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees,
+                        pose.HeaveMm, game, crestPush, tiltScale));
                 }
                 return;
             }
@@ -399,11 +378,11 @@ namespace MozaPlugin.Integration.Motion
         private void PollManualControl(MozaMotionController? lane)
         {
             if (lane == null) return;
-            // The SimHub pose source runs the controller in AI mode (pose followed as positions).
-            lane.SetAiPoseWanted(Settings?.Source == MozaHma150Source.SimHubPose && Settings.AiPoseMode);
+            // The SimHub pose source runs the controller in full control mode (pose followed as positions).
+            lane.SetFullControlWanted(Settings?.Source == MozaHma150Source.SimHubPose);
             lane.SetEngineVibrationPitch((float)Math.Pow(2.0, ((Settings?.EngineVibrationPitch ?? 50) - 50) / 25.0));
             lane.SetEngineTickover((Settings?.EngineTickover ?? 0) / 100f * 3f);
-            lane.SetAiMaxPerformance(Settings?.AiMaxPerformance == true);
+            lane.SetMaxPerformance(Settings?.MaxPerformance == true);
             if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
             // Between plugin instances (SimHub game switch) there is nothing to ask: keep the last answer.
             if (MozaPlugin.Instance == null) return;

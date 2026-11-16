@@ -2015,10 +2015,10 @@ own kinematics"). What the decompile requires of such an output:
   7 Hz; wing load ~40 Hz). Signs: `MotionPlugin` builds
   `OrientationPitchDegrees = −GameData.OrientationPitch` and `OrientationRollDegrees =
   +GameData.OrientationRoll` (`PitchEffect` / `RollEffect` feed these into the pose as-is). By
-  default the HMA150 output does **not** use the pose: its controller takes raw physics like
-  Motion Manager sends, so it streams `GameData` from the plugin's own `DataUpdate`
-  (`MotionInputData` is `internal`). Its *Motion source* setting
-  (`MozaHma150OutputSettings.Source`) can switch it to the pose
+  default the HMA150 output streams this pose, which the controller follows as positions in its
+  full control mode (mode 11). Its *Motion source* setting (`MozaHma150OutputSettings.Source`)
+  can switch it to raw physics like Motion Manager sends, streamed as `GameData` from the
+  plugin's own `DataUpdate` (`MotionInputData` is `internal`)
   ([`protocol/motion/game-stream-0x22.md`](protocol/motion/game-stream-0x22.md) § Plugin mapping).
 - **Output settings changes:** the base settings' `PropertyChanged` calls
   `Output.ApplySettings()`, which drops the JSON-cloned running settings so the next update
@@ -2085,13 +2085,14 @@ streaming, calls `Hma150MotionCompensation.Apply`:
   convention: `Surge = seat-from-front − length / 2`, `Sway = 0`, `Heave = seat height + 80 mm`
   (the controller logs −80 mm per actuator parked and 0 at the centre position). Not written until
   all three are set.
-- **Driven pose (AI mode, `McUseDrivenPose`, on by default):** `MotionState` is replaced by a copy
-  with the pitch, roll and heave the controller is driven to (`MozaMotionController.LatestDrivenPose`,
-  published each AI-mode tick from `AiPoseLimiter.IntendedPitchMm / IntendedRollMm / HeaveMm`, at
-  most 200 ms old). The controller converts an angle to actuator travel with its own stored
-  dimensions (often the 500 × 500 mm default), so the real tilt is `asin(travel / (spacing / 2))`
-  on the measured spacing (`McRigLengthMm`, `McRigWidthMm`; 0 falls back to the controller's).
-  Game mode leaves SimHub's pose: the controller's own cueing there is not modelled.
+- **Driven pose (pose source, full control mode; `McUseDrivenPose`, on by default):** `MotionState`
+  is replaced by a copy with the pitch, roll and heave the controller is driven to
+  (`MozaMotionController.LatestDrivenPose`, published each full control tick from
+  `PoseLimiter.IntendedPitchMm / IntendedRollMm / HeaveMm`, at most 200 ms old). The controller
+  converts an angle to actuator travel with its own stored dimensions (often the 500 × 500 mm
+  default), so the real tilt is `asin(travel / (spacing / 2))` on the measured spacing
+  (`McRigLengthMm`, `McRigWidthMm`; 0 falls back to the controller's). The game telemetry source
+  (game mode) leaves SimHub's pose: the controller's own cueing there is not modelled.
 
 The geometry tab of the MC monitor stays empty: it is drawn from the geometry's 3D view.
 

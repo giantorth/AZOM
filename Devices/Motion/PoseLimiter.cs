@@ -3,9 +3,9 @@ using System;
 namespace MozaPlugin.Devices.Motion
 {
     /// <summary>
-    /// Limits for the pose streamed in the controller's AI mode (mode 11), which follows pitch, roll
-    /// and heave as sent. Game mode leaves travel and rates to the controller's own cueing; here the
-    /// plugin asks for positions, so it bounds them itself:
+    /// Limits for the pose streamed in the controller's full control mode (mode 11), which follows
+    /// pitch, roll and heave as sent. Game mode leaves travel and rates to the controller's own
+    /// cueing; here the plugin asks for positions, so it bounds them itself:
     /// <list type="bullet">
     /// <item>travel: pitch and roll are each eased off towards the travel the controller gives one axis
     /// in game mode, and the furthest any actuator is then meant to move, |heave| + pitch travel + roll
@@ -16,7 +16,7 @@ namespace MozaPlugin.Devices.Motion
     /// </list>
     /// Angles in radians, heave in mm. Not thread-safe: the lane's tick owns it.
     /// </summary>
-    public sealed class AiPoseLimiter
+    public sealed class PoseLimiter
     {
         /// <summary>
         /// Actuator travel from centre asked for at most at Max Available Stroke 1.0: the furthest game
@@ -29,7 +29,7 @@ namespace MozaPlugin.Devices.Motion
 
         /// <summary>
         /// Share of a pose angle tilted by without Max performance. Game mode at Pitch / Roll 100 % (bench: a 1° step
-        /// moves an actuator 6.7 mm on a 1029 mm rig, where 1° is 8.98 mm). AI mode follows angles
+        /// moves an actuator 6.7 mm on a 1029 mm rig, where 1° is 8.98 mm). Full control follows angles
         /// 1:1 and game mode gives about 0.75 of it; without Max performance the pose is scaled to 0.9,
         /// a little above game mode, as tuned from the seat (0.75 felt tamer than the game mode build).
         /// </summary>

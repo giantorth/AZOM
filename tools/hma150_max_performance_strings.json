@@ -1,20 +1,20 @@
 {
-  "Motion_Panel_AiMaxPerformance": {
-    "en": "AI mode max performance",
-    "de": "KI-Modus: maximale Leistung",
-    "el": "Λειτουργία AI: μέγιστη απόδοση",
-    "es": "Modo IA: máximo rendimiento",
-    "fr": "Mode IA : performances maximales",
-    "it": "Modalità IA: prestazioni massime",
-    "ko": "AI 모드 최대 성능",
-    "nb": "AI-modus: maks ytelse",
-    "pt": "Modo IA: desempenho máximo",
-    "qps-ploc": "Woof bark grr arf woof",
-    "ru": "Режим ИИ: максимальная производительность",
-    "vi": "Chế độ AI: hiệu năng tối đa",
-    "zh-Hans": "AI 模式最大性能"
+  "Motion_Panel_MaxPerformance": {
+    "en": "Max performance",
+    "de": "Maximale Leistung",
+    "el": "Μέγιστη απόδοση",
+    "es": "Máximo rendimiento",
+    "fr": "Performances maximales",
+    "it": "Prestazioni massime",
+    "ko": "최대 성능",
+    "nb": "Maks ytelse",
+    "pt": "Desempenho máximo",
+    "qps-ploc": "Woof bark",
+    "ru": "Максимальная производительность",
+    "vi": "Hiệu năng tối đa",
+    "zh-Hans": "最大性能"
   },
-  "Motion_Panel_AiMaxPerformanceWarning": {
+  "Motion_Panel_MaxPerformanceWarning": {
     "en": "Max performance follows SimHub's full angles with no limit on speed. Your rig is likely to hop or shift with SimHub's settings at or close to maximum. Use at your own risk.",
     "de": "Maximale Leistung folgt den vollen Winkeln von SimHub ohne Geschwindigkeitsbegrenzung. Bei SimHub-Einstellungen am oder nahe am Maximum wird Ihr Rig wahrscheinlich hüpfen oder verrutschen. Benutzung auf eigene Gefahr.",
     "el": "Η μέγιστη απόδοση ακολουθεί τις πλήρεις γωνίες του SimHub χωρίς όριο ταχύτητας. Με τις ρυθμίσεις του SimHub στο μέγιστο ή κοντά σε αυτό, το rig σας είναι πιθανό να αναπηδήσει ή να μετακινηθεί. Χρήση με δική σας ευθύνη.",

@@ -15,11 +15,11 @@ namespace MozaPlugin.Protocol
         TravelSelfCheck = 7,
         PortSelfTest = 8,
         /// <summary>
-        /// Motion Manager's "AI mode" (its command table names 11 so; firmware <c>CtrlMode:7</c>): the
+        /// Full control (Motion Manager's command table calls 11 "AI mode"; firmware <c>CtrlMode:7</c>): the
         /// <c>0x22/00</c> frame is followed as a pose. f0/f1 are platform angles 1:1 and f6 is a held
         /// heave position in mm (soft limit near ±25 mm); the shock fields are ignored. Bench, 12 Nov 2026.
         /// </summary>
-        AiPose = 11,
+        FullControl = 11,
         /// <summary>Flight-sim game mode (<c>0x22/01</c> frame); heave washes out as in <see cref="Game"/>.</summary>
         FlightGame = 12,
         Standby = 13,
@@ -65,8 +65,8 @@ namespace MozaPlugin.Protocol
         public byte Flags;
 
         /// <summary>
-        /// The frame is a pose for AI mode (mode 11): f0/f1 angles to follow and f6 a heave position
-        /// in mm (<c>MotionGameFeed.PoseFrameAsPosition</c>). False for game-mode input, where f6 is
+        /// The frame is a pose for full control mode (mode 11): f0/f1 angles to follow and f6 a heave
+        /// position in mm (<c>MotionGameFeed.PoseFrame</c>). False for game-mode input, where f6 is
         /// vertical acceleration. The lane streams a frame only in the mode it was built for.
         /// </summary>
         public bool IsPosition;
@@ -357,8 +357,8 @@ namespace MozaPlugin.Protocol
             => BuildTelemetryFrame(f, f.Fields[0], f.Fields[1], f.Fields[6]);
 
         /// <summary>
-        /// The same frame with f0, f1 and f6 replaced, for a sender that reshapes the pose (AI mode's
-        /// limits) without writing to a frame other threads hold.
+        /// The same frame with f0, f1 and f6 replaced, for a sender that reshapes the pose (full control
+        /// mode's limits) without writing to a frame other threads hold.
         /// </summary>
         public static byte[] BuildTelemetryFrame(MotionTelemetryFrame f, float f0, float f1, float f6)
         {

@@ -90,19 +90,19 @@
     "zh-Hans": "平台停放时座椅底部离地高度 (mm)"
   },
   "Motion_Panel_VrMcDrivenPose": {
-    "en": "In AI mode, compensate the angles the platform is driven to",
-    "de": "Im KI-Modus die Winkel kompensieren, auf die die Plattform gefahren wird",
-    "el": "Σε λειτουργία AI, αντιστάθμιση των γωνιών στις οποίες οδηγείται η πλατφόρμα",
-    "es": "En modo IA, compensar los ángulos a los que se lleva la plataforma",
-    "fr": "En mode IA, compenser les angles auxquels la plateforme est amenée",
-    "it": "In modalità IA, compensa gli angoli a cui viene portata la piattaforma",
-    "ko": "AI 모드에서 플랫폼이 실제로 구동되는 각도를 보정",
-    "nb": "I AI-modus, kompenser vinklene plattformen kjøres til",
-    "pt": "No modo IA, compensar os ângulos para os quais a plataforma é levada",
-    "qps-ploc": "Woof bark grr arf woof bark grr",
-    "ru": "В режиме ИИ компенсировать углы, в которые фактически выводится платформа",
-    "vi": "Ở chế độ AI, bù theo góc mà nền tảng thực sự được điều khiển tới",
-    "zh-Hans": "AI 模式下按平台实际驱动的角度进行补偿"
+    "en": "Compensate the angles the platform is driven to",
+    "de": "Die Winkel kompensieren, auf die die Plattform gefahren wird",
+    "el": "Αντιστάθμιση των γωνιών στις οποίες οδηγείται η πλατφόρμα",
+    "es": "Compensar los ángulos a los que se lleva la plataforma",
+    "fr": "Compenser les angles auxquels la plateforme est amenée",
+    "it": "Compensa gli angoli a cui viene portata la piattaforma",
+    "ko": "플랫폼이 실제로 구동되는 각도를 보정",
+    "nb": "Kompenser vinklene plattformen kjøres til",
+    "pt": "Compensar os ângulos para os quais a plataforma é levada",
+    "qps-ploc": "Woof bark grr arf woof bark",
+    "ru": "Компенсировать углы, в которые фактически выводится платформа",
+    "vi": "Bù theo góc mà nền tảng thực sự được điều khiển tới",
+    "zh-Hans": "按平台实际驱动的角度进行补偿"
   },
   "Motion_Panel_VrMcPivotUnset": {
     "en": "Enter length, seat position and seat height to set the pivot (SimHub uses the seat as the pivot until then).",

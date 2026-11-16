@@ -17,8 +17,9 @@ namespace MozaPlugin.Integration.Motion
     /// retracted + the rise to the centre position. The MC places it at
     /// (sway, surge, −(<c>SeatToPivotHeightMm</c> + heave)) from the seat; the bypass geometry's
     /// <c>SeatToPivotHeightMm</c> has no UI and stays 0.</item>
-    /// <item>in AI mode, the pitch, roll and heave the controller is actually driven to (after the plugin's
-    /// tilt share and limiter, and the controller's soft limits), in place of SimHub's pose in
+    /// <item>with the pose source (full control mode), the pitch, roll and heave the controller is
+    /// actually driven to (after the plugin's tilt share and limiter, and the controller's soft
+    /// limits), in place of SimHub's pose in
     /// <c>MotionState</c>, which is what the MC estimates from. The <c>MotionCompensationExternal*</c>
     /// fields are not used: the MC reads them only with a platform sensor enabled, which its UI offers
     /// only for geometries with a hardware MC report.</item>
@@ -71,8 +72,8 @@ namespace MozaPlugin.Integration.Motion
             => halfSpacingMm > 0 ? Math.Asin(Math.Max(-1.0, Math.Min(1.0, travelMm / halfSpacingMm))) : 0.0;
 
         /// <summary>
-        /// Write the pivot and, in AI mode, the driven pose into the primary result. Safe with a null
-        /// result or settings; leaves the result untouched when nothing has been entered.
+        /// Write the pivot and, in full control mode, the driven pose into the primary result. Safe with
+        /// a null result or settings; leaves the result untouched when nothing has been entered.
         /// </summary>
         public static void Apply(CompositeGeometryResult? geometryResult, MozaHma150OutputSettings? settings,
             MozaMotionController? lane)

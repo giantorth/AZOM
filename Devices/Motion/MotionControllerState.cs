@@ -21,8 +21,8 @@ namespace MozaPlugin.Devices.Motion
     }
 
     /// <summary>
-    /// AI mode: the pose the lane last drove the controller to, as actuator travel (what the controller
-    /// is expected to move after its own soft limits), with the half spacings it was computed from.
+    /// Full control mode: the pose the lane last drove the controller to, as actuator travel (what the
+    /// controller is expected to move after its own soft limits), with the half spacings it was computed from.
     /// Immutable; swapped whole by the lane's tick.
     /// </summary>
     public sealed class MotionDrivenPose

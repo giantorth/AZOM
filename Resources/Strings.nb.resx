@@ -925,12 +925,9 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Utløser</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Puls</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>AI-modus: plattformen følger SimHubs hiv, stamping og rulling som posisjoner</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonehøyde for motorvibrasjon (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Styrke på tomgangspuls (0 = av)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Slå av motorvibrasjonseffekten i SimHub Motion-profilen din når du bruker denne, slik at de ikke kolliderer.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>AI-modus: maks ytelse</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>FFB-stil</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Myk</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
@@ -945,7 +942,9 @@ Id: {2}</value></data>
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Aktuatoravstand venstre–høyre (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Fremre aktuatorer til setets midtpunkt (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Setebunn over gulvet, plattform parkert (mm)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>I AI-modus, kompenser vinklene plattformen kjøres til</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Kompenser vinklene plattformen kjøres til</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Angi lengde, seteposisjon og setehøyde for å sette dreiepunktet (til da bruker SimHub setet som dreiepunkt).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Dreiepunkt fra setet: {0:0} mm fremover, {1:0} mm ned</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Maks ytelse</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
 </root>

@@ -20,15 +20,10 @@ namespace MozaPlugin.Devices.Motion
     public sealed class MotionGameFeed
     {
         private const double DegToRad = Math.PI / 180.0;
-        // Pose heave → f6: SimHub's default heave range (17 m/s² → 80 mm) run backwards. Fixed on
-        // purpose; the profile's Heave row is where strength is tuned. +f6 raises the platform.
-        private const float HeaveAccelPerMm = 17f / 80f;
-        // Bound on pose f6 (heave + crest push); travel levels off near 16 m/s².
-        private const float PoseHeaveAccelLimit = 30f;
-        // AI mode (PoseFrameAsPosition): the controller's heave tops out near 25 mm, so more is never asked.
-        private const double AiPoseHeaveLimitMm = 25.0;
-        // Crest strength 100 in AI mode: the full crest push (30) is a 20 mm drop on top of the profile's heave.
-        private const double AiPoseCrestDropMm = 20.0;
+        // Pose heave: the controller's heave tops out near 25 mm, so more is never asked.
+        private const double PoseHeaveLimitMm = 25.0;
+        // Crest strength 100: the full crest push (30) is a 20 mm drop on top of the profile's heave.
+        private const double PoseCrestDropMm = 20.0;
         private const double CrestPushMax = 30.0;
         // Crest signal (docs/protocol/motion/game-stream-0x22.md § Plugin mapping): low-passed
         // vertical accel, one-sided past a dead band, so crests pass and short bumps don't.
@@ -81,7 +76,7 @@ namespace MozaPlugin.Devices.Motion
         private double _crestPush;
         private volatile float _crestPushOut;
 
-        /// <summary>Crest push at full strength (m/s² of f6, ≥ 0); 0 while no game runs.</summary>
+        /// <summary>Crest push at full strength (0–30, <see cref="PoseFrame"/> turns it into a drop in mm); 0 while no game runs.</summary>
         public float CrestPush => _crestPushOut;
 
         /// <summary>Latest frame if it is younger than <paramref name="maxAgeMs"/>.</summary>
@@ -176,20 +171,27 @@ namespace MozaPlugin.Devices.Motion
         }
 
         /// <summary>
-        /// A frame that carries a SimHub Motion pose instead of raw physics: pitch/roll in f0/f1,
-        /// which the controller applies as platform attitude; heave as vertical acceleration in f6
-        /// (the input its washed-out Heave effect follows), minus <paramref name="crestPush"/>, held
-        /// within ±<see cref="PoseHeaveAccelLimit"/>; f4/f5 zero so its acceleration effects stay
-        /// idle; shocks at rest. Heading, yaw rate, speed, pedals, engine and flags come from
+        /// A SimHub Motion pose for the controller's full control mode (mode 11), which follows the
+        /// frame as positions: f0/f1 are the platform's angles 1:1 (the pose's × <paramref name="tiltScale"/>)
+        /// and f6 carries the wanted heave in mm, with <paramref name="crestPush"/> taken off as a drop
+        /// in mm (a full push being <see cref="PoseCrestDropMm"/>). The lane applies its travel, speed
+        /// and acceleration limits and the inverse of the controller's heave soft limit before sending
+        /// (<see cref="PoseLimiter"/>, MozaMotionController.StreamTick). f4/f5 zero, shocks at rest
+        /// (ignored in this mode). Heading, yaw rate, speed, pedals, engine and flags come from
         /// <paramref name="game"/> when a game runs. Pose signs: SimHub's pitch is −GameData pitch
         /// and its roll +GameData roll (MotionPlugin), so both flip to match <see cref="Update"/>.
         /// </summary>
         public static MotionTelemetryFrame PoseFrame(double pitchDegrees, double rollDegrees, double heaveMm,
-            MotionTelemetryFrame? game, double crestPush = 0.0)
+            MotionTelemetryFrame? game, double crestPush, double tiltScale)
         {
+            // tiltScale: share of the pose angle to tilt by (1 = the true angle; PoseLimiter.DefaultTiltShare without Max performance).
+            // ±30° only keeps the numbers sane; the lane's travel limit is the real bound.
+            double scale = Math.Max(0.0, Math.Min(1.0, Finite(tiltScale)));
+            double pitch = Math.Max(-30.0, Math.Min(30.0, Finite(pitchDegrees) * scale));
+            double roll = Math.Max(-30.0, Math.Min(30.0, Finite(rollDegrees) * scale));
             var f = new MotionTelemetryFrame();
-            f.Fields[0] = (float)(-pitchDegrees * DegToRad);
-            f.Fields[1] = (float)(-rollDegrees * DegToRad);
+            f.Fields[0] = (float)(-pitch * DegToRad);
+            f.Fields[1] = (float)(-roll * DegToRad);
             if (game != null)
             {
                 f.Fields[2] = game.Fields[2];
@@ -204,33 +206,10 @@ namespace MozaPlugin.Devices.Motion
             }
             else
                 f.Flags = MozaMotionProtocol.FlagInGame;
-            double heaveAccel = Finite(heaveMm) * HeaveAccelPerMm - Math.Max(0.0, Finite(crestPush));
-            f.Fields[6] = (float)Math.Max(-PoseHeaveAccelLimit, Math.Min(PoseHeaveAccelLimit, heaveAccel));
+            double mm = Finite(heaveMm) - Math.Max(0.0, Finite(crestPush)) * (PoseCrestDropMm / CrestPushMax);
+            f.Fields[6] = (float)Math.Max(-PoseHeaveLimitMm, Math.Min(PoseHeaveLimitMm, mm));
             for (int k = 0; k < 4; k++)
                 f.Fields[8 + k] = MotionTelemetryFrame.ShockRestMm[k];
-            return f;
-        }
-
-        /// <summary>
-        /// The pose for the controller's AI mode (mode 11), which follows the frame as positions:
-        /// f0/f1 are the platform's angles 1:1 and f6 carries the wanted heave in mm, with
-        /// <paramref name="crestPush"/> taken off as a drop in mm (a full push being
-        /// <see cref="AiPoseCrestDropMm"/>). The lane applies its travel, speed and acceleration
-        /// limits and the inverse of the controller's heave soft limit before sending
-        /// (<see cref="AiPoseLimiter"/>, MozaMotionController.StreamTick). The shock fields are
-        /// ignored in this mode.
-        /// </summary>
-        public static MotionTelemetryFrame PoseFrameAsPosition(double pitchDegrees, double rollDegrees, double heaveMm,
-            MotionTelemetryFrame? game, double crestPush, double tiltScale)
-        {
-            // tiltScale: share of the pose angle to tilt by (1 = the true angle; AiPoseLimiter.DefaultTiltShare without Max performance).
-            // ±30° only keeps the numbers sane; the lane's travel limit is the real bound.
-            double scale = Math.Max(0.0, Math.Min(1.0, Finite(tiltScale)));
-            double pitch = Math.Max(-30.0, Math.Min(30.0, Finite(pitchDegrees) * scale));
-            double roll = Math.Max(-30.0, Math.Min(30.0, Finite(rollDegrees) * scale));
-            var f = PoseFrame(pitch, roll, 0.0, game);
-            double mm = Finite(heaveMm) - Math.Max(0.0, Finite(crestPush)) * (AiPoseCrestDropMm / CrestPushMax);
-            f.Fields[6] = (float)Math.Max(-AiPoseHeaveLimitMm, Math.Min(AiPoseHeaveLimitMm, mm));
             f.IsPosition = true;
             return f;
         }

@@ -150,7 +150,7 @@ namespace MozaPlugin.Integration.Motion
             SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_SimHubPose, Tag = MozaHma150Source.SimHubPose });
             var settings = _output?.Settings;
             SourceCombo.IsEnabled = settings != null;
-            SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            SourceCombo.SelectedIndex = (settings?.Source ?? MozaHma150Source.SimHubPose) == MozaHma150Source.SimHubPose ? 1 : 0;
             SlowManualCheck.IsEnabled = settings != null;
             SlowManualCheck.IsChecked = settings?.SlowManualControl ?? true;
             SlowManualCheck.Click += (_, __) =>
@@ -159,27 +159,20 @@ namespace MozaPlugin.Integration.Motion
                 if (s != null) s.SlowManualControl = SlowManualCheck.IsChecked == true;
             };
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
-            AiPoseCheck.IsChecked = settings?.AiPoseMode ?? false;
-            AiPoseCheck.Click += (_, __) =>
+            MaxPerformanceCheck.IsChecked = settings?.MaxPerformance ?? false;
+            MaxPerformanceCheck.Click += (_, __) =>
             {
                 var s = _output?.Settings;
-                if (s != null) s.AiPoseMode = AiPoseCheck.IsChecked == true;
-                UpdateCornerHapticsEnabled();
-            };
-            AiMaxPerformanceCheck.IsChecked = settings?.AiMaxPerformance ?? false;
-            AiMaxPerformanceCheck.Click += (_, __) =>
-            {
-                var s = _output?.Settings;
-                if (s != null) s.AiMaxPerformance = AiMaxPerformanceCheck.IsChecked == true;
+                if (s != null) s.MaxPerformance = MaxPerformanceCheck.IsChecked == true;
             };
             SyncCrestSlider();
-            UpdateCornerHapticsEnabled();
+            UpdatePoseOnlyEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
             {
                 var s = _output?.Settings;
                 if (s != null && SourceCombo.SelectedItem is ComboBoxItem item && item.Tag is MozaHma150Source source)
                     s.Source = source;
-                UpdateCornerHapticsEnabled();
+                UpdatePoseOnlyEnabled();
             };
             CornerHapticsCheck.Click += (_, __) =>
             {
@@ -201,7 +194,6 @@ namespace MozaPlugin.Integration.Motion
             WireMmBox(McRigWidthBox, settings?.McRigWidthMm, (st, v) => st.McRigWidthMm = v);
             WireMmBox(McSeatFromFrontBox, settings?.McSeatFromFrontMm, (st, v) => st.McSeatFromFrontMm = v);
             WireMmBox(McSeatHeightBox, settings?.McSeatHeightMm, (st, v) => st.McSeatHeightMm = v);
-            McDrivenPoseCheck.IsEnabled = settings != null;
             McDrivenPoseCheck.IsChecked = settings?.McUseDrivenPose ?? true;
             McDrivenPoseCheck.Click += (_, __) =>
             {
@@ -277,21 +269,19 @@ namespace MozaPlugin.Integration.Motion
             EngineTickValue.Text = tick.ToString(CultureInfo.CurrentCulture);
         }
 
-        /// <summary>The haptics choice and the crest strength only apply to the pose source.</summary>
-        private void UpdateCornerHapticsEnabled()
+        /// <summary>These settings only apply to the pose source (the controller's full control mode).</summary>
+        private void UpdatePoseOnlyEnabled()
         {
             bool pose = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
             CornerHapticsCheck.IsEnabled = pose;
             CrestBoostSlider.IsEnabled = pose;
-            // AI mode belongs to the pose source; the engine pitch and tick-over only exist in AI mode.
-            bool ai = pose && _output?.Settings?.AiPoseMode == true;
-            AiPoseCheck.IsEnabled = pose;
-            EnginePitchSlider.IsEnabled = ai;
-            EngineTickSlider.IsEnabled = ai;
-            EngineTickNote.IsEnabled = ai;
-            AiMaxPerformanceCheck.IsEnabled = ai;
+            EnginePitchSlider.IsEnabled = pose;
+            EngineTickSlider.IsEnabled = pose;
+            EngineTickNote.IsEnabled = pose;
+            MaxPerformanceCheck.IsEnabled = pose;
             // The warning's own colour ignores IsEnabled, so it is dimmed by hand.
-            AiMaxPerformanceWarning.Opacity = ai ? 1.0 : 0.4;
+            MaxPerformanceWarning.Opacity = pose ? 1.0 : 0.4;
+            McDrivenPoseCheck.IsEnabled = pose;
         }
 
         // ------------------------------------------------------------ motion effects

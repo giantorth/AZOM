@@ -82,8 +82,9 @@ what it does is the firmware log's `Output Displacement` (mm per actuator) every
 
 ## Plugin mapping
 
-`Devices/Motion/MotionGameFeed` fills the frame from SimHub `GameData` the way the handover
-bridge (v30) does — tuned against Motion Manager's stream and the rig — and leaves strength to
+With the game telemetry source (output setting *Motion source* = Game telemetry; the default is
+the SimHub pose source below), `Devices/Motion/MotionGameFeed` fills the frame from SimHub
+`GameData` the way the handover bridge (v30) does — tuned against Motion Manager's stream and the rig — and leaves strength to
 the controller's Motion Effects sliders, as Motion Manager does:
 
 | Field | Source |
@@ -101,17 +102,24 @@ the controller's Motion Effects sliders, as Motion Manager does:
 No frame while the game is not running or paused: the lane then sends the neutral frame
 (shocks at rest, flag `01`), and SimHub idle sends it with flag `00`.
 
-**SimHub pose source** (output setting *Motion source* = SimHub Motion profile,
+**SimHub pose source** (output setting *Motion source* = SimHub Motion profile, the default,
 `MotionGameFeed.PoseFrame`): the frame carries SimHub Motion's pose instead, so its effects
-profile (washout, limits, per-game tuning) does the cueing:
+profile (washout, limits, per-game tuning) does the cueing, and the lane runs the controller in
+full control mode (mode 11), which follows it as positions — see
+[Full control mode](#full-control-mode-controller-mode-11-the-same-frame-followed-as-positions):
 
 | Field | Source |
 |-------|--------|
 | f0 / f1 | −`PitchDegrees` / −`RollDegrees` → rad. SimHub builds pitch from −GameData pitch and roll from +GameData roll, so this keeps the game-telemetry signs |
 | f2, f3, f7, pedals, flags, engine vibration | as in the table above while a game runs; else 0 and flag `01` |
-| f4, f5 | 0, so the controller's Acceleration Pitch / Roll effects add nothing |
-| f6 | +`HeaveMm` × 17/80 m/s² per mm — SimHub's default heave range (17 m/s² → 80 mm) run backwards. f6 is the input the controller's Heave effect follows (below); +f6 raises the platform, as SimHub's +mm does. *Crest strength* takes its push off it (below), and the sum is held within ±30. The scale is fixed: the profile's Heave row is where strength is tuned, and a row set up for less travel gives proportionally less f6 |
-| f8–f11 | rest, so heave reaches the base through f6 alone. (They carried rest − `HeaveMm` before f6 did: felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on the rig, and a held offset washes out in ~1 s) |
+| f4, f5 | 0 |
+| f6 | the pose's heave as a position in mm (below) |
+| f8–f11 | rest (ignored in mode 11) |
+
+Earlier builds sent the pose in game mode (mode 1). 1.7.3 put heave in f8–f11 as rest −
+`HeaveMm` (felt as a kick when it steps 10 mm, but SimHub's few mm over a bump moved nothing on
+the rig, and a held offset washes out in ~1 s); a later dev build sent `HeaveMm` × 17/80 m/s²
+in f6 (SimHub's default heave range run backwards), which the washout below also returns to rest.
 
 Heave inputs in game mode, seat-judged bench run of 10 Nov (`tools/hma150-characterize.ps1
 -Experiment HeaveFeel`: Heave 1.0 / 0, Road Detail 0, f7 40 m/s; pulses of 0.3 s, a 2 s step
@@ -140,8 +148,9 @@ the platform dips the other way when the input lets go, which is what the −5.4
 (and a −12 mm line 0.3 s after a +18 push had ramped out on track) caught. A reading taken
 just after a pulse therefore shows the opposite sign to the pulse.
 
-**Crest strength** (0–100, default 0 = off, pose source only) takes strength/100 · p off f6, where
-p is built from the game's own `AccelerationHeave`, not from the profile:
+**Crest strength** (0–100, default 0 = off, pose source only) takes strength/100 · p off the
+pose's heave as a drop in mm (full control table below), where p is built from the game's own
+`AccelerationHeave`, not from the profile:
 
 | Step | Rule |
 |------|------|
@@ -166,17 +175,15 @@ fastest downforce cars reach 5–6 g, about 60 m/s²; the wall hit read 90–350
 a lighter hit is not caught, and the input clip and the ceiling still bound what it can ask
 for. Tested on that one track and car only.
 
-Two limits to keep in mind. The shape above was tuned from the seat while the push still went
-out with the wrong sign (it lifted the platform, and the drop that felt right was the dip on
-its release); with the sign corrected the drop comes as the car goes light, driven once and
-judged good, not yet retuned. And because the Heave effect is a washout that levels off near
-30 mm, the platform answers the start and the end of a push, not its length, and a push of
-30 is already at the top of what f6 can ask for.
+The shape above was tuned from the seat in game mode, where p went out as f6 acceleration into
+the washed-out Heave effect (so the platform answered the start and the end of a push, not its
+length), and at first with the wrong sign (it lifted the platform, and the drop that felt right
+was the dip on its release). Full control mode holds the drop as a position instead (below).
 
-### AI mode (controller mode 11): the same frame followed as positions
+### Full control mode (controller mode 11): the same frame followed as positions
 
-With *AI mode* ticked (pose source only, off by default) the lane enters mode 11 instead of
-mode 1 and sends the same `0x22/00` frame, which the controller then follows as a pose rather
+Motion Manager's command table calls mode 11 "AI mode"; the plugin calls it full control. With
+the SimHub pose source the lane enters mode 11 instead of mode 1 and sends the same `0x22/00` frame, which the controller then follows as a pose rather
 than cueing from it. Bench, fw 2.35, 12–13 Nov 2026, slots pitch 1.0 / 0.2, roll 1.0 / 0.2,
 heave 1.0 / 0, f7 40 m/s, displacement read from the 60 s `Output Displacement` line with a step
 timed against it (±30 ms from the frame interval):
@@ -207,7 +214,7 @@ timed against it (±30 ms from the frame interval):
 Available Stroke 1.0 unless noted; every input ramped over 5–8 s and held 4 s; the furthest
 actuator up / down from the `Output Displacement` line):
 
-| Input | Mode 1 (game, Pitch / Roll 1.0 / 0.2) | Mode 2 (manual) | Mode 11 (AI) |
+| Input | Mode 1 (game, Pitch / Roll 1.0 / 0.2) | Mode 2 (manual) | Mode 11 (full control) |
 |-------|----------------------------------------|-----------------|--------------|
 | pitch | 10°: 43.1 / −40.8; 20°: 49.5 / −46.4 | 0.5: 30.4 / −29.3; 1.0: 50.4 / −47.1 | 3.6°: 30.1 / −29.2; 7.2°: 49.5 / −47.0 |
 | roll | 10°: 36.5 / −33.4; 20°: 48.0 / −42.1 | 0.5: 30.7 / −28.6; 1.0: 51.4 / −44.4 | 5.3°: 30.7 / −28.7; 10.6°: 51.0 / −45.7 |
@@ -228,13 +235,13 @@ actuator up / down from the `Output Displacement` line):
   angle into tilt (6.7 mm per degree of pitch here, where 1° is 8.98 mm), mode 11 all of it.
 - The two game modes respond to a step at about the same pace.
 
-**Why AI mode is limited unless *max performance* is ticked** (iRacing, 13 Nov 2026, USB
+**Why full control is limited unless *Max performance* is ticked** (iRacing, 13 Nov 2026, USB
 captures). With the pose followed 1:1 and a profile at full gains, two laps asked one actuator
 for up to 153 mm (pitch 65 + roll 65 + heave 23; the controller's readings stayed at 52–55 mm)
 and for an 84 mm swing on one axis within 0.3 s, a full pitch reversal. Nothing faulted, but
 the rig hopped on the floor at least once. Game mode laps on the same track never asked for a
-swing above about 23 mm in 0.3 s, and an earlier AI mode lap with a 53 mm swing did not hop.
-Replayed through `AiPoseLimiter` at 210 mm/s and 1080 mm/s², with the 0.9 tilt and the 62 mm
+swing above about 23 mm in 0.3 s, and an earlier mode 11 lap with a 53 mm swing did not hop.
+Replayed through `PoseLimiter` at 210 mm/s and 1080 mm/s², with the 0.9 tilt and the 62 mm
 travel, the largest 0.3 s swing of those laps is 56 mm and of a gentler lap 19 mm (none of
 its frames more than 3 mm behind the pose). The caps come from those replays; that the rig
 no longer hops with them rests on a later drive, not on a measurement of the hop itself.
@@ -244,18 +251,18 @@ heading, angular velocity X/Y/Z, ACCX, ACCY, ACCZ, VelocityX), brake, throttle, 
 flag, per Motion Manager's `SuTelemetry_GameTelemtry2` — and washes heave out like mode 1
 (ACCZ +3: 10.75 mm at 0.49 s, 0.0003 mm at 5 s; pitch +2° holds at 13.2 mm).
 
-What the plugin sends in AI mode (`MotionGameFeed.PoseFrameAsPosition`, `MozaMotionController.StreamTick`):
+What the plugin sends in full control mode (`MotionGameFeed.PoseFrame`, `MozaMotionController.StreamTick`):
 
 | Part | Rule |
 |------|------|
-| f0 / f1 | the pose angle × 0.9 (game mode turns about 0.75 of an angle into tilt; 0.75 felt tamer than the game mode build from the seat); with *AI mode max performance* the true angle, each held only to the angle that moves an actuator 65 mm |
-| Travel | `AiPoseLimiter`, on the travel the platform is meant to end up with: pitch and roll are each eased off towards Max Available Stroke × 50 mm (where the controller puts one axis in game mode), then \|heave\| + pitch travel + roll travel, the furthest any actuator moves, is held to stroke × 62 mm (game mode's own maximum, above) by scaling the whole pose back. The angles sent are 70 · atanh(travel / 70), which undoes the controller's soft limit on a mode 11 angle, so up to about 72 mm can be asked of one actuator for 62 mm meant. Not with max performance, which leaves it all to the controller |
+| f0 / f1 | the pose angle × 0.9 (game mode turns about 0.75 of an angle into tilt; 0.75 felt tamer than the game mode build from the seat); with *Max performance* the true angle, each held only to the angle that moves an actuator 65 mm |
+| Travel | `PoseLimiter`, on the travel the platform is meant to end up with: pitch and roll are each eased off towards Max Available Stroke × 50 mm (where the controller puts one axis in game mode), then \|heave\| + pitch travel + roll travel, the furthest any actuator moves, is held to stroke × 62 mm (game mode's own maximum, above) by scaling the whole pose back. The angles sent are 70 · atanh(travel / 70), which undoes the controller's soft limit on a mode 11 angle, so up to about 72 mm can be asked of one actuator for 62 mm meant. Not with max performance, which leaves it all to the controller |
 | Speed, acceleration | each axis, as the actuator travel it causes, moves at no more than 210 mm/s and changes speed by no more than 1080 mm/s². A frame that arrives late counts as 0.05 s at most, so a stall is not caught up in one step (10.5 mm at most per frame). Not with max performance |
 | f6 | 25.5 · atanh(mm / 25.5), mm held within ±0.9 · 25.5, which undoes the soft limit: the platform sits where the profile's heave asks up to about 23 mm |
 | Crest strength | taken off as a drop in mm (strength 100 = up to 20 mm), none below 5 m/s and full from 15 m/s: a car being placed on track reads as "light" and held the drop for 10 s |
 | Source changes | f0, f1 and f6 ease over 2.5 s whenever the stream flips between a live pose and neutral frames (game start, pause, exit, SimHub idle, stale data) |
-| Frame shape | a posted frame carries its shape (`MotionTelemetryFrame.IsPosition`: f6 in mm for mode 11, f6 as acceleration for mode 1). The lane streams neutral frames while a frame's shape is not the mode it entered, so around a mode or source change one mode's f6 never goes out in the other |
-| Switching while running | ticking AI mode on or off while streaming goes hold → mode 3 → wait for the actuators → the normal entry, the path Manual control takes out of game mode. Whether the controller levels by itself between modes 1 and 11 is not known |
+| Frame shape | a posted frame carries its shape (`MotionTelemetryFrame.IsPosition`: f6 in mm for mode 11, raw game telemetry with f6 as acceleration for mode 1). The lane streams neutral frames while a frame's shape is not the mode it entered, so around a mode or source change one mode's f6 never goes out in the other |
+| Switching while running | changing *Motion source* while streaming goes hold → mode 3 → wait for the actuators → the normal entry, the path Manual control takes out of game mode. Whether the controller levels by itself between modes 1 and 11 is not known |
 | Engine tick-over | strength 0–100 = a heave pulse of up to 3 mm added to f6 at rpm / 230 Hz (4–11 Hz), each pulse with its own height, length and timing, +40 % with throttle, up to 2.5× for 2.5 s after the engine fires, never more than 4 mm; gone between 40 % and 70 % of the redline. It is added after the limiter, as a step of its own height, and the limiter keeps that much of the 62 mm travel free at the current revs, so pose plus pulse stays within the travel. A pulse rendered by the profile's own engine effect is sampled at the 33 Hz frame rate and arrives uneven (0.15 mm at idle, 0.7 mm at 6000 rpm in a capture), hence this one |
 | `0x22/09` | with a tick-over strength set it fades in over 30–55 % of the redline; *Engine vibration pitch* multiplies f₀ by 2^((value − 50) / 25) (0.25× at 0 to 4× at 100; f₀ kept within 20–250 Hz) and divides the gains by that factor^1.5. The engine counts as running from 500 rpm (iRacing reports a few hundred for a car that is not started) |
 

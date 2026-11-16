@@ -910,12 +910,9 @@
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Bork go!</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Thump-thump!</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Vroom-vroom!</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Woof bark: grr arf woof bark grr arf woof bark grr</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Woof bark grr (50 = arf)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Woof bark-grr arf (0 = woof)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf woof bark grr, arf woof bark grr.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Woof bark grr arf woof</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf woof bark grr arf woof bark. Woof bark grr arf woof.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>Woof bark!</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Yip!</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Arf!</value></data>
@@ -930,7 +927,9 @@
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Woof Arf Grr Bark (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Woof Arf Grr Bark (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Woof Arf Grr Bark Woof (mm)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Woof bark grr arf woof bark grr</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Woof bark grr arf woof bark</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof.</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Woof bark: {0:0} mm grr, {1:0} mm arf</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Woof bark</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf woof bark grr arf woof bark. Woof bark grr arf woof.</value></data>
 </root>

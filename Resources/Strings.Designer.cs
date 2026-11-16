@@ -978,12 +978,9 @@ namespace MozaPlugin.Resources
         public static string Section_ShakeItTrigger => Get("Section_ShakeItTrigger");
         public static string Section_ShakeItPulse => Get("Section_ShakeItPulse");
         public static string Section_ShakeItEngine => Get("Section_ShakeItEngine");
-        public static string Motion_Panel_AiPoseMode => Get("Motion_Panel_AiPoseMode");
         public static string Motion_Panel_EngineVibrationPitch => Get("Motion_Panel_EngineVibrationPitch");
         public static string Motion_Panel_EngineTickover => Get("Motion_Panel_EngineTickover");
         public static string Motion_Panel_EngineTickoverNote => Get("Motion_Panel_EngineTickoverNote");
-        public static string Motion_Panel_AiMaxPerformance => Get("Motion_Panel_AiMaxPerformance");
-        public static string Motion_Panel_AiMaxPerformanceWarning => Get("Motion_Panel_AiMaxPerformanceWarning");
         public static string Label_FfbStyle => Get("Label_FfbStyle");
         public static string Option_FfbStyleSoft => Get("Option_FfbStyleSoft");
         public static string Option_FfbStyleNormal => Get("Option_FfbStyleNormal");
@@ -1001,5 +998,7 @@ namespace MozaPlugin.Resources
         public static string Motion_Panel_VrMcDrivenPose => Get("Motion_Panel_VrMcDrivenPose");
         public static string Motion_Panel_VrMcPivotUnset => Get("Motion_Panel_VrMcPivotUnset");
         public static string Motion_Panel_VrMcPivotFmt => Get("Motion_Panel_VrMcPivotFmt");
+        public static string Motion_Panel_MaxPerformance => Get("Motion_Panel_MaxPerformance");
+        public static string Motion_Panel_MaxPerformanceWarning => Get("Motion_Panel_MaxPerformanceWarning");
     }
 }

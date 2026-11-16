@@ -920,12 +920,9 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Срабатывание</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Импульс</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Двигатель</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Режим ИИ: платформа следует вертикальному смещению, тангажу и крену SimHub как позициям</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Высота вибрации двигателя (50 = обычная)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Сила холостого хода двигателя (0 = выкл.)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>При использовании отключите эффект вибрации двигателя в профиле SimHub Motion, чтобы они не мешали друг другу.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Режим ИИ: максимальная производительность</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Максимальная производительность следует полным углам SimHub без ограничения скорости. При настройках SimHub на максимуме или близко к нему ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>Стиль FFB</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Мягкий</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Обычный</value></data>
@@ -940,7 +937,9 @@ Id: {2}</value></data>
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Расстояние между актуаторами слева–справа (мм)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>От передних актуаторов до центра сиденья (мм)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Низ сиденья над полом, платформа запаркована (мм)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>В режиме ИИ компенсировать углы, в которые фактически выводится платформа</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Компенсировать углы, в которые фактически выводится платформа</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Введите длину, положение и высоту сиденья, чтобы задать точку вращения (до этого SimHub использует сиденье).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Точка вращения от сиденья: {0:0} мм вперёд, {1:0} мм вниз</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Максимальная производительность</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Максимальная производительность следует полным углам SimHub без ограничения скорости. При настройках SimHub на максимуме или близко к нему ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.</value></data>
 </root>

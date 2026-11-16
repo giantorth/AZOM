@@ -923,12 +923,9 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Attivazione</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Impulso</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motore</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Modalità IA: la piattaforma segue sussulto, beccheggio e rollio di SimHub come posizioni</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tonalità della vibrazione motore (50 = normale)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Forza del minimo motore (0 = disattivato)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Quando lo usi, disattiva l'effetto vibrazione motore nel tuo profilo SimHub Motion, così i due non si sovrappongono.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Modalità IA: prestazioni massime</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>Stile FFB</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Morbido</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normale</value></data>
@@ -943,7 +940,9 @@ Id: {2}</value></data>
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Distanza attuatori sinistra–destra (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Attuatori anteriori al centro del sedile (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Base del sedile dal pavimento, piattaforma parcheggiata (mm)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>In modalità IA, compensa gli angoli a cui viene portata la piattaforma</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Compensa gli angoli a cui viene portata la piattaforma</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Inserisci lunghezza, posizione e altezza del sedile per impostare il perno (fino ad allora SimHub usa il sedile come perno).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Perno dal sedile: {0:0} mm in avanti, {1:0} mm in basso</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Prestazioni massime</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.</value></data>
 </root>

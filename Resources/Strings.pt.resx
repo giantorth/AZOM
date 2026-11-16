@@ -919,12 +919,9 @@ Id: {2}</value></data>
   <data name="Section_ShakeItTrigger" xml:space="preserve"><value>Disparo</value></data>
   <data name="Section_ShakeItPulse" xml:space="preserve"><value>Pulso</value></data>
   <data name="Section_ShakeItEngine" xml:space="preserve"><value>Motor</value></data>
-  <data name="Motion_Panel_AiPoseMode" xml:space="preserve"><value>Modo IA: a plataforma segue o movimento vertical, a arfagem e a rolagem do SimHub como posições</value></data>
   <data name="Motion_Panel_EngineVibrationPitch" xml:space="preserve"><value>Tom da vibração do motor (50 = normal)</value></data>
   <data name="Motion_Panel_EngineTickover" xml:space="preserve"><value>Força do ralenti do motor (0 = desligado)</value></data>
   <data name="Motion_Panel_EngineTickoverNote" xml:space="preserve"><value>Ao usar isto, desligue o efeito de vibração do motor no seu perfil do SimHub Motion, para que os dois não entrem em conflito.</value></data>
-  <data name="Motion_Panel_AiMaxPerformance" xml:space="preserve"><value>Modo IA: desempenho máximo</value></data>
-  <data name="Motion_Panel_AiMaxPerformanceWarning" xml:space="preserve"><value>O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. Com as definições do SimHub no máximo ou perto dele, é provável que o seu rig salte ou se desloque. Use por sua conta e risco.</value></data>
   <data name="Label_FfbStyle" xml:space="preserve"><value>Estilo de FFB</value></data>
   <data name="Option_FfbStyleSoft" xml:space="preserve"><value>Suave</value></data>
   <data name="Option_FfbStyleNormal" xml:space="preserve"><value>Normal</value></data>
@@ -939,7 +936,9 @@ Id: {2}</value></data>
   <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Distância entre atuadores esquerda–direita (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Atuadores dianteiros ao centro do banco (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Base do banco acima do chão, plataforma estacionada (mm)</value></data>
-  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>No modo IA, compensar os ângulos para os quais a plataforma é levada</value></data>
+  <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Compensar os ângulos para os quais a plataforma é levada</value></data>
   <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Introduza o comprimento, a posição e a altura do banco para definir o pivô (até lá o SimHub usa o banco como pivô).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Pivô a partir do banco: {0:0} mm para a frente, {1:0} mm para baixo</value></data>
+  <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Desempenho máximo</value></data>
+  <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. Com as definições do SimHub no máximo ou perto dele, é provável que o seu rig salte ou se desloque. Use por sua conta e risco.</value></data>
 </root>
