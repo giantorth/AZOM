@@ -932,14 +932,11 @@ Id: {2}</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Nhãn điều khiển</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Bánh xe ngón cái</value></data>
   <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Bù chuyển động VR</value></data>
-  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Kích thước giàn của bạn cho tính năng bù chuyển động VR của SimHub. Chỉ lưu trong SimHub, không gửi gì tới bộ điều khiển. Chiều dài, vị trí ghế và chiều cao ghế xác định tâm xoay; chiều rộng là tùy chọn.</value></data>
-  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Khoảng cách bộ truyền động trước–sau (mm)</value></data>
-  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Khoảng cách bộ truyền động trái–phải (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Bộ truyền động trước tới tâm ghế (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Đáy ghế cách sàn, nền tảng ở vị trí đỗ (mm)</value></data>
   <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Bù theo góc mà nền tảng thực sự được điều khiển tới</value></data>
-  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Nhập chiều dài, vị trí ghế và chiều cao ghế để đặt tâm xoay (trước đó SimHub dùng ghế làm tâm xoay).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Tâm xoay so với ghế: {0:0} mm về trước, {1:0} mm xuống dưới</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Hiệu năng tối đa</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.</value></data>
+  <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Tâm xoay so với ghế: {0:0} mm về sau, {1:0} mm xuống dưới</value></data>
 </root>

@@ -931,14 +931,11 @@ Id: {2}</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>컨트롤 라벨</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>썸 휠</value></data>
   <data name="Motion_Panel_VrMc" xml:space="preserve"><value>VR 모션 보정</value></data>
-  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>SimHub VR 모션 보정을 위한 리그 치수입니다. SimHub에만 저장되며 컨트롤러로는 아무것도 전송되지 않습니다. 길이, 시트 위치, 시트 높이로 회전 중심이 정해지며 폭은 선택 사항입니다.</value></data>
-  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>액추에이터 간격 앞–뒤 (mm)</value></data>
-  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>액추에이터 간격 좌–우 (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>앞쪽 액추에이터에서 시트 중심까지 (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>플랫폼 주차 시 바닥에서 시트 하단까지 (mm)</value></data>
   <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>플랫폼이 실제로 구동되는 각도를 보정</value></data>
-  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>회전 중심을 정하려면 길이, 시트 위치, 시트 높이를 입력하세요 (그 전까지 SimHub는 시트를 회전 중심으로 사용합니다).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>시트 기준 회전 중심: 앞으로 {0:0} mm, 아래로 {1:0} mm</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>최대 성능</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>최대 성능은 속도 제한 없이 SimHub의 전체 각도를 따릅니다. SimHub 설정이 최대이거나 최대에 가까우면 리그가 튀거나 밀릴 가능성이 높습니다. 사용에 따른 위험은 본인이 부담합니다.</value></data>
+  <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>시트 기준 회전 중심: 뒤로 {0:0} mm, 아래로 {1:0} mm</value></data>
 </root>

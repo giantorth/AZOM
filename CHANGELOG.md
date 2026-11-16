@@ -21,7 +21,7 @@ All notable changes to the AZOM plugin are documented here.
 - **HMA150 engine tick-over strength and engine vibration pitch (SimHub Motion profile source);** a low-rev heave pulse that hands over to the controller's engine vibration as revs rise; turn off the profile's own engine vibration effect when using it.
 - **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
 - **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
-- **HMA150 VR motion compensation settings;** enter the actuator spacing, the seat's distance from the front actuators and its height above the floor, and SimHub's VR motion compensation pivots where the rig does instead of at the seat. With the SimHub Motion profile source it also compensates the angles the platform is actually driven to.
+- **HMA150 VR motion compensation settings;** with the rig length set, enter the seat's distance from the front actuators and its height above the floor, and SimHub's VR motion compensation pivots where the rig does instead of at the seat. With the SimHub Motion profile source it also compensates the angles the platform is actually driven to.
 
 ### Clutch bite point
 

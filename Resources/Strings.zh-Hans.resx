@@ -932,14 +932,11 @@ Id: {2}</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>控件标签</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>拇指滚轮</value></data>
   <data name="Motion_Panel_VrMc" xml:space="preserve"><value>VR 运动补偿</value></data>
-  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>用于 SimHub VR 运动补偿的平台尺寸。仅保存在 SimHub 中，不会发送到控制器。长度、座椅位置和座椅高度决定旋转中心；宽度为可选项。</value></data>
-  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>执行器前后间距 (mm)</value></data>
-  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>执行器左右间距 (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>前执行器到座椅中心 (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>平台停放时座椅底部离地高度 (mm)</value></data>
   <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>按平台实际驱动的角度进行补偿</value></data>
-  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>输入长度、座椅位置和座椅高度以设置旋转中心（在此之前 SimHub 以座椅作为旋转中心）。</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>旋转中心相对座椅：向前 {0:0} mm，向下 {1:0} mm</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>最大性能</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>最大性能会跟随 SimHub 的完整角度，且不限制速度。当 SimHub 的设置处于或接近最大值时，您的设备很可能会跳动或移位。使用风险自负。</value></data>
+  <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>旋转中心相对座椅：向后 {0:0} mm，向下 {1:0} mm</value></data>
 </root>

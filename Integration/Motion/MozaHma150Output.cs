@@ -123,25 +123,21 @@ namespace MozaPlugin.Integration.Motion
             }
         }
 
-        private double _mcRigLengthMm, _mcRigWidthMm, _mcSeatFromFrontMm, _mcSeatHeightMm;
+        private double _mcSeatFromFrontMm, _mcSeatHeightMm;
         private bool _mcUseDrivenPose = true;
 
         /// <summary>
-        /// VR motion compensation, rig measurements entered by hand (mm, 0 = not set): distance between
-        /// the front and rear actuator centres. With <see cref="McSeatFromFrontMm"/> and
-        /// <see cref="McSeatHeightMm"/> it places SimHub's MC pivot (<see cref="Hma150MotionCompensation"/>);
-        /// it also turns the driven travel into the real pitch angle.
+        /// VR motion compensation (mm, 0 = not set): distance from the front actuators' line back to the
+        /// centre of the seat. With <see cref="McSeatHeightMm"/> and the controller's rig length it places
+        /// SimHub's MC pivot (<see cref="Hma150MotionCompensation"/>).
         /// </summary>
-        public double McRigLengthMm { get => _mcRigLengthMm; set => SetMm(ref _mcRigLengthMm, value); }
-
-        /// <summary>VR MC: distance between the left and right actuator centres (mm, 0 = the controller's own figure); turns the driven travel into the real roll angle.</summary>
-        public double McRigWidthMm { get => _mcRigWidthMm; set => SetMm(ref _mcRigWidthMm, value); }
-
-        /// <summary>VR MC: distance from the front actuators' line back to the centre of the seat (mm).</summary>
         public double McSeatFromFrontMm { get => _mcSeatFromFrontMm; set => SetMm(ref _mcSeatFromFrontMm, value); }
 
-        /// <summary>VR MC: height of the seat bottom above the floor with the platform parked, actuators fully retracted (mm).</summary>
+        /// <summary>VR MC: height of the seat bottom above the floor with the platform parked, actuators fully retracted (mm, 0 = not set).</summary>
         public double McSeatHeightMm { get => _mcSeatHeightMm; set => SetMm(ref _mcSeatHeightMm, value); }
+
+        /// <summary>VR MC measurement range (mm); anything below the minimum is stored as 0, not set.</summary>
+        public const double McMinMm = 1.0, McMaxMm = 5000.0;
 
         /// <summary>
         /// VR MC, on by default, pose source only: give SimHub's motion compensation the pitch, roll and
@@ -161,7 +157,7 @@ namespace MozaPlugin.Integration.Motion
 
         private void SetMm(ref double field, double value)
         {
-            value = double.IsNaN(value) || double.IsInfinity(value) ? 0.0 : Math.Max(0.0, Math.Min(5000.0, value));
+            value = double.IsNaN(value) || double.IsInfinity(value) || value < McMinMm ? 0.0 : Math.Min(McMaxMm, value);
             if (field == value) return;
             field = value;
             Output?.ApplySettings();
@@ -318,18 +314,22 @@ namespace MozaPlugin.Integration.Motion
             var lane = Lane;
             Stream(lane, geometryResult, currentSettings);
             // SimHub's VR motion compensation reads this same result right after this call.
-            Hma150MotionCompensation.Apply(geometryResult, currentSettings, lane);
+            _motionCompensation.Apply(geometryResult, currentSettings, lane);
         }
+
+        private readonly Hma150MotionCompensation _motionCompensation = new Hma150MotionCompensation();
 
         private void Stream(MozaMotionController? lane, CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
         {
             PollManualControl(lane);
             if (!CheckLane(lane)) return;
+            var primary = geometryResult?.PrimaryGeometryResult;
+            // SimHub's own state, not the driven pose a previous update put in a result SimHub reuses.
+            var simHubState = _motionCompensation.SimHubState(primary);
             if (lane!.ManualDriven)
             {
                 // Manual control and Hop-in poses carry no effects, so either state reads the same.
-                var primary = geometryResult?.PrimaryGeometryResult;
-                var pose = primary?.MotionState ?? primary?.FinalMotionState;
+                var pose = simHubState ?? primary?.FinalMotionState;
                 if (pose != null)
                     lane.PostManualPose(
                         (float)(pose.PitchDegrees / ManualFullScaleDegrees),
@@ -342,10 +342,9 @@ namespace MozaPlugin.Integration.Motion
             if (currentSettings?.Source == MozaHma150Source.SimHubPose)
             {
                 // Final state: the bypass geometry folds corner haptics into it, as SimHub's <PoseAxis> token reads.
-                var primary = geometryResult?.PrimaryGeometryResult;
                 var pose = currentSettings!.IncludeCornerHaptics
-                    ? primary?.FinalMotionState ?? primary?.MotionState
-                    : primary?.MotionState;
+                    ? primary?.FinalMotionState ?? simHubState
+                    : simHubState;
                 if (pose != null)
                 {
                     // The crest signal belongs to the running game: none without a fresh game frame.

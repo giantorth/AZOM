@@ -2080,18 +2080,21 @@ folded into `FinalMotionState`, add its 50°/s angular spike limiter and stroke 
 pose, and change the Manual control scale). Instead `MozaHma150Output.UpdateInternal`, after
 streaming, calls `Hma150MotionCompensation.Apply`:
 
-- **Pivot**, from the output settings `McRigLengthMm`, `McSeatFromFrontMm`, `McSeatHeightMm`
-  (entered by hand in the HMA150 panel's *VR motion compensation* section), in the 4-corner
-  convention: `Surge = seat-from-front − length / 2`, `Sway = 0`, `Heave = seat height + 80 mm`
-  (the controller logs −80 mm per actuator parked and 0 at the centre position). Not written until
-  all three are set.
+- **Pivot**, from the controller's front-to-rear actuator spacing (the panel's rig length, read
+  back from `0x1F/08`; `MozaMotionController.RigLengthReadMm`) and the output settings
+  `McSeatFromFrontMm`, `McSeatHeightMm` (the panel's *VR motion compensation* section, saved
+  together by its Apply button), in the 4-corner convention: `Surge = seat-from-front − length / 2`,
+  `Sway = 0`, `Heave = seat height + 80 mm` (the controller logs −80 mm per actuator parked and 0 at
+  the centre position). Not written until the spacing has been read and both seat values are set.
+  One `RotationCenter` is reused until a value changes.
 - **Driven pose (pose source, full control mode; `McUseDrivenPose`, on by default):** `MotionState`
   is replaced by a copy with the pitch, roll and heave the controller is driven to
-  (`MozaMotionController.LatestDrivenPose`, published each full control tick from
-  `PoseLimiter.IntendedPitchMm / IntendedRollMm / HeaveMm`, at most 200 ms old). The controller
-  converts an angle to actuator travel with its own stored dimensions (often the 500 × 500 mm
-  default), so the real tilt is `asin(travel / (spacing / 2))` on the measured spacing
-  (`McRigLengthMm`, `McRigWidthMm`; 0 falls back to the controller's). The game telemetry source
+  (`MozaMotionController.TryGetDrivenPose`, published each full control tick from
+  `PoseLimiter.IntendedPitchMm / IntendedRollMm / HeaveMm`, at most 200 ms old), and yaw, surge and
+  sway zeroed (the platform has none). The tilt is `asin(travel / (spacing / 2))` on the
+  controller's stored spacing, which the panel's rig length and width set to the real one. SimHub
+  can hand a result back to the output (Manual control, Hop-in), so streaming reads SimHub's own
+  state through `Hma150MotionCompensation.SimHubState`, never the copy. The game telemetry source
   (game mode) leaves SimHub's pose: the controller's own cueing there is not modelled.
 
 The geometry tab of the MC monitor stays empty: it is drawn from the geometry's 3D view.

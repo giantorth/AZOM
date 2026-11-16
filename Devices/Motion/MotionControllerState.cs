@@ -23,18 +23,27 @@ namespace MozaPlugin.Devices.Motion
     /// <summary>
     /// Full control mode: the pose the lane last drove the controller to, as actuator travel (what the
     /// controller is expected to move after its own soft limits), with the half spacings it was computed from.
-    /// Immutable; swapped whole by the lane's tick.
     /// </summary>
-    public sealed class MotionDrivenPose
+    public readonly struct MotionDrivenPose
     {
+        public MotionDrivenPose(double pitchTravelMm, double rollTravelMm, double heaveMm,
+            double controllerHalfLengthMm, double controllerHalfWidthMm)
+        {
+            PitchTravelMm = pitchTravelMm;
+            RollTravelMm = rollTravelMm;
+            HeaveMm = heaveMm;
+            ControllerHalfLengthMm = controllerHalfLengthMm;
+            ControllerHalfWidthMm = controllerHalfWidthMm;
+        }
+
         /// <summary>Travel at an actuator from pitch and from roll (mm), sign of the frame's f0 / f1.</summary>
-        public double PitchTravelMm, RollTravelMm;
+        public double PitchTravelMm { get; }
+        public double RollTravelMm { get; }
         /// <summary>Heave the controller is expected to hold (mm, + up).</summary>
-        public double HeaveMm;
+        public double HeaveMm { get; }
         /// <summary>Half the actuator spacing the controller computes with (its stored dimensions, or the lane's default).</summary>
-        public double ControllerHalfLengthMm, ControllerHalfWidthMm;
-        /// <summary>Lane clock (ms) when this pose went out.</summary>
-        public long AtMs;
+        public double ControllerHalfLengthMm { get; }
+        public double ControllerHalfWidthMm { get; }
     }
 
     /// <summary>Engage parameters. The effect sliders live on the controller and are not touched.</summary>

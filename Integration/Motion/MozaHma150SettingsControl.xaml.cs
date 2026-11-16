@@ -140,6 +140,8 @@ namespace MozaPlugin.Integration.Motion
                     : s.HapticIntensity.HasValue ? (s.HapticIntensity.Value * 100).ToString("0", CultureInfo.CurrentCulture) : "";
             }
             RefreshLighting(lane);
+            // The rig length comes from the controller, read after connecting or rewritten by Apply.
+            ShowMcPivot();
         }
 
         // ------------------------------------------------------------ source
@@ -187,13 +189,12 @@ namespace MozaPlugin.Integration.Motion
 
         // ------------------------------------------------------------ VR motion compensation
 
-        /// <summary>Rig measurements for SimHub's VR MC: SimHub-side output settings, nothing goes to the controller.</summary>
+        /// <summary>Seat measurements for SimHub's VR MC: SimHub-side output settings, nothing goes to the controller.</summary>
         private void WireMcSettings(MozaHma150OutputSettings? settings)
         {
-            WireMmBox(McRigLengthBox, settings?.McRigLengthMm, (st, v) => st.McRigLengthMm = v);
-            WireMmBox(McRigWidthBox, settings?.McRigWidthMm, (st, v) => st.McRigWidthMm = v);
-            WireMmBox(McSeatFromFrontBox, settings?.McSeatFromFrontMm, (st, v) => st.McSeatFromFrontMm = v);
-            WireMmBox(McSeatHeightBox, settings?.McSeatHeightMm, (st, v) => st.McSeatHeightMm = v);
+            ShowMm(McSeatFromFrontBox, settings?.McSeatFromFrontMm);
+            ShowMm(McSeatHeightBox, settings?.McSeatHeightMm);
+            McSeatFromFrontBox.IsEnabled = McSeatHeightBox.IsEnabled = McApply.IsEnabled = settings != null;
             McDrivenPoseCheck.IsChecked = settings?.McUseDrivenPose ?? true;
             McDrivenPoseCheck.Click += (_, __) =>
             {
@@ -203,39 +204,45 @@ namespace MozaPlugin.Integration.Motion
             ShowMcPivot();
         }
 
-        /// <summary>A millimetre box stored on every valid edit (empty = 0, not set); an invalid entry is left unsaved.</summary>
-        private void WireMmBox(TextBox box, double? value, Action<MozaHma150OutputSettings, double> store)
+        private static void ShowMm(TextBox box, double? value)
+            => box.Text = value is double mm && mm > 0 ? mm.ToString("0", CultureInfo.CurrentCulture) : "";
+
+        /// <summary>Saves both seat measurements together, or neither if one is invalid (empty = not set).</summary>
+        private void McApply_Click(object sender, RoutedEventArgs e)
         {
-            box.IsEnabled = value.HasValue;
-            box.Text = value.HasValue && value.Value > 0 ? value.Value.ToString("0", CultureInfo.CurrentCulture) : "";
-            box.TextChanged += (_, __) =>
-            {
-                var s = _output?.Settings;
-                if (s == null) return;
-                double mm = 0.0;
-                bool ok = string.IsNullOrWhiteSpace(box.Text) || (TryParse(box.Text, out mm) && mm >= 0 && mm <= 5000);
-                box.ClearValue(TextBox.BorderBrushProperty);
-                if (!ok)
-                {
-                    box.BorderBrush = Brushes.OrangeRed;
-                    return;
-                }
-                store(s, mm);
-                ShowMcPivot();
-            };
+            var s = _output?.Settings;
+            if (s == null) return;
+            bool fromFrontOk = TryParseMm(McSeatFromFrontBox, out double fromFront);
+            bool heightOk = TryParseMm(McSeatHeightBox, out double height);
+            if (!fromFrontOk || !heightOk) return;
+            s.McSeatFromFrontMm = fromFront;
+            s.McSeatHeightMm = height;
+            ShowMcPivot();
         }
 
+        private static bool TryParseMm(TextBox box, out double mm)
+        {
+            mm = 0.0;
+            bool ok = string.IsNullOrWhiteSpace(box.Text)
+                || (TryParse(box.Text, out mm) && mm >= MozaHma150OutputSettings.McMinMm && mm <= MozaHma150OutputSettings.McMaxMm);
+            if (ok) box.ClearValue(TextBox.BorderBrushProperty);
+            else box.BorderBrush = Brushes.OrangeRed;
+            return ok;
+        }
+
+        /// <summary>The pivot as saved, once the controller's rig length has been read; hidden until then.</summary>
         private void ShowMcPivot()
         {
             var s = _output?.Settings;
-            if (!Hma150MotionCompensation.HasPivot(s))
+            if (s == null || !Hma150MotionCompensation.TryPivot(Lane?.RigLengthReadMm, s.McSeatFromFrontMm, s.McSeatHeightMm,
+                    out double surge, out double heave))
             {
-                McPivotValue.Text = Strings.Motion_Panel_VrMcPivotUnset;
+                McPivotRow.Visibility = Visibility.Collapsed;
                 return;
             }
-            Hma150MotionCompensation.Pivot(s!.McRigLengthMm, s.McSeatFromFrontMm, s.McSeatHeightMm,
-                out double surge, out _, out double heave);
-            McPivotValue.Text = string.Format(CultureInfo.CurrentCulture, Strings.Motion_Panel_VrMcPivotFmt, surge, heave);
+            string fmt = surge >= 0 ? Strings.Motion_Panel_VrMcPivotFmt : Strings.Motion_Panel_VrMcPivotBehindFmt;
+            McPivotValue.Text = string.Format(CultureInfo.CurrentCulture, fmt, Math.Abs(surge), heave);
+            McPivotRow.Visibility = Visibility.Visible;
         }
 
         /// <summary>A whole-number slider with its value label, stored into the output's settings.</summary>

@@ -14,51 +14,6 @@
     "vi": "Bù chuyển động VR",
     "zh-Hans": "VR 运动补偿"
   },
-  "Motion_Panel_VrMcNote": {
-    "en": "Measurements of your rig for SimHub's VR motion compensation. Stored in SimHub only, nothing is sent to the controller. Length, seat position and seat height place the pivot; width is optional.",
-    "de": "Maße Ihres Rigs für die VR-Bewegungskompensation von SimHub. Nur in SimHub gespeichert, nichts wird an den Controller gesendet. Länge, Sitzposition und Sitzhöhe legen den Drehpunkt fest; die Breite ist optional.",
-    "el": "Διαστάσεις του rig σας για την αντιστάθμιση κίνησης VR του SimHub. Αποθηκεύονται μόνο στο SimHub, τίποτα δεν στέλνεται στον ελεγκτή. Το μήκος, η θέση και το ύψος του καθίσματος ορίζουν το σημείο περιστροφής· το πλάτος είναι προαιρετικό.",
-    "es": "Medidas de su rig para la compensación de movimiento VR de SimHub. Se guardan solo en SimHub, no se envía nada al controlador. La longitud, la posición y la altura del asiento sitúan el pivote; el ancho es opcional.",
-    "fr": "Mesures de votre rig pour la compensation de mouvement VR de SimHub. Enregistrées dans SimHub uniquement, rien n'est envoyé au contrôleur. La longueur, la position et la hauteur du siège placent le pivot ; la largeur est facultative.",
-    "it": "Misure del tuo rig per la compensazione del movimento VR di SimHub. Salvate solo in SimHub, nulla viene inviato al controller. Lunghezza, posizione e altezza del sedile collocano il perno; la larghezza è facoltativa.",
-    "ko": "SimHub VR 모션 보정을 위한 리그 치수입니다. SimHub에만 저장되며 컨트롤러로는 아무것도 전송되지 않습니다. 길이, 시트 위치, 시트 높이로 회전 중심이 정해지며 폭은 선택 사항입니다.",
-    "nb": "Mål av riggen din for SimHubs VR-bevegelseskompensasjon. Lagres bare i SimHub, ingenting sendes til kontrolleren. Lengde, seteposisjon og setehøyde plasserer dreiepunktet; bredde er valgfritt.",
-    "pt": "Medidas do seu rig para a compensação de movimento VR do SimHub. Guardadas apenas no SimHub, nada é enviado ao controlador. O comprimento, a posição e a altura do banco definem o pivô; a largura é opcional.",
-    "qps-ploc": "Woof bark grr arf woof bark. Grr arf woof bark grr. Woof arf grr bark woof.",
-    "ru": "Размеры вашего стенда для компенсации движения VR в SimHub. Хранятся только в SimHub, на контроллер ничего не отправляется. Длина, положение и высота сиденья задают точку вращения; ширина необязательна.",
-    "vi": "Kích thước giàn của bạn cho tính năng bù chuyển động VR của SimHub. Chỉ lưu trong SimHub, không gửi gì tới bộ điều khiển. Chiều dài, vị trí ghế và chiều cao ghế xác định tâm xoay; chiều rộng là tùy chọn.",
-    "zh-Hans": "用于 SimHub VR 运动补偿的平台尺寸。仅保存在 SimHub 中，不会发送到控制器。长度、座椅位置和座椅高度决定旋转中心；宽度为可选项。"
-  },
-  "Motion_Panel_VrMcRigLength": {
-    "en": "Actuator distance front to rear (mm)",
-    "de": "Aktuatorabstand vorne–hinten (mm)",
-    "el": "Απόσταση ενεργοποιητών εμπρός–πίσω (mm)",
-    "es": "Distancia entre actuadores delante–detrás (mm)",
-    "fr": "Distance entre actionneurs avant–arrière (mm)",
-    "it": "Distanza attuatori anteriore–posteriore (mm)",
-    "ko": "액추에이터 간격 앞–뒤 (mm)",
-    "nb": "Aktuatoravstand foran–bak (mm)",
-    "pt": "Distância entre atuadores frente–trás (mm)",
-    "qps-ploc": "Woof Arf Grr Bark (mm)",
-    "ru": "Расстояние между актуаторами спереди–сзади (мм)",
-    "vi": "Khoảng cách bộ truyền động trước–sau (mm)",
-    "zh-Hans": "执行器前后间距 (mm)"
-  },
-  "Motion_Panel_VrMcRigWidth": {
-    "en": "Actuator distance left to right (mm)",
-    "de": "Aktuatorabstand links–rechts (mm)",
-    "el": "Απόσταση ενεργοποιητών αριστερά–δεξιά (mm)",
-    "es": "Distancia entre actuadores izquierda–derecha (mm)",
-    "fr": "Distance entre actionneurs gauche–droite (mm)",
-    "it": "Distanza attuatori sinistra–destra (mm)",
-    "ko": "액추에이터 간격 좌–우 (mm)",
-    "nb": "Aktuatoravstand venstre–høyre (mm)",
-    "pt": "Distância entre atuadores esquerda–direita (mm)",
-    "qps-ploc": "Woof Arf Grr Bark (mm)",
-    "ru": "Расстояние между актуаторами слева–справа (мм)",
-    "vi": "Khoảng cách bộ truyền động trái–phải (mm)",
-    "zh-Hans": "执行器左右间距 (mm)"
-  },
   "Motion_Panel_VrMcSeatFromFront": {
     "en": "Front actuators to seat centre (mm)",
     "de": "Vordere Aktuatoren bis Sitzmitte (mm)",
@@ -104,21 +59,6 @@
     "vi": "Bù theo góc mà nền tảng thực sự được điều khiển tới",
     "zh-Hans": "按平台实际驱动的角度进行补偿"
   },
-  "Motion_Panel_VrMcPivotUnset": {
-    "en": "Enter length, seat position and seat height to set the pivot (SimHub uses the seat as the pivot until then).",
-    "de": "Länge, Sitzposition und Sitzhöhe eingeben, um den Drehpunkt festzulegen (bis dahin nutzt SimHub den Sitz als Drehpunkt).",
-    "el": "Εισαγάγετε μήκος, θέση και ύψος καθίσματος για να οριστεί το σημείο περιστροφής (μέχρι τότε το SimHub χρησιμοποιεί το κάθισμα).",
-    "es": "Introduzca la longitud, la posición y la altura del asiento para fijar el pivote (hasta entonces SimHub usa el asiento como pivote).",
-    "fr": "Saisissez la longueur, la position et la hauteur du siège pour placer le pivot (jusque-là, SimHub utilise le siège comme pivot).",
-    "it": "Inserisci lunghezza, posizione e altezza del sedile per impostare il perno (fino ad allora SimHub usa il sedile come perno).",
-    "ko": "회전 중심을 정하려면 길이, 시트 위치, 시트 높이를 입력하세요 (그 전까지 SimHub는 시트를 회전 중심으로 사용합니다).",
-    "nb": "Angi lengde, seteposisjon og setehøyde for å sette dreiepunktet (til da bruker SimHub setet som dreiepunkt).",
-    "pt": "Introduza o comprimento, a posição e a altura do banco para definir o pivô (até lá o SimHub usa o banco como pivô).",
-    "qps-ploc": "Woof bark grr arf woof bark grr arf woof.",
-    "ru": "Введите длину, положение и высоту сиденья, чтобы задать точку вращения (до этого SimHub использует сиденье).",
-    "vi": "Nhập chiều dài, vị trí ghế và chiều cao ghế để đặt tâm xoay (trước đó SimHub dùng ghế làm tâm xoay).",
-    "zh-Hans": "输入长度、座椅位置和座椅高度以设置旋转中心（在此之前 SimHub 以座椅作为旋转中心）。"
-  },
   "Motion_Panel_VrMcPivotFmt": {
     "en": "Pivot from the seat: {0:0} mm forward, {1:0} mm down",
     "de": "Drehpunkt vom Sitz aus: {0:0} mm nach vorne, {1:0} mm nach unten",
@@ -133,5 +73,20 @@
     "ru": "Точка вращения от сиденья: {0:0} мм вперёд, {1:0} мм вниз",
     "vi": "Tâm xoay so với ghế: {0:0} mm về trước, {1:0} mm xuống dưới",
     "zh-Hans": "旋转中心相对座椅：向前 {0:0} mm，向下 {1:0} mm"
+  },
+  "Motion_Panel_VrMcPivotBehindFmt": {
+    "en": "Pivot from the seat: {0:0} mm behind, {1:0} mm down",
+    "de": "Drehpunkt vom Sitz aus: {0:0} mm nach hinten, {1:0} mm nach unten",
+    "el": "Σημείο περιστροφής από το κάθισμα: {0:0} mm πίσω, {1:0} mm κάτω",
+    "es": "Pivote desde el asiento: {0:0} mm hacia atrás, {1:0} mm hacia abajo",
+    "fr": "Pivot depuis le siège : {0:0} mm vers l'arrière, {1:0} mm vers le bas",
+    "it": "Perno dal sedile: {0:0} mm indietro, {1:0} mm in basso",
+    "ko": "시트 기준 회전 중심: 뒤로 {0:0} mm, 아래로 {1:0} mm",
+    "nb": "Dreiepunkt fra setet: {0:0} mm bakover, {1:0} mm ned",
+    "pt": "Pivô a partir do banco: {0:0} mm para trás, {1:0} mm para baixo",
+    "qps-ploc": "Woof bark: {0:0} mm yip, {1:0} mm arf",
+    "ru": "Точка вращения от сиденья: {0:0} мм назад, {1:0} мм вниз",
+    "vi": "Tâm xoay so với ghế: {0:0} mm về sau, {1:0} mm xuống dưới",
+    "zh-Hans": "旋转中心相对座椅：向后 {0:0} mm，向下 {1:0} mm"
   }
 }

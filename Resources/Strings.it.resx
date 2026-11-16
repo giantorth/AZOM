@@ -935,14 +935,11 @@ Id: {2}</value></data>
   <data name="Label_ControlLabels" xml:space="preserve"><value>Etichette dei comandi</value></data>
   <data name="Label_ThumbWheel" xml:space="preserve"><value>Rotella per pollice</value></data>
   <data name="Motion_Panel_VrMc" xml:space="preserve"><value>Compensazione del movimento VR</value></data>
-  <data name="Motion_Panel_VrMcNote" xml:space="preserve"><value>Misure del tuo rig per la compensazione del movimento VR di SimHub. Salvate solo in SimHub, nulla viene inviato al controller. Lunghezza, posizione e altezza del sedile collocano il perno; la larghezza è facoltativa.</value></data>
-  <data name="Motion_Panel_VrMcRigLength" xml:space="preserve"><value>Distanza attuatori anteriore–posteriore (mm)</value></data>
-  <data name="Motion_Panel_VrMcRigWidth" xml:space="preserve"><value>Distanza attuatori sinistra–destra (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatFromFront" xml:space="preserve"><value>Attuatori anteriori al centro del sedile (mm)</value></data>
   <data name="Motion_Panel_VrMcSeatHeight" xml:space="preserve"><value>Base del sedile dal pavimento, piattaforma parcheggiata (mm)</value></data>
   <data name="Motion_Panel_VrMcDrivenPose" xml:space="preserve"><value>Compensa gli angoli a cui viene portata la piattaforma</value></data>
-  <data name="Motion_Panel_VrMcPivotUnset" xml:space="preserve"><value>Inserisci lunghezza, posizione e altezza del sedile per impostare il perno (fino ad allora SimHub usa il sedile come perno).</value></data>
   <data name="Motion_Panel_VrMcPivotFmt" xml:space="preserve"><value>Perno dal sedile: {0:0} mm in avanti, {1:0} mm in basso</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Prestazioni massime</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.</value></data>
+  <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Perno dal sedile: {0:0} mm indietro, {1:0} mm in basso</value></data>
 </root>

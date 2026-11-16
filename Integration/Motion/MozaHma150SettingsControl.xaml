@@ -131,32 +131,20 @@
 
         <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_VrMc}"/>
         <StackPanel Style="{StaticResource Row}">
-            <TextBlock Style="{StaticResource Label}"/>
-            <TextBlock VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460" Opacity="0.7"
-                       Text="{x:Static res:Strings.Motion_Panel_VrMcNote}"/>
-        </StackPanel>
-        <StackPanel Style="{StaticResource Row}">
-            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcRigLength}"/>
-            <TextBox Style="{StaticResource NumberBox}" x:Name="McRigLengthBox"/>
-        </StackPanel>
-        <StackPanel Style="{StaticResource Row}">
-            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcRigWidth}"/>
-            <TextBox Style="{StaticResource NumberBox}" x:Name="McRigWidthBox"/>
-        </StackPanel>
-        <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcSeatFromFront}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="McSeatFromFrontBox"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcSeatHeight}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="McSeatHeightBox"/>
+            <Button x:Name="McApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="McApply_Click"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}"/>
             <CheckBox x:Name="McDrivenPoseCheck" VerticalAlignment="Center"
                       Content="{x:Static res:Strings.Motion_Panel_VrMcDrivenPose}"/>
         </StackPanel>
-        <StackPanel Style="{StaticResource Row}">
+        <StackPanel Style="{StaticResource Row}" x:Name="McPivotRow" Visibility="Collapsed">
             <TextBlock Style="{StaticResource Label}"/>
             <TextBlock x:Name="McPivotValue" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460" Opacity="0.7"/>
         </StackPanel>
