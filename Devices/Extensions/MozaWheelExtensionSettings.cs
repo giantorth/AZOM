@@ -27,6 +27,8 @@ namespace MozaPlugin.Devices.Extensions
         public int WheelTelemetryIdleSpeedMs { get; set; } = -1;
         public int WheelButtonsIdleSpeedMs { get; set; } = -1;
         public int WheelKnobIdleSpeedMs { get; set; } = -1;
+        public int[]? WheelKnobBreathColors { get; set; }
+        public WheelMultiDialSettings? WheelMultiDial { get; set; }
         public int WheelSleepMode { get; set; } = -1;
         public int WheelSleepTimeoutMin { get; set; } = -1;
         public int WheelSleepSpeedMs { get; set; } = -1;
@@ -89,7 +91,10 @@ namespace MozaPlugin.Devices.Extensions
                 WheelIdleSettings? idle = null;
                 if (settings.WheelIdleByPageGuid != null)
                     settings.WheelIdleByPageGuid.TryGetValue(pageGuid, out idle);
-                CaptureFromProfile(ov, data, sleep, idle);
+                WheelMultiDialSettings? multiDial = null;
+                if (settings.WheelMultiDialByPageGuid != null)
+                    settings.WheelMultiDialByPageGuid.TryGetValue(pageGuid, out multiDial);
+                CaptureFromProfile(ov, data, sleep, idle, multiDial);
                 return;
             }
 
@@ -208,7 +213,8 @@ namespace MozaPlugin.Devices.Extensions
                 // Same fill-only semantics as the sleep bundle above.
                 if (settings != null && (WheelIdleEffect >= 0 || WheelButtonsIdleEffect >= 0
                     || WheelKnobIdleEffect >= 0 || WheelTelemetryIdleSpeedMs >= 0
-                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0))
+                    || WheelButtonsIdleSpeedMs >= 0 || WheelKnobIdleSpeedMs >= 0
+                    || WheelKnobBreathColors != null))
                 {
                     if (settings.WheelIdleByPageGuid == null)
                         settings.WheelIdleByPageGuid = new Dictionary<Guid, WheelIdleSettings>();
@@ -225,6 +231,29 @@ namespace MozaPlugin.Devices.Extensions
                     if (idle.TelemetrySpeedMs < 0 && WheelTelemetryIdleSpeedMs  >= 0) idle.TelemetrySpeedMs = WheelTelemetryIdleSpeedMs;
                     if (idle.ButtonsSpeedMs   < 0 && WheelButtonsIdleSpeedMs    >= 0) idle.ButtonsSpeedMs   = WheelButtonsIdleSpeedMs;
                     if (idle.KnobSpeedMs      < 0 && WheelKnobIdleSpeedMs       >= 0) idle.KnobSpeedMs      = WheelKnobIdleSpeedMs;
+                    if (idle.KnobBreathColors == null && WheelKnobBreathColors != null) idle.KnobBreathColors = (int[])WheelKnobBreathColors.Clone();
+                }
+
+                // Multi-mode dial bundle: same per-wheel-page, fill-only semantics.
+                if (settings != null && WheelMultiDial != null)
+                {
+                    if (settings.WheelMultiDialByPageGuid == null)
+                        settings.WheelMultiDialByPageGuid = new Dictionary<Guid, WheelMultiDialSettings>();
+                    if (!settings.WheelMultiDialByPageGuid.TryGetValue(pageGuid, out var dial) || dial == null)
+                    {
+                        dial = new WheelMultiDialSettings();
+                        var next = new Dictionary<Guid, WheelMultiDialSettings>(settings.WheelMultiDialByPageGuid);
+                        next[pageGuid] = dial;
+                        settings.WheelMultiDialByPageGuid = next;
+                    }
+                    var src = WheelMultiDial.Clone();
+                    if (dial.Enabled < 0 && src.Enabled >= 0) dial.Enabled = src.Enabled;
+                    if (dial.Knob    < 0 && src.Knob    >= 0) dial.Knob    = src.Knob;
+                    if (dial.Left    < 0 && src.Left    >= 0) dial.Left    = src.Left;
+                    if (dial.Right   < 0 && src.Right   >= 0) dial.Right   = src.Right;
+                    if (dial.LeftWheel  < 0 && src.LeftWheel  >= 0) dial.LeftWheel  = src.LeftWheel;
+                    if (dial.RightWheel < 0 && src.RightWheel >= 0) dial.RightWheel = src.RightWheel;
+                    if (dial.Labels == null && src.Labels != null) dial.Labels = src.Labels;
                 }
             }
 
@@ -333,8 +362,10 @@ namespace MozaPlugin.Devices.Extensions
         /// the live state.
         /// </summary>
         internal void CaptureFromProfile(MozaWheelProfile ov, MozaData data,
-            WheelSleepSettings? sleep = null, WheelIdleSettings? idle = null)
+            WheelSleepSettings? sleep = null, WheelIdleSettings? idle = null,
+            WheelMultiDialSettings? multiDial = null)
         {
+            WheelMultiDial = multiDial?.Clone();
             WheelModelName = data.WheelModelName ?? "";
             WheelTelemetryMode      = ov.WheelTelemetryMode;
             WheelKnobLedMode        = ov.WheelKnobLedMode;
@@ -359,6 +390,7 @@ namespace MozaPlugin.Devices.Extensions
                 WheelTelemetryIdleSpeedMs  = idle.TelemetrySpeedMs;
                 WheelButtonsIdleSpeedMs    = idle.ButtonsSpeedMs;
                 WheelKnobIdleSpeedMs       = idle.KnobSpeedMs;
+                WheelKnobBreathColors      = idle.KnobBreathColors;
             }
             WheelRpmBrightness      = ov.WheelRpmBrightness;
             WheelButtonsBrightness  = ov.WheelButtonsBrightness;

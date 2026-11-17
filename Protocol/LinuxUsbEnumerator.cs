@@ -159,6 +159,18 @@ namespace MozaPlugin.Protocol
         public static IReadOnlyDictionary<ushort, string> EnumerateMozaHidraw()
         {
             var result = new SortedDictionary<ushort, string>();
+            foreach (var n in EnumerateMozaHidrawNodes())
+                if (n.Name.Length > 0 || !result.ContainsKey(n.Pid)) result[n.Pid] = n.Name;
+            return result;
+        }
+
+        /// <summary>
+        /// Every MOZA USB hidraw node: kernel node name ("hidraw9"), PID and
+        /// kernel HID name. Empty — never throws — when sysfs is unreachable.
+        /// </summary>
+        public static IReadOnlyList<(string Node, ushort Pid, string Name)> EnumerateMozaHidrawNodes()
+        {
+            var result = new List<(string Node, ushort Pid, string Name)>();
             string? root = WineHost.UnixPath("/sys/class/hidraw");
             if (root == null) return result;
 
@@ -190,9 +202,10 @@ namespace MozaPlugin.Protocol
                 {
                     // Kernel name is "<manufacturer> <product>" — "Gudsen MOZA R9 Base".
                     if (name.StartsWith("Gudsen ", StringComparison.Ordinal)) name = name.Substring("Gudsen ".Length);
-                    if (name.Length > 0 || !result.ContainsKey((ushort)pid)) result[(ushort)pid] = name;
+                    result.Add((LeafName(dir), (ushort)pid, name));
                 }
             }
+            result.Sort((a, b) => string.CompareOrdinal(a.Node, b.Node));
             return result;
         }
 

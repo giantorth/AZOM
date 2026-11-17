@@ -69,9 +69,28 @@ namespace MozaPlugin
         /// the CM2 page combo, a dash-side switch, an adopted boot slot — is saved to
         /// the active profile and recalled on any profile switch. The plugin-wide
         /// <c>Cm2SelectedDashboard</c> is kept in step as the fallback for a profile
-        /// that has no pick yet.
+        /// that has no pick yet. Reads the idle dashboard while one is showing; a write is
+        /// an explicit pick and ends it until the next game.
         /// </summary>
         internal string ActiveCm2DashboardName
+        {
+            get => _idleDashboards?.Cm2OverrideName ?? SavedCm2DashboardName;
+            set
+            {
+                _idleDashboards?.YieldCm2();
+                string name = value ?? "";
+                if (_settings != null) _settings.Cm2SelectedDashboard = name;
+                var profile = _deviceProfiles?.DashProfileFor(Cm2PageGuid);
+                if (profile != null)
+                    profile.TelemetryDashboardKey = name.Length > 0
+                        ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : null;
+                // A first-ever pick gives pickless profiles a key for their legacy bucket.
+                if (_settings != null) DeviceProfileMigration.MigrateCm2MappingKeys(_settings);
+            }
+        }
+
+        /// <summary>The CM2 profile's own pick, ignoring a showing idle dashboard.</summary>
+        internal string SavedCm2DashboardName
         {
             get
             {
@@ -80,14 +99,17 @@ namespace MozaPlugin
                     return key!.Substring(Telemetry.Dashboard.WheelDashboardKey.Prefix.Length);
                 return _settings?.Cm2SelectedDashboard ?? "";
             }
-            set
+        }
+
+        /// <summary>Channel-mapping key for the CM2's selected dashboard on its current
+        /// profile (<c>wheel:&lt;name&gt;</c>); the legacy <see cref="Cm2LegacyDashKey"/>
+        /// bucket only while no dashboard has ever been picked.</summary>
+        internal string Cm2MappingDashKey
+        {
+            get
             {
-                string name = value ?? "";
-                if (_settings != null) _settings.Cm2SelectedDashboard = name;
-                var profile = _deviceProfiles?.DashProfileFor(Cm2PageGuid);
-                if (profile != null)
-                    profile.TelemetryDashboardKey = name.Length > 0
-                        ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : null;
+                string name = ActiveCm2DashboardName;
+                return name.Length > 0 ? Telemetry.Dashboard.WheelDashboardKey.Prefix + name : Cm2LegacyDashKey;
             }
         }
 

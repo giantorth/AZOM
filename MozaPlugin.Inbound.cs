@@ -100,6 +100,9 @@ namespace MozaPlugin
                 // switches. See docs/protocol/devices/wheel-0x17.md § Group 0x42.
                 if (rawDeviceId == 0x71 && IsFsr1DisplayWheel)
                     _fsr1Cm1Mapping.TryFollowFsr1DashboardLog(text);
+                // Wheel heartbeat reports the multi-mode dial word (Table 2 Param 62).
+                if (rawDeviceId == 0x71)
+                    TryFollowMultiDialHeartbeat(text);
                 // A CM1 base-bridged dash reports its current page via the byte-identical
                 // "Table 7, Param 6 Written: N" log on dev 0x41 (0x14 swapped). Follow it.
                 if (rawDeviceId == 0x41 && DashIsCm1)
@@ -184,6 +187,8 @@ namespace MozaPlugin
                         _data.Last28x01BytesValid = true;
                         _data.Last28xReplyTickMs = Environment.TickCount;
                     }
+                    else if (data[3] == 0x02)
+                        TryFollowMultiDialRightRead(data[4], data[5]);
                 }
                 _deviceManager.MarkWheelResponse(MozaProtocol.SwapNibbles(data[1]));
                 return;
@@ -364,7 +369,10 @@ namespace MozaPlugin
             // (idle-speed / idle-color pack mode+ms and RGB into composite keys; they
             // are left alone rather than risk a mis-encoded prime silently swallowing a
             // real user change.) See HardwareApplier.PrimeWheelCfgFromDevice.
-            if (r.Name != null && r.IntValue >= 0 && TryPrimableWheelCfgKey(r.Name, out var primeKey))
+            // Write echoes only repeat what we sent; priming from one reset the
+            // re-assert cap and looped against a wheel that reads back another value.
+            if (r.Name != null && r.IntValue >= 0 && !r.IsWriteEcho
+                && TryPrimableWheelCfgKey(r.Name, out var primeKey))
                 _hardwareApplier.PrimeWheelCfgFromDevice(primeKey, r.IntValue, r.Name);
 
             // Extended LED group presence: any response from a group proves it exists.

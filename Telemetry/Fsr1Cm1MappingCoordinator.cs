@@ -134,11 +134,20 @@ namespace MozaPlugin.Telemetry
             // agreement on the frozen page for the probe's lifetime.
             int frozen = _plugin.Fsr1Probe.FrozenIndex;
             if (frozen >= 0) return frozen;
+            // The idle page while idle; the stored page is the driving pick.
+            int idle = _plugin.IdleDashboards?.Fsr1OverrideIndex ?? -1;
+            if (idle >= 0) return idle;
             return RawActiveFsr1Index();
         }
 
+        /// <summary>The stored page for the current wheel page (the in-game pick).</summary>
+        internal int StoredFsr1Index() => RawActiveFsr1Index();
+
+        /// <summary>Queue a select without touching the stored page (idle dashboard).</summary>
+        internal void QueueFsr1Select(int index) => Interlocked.Exchange(ref _fsr1PendingSelect, index);
+
         /// <summary>The persisted active index for the current wheel page, ignoring any probe
-        /// freeze — the true wheel-followed value used for change detection.</summary>
+        /// freeze and idle page — the in-game pick used for change detection.</summary>
         private int RawActiveFsr1Index()
         {
             var g = _plugin.GetCurrentWheelPageGuid();
@@ -159,6 +168,8 @@ namespace MozaPlugin.Telemetry
             if (index < 0) index = 0;
             if (index > Fsr1DisplayEmitter.MaxDashboardIndex)
                 index = Fsr1DisplayEmitter.MaxDashboardIndex;
+            // A user pick ends the idle page; the wheel is on that page, not the stored one.
+            bool idleWasShowing = sendToWheel && (_plugin.IdleDashboards?.YieldFsr1() ?? false);
             bool changed = true;   // unknown wheel/settings → can't dedupe, emit
             var g = _plugin.GetCurrentWheelPageGuid();
             if (g.HasValue && _plugin.Settings != null)
@@ -179,7 +190,7 @@ namespace MozaPlugin.Telemetry
             // select, so a re-pick of the page it is already on must not hit the wire.
             // The stored index tracks wheel self-switches (Param-6 log follow), so it is
             // an accurate mirror of the wheel's current page.
-            if (sendToWheel && changed)
+            if (sendToWheel && (changed || idleWasShowing))
             {
                 Interlocked.Exchange(ref _fsr1PendingSelect, index);
                 _plugin.SaveSettings();
@@ -223,8 +234,15 @@ namespace MozaPlugin.Telemetry
             // Compare against the RAW stored index, not GetActiveFsr1Index — the latter is
             // pinned during a probe, which would suppress real wheel switches and break the
             // change log used to diagnose page-report spam.
+            // Our own idle-page select coming back — not a switch made on the wheel.
+            if (_plugin.IdleDashboards?.IsFsr1IdleEcho(index) == true) return;
+            bool idleWasShowing = _plugin.IdleDashboards?.YieldFsr1() ?? false;
             int prev = RawActiveFsr1Index();
-            if (index == prev) return;
+            if (index == prev)
+            {
+                if (idleWasShowing) _plugin.RaiseFsr1ActiveIndexChanged();
+                return;
+            }
             MozaLog.Info($"[AZOM] FSR1 wheel-reported page index {prev} → {index} (Param-6 follow)");
             SetActiveFsr1Index(index, sendToWheel: false);
         }
@@ -305,8 +323,19 @@ namespace MozaPlugin.Telemetry
 
         private int _cm1PendingSelect = -1;
 
-        /// <summary>Current CM1 active dashboard page (1-based), default 1.</summary>
+        /// <summary>Current CM1 active dashboard page (1-based), default 1: the idle page
+        /// while no game runs, else the stored pick.</summary>
         internal int GetActiveCm1Index()
+        {
+            int idle = _plugin.IdleDashboards?.Cm1OverrideIndex ?? -1;
+            return idle >= 0 ? idle : StoredCm1Index();
+        }
+
+        /// <summary>Queue a CM1 select without touching the stored page (idle dashboard).</summary>
+        internal void QueueCm1Select(int index) => Interlocked.Exchange(ref _cm1PendingSelect, index);
+
+        /// <summary>The stored CM1 page (the in-game pick), default 1.</summary>
+        internal int StoredCm1Index()
         {
             if (_plugin.Settings?.Cm1ActiveDashboardByGuid != null
                 && _plugin.Settings.Cm1ActiveDashboardByGuid.TryGetValue(MozaPlugin.Cm1PageGuid, out var i))
@@ -323,6 +352,7 @@ namespace MozaPlugin.Telemetry
                 index = Cm1DisplayEmitter.MinDashboardIndex;
             if (index > Cm1DisplayEmitter.MaxDashboardIndex)
                 index = Cm1DisplayEmitter.MaxDashboardIndex;
+            if (sendToWheel) _plugin.IdleDashboards?.YieldCm1();
             if (_plugin.Settings != null)
             {
                 var cur = _plugin.Settings.Cm1ActiveDashboardByGuid;
@@ -350,7 +380,14 @@ namespace MozaPlugin.Telemetry
         /// <summary>Record a dash-reported page index (self-switch via Param-6 log).</summary>
         internal void NoteCm1WheelIndex(int index)
         {
-            if (index == GetActiveCm1Index()) return;
+            // Our own idle-page select coming back — not a switch made on the dash.
+            if (_plugin.IdleDashboards?.IsCm1IdleEcho(index) == true) return;
+            bool idleWasShowing = _plugin.IdleDashboards?.YieldCm1() ?? false;
+            if (index == StoredCm1Index())
+            {
+                if (idleWasShowing) _plugin.RaiseCm1ActiveIndexChanged();
+                return;
+            }
             SetActiveCm1Index(index, sendToWheel: false);
         }
 

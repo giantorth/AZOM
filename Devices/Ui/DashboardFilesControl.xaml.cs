@@ -332,13 +332,17 @@ namespace MozaPlugin.Devices.Ui
                     return;
                 }
 
-                string dashKey = DashboardProfileStore.GetDashboardKey(mzdashPath, profile);
+                // CM2: keyed by the name the upload gives it on the dash (file base name),
+                // which is how the CM2's dashboard picks are keyed.
+                string dashKey = IsCm2Target
+                    ? WheelDashboardKey.Prefix + System.IO.Path.GetFileNameWithoutExtension(mzdashPath)
+                    : DashboardProfileStore.GetDashboardKey(mzdashPath, profile);
                 foreach (var o in overrides)
                 {
                     if (IsCm2Target)
                     {
                         _plugin.ChannelMapping.Set(o.Url, o.Source,
-                            MozaPlugin.Cm2PageGuid, MozaPlugin.Cm2DashKey, _plugin.ActiveCm2Sender);
+                            MozaPlugin.Cm2PageGuid, dashKey, _plugin.ActiveCm2Sender);
                     }
                     else
                     {

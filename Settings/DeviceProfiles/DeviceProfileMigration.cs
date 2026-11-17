@@ -138,6 +138,40 @@ namespace MozaPlugin.Settings
                 MozaLog.Info($"[AZOM] Cleared {cleared} CM2 profile dashboard key(s) copied from the wheel");
         }
 
+        /// <summary>
+        /// Move each CM2 profile's legacy single mapping bucket
+        /// (<see cref="global::MozaPlugin.MozaPlugin.Cm2LegacyDashKey"/>) under the dashboard
+        /// that profile resolves to — its own pick, else the plugin-wide
+        /// <see cref="MozaPluginSettings.Cm2SelectedDashboard"/>, the same fallback
+        /// <c>MozaPlugin.Cm2MappingDashKey</c> reads with. Pickless profiles keep the bucket
+        /// until a pick exists. Entries already under the dashboard key win. Idempotent;
+        /// copy-on-write (the tick threads walk these dicts). Returns true when anything moved.
+        /// </summary>
+        internal static bool MigrateCm2MappingKeys(MozaPluginSettings settings)
+        {
+            var dashes = settings?.DeviceProfiles?.Dashes;
+            if (dashes == null
+                || !dashes.TryGetValue(global::MozaPlugin.MozaPlugin.Cm2PageGuid, out var store)
+                || store == null) return false;
+            string legacyKey = global::MozaPlugin.MozaPlugin.Cm2LegacyDashKey;
+            string fallback = settings!.Cm2SelectedDashboard ?? "";
+            int moved = 0;
+            foreach (var p in store.Profiles)
+            {
+                var middle = p?.ChannelMappings;
+                if (middle == null || !middle.ContainsKey(legacyKey)) continue;
+                string? target = Telemetry.Dashboard.WheelDashboardKey.IsWheelKey(p!.TelemetryDashboardKey)
+                    ? p.TelemetryDashboardKey
+                    : fallback.Length > 0 ? Telemetry.Dashboard.WheelDashboardKey.Prefix + fallback : null;
+                if (target == null) continue;
+                p.ChannelMappings = Telemetry.ChannelMappingCoordinator.MoveBucket(middle, legacyKey, target);
+                moved++;
+            }
+            if (moved > 0)
+                MozaLog.Info($"[AZOM] Moved {moved} CM2 profile(s)' shared channel mappings under their selected dashboard");
+            return moved > 0;
+        }
+
         // ===== Store construction (also used for late devices) =====
 
         internal static MozaWheelProfileStore BuildWheelStore(JObject? snapshot, Guid pageGuid) =>

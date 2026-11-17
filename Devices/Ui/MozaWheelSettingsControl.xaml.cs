@@ -718,6 +718,8 @@ skipReadByMode:
                 bool showTelemetry = newWheel
                                      && ((_plugin?.IsFsr1DisplayWheel ?? false)
                                          || (_plugin?.ShouldDriveDashboard() ?? false));
+                // FSR1's group-0x42 display has no tier-def upload path.
+                bool showFilesTab = showTelemetry && !(_plugin?.IsFsr1DisplayWheel ?? false);
                 bool showButtonsTab = newWheel && (modelInfoForTabs?.ButtonLedCount ?? 0) > 0;
                 // Knobs tab covers two independent capabilities: knob LEDs
                 // (KnobCount) and configurable rotary encoders (what the wheel
@@ -735,7 +737,7 @@ skipReadByMode:
                 // slot and flash its firmware (and vice versa).
                 InputsTab.Visibility = anyWheel ? Visibility.Visible : Visibility.Collapsed;
                 DashboardTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
-                FilesTab.Visibility = showTelemetry ? Visibility.Visible : Visibility.Collapsed;
+                FilesTab.Visibility = showFilesTab ? Visibility.Visible : Visibility.Collapsed;
                 RpmTab.Visibility = newWheel ? Visibility.Visible : Visibility.Collapsed;
                 ButtonsTab.Visibility = showButtonsTab ? Visibility.Visible : Visibility.Collapsed;
                 KnobsTab.Visibility = showKnobsTab ? Visibility.Visible : Visibility.Collapsed;
@@ -787,6 +789,7 @@ skipReadByMode:
                     if (knbSpeed < 0) knbSpeed = 1000;
                     WheelKnobIdleSpeedSlider.Value = System.Math.Max(WheelKnobIdleSpeedSlider.Minimum, System.Math.Min(WheelKnobIdleSpeedSlider.Maximum, knbSpeed));
                     WheelKnobIdleSpeedValue.Text = $"{knbSpeed} ms";
+                    RefreshKnobBreathSwatches();
                     UpdateIdleSpeedRowVisibility();
 
                     // Sleep-light tab — drive the UI from the persisted per-page
@@ -796,7 +799,7 @@ skipReadByMode:
                     // which doesn't map to any dropdown option → the dropdown
                     // would render empty and look like the value was wiped.
                     var sleepBundle = _plugin!.ActiveWheelSleep;
-                    int sleepMode = sleepBundle?.Mode ?? _data.WheelIdleMode;
+                    int sleepMode = System.Math.Min(sleepBundle?.Mode ?? _data.WheelIdleMode, 1);
                     int sleepTimeoutMin = sleepBundle?.TimeoutMin > 0
                         ? sleepBundle.TimeoutMin
                         : _data.WheelIdleTimeout;
@@ -860,11 +863,12 @@ skipReadByMode:
                     // WheelKnobSection holds the two knob-LED cards (LED mode +
                     // telemetry restore) — knob-LED capability only. The settings
                     // card below carries both subsections and shows for either.
-                    WheelKnobSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    var knobVis = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    WheelKnobSection.Visibility = knobVis;
                     WiKnobSettingsCard.Visibility = (knobCount > 0 || hasEncoders)
                         ? Visibility.Visible : Visibility.Collapsed;
                     WiKnobSignalModeSection.Visibility = hasEncoders ? Visibility.Visible : Visibility.Collapsed;
-                    WiKnobColoursSection.Visibility = knobCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    WiKnobColoursSection.Visibility = knobVis;
 
                     // Knob palettes render saved-first like the RPM/button swatches
                     // above: the saved (sparse) arrays win and _data fills the unset
@@ -1117,8 +1121,8 @@ skipReadByMode:
             _data!.WheelIdleSpeed = ms;
             var sleep = _plugin.GetOrCreateActiveWheelSleep();
             if (sleep != null) sleep.SpeedMs = ms;
-            int mode = _data.WheelIdleMode;
-            if (mode >= 2)
+            int mode = WheelSleepModeCombo.SelectedIndex;
+            if (mode >= 1)
                 _plugin.HardwareApplier.WriteArrayIfWheelDetected("wheel-idle-speed", BuildIdleSpeedPayload(mode, ms));
             _plugin.SaveSettings();
         }
@@ -1155,12 +1159,66 @@ skipReadByMode:
                 ? Visibility.Visible : Visibility.Collapsed;
             WheelKnobIdleSpeedRow.Visibility = _data.WheelKnobIdleEffect >= 2
                 ? Visibility.Visible : Visibility.Collapsed;
+            WheelKnobBreathColorRow.Visibility = _data.WheelKnobIdleEffect == 2
+                                                 && WheelKnobBreathSwatches.Children.Count > 0
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // One swatch per LED-ring knob on wheels with idle effects; rebuilt only
+        // when the knob count changes.
+        private void RefreshKnobBreathSwatches()
+        {
+            if (_data == null) return;
+            var info = _plugin?.WheelModelInfo;
+            int n = info != null && info.HasSleepLight
+                ? System.Math.Min(info.KnobCount, MozaData.WheelKnobMax) : 0;
+            var panel = WheelKnobBreathSwatches;
+            if (panel.Children.Count != n)
+            {
+                panel.Children.Clear();
+                var border = (Brush)(TryFindResource("BorderBrightBrush") ?? Brushes.Gray);
+                for (int i = 0; i < n; i++)
+                {
+                    var sw = new Border
+                    {
+                        Width = 36, Height = 36, CornerRadius = new CornerRadius(18),
+                        BorderBrush = border, BorderThickness = new Thickness(1),
+                        Margin = new Thickness(0, 0, 8, 0), Cursor = Cursors.Hand, Tag = i,
+                    };
+                    sw.MouseLeftButtonUp += KnobBreathSwatch_Click;
+                    panel.Children.Add(sw);
+                }
+            }
+            for (int i = 0; i < n; i++)
+            {
+                var c = _data.WheelKnobBreathColors[i];
+                ((Border)panel.Children[i]).Background = GetCachedBrush(c[0], c[1], c[2]);
+            }
+        }
+
+        private void KnobBreathSwatch_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null || _data == null) return;
+            if (!(sender is Border sw) || !(sw.Tag is int knob)) return;
+            if (knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            var cur = _data.WheelKnobBreathColors[knob];
+            var dialog = new ColorPickerDialog(cur[0], cur[1], cur[2]);
+            dialog.Owner = Window.GetWindow(this);
+            if (dialog.ShowDialog() != true) return;
+            byte r = dialog.SelectedR, g = dialog.SelectedG, b = dialog.SelectedB;
+            cur[0] = r;
+            cur[1] = g;
+            cur[2] = b;
+            sw.Background = GetCachedBrush(r, g, b);
+            _plugin.GetOrCreateActiveWheelIdle()?.SetKnobBreathColor(knob, (r << 16) | (g << 8) | b);
+            _plugin.HardwareApplier.WriteColorIfWheelDetected($"wheel-knob-breath-color{knob + 1}", r, g, b);
+            _plugin.SaveSettings();
         }
 
         private void UpdateSleepSpeedRowVisibility()
         {
             if (_data == null) return;
-            WheelSleepSpeedRow.Visibility = _data.WheelIdleMode >= 2
+            WheelSleepSpeedRow.Visibility = WheelSleepModeCombo.SelectedIndex >= 1
                 ? Visibility.Visible : Visibility.Collapsed;
         }
 

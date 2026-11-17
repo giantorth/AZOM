@@ -42,6 +42,7 @@ namespace MozaPlugin.Integration.Motion
         private bool _readsRequested;
         private MozaMotionController? _held;
         private readonly MozaHma150Output? _output;
+        private bool _crestSyncing;
 
         public MozaHma150SettingsControl(MozaHma150Output? output = null)
         {
@@ -50,7 +51,7 @@ namespace MozaPlugin.Integration.Motion
             BuildSourceItems();
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             _timer.Tick += (_, __) => Refresh();
-            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); Refresh(); _timer.Start(); };
+            Loaded += (_, __) => { Hold(); BuildZoneRows(); BuildEffectRows(); SyncCrestSlider(); Refresh(); _timer.Start(); };
             Unloaded += (_, __) => { _timer.Stop(); Unhold(); };
         }
 
@@ -68,7 +69,7 @@ namespace MozaPlugin.Integration.Motion
             _held = null;
         }
 
-        private static MozaMotionController? Lane => MozaPlugin.Instance?.MotionController;
+        private static MozaMotionController? Lane => MozaPlugin.SharedMotionController;
 
         private void RequestReads()
         {
@@ -139,6 +140,8 @@ namespace MozaPlugin.Integration.Motion
                     : s.HapticIntensity.HasValue ? (s.HapticIntensity.Value * 100).ToString("0", CultureInfo.CurrentCulture) : "";
             }
             RefreshLighting(lane);
+            // The rig length comes from the controller, read after connecting or rewritten by Apply.
+            ShowMcPivot();
         }
 
         // ------------------------------------------------------------ source
@@ -149,26 +152,144 @@ namespace MozaPlugin.Integration.Motion
             SourceCombo.Items.Add(new ComboBoxItem { Content = Strings.Motion_Source_SimHubPose, Tag = MozaHma150Source.SimHubPose });
             var settings = _output?.Settings;
             SourceCombo.IsEnabled = settings != null;
-            SourceCombo.SelectedIndex = settings?.Source == MozaHma150Source.SimHubPose ? 1 : 0;
+            SourceCombo.SelectedIndex = (settings?.Source ?? MozaHma150Source.SimHubPose) == MozaHma150Source.SimHubPose ? 1 : 0;
+            SlowManualCheck.IsEnabled = settings != null;
+            SlowManualCheck.IsChecked = settings?.SlowManualControl ?? true;
+            SlowManualCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.SlowManualControl = SlowManualCheck.IsChecked == true;
+            };
             CornerHapticsCheck.IsChecked = settings?.IncludeCornerHaptics ?? true;
-            UpdateCornerHapticsEnabled();
+            MaxPerformanceCheck.IsChecked = settings?.MaxPerformance ?? false;
+            MaxPerformanceCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.MaxPerformance = MaxPerformanceCheck.IsChecked == true;
+            };
+            SyncCrestSlider();
+            UpdatePoseOnlyEnabled();
             SourceCombo.SelectionChanged += (_, __) =>
             {
                 var s = _output?.Settings;
                 if (s != null && SourceCombo.SelectedItem is ComboBoxItem item && item.Tag is MozaHma150Source source)
                     s.Source = source;
-                UpdateCornerHapticsEnabled();
+                UpdatePoseOnlyEnabled();
             };
             CornerHapticsCheck.Click += (_, __) =>
             {
                 var s = _output?.Settings;
                 if (s != null) s.IncludeCornerHaptics = CornerHapticsCheck.IsChecked == true;
             };
+            WireIntSlider(CrestBoostSlider, CrestBoostValue, (st, v) => st.CrestBoost = v);
+            WireIntSlider(EnginePitchSlider, EnginePitchValue, (st, v) => st.EngineVibrationPitch = v);
+            WireIntSlider(EngineTickSlider, EngineTickValue, (st, v) => st.EngineTickover = v);
+            WireMcSettings(settings);
         }
 
-        /// <summary>The haptics choice only applies to the pose source.</summary>
-        private void UpdateCornerHapticsEnabled()
-            => CornerHapticsCheck.IsEnabled = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
+        // ------------------------------------------------------------ VR motion compensation
+
+        /// <summary>Seat measurements for SimHub's VR MC: SimHub-side output settings, nothing goes to the controller.</summary>
+        private void WireMcSettings(MozaHma150OutputSettings? settings)
+        {
+            ShowMm(McSeatFromFrontBox, settings?.McSeatFromFrontMm);
+            ShowMm(McSeatHeightBox, settings?.McSeatHeightMm);
+            McSeatFromFrontBox.IsEnabled = McSeatHeightBox.IsEnabled = McApply.IsEnabled = settings != null;
+            McDrivenPoseCheck.IsChecked = settings?.McUseDrivenPose ?? true;
+            McDrivenPoseCheck.Click += (_, __) =>
+            {
+                var s = _output?.Settings;
+                if (s != null) s.McUseDrivenPose = McDrivenPoseCheck.IsChecked == true;
+            };
+            ShowMcPivot();
+        }
+
+        private static void ShowMm(TextBox box, double? value)
+            => box.Text = value is double mm && mm > 0 ? mm.ToString("0", CultureInfo.CurrentCulture) : "";
+
+        /// <summary>Saves both seat measurements together, or neither if one is invalid (empty = not set).</summary>
+        private void McApply_Click(object sender, RoutedEventArgs e)
+        {
+            var s = _output?.Settings;
+            if (s == null) return;
+            bool fromFrontOk = TryParseMm(McSeatFromFrontBox, out double fromFront);
+            bool heightOk = TryParseMm(McSeatHeightBox, out double height);
+            if (!fromFrontOk || !heightOk) return;
+            s.McSeatFromFrontMm = fromFront;
+            s.McSeatHeightMm = height;
+            ShowMcPivot();
+        }
+
+        private static bool TryParseMm(TextBox box, out double mm)
+        {
+            mm = 0.0;
+            bool ok = string.IsNullOrWhiteSpace(box.Text)
+                || (TryParse(box.Text, out mm) && mm >= MozaHma150OutputSettings.McMinMm && mm <= MozaHma150OutputSettings.McMaxMm);
+            if (ok) box.ClearValue(TextBox.BorderBrushProperty);
+            else box.BorderBrush = Brushes.OrangeRed;
+            return ok;
+        }
+
+        /// <summary>The pivot as saved, once the controller's rig length has been read; hidden until then.</summary>
+        private void ShowMcPivot()
+        {
+            var s = _output?.Settings;
+            if (s == null || !Hma150MotionCompensation.TryPivot(Lane?.RigLengthReadMm, s.McSeatFromFrontMm, s.McSeatHeightMm,
+                    out double surge, out double heave))
+            {
+                McPivotRow.Visibility = Visibility.Collapsed;
+                return;
+            }
+            string fmt = surge >= 0 ? Strings.Motion_Panel_VrMcPivotFmt : Strings.Motion_Panel_VrMcPivotBehindFmt;
+            McPivotValue.Text = string.Format(CultureInfo.CurrentCulture, fmt, Math.Abs(surge), heave);
+            McPivotRow.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>A whole-number slider with its value label, stored into the output's settings.</summary>
+        private void WireIntSlider(Slider slider, TextBlock label, Action<MozaHma150OutputSettings, int> store)
+        {
+            slider.ValueChanged += (_, __) =>
+            {
+                if (_crestSyncing) return;
+                int value = (int)Math.Round(slider.Value);
+                // Re-set as the local value: WPF drops a drag's "current" value when the page
+                // unloads and raises ValueChanged with the stale local one, which got saved.
+                _crestSyncing = true;
+                try { slider.Value = value; }
+                finally { _crestSyncing = false; }
+                label.Text = value.ToString(CultureInfo.CurrentCulture);
+                var s = _output?.Settings;
+                if (s != null) store(s, value);
+            };
+        }
+
+        private void SyncCrestSlider()
+        {
+            int value = _output?.Settings?.CrestBoost ?? 0;
+            int pitch = _output?.Settings?.EngineVibrationPitch ?? 50;
+            int tick = _output?.Settings?.EngineTickover ?? 0;
+            _crestSyncing = true;
+            try { CrestBoostSlider.Value = value; EnginePitchSlider.Value = pitch; EngineTickSlider.Value = tick; }
+            finally { _crestSyncing = false; }
+            CrestBoostValue.Text = value.ToString(CultureInfo.CurrentCulture);
+            EnginePitchValue.Text = pitch.ToString(CultureInfo.CurrentCulture);
+            EngineTickValue.Text = tick.ToString(CultureInfo.CurrentCulture);
+        }
+
+        /// <summary>These settings only apply to the pose source (the controller's full control mode).</summary>
+        private void UpdatePoseOnlyEnabled()
+        {
+            bool pose = _output?.Settings?.Source == MozaHma150Source.SimHubPose;
+            CornerHapticsCheck.IsEnabled = pose;
+            CrestBoostSlider.IsEnabled = pose;
+            EnginePitchSlider.IsEnabled = pose;
+            EngineTickSlider.IsEnabled = pose;
+            EngineTickNote.IsEnabled = pose;
+            MaxPerformanceCheck.IsEnabled = pose;
+            // The warning's own colour ignores IsEnabled, so it is dimmed by hand.
+            MaxPerformanceWarning.Opacity = pose ? 1.0 : 0.4;
+            McDrivenPoseCheck.IsEnabled = pose;
+        }
 
         // ------------------------------------------------------------ motion effects
 
@@ -378,6 +499,7 @@ namespace MozaPlugin.Integration.Motion
             MotionLanePhase.Disengaging => Strings.Motion_Phase_Disengaging,
             MotionLanePhase.PortSelfTest => Strings.Motion_Phase_PortSelfTest,
             MotionLanePhase.Faulted => Strings.Motion_Phase_Faulted,
+            MotionLanePhase.ManualTest => Strings.Motion_Phase_ManualTest,
             _ => phase.ToString(),
         };
     }

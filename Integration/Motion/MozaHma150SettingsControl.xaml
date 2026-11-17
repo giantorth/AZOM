@@ -77,6 +77,44 @@
                       Content="{x:Static res:Strings.Motion_Panel_CornerHaptics}"/>
         </StackPanel>
         <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="MaxPerformanceCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_MaxPerformance}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <TextBlock x:Name="MaxPerformanceWarning" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460"
+                       Foreground="OrangeRed" Text="{x:Static res:Strings.Motion_Panel_MaxPerformanceWarning}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_CrestBoost}"/>
+            <Slider x:Name="CrestBoostSlider" Width="240" Minimum="0" Maximum="100" TickFrequency="5"
+                    IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="CrestBoostValue" Width="40" Margin="8,0,0,0"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_EngineVibrationPitch}"/>
+            <Slider x:Name="EnginePitchSlider" Width="240" Minimum="0" Maximum="100" TickFrequency="5"
+                    IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="EnginePitchValue" Width="40" Margin="8,0,0,0"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_EngineTickover}"/>
+            <Slider x:Name="EngineTickSlider" Width="240" Minimum="0" Maximum="100" TickFrequency="5"
+                    IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10" VerticalAlignment="Center"/>
+            <TextBlock Style="{StaticResource Value}" x:Name="EngineTickValue" Width="40" Margin="8,0,0,0"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <TextBlock x:Name="EngineTickNote" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460" Opacity="0.7"
+                       Text="{x:Static res:Strings.Motion_Panel_EngineTickoverNote}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="SlowManualCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_SlowManualControl}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_MaxStroke}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="MaxStrokeBox"/>
             <Button x:Name="MaxStrokeApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="MaxStrokeApply_Click"/>
@@ -89,6 +127,26 @@
             <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_RigWidth}"/>
             <TextBox Style="{StaticResource NumberBox}" x:Name="RigWidthBox"/>
             <Button x:Name="RigApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="RigApply_Click"/>
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_VrMc}"/>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcSeatFromFront}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="McSeatFromFrontBox"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}" Text="{x:Static res:Strings.Motion_Panel_VrMcSeatHeight}"/>
+            <TextBox Style="{StaticResource NumberBox}" x:Name="McSeatHeightBox"/>
+            <Button x:Name="McApply" Content="{x:Static res:Strings.Motion_Panel_Apply}" Click="McApply_Click"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}">
+            <TextBlock Style="{StaticResource Label}"/>
+            <CheckBox x:Name="McDrivenPoseCheck" VerticalAlignment="Center"
+                      Content="{x:Static res:Strings.Motion_Panel_VrMcDrivenPose}"/>
+        </StackPanel>
+        <StackPanel Style="{StaticResource Row}" x:Name="McPivotRow" Visibility="Collapsed">
+            <TextBlock Style="{StaticResource Label}"/>
+            <TextBlock x:Name="McPivotValue" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="460" Opacity="0.7"/>
         </StackPanel>
 
         <TextBlock Style="{StaticResource Header}" Text="{x:Static res:Strings.Motion_Panel_Effects}"/>

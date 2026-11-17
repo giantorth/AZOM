@@ -74,6 +74,9 @@ namespace MozaPlugin.Devices
         // Edge guard: apply+read equalizer7-10 at most once per base detect
         // (deferred until the base-fw-version reply confirms 10-band support).
         public volatile bool BaseEq10Probed;
+        // Edge guard: apply+read the FFB style register at most once per base detect
+        // (deferred until firmware, model and hardware code all confirm support).
+        public volatile bool BaseFfbStyleProbed;
         // Edge guard: log the resolved base firmware once per base detect (three
         // probes race for the answer — see DeviceProber's base-fw-version case).
         public volatile bool BaseFwVersionLogged;
@@ -255,6 +258,7 @@ namespace MozaPlugin.Devices
             BaseAmbientLedSupported = false;
             BaseAmbientProbed = false;
             BaseEq10Probed = false;
+            BaseFfbStyleProbed = false;
             BaseFwVersionLogged = false;
             BaseFwVersionProbeRetries = 0;
         }

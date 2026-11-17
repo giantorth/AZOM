@@ -2,6 +2,65 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.4]
+
+## Highlights
+
+- **Ford Mustang GTD wheel (W20) recognized;** correct RPM, button and knob-ring LED layout, dashboard telemetry and device picture.
+- **Idle dashboard selector on the wheel and CM1/CM2 dashboard tabs;** shown while no game is open (optionally also in game menus), saved per device, and the profile's dashboard returns when driving starts.
+- **MOZA Wheelbase Control dashboard;** installed into SimHub's dashboards for adjusting wheelbase settings from a phone or tablet.
+- **Clutch Engine Vibration ShakeIt effect** in the AZOM group; engine vibration at the firing frequency while the clutch is closed, with a choice of when it counts as closed (or Always), plus Lope and Smoothness for a lumpy, uneven idle.
+
+## Added
+
+### HMA150 motion platform
+
+- **HMA150 SimHub Motion profile source is the default and uses the controller's full control mode;** the platform follows SimHub's heave, pitch and roll as positions, so heave holds and nothing springs back, with tilt, travel and speed kept to what game mode does.
+- **HMA150 Max performance (SimHub Motion profile source, off by default);** follows the profile's full angles with no speed limit, with a warning that the rig may hop or shift near SimHub's maximum settings.
+- **HMA150 Crest strength slider (SimHub Motion profile source);** the platform drops as the car goes light over a crest.
+- **HMA150 engine tick-over strength and engine vibration pitch (SimHub Motion profile source);** a low-rev heave pulse that hands over to the controller's engine vibration as revs rise; turn off the profile's own engine vibration effect when using it.
+- **HMA150 Manual control and Hop-in move the platform slowly;** they use the controller's manual test mode, so heave holds and nothing lunges.
+- **HMA150 platform stays up when SimHub switches game;** it no longer drops to standby with "Output connection failure" when a different game starts while motion is on.
+- **HMA150 VR motion compensation settings;** with the rig length set, enter the seat's distance from the front actuators and its height above the floor, and SimHub's VR motion compensation pivots where the rig does instead of at the seat. With the SimHub Motion profile source it also compensates the angles the platform is actually driven to.
+
+### Clutch bite point
+
+- **Prediction toggle for Clutch Bite Point;** learns how fast you move the clutch and fires ahead of quick moves so they don't pulse late.
+- **Clutch Bite Point pulses when the clutch jumps past the bite point between readings** instead of staying silent.
+- **Clutch bite point calibration no longer reads low;** each standing start is traced back to when the car began to move, so releases no longer pulse late.
+- **Clutch bite point auto-calibration learns from normal launches;** releases taking 0.6 s or more over the whole travel now count, down from 1 s.
+- **Clutch bite zone stays between 5 % and 95 % travel;** a wide zone near either end no longer reaches the fully released or pressed clutch.
+
+### Wheelbase
+
+- **High Speed Damping now works;** above the trigger speed the damping level is added to the wheelbase damper, and a trigger speed of 0 turns it off.
+- **Startup music settings on the Base tab;** on/off, track 1–10 (previewed on selection) and volume, for bases that report them.
+- **FFB style selector (Soft / Normal / Strong) on the FFB equalizer card;** bases on firmware 1.2.12 or newer, saved per profile.
+
+### Wheel
+
+- **Knob breathing colours;** one swatch per knob when the knob sleep light is set to Breathing, saved per wheel.
+- **Multi-mode dial on the Inputs tab (CS Pro, KS Pro, Mustang GTD, Vision GS);** set a knob to MULTI-MODE, include the thumb wheels and set control labels per position, saved per wheel.
+- **KS Pro multi-mode dial on the centre knob only, with Left and Right thumb-wheel pickers (TC, ABS, DIFF, BB);** pairings Pit House doesn't allow are greyed out.
+
+### Connection and detection
+
+- **Linux permission banner;** warns when your user can't open a MOZA serial or HID device node and names the missing udev rule.
+
+## Changed
+
+- **Steering Wheel Inertia is saved per wheel;** it follows the attached rim across profiles, while Hands-off Protection stays in the profile.
+- **Stalks start in truck-sim mode with the ETS2/ATS key map** on new installs and after Clear all settings.
+- **FFB curve input step actions stop at the neighbouring points;** curve points can no longer be stepped past each other.
+
+## Fixed
+
+- **mBooster Sensor Output Ratio and Max Threshold show on active Throttle and Clutch pedals;** a threshold above Max Force no longer caps output below 100%.
+- **CM2 channel mappings are saved per dashboard;** switching dashboards on the CM2 page now shows and sends that dashboard's own mappings.
+- **FSR V1 wheel page no longer shows a Files tab;** its display doesn't support dashboard uploads.
+- **Wheel sleep settings no longer flicker** when the wheel reads back a different value than was set.
+- **Wheel sleep light offers Off and Breathing only,** matching Pit House; the speed slider shows for Breathing.
+
 ## [1.7.3]
 
 ## Highlights

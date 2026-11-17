@@ -144,7 +144,7 @@ namespace MozaPlugin.Telemetry
 
         /// <summary>Set or clear a per-channel SimHub property override. Defaults to the
         /// current wheel + active dashboard; the CM2 page passes its own page GUID +
-        /// fixed key + sender so its config is independent of the wheel's.</summary>
+        /// dashboard key + sender so its config is independent of the wheel's.</summary>
         internal void Set(string channelUrl, string propertyPath,
             Guid? pageGuid = null, string? fixedDashKey = null, TelemetrySender? sender = null)
         {
@@ -192,10 +192,34 @@ namespace MozaPlugin.Telemetry
             owner.Set(newMiddle);
 
             // Live-rewire the matching channel on the target sender's profile so the
-            // next frame uses the new property. No tier-def restart.
-            UpdateActive(channelUrl, trimmed, sender);
+            // next frame uses the new property. No tier-def restart. A CM2 write for a
+            // dashboard the CM2 isn't showing (DjsonImport) must not touch its live channels.
+            if (pageGuid != MozaPlugin.Cm2PageGuid
+                || string.Equals(dashKey, _plugin.Cm2MappingDashKey, StringComparison.OrdinalIgnoreCase))
+                UpdateActive(channelUrl, trimmed, sender);
 
             _plugin.SaveSettings();
+        }
+
+        /// <summary>Copy of <paramref name="middle"/> with the <paramref name="from"/> bucket
+        /// merged into <paramref name="to"/> (entries already under <paramref name="to"/> win)
+        /// and removed. COW: <paramref name="middle"/> is never mutated.</summary>
+        internal static Dictionary<string, Dictionary<string, string>> MoveBucket(
+            Dictionary<string, Dictionary<string, string>> middle, string from, string to)
+        {
+            var next = new Dictionary<string, Dictionary<string, string>>(middle, StringComparer.OrdinalIgnoreCase);
+            if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)
+                || !next.TryGetValue(from, out var moving)) return next;
+            next.Remove(from);
+            var merged = next.TryGetValue(to, out var existing) && existing != null
+                ? new Dictionary<string, string>(existing, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (moving != null)
+                foreach (var ch in moving)
+                    if (!merged.ContainsKey(ch.Key)) merged[ch.Key] = ch.Value;
+            if (merged.Count > 0) next[to] = merged;
+            else next.Remove(to);
+            return next;
         }
 
         /// <summary>Clear all per-channel overrides for a page + its dashboard key(s).

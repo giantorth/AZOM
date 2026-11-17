@@ -305,6 +305,7 @@ namespace MozaPlugin.Hardware
                 "wheel-rpm-brightness", "wheel-buttons-brightness", "wheel-knob-brightness",
                 "wheel-old-rpm-brightness", "dash-flags-brightness",
                 "wheel-rpm-indicator-mode", "wheel-set-rpm-display-mode", "wheel-knob-mode",
+                "wheel-multifn-enable", "wheel-multifn-knob", "wheel-multifn-left", "wheel-multifn-right",
             };
 
         // Input settings the apply re-asserts and the readback verifies, kept out of
@@ -316,11 +317,40 @@ namespace MozaPlugin.Hardware
             };
 
         /// <summary>Flash-backed per the set above, plus the per-knob signal modes
-        /// (<c>wheel-knob-signal-mode{fwIdx}</c>) whose names carry a firmware index.</summary>
+        /// (<c>wheel-knob-signal-mode{fwIdx}</c>) and sleep-light breathing colours
+        /// (<c>wheel-knob-breath-color{k}</c>) whose names carry an index.</summary>
         private static bool IsFlashBackedWheelCfg(string command) =>
             command != null
             && (s_flashBackedWheelCfg.Contains(command)
-                || command.StartsWith("wheel-knob-signal-mode", System.StringComparison.Ordinal));
+                || command.StartsWith("wheel-knob-signal-mode", System.StringComparison.Ordinal)
+                || command.StartsWith("wheel-knob-breath-color", System.StringComparison.Ordinal));
+
+        /// <summary>Logical knob the multi-mode dial forces into BUTTON mode, or -1
+        /// when the dial is off, unset, or not offered by this wheel.</summary>
+        internal static int MultiDialForcedButtonKnob(WheelMultiDialSettings? dial, WheelModelInfo? model)
+        {
+            if (dial == null || dial.Enabled != 1 || model == null) return -1;
+            int knob = model.MultiDialEffectiveKnob(dial.Knob);
+            return knob >= 0 && knob < MozaData.WheelKnobMax ? knob : -1;
+        }
+
+        /// <summary>Wire value for a fixed dial side (<c>28 02 [side]</c>): the side's
+        /// own index when included, 0xFF when not.</summary>
+        internal static int MultiDialSideValue(int side, int included) => included == 1 ? side : 0xFF;
+
+        /// <summary>Wire value for dial side 0 (left) / 1 (right), or -1 = no opinion.
+        /// On wheels with a thumb-wheel choice an unset pick falls back to the fixed
+        /// encoding, which is what earlier versions wrote.</summary>
+        internal static int MultiDialSideWire(WheelMultiDialSettings dial, WheelModelInfo? model, int side)
+        {
+            if (model?.MultiDialThumbWheels != null)
+            {
+                int wheel = side == 0 ? dial.LeftWheel : dial.RightWheel;
+                if (wheel >= 0) return wheel;
+            }
+            int included = side == 0 ? dial.Left : dial.Right;
+            return included >= 0 ? MultiDialSideValue(side, included) : -1;
+        }
 
         // ── Coalescing gate for UI-driven flash-backed wheel writes ──
         // A slider raises ValueChanged per tick, so dragging "Sleep speed" or a
@@ -793,6 +823,46 @@ namespace MozaPlugin.Hardware
         // Pedals/Handbrake resolvers above.
         private MozaDeviceManager BaseManager => _detectionState.BaseOwner ?? _deviceManager;
 
+        // ── High-speed damping overlay ──
+        // Every base-damper write goes through WriteBaseSetting so the active speed
+        // boost rides on top of the user's value; _data.Damper never holds the boost.
+        private readonly object _damperWireLock = new object();
+        private const int DamperRawMax = 1000;
+
+        private bool WriteBaseSetting(string command, int value)
+        {
+            if (command != "base-damper") return BaseManager.WriteSetting(command, value);
+            lock (_damperWireLock) return WriteBaseDamperLocked(value);
+        }
+
+        private bool WriteBaseDamperLocked(int userRaw)
+        {
+            int boost = _data.DamperSpeedBoost;
+            if (boost <= 0) return BaseManager.WriteSetting("base-damper", userRaw);
+            int wire = Math.Min(DamperRawMax, userRaw + boost);
+            _data.DamperBoostedWire = wire;
+            return BaseManager.WriteSetting("base-damper", wire);
+        }
+
+        /// <summary>Set the high-speed damping boost (raw tenths, 0 = off) and push
+        /// Damper plus boost. True iff the write was dispatched.</summary>
+        internal bool SetDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock)
+            {
+                _data.DamperSpeedBoost = boostRaw;
+                int user = _data.Damper;
+                if (user < 0 || !_detectionState.BaseDetected) return false;
+                return WriteBaseDamperLocked(user);
+            }
+        }
+
+        /// <summary>Set the overlay without a write, for when the wire already matches.</summary>
+        internal void SyncDamperSpeedBoost(int boostRaw)
+        {
+            lock (_damperWireLock) _data.DamperSpeedBoost = boostRaw;
+        }
+
         // All-sentinel stand-in while the attached wheel has no store yet (not
         // identified, or its store is still being seeded): mirrors nothing, writes
         // nothing saved, but the per-wheel bundles and display-rotation still run.
@@ -838,6 +908,7 @@ namespace MozaPlugin.Hardware
             int idleSpeed      = idleBundle?.TelemetrySpeedMs ?? -1;
             int btnIdleSpeed   = idleBundle?.ButtonsSpeedMs ?? -1;
             int knobIdleSpeed  = idleBundle?.KnobSpeedMs ?? -1;
+            int[]? knobBreathColors = idleBundle?.KnobBreathColors;
             int knobLedMode    = profile.WheelKnobLedMode;
             int btnLedMode     = profile.WheelButtonsLedMode;
             // Sleep bundle is per-wheel-page (schema v8); null = leave wheel's value alone.
@@ -889,6 +960,15 @@ namespace MozaPlugin.Hardware
             if (idleSpeed      >= 0) _data.WheelTelemetryIdleSpeedMs = idleSpeed;
             if (btnIdleSpeed   >= 0) _data.WheelButtonsIdleSpeedMs = btnIdleSpeed;
             if (knobIdleSpeed  >= 0) _data.WheelKnobIdleSpeedMs    = knobIdleSpeed;
+            if (knobBreathColors != null)
+                for (int i = 0; i < Math.Min(knobBreathColors.Length, MozaData.WheelKnobMax); i++)
+                    if (knobBreathColors[i] >= 0)
+                    {
+                        var rgb = MozaProfile.UnpackColor(knobBreathColors[i]);
+                        _data.WheelKnobBreathColors[i][0] = rgb[0];
+                        _data.WheelKnobBreathColors[i][1] = rgb[1];
+                        _data.WheelKnobBreathColors[i][2] = rgb[2];
+                    }
             if (sleepMode      >= 0) _data.WheelIdleMode           = sleepMode;
             if (sleepTimeout   >= 0) _data.WheelIdleTimeout        = sleepTimeout;
             if (sleepSpeed     >= 0) _data.WheelIdleSpeed          = sleepSpeed;
@@ -914,6 +994,18 @@ namespace MozaPlugin.Hardware
             // a single value, so a readback alone can't re-assert a different profile's
             // saved mode).
             var signalModes = profile.WheelKnobSignalModes;
+            // Multi-mode dial is per wheel and only works in BUTTON mode, so its knob
+            // is forced to BUTTON over whatever this profile saved for it.
+            var multiDial = _plugin.ActiveWheelMultiDial;
+            int dialKnob = MultiDialForcedButtonKnob(multiDial, _plugin.WheelModelInfo);
+            if (dialKnob >= 0)
+            {
+                var forced = new int[Math.Max(dialKnob + 1, signalModes?.Length ?? 0)];
+                for (int i = 0; i < forced.Length; i++)
+                    forced[i] = signalModes != null && i < signalModes.Length ? signalModes[i] : -1;
+                forced[dialKnob] = 0;
+                signalModes = forced;
+            }
             if (signalModes != null)
                 for (int i = 0; i < Math.Min(_data.WheelKnobSignalModes.Length, signalModes.Length); i++)
                     if (signalModes[i] >= 0) _data.WheelKnobSignalModes[i] = signalModes[i];
@@ -1074,6 +1166,27 @@ namespace MozaPlugin.Hardware
                             _deviceManager.WriteSetting($"wheel-knob-signal-mode{fwIdx}", sm);
                     }
                 }
+                // Multi-mode dial (cmd 0x28), per wheel. Knob and sides before the
+                // enable so the dial never comes up on the wrong knob.
+                var dialOrder = model.MultiDialKnobOrder;
+                if (dialOrder != null && multiDial != null)
+                {
+                    // A single-knob dial (KS Pro) is that knob whenever it's in use.
+                    int wireKnob = multiDial.Knob >= 0 || multiDial.Enabled == 1
+                        ? model.MultiDialEffectiveKnob(multiDial.Knob) : -1;
+                    if (wireKnob >= 0
+                        && WheelCfgChangedForApply("wheel-multifn-knob", dialOrder[wireKnob]))
+                        _deviceManager.WriteSetting("wheel-multifn-knob", dialOrder[wireKnob]);
+                    int leftWire = MultiDialSideWire(multiDial, model, 0);
+                    if (leftWire >= 0 && WheelCfgChangedForApply("wheel-multifn-left", leftWire))
+                        _deviceManager.WriteSetting("wheel-multifn-left", leftWire);
+                    int rightWire = MultiDialSideWire(multiDial, model, 1);
+                    if (rightWire >= 0 && WheelCfgChangedForApply("wheel-multifn-right", rightWire))
+                        _deviceManager.WriteSetting("wheel-multifn-right", rightWire);
+                    if (multiDial.Enabled >= 0
+                        && WheelCfgChangedForApply("wheel-multifn-enable", multiDial.Enabled))
+                        _deviceManager.WriteSetting("wheel-multifn-enable", multiDial.Enabled);
+                }
                 // Paddle input mode + the combined-mode clutch split point —
                 // overlay-only, per-(profile x wheel-page). Re-pushed here for the
                 // same reason as the knob signal modes above: the wheel firmware
@@ -1112,6 +1225,21 @@ namespace MozaPlugin.Hardware
                     var p = BuildIdleIntervalPayload(knobIdleEffect, knobIdleSpeed);
                     if (WheelCfgChangedBytesForApply("wheel-knob-idle-interval", p))
                         _deviceManager.WriteArray("wheel-knob-idle-interval", p);
+                }
+                if (knobBreathColors != null && hasKnob && hasIdleLed)
+                {
+                    int knobs = Math.Min(Math.Min(model.KnobCount, MozaData.WheelKnobMax), knobBreathColors.Length);
+                    for (int i = 0; i < knobs; i++)
+                    {
+                        int packed = knobBreathColors[i];
+                        if (packed < 0) continue;
+                        string cmd = $"wheel-knob-breath-color{i + 1}";
+                        if (WheelCfgChangedForApply(cmd, packed & 0xFFFFFF))
+                        {
+                            var rgb = MozaProfile.UnpackColor(packed);
+                            _deviceManager.WriteColor(cmd, rgb[0], rgb[1], rgb[2]);
+                        }
+                    }
                 }
                 if (sleepMode    >= 0 && hasSleepLight && WheelCfgChangedForApply("wheel-idle-mode", sleepMode))       _deviceManager.WriteSetting("wheel-idle-mode", sleepMode);
                 if (sleepTimeout >= 0 && hasSleepLight && WheelCfgChangedForApply("wheel-idle-timeout", sleepTimeout)) _deviceManager.WriteSetting("wheel-idle-timeout", sleepTimeout);
@@ -1718,9 +1846,16 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.SpeedDampingPoint,  v => profile.SpeedDampingPoint  = v,
                   () => _data.SpeedDampingPoint,    v => _data.SpeedDampingPoint    = v,
                   "base-speed-damping-point");
-            Apply(() => profile.NaturalInertia,     v => profile.NaturalInertia     = v,
-                  () => _data.NaturalInertia,       v => _data.NaturalInertia       = v,
-                  "base-natural-inertia");
+            // Steering Wheel Inertia is per wheel, not per profile. Page resolved once
+            // so a hot-swap can't split the read and the seed across two wheels.
+            var wheelPage = _plugin.GetCurrentWheelPageGuid();
+            if (wheelPage.HasValue)
+            {
+                var page = wheelPage.Value;
+                Apply(() => _plugin.GetWheelNaturalInertia(page), v => _plugin.SetWheelNaturalInertia(page, v),
+                      () => _data.NaturalInertia,               v => _data.NaturalInertia = v,
+                      "base-natural-inertia");
+            }
             Apply(() => profile.SoftLimitStiffness, v => profile.SoftLimitStiffness = v,
                   () => _data.SoftLimitStiffness,   v => _data.SoftLimitStiffness   = v,
                   "base-soft-limit-stiffness");
@@ -1760,6 +1895,12 @@ namespace MozaPlugin.Hardware
             Apply(() => profile.RoadSensitivity,    v => profile.RoadSensitivity    = v,
                   () => _data.RoadSensitivity,      v => _data.RoadSensitivity      = v,
                   "base-road-sensitivity");
+            // Ultra bases on fw >= 1.2.12.0 only; others must never see cmd 0x36.
+            // Until support resolves, the poll's one-shot probe re-runs this apply.
+            if (_data.BaseSupportsFfbStyle)
+                Apply(() => profile.FfbStyle,       v => profile.FfbStyle           = v,
+                      () => _data.FfbStyle,         v => _data.FfbStyle             = v,
+                      "base-ffb-style");
 
             // Local helper — does seed + mirror + write in one pass. Closes
             // over `profile` and `_data` via the enclosing scope so callers
@@ -1791,7 +1932,7 @@ namespace MozaPlugin.Hardware
                     {
                         if (deviceVal >= 0) BaseCfgPrime(cmd, deviceVal);
                         if (BaseCfgChanged(cmd, val))
-                            BaseManager.WriteSetting(cmd, val);
+                            WriteBaseSetting(cmd, val);
                     }
             }
 
@@ -1908,8 +2049,9 @@ namespace MozaPlugin.Hardware
                 profile.FfbStrength = -1; profile.Torque = -1; profile.Speed = -1;
                 profile.Damper = -1; profile.Friction = -1; profile.Inertia = -1; profile.Spring = -1;
                 profile.SpeedDamping = -1; profile.SpeedDampingPoint = -1;
-                profile.NaturalInertia = -1; profile.SoftLimitStiffness = -1;
+                profile.SoftLimitStiffness = -1;
                 profile.SoftLimitStrength = -1; profile.SoftLimitRetain = -1; profile.FfbReverse = -1; profile.Protection = -1;
+                profile.FfbStyle = -1;
                 profile.GameDamper = -1; profile.GameFriction = -1;
                 profile.GameInertia = -1; profile.GameSpring = -1;
             }
@@ -2120,7 +2262,7 @@ namespace MozaPlugin.Hardware
         public bool WriteIfBaseConnected(string command, int value)
         {
             if (value < 0) return false;
-            return _detectionState.BaseDetected && BaseManager.WriteSetting(command, value);
+            return _detectionState.BaseDetected && WriteBaseSetting(command, value);
         }
         public void WriteFloatIfBaseConnected(string command, int value)
         {

@@ -37,7 +37,10 @@ namespace MozaPlugin.Telemetry
         {
             _plugin = plugin;
             _detectionState = detectionState;
+            _cm2MappingDashKey = () => _plugin.Cm2MappingDashKey;
         }
+
+        private readonly Func<string> _cm2MappingDashKey;
 
         // Teardown debounce: when EnsureCm2Pipeline computes want==false, hold off
         // tearing the CM2 pipeline down until want has stayed false this long. A
@@ -109,7 +112,6 @@ namespace MozaPlugin.Telemetry
 
         private readonly object _cm2ReconcileLock = new object();
         private int _cm2ReconcileRequested;
-        private static readonly string[] Cm2MappingDashKeys = { MozaPlugin.Cm2DashKey };
 
         private void EnsureCm2PipelineCore()
         {
@@ -227,10 +229,10 @@ namespace MozaPlugin.Telemetry
             // wheel. The coordinator's own default is true, so this is the override
             // path, not the enable.
             cm2.EnableHotRenegotiation = _plugin.Settings?.EnableHotRenegotiation ?? true;
-            // CM2 channel mappings live under the dash device GUID + a fixed key,
-            // independent of the wheel, so the CM2's catalog-synth applies its own.
+            // CM2 channel mappings live under the dash device GUID + the CM2's selected
+            // dashboard, independent of the wheel, so the CM2's catalog-synth applies its own.
             cm2.MappingPageGuid = MozaPlugin.Cm2PageGuid;
-            cm2.MappingDashKeys = Cm2MappingDashKeys;
+            cm2.MappingDashKeyProvider = _cm2MappingDashKey;
             // A bus-bridged dash of unknown type might be a CM1 (group-0x35) that never
             // advertises a tier-def catalog. Suppress the no-catalog engagement watchdog
             // so it doesn't loop restarts while TickCm1Discriminator decides. A USB dash
@@ -310,7 +312,11 @@ namespace MozaPlugin.Telemetry
         }
 
         // One-shot guard: re-assert the saved CM2 dashboard once per pipeline start.
-        private bool _cm2ReassertAttempted;
+        private volatile bool _cm2ReassertAttempted;
+
+        /// <summary>The idle dashboard's kind=4 bound the CM2 for this pipeline; the
+        /// re-assert has nothing left to do.</summary>
+        internal void MarkCm2DashboardReasserted() => _cm2ReassertAttempted = true;
         // Attempts made in the current pipeline lifetime. The one-shot is only claimed
         // once the kind=4 actually reaches the wire, so a sender that keeps refusing
         // would otherwise be retried on every PollStatus tick forever; cap it so a
@@ -332,6 +338,8 @@ namespace MozaPlugin.Telemetry
             if (_cm2ReassertAttempted) return;
             var cm2 = _plugin._cm2Sender;
             if (cm2 == null || cm2.FramesSent == 0) return;
+            // An idle dashboard may be the right target; it binds the CM2 itself.
+            if (_plugin.IdleDashboards?.Cm2ReassertMustWait == true) return;
             // Match what SendDashboardSwitch itself requires (Active, out of the
             // post-emit cooldown) rather than the broader Enabled, so a sender still
             // cold-starting is waited out silently instead of burning an attempt.

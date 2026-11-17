@@ -780,6 +780,7 @@ namespace MozaPlugin.UI
             int widthPct = fx?.BitePoint?.BitePointWidthPct ?? MBoosterUiConstants.BitePointWidthDefaultPct;
             MBoosterBitePointWidth.Value = widthPct;
             SetValueText(MBoosterBitePointWidthValue, widthPct.ToString());
+            MBoosterBitePointPredict.IsChecked = fx?.BitePoint?.BitePointPredict ?? false;
             int minMs = fx?.BitePoint?.BitePointMinLengthMs ?? MBoosterUiConstants.BitePointMinLengthDefaultMs;
             MBoosterBitePointMinLength.Value = minMs;
             SetValueText(MBoosterBitePointMinLengthValue, minMs.ToString());

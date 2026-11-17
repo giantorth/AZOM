@@ -35,6 +35,7 @@
     <Geometry x:Key="IconShift">M12,3 V21 M5,8 L12,3 L19,8 M5,16 L12,21 L19,16</Geometry>
 
     <Geometry x:Key="IconMisc">M3.4,12 A1.6,1.6 0 1 1 6.6,12 A1.6,1.6 0 1 1 3.4,12 Z M10.4,12 A1.6,1.6 0 1 1 13.6,12 A1.6,1.6 0 1 1 10.4,12 Z M17.4,12 A1.6,1.6 0 1 1 20.6,12 A1.6,1.6 0 1 1 17.4,12 Z</Geometry>
+    <Geometry x:Key="IconMusic">M9,18 V5 L21,3 V16 M3,18 A3,3 0 1 1 9,18 A3,3 0 1 1 3,18 Z M15,16 A3,3 0 1 1 21,16 A3,3 0 1 1 15,16 Z</Geometry>
 
     <Geometry x:Key="IconPaddle">M3,8 L11,5 V19 L3,16 Z M21,8 L13,5 V19 L21,17 Z</Geometry>
 

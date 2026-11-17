@@ -14,6 +14,14 @@ namespace MozaPlugin.Protocol
         Armed = 5,
         TravelSelfCheck = 7,
         PortSelfTest = 8,
+        /// <summary>
+        /// Full control (Motion Manager's command table calls 11 "AI mode"; firmware <c>CtrlMode:7</c>): the
+        /// <c>0x22/00</c> frame is followed as a pose. f0/f1 are platform angles 1:1 and f6 is a held
+        /// heave position in mm (soft limit near ±25 mm); the shock fields are ignored. Bench, 12 Nov 2026.
+        /// </summary>
+        FullControl = 11,
+        /// <summary>Flight-sim game mode (<c>0x22/01</c> frame); heave washes out as in <see cref="Game"/>.</summary>
+        FlightGame = 12,
         Standby = 13,
     }
 
@@ -56,8 +64,17 @@ namespace MozaPlugin.Protocol
         public byte ThrottlePercent;
         public byte Flags;
 
+        /// <summary>
+        /// The frame is a pose for full control mode (mode 11): f0/f1 angles to follow and f6 a heave
+        /// position in mm (<c>MotionGameFeed.PoseFrame</c>). False for game-mode input, where f6 is
+        /// vertical acceleration. The lane streams a frame only in the mode it was built for.
+        /// </summary>
+        public bool IsPosition;
+
         /// <summary>Engine speed for the <c>0x22/09</c> engine vibration; negative = send none.</summary>
         public float EngineRpm = -1f;
+        /// <summary>Engine speed as a share of the redline (0..1), for the vibration's fade-in with revs.</summary>
+        public float EngineRpmFraction;
         /// <summary>Unrounded throttle (0..1) for the vibration's 4th harmonic.</summary>
         public float Throttle;
 
@@ -102,6 +119,7 @@ namespace MozaPlugin.Protocol
         public const byte CmdGlobal = 0x04;
         public const byte CmdEffectSlot = 0x05;
         public const byte CmdRoadDetail = 0x06;
+        public const byte CmdManualSetpoint = 0x07;
         public const byte CmdRigDimensions = 0x08;
         public const byte CmdDeviceType = 0x0A;
         public const byte CmdLighting = 0x0B;
@@ -119,6 +137,9 @@ namespace MozaPlugin.Protocol
         /// <summary>Effect slots MM writes on this platform.</summary>
         public const byte SlotPitch = 0x00, SlotRoll = 0x01, SlotHeave = 0x03, SlotAccelPitch = 0x07, SlotAccelRoll = 0x08;
         public static readonly byte[] EffectSlots = { SlotPitch, SlotRoll, SlotHeave, SlotAccelPitch, SlotAccelRoll };
+
+        /// <summary>Manual Motion Test axes (<c>0x1E/07</c>); <c>02</c> is never sent on this platform.</summary>
+        public const byte ManualAxisPitch = 0x00, ManualAxisRoll = 0x01, ManualAxisHeave = 0x03;
 
         // Mode-poll / controller-status flag byte.
         public const byte FlagSelfCheckRunning = 0x80;
@@ -234,6 +255,20 @@ namespace MozaPlugin.Protocol
         public static byte[] BuildEffectSlotRead(byte slot)
             => Build(GroupRead, DeviceController, CmdEffectSlot, slot, 0, 0, 0, 0, 0, 0, 0, 0);
 
+        /// <summary>
+        /// Manual Motion Test setpoint, mode 2 only: <c>1E 12 07 [axis] [f32 −1..+1]</c>, e.g. pitch
+        /// +100 % <c>7E 06 1E 12 07 00 3F800000</c>, echoed on <c>9E 21</c>. Motion Manager sends one
+        /// per slider release (Zero = 0.0); the controller ramps to the new position itself.
+        /// </summary>
+        public static byte[] BuildManualSetpoint(byte axis, float value)
+        {
+            var p = new byte[6];
+            p[0] = CmdManualSetpoint;
+            p[1] = axis;
+            PutF32(p, 2, Math.Max(-1f, Math.Min(1f, value)));
+            return Build(GroupWrite, DeviceController, p);
+        }
+
         /// <summary><c>7e091f12060000000000000000cb</c> → <c>9F 21 06 [f32][f32]</c>.</summary>
         public static byte[] BuildRoadDetailRead()
             => Build(GroupRead, DeviceController, CmdRoadDetail, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -319,11 +354,18 @@ namespace MozaPlugin.Protocol
         /// mode 1, never answered.
         /// </summary>
         public static byte[] BuildTelemetryFrame(MotionTelemetryFrame f)
+            => BuildTelemetryFrame(f, f.Fields[0], f.Fields[1], f.Fields[6]);
+
+        /// <summary>
+        /// The same frame with f0, f1 and f6 replaced, for a sender that reshapes the pose (full control
+        /// mode's limits) without writing to a frame other threads hold.
+        /// </summary>
+        public static byte[] BuildTelemetryFrame(MotionTelemetryFrame f, float f0, float f1, float f6)
         {
             var p = new byte[53];
             p[0] = StreamTelemetry;
             for (int i = 0; i < MotionTelemetryFrame.FieldCount; i++)
-                PutF32(p, 1 + 4 * i, f.Fields[i]);
+                PutF32(p, 1 + 4 * i, i == 0 ? f0 : i == 1 ? f1 : i == 6 ? f6 : f.Fields[i]);
             p[49] = f.BrakePercent;
             p[50] = f.ThrottlePercent;
             p[51] = 0;
@@ -342,7 +384,25 @@ namespace MozaPlugin.Protocol
         /// throttle (0..1).
         /// </summary>
         public static byte[] BuildEngineVibration(float f0Hz, float throttle, float strength, float tactile)
+            => BuildEngineVibration(f0Hz, throttle, strength, tactile, 1f, 1f);
+
+        /// <summary>
+        /// As above with the fundamental multiplied by <paramref name="pitch"/> (kept within the
+        /// oscillators' 20–1000 Hz, 4th harmonic included) and every gain by <paramref name="level"/>.
+        /// A raised pitch lowers the amplitude by pitch^1.5, so the buzz gets finer rather than harsher.
+        /// </summary>
+        public static byte[] BuildEngineVibration(float f0Hz, float throttle, float strength, float tactile,
+            float pitch, float level)
         {
+            if (pitch != 1f || level != 1f)
+            {
+                float f = Math.Max(20f, Math.Min(250f, f0Hz * pitch));
+                float eff = f / f0Hz;
+                float k = Math.Max(0f, level) * (eff > 1f ? (float)Math.Pow(eff, -1.5) : 1f);
+                float tt = Math.Max(0f, Math.Min(1f, throttle));
+                float a1 = 0.045f * strength * tactile * k;
+                return EngineVibrationFrame(f, 0.0009f * strength * tactile * k, a1, a1 * 0.5f, a1 * (0.1f + 0.15f * tt));
+            }
             float t = Math.Max(0f, Math.Min(1f, throttle));
             // (float) casts force float32 rounding at each step, matching the captured bits.
             float g0 = (float)((float)(0.0009f * strength) * tactile);

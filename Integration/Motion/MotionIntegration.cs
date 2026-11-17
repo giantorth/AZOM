@@ -89,6 +89,29 @@ namespace MozaPlugin.Integration.Motion
             return true;
         }
 
+        /// <summary>
+        /// Whether SimHub's Manual control (or its automated test cycles) or the Hop-in position is the
+        /// motion source of the active setup: <c>MotionDevice.SimulatedMotionStateAggregator.IsEnabled</c>
+        /// or <c>MotionDevice.HopInActive</c>.
+        /// </summary>
+        public static bool IsManualControlActive(PluginManager? pluginManager)
+        {
+            if (s_broken || pluginManager == null) return false;
+            try { return IsManualControlActiveCore(pluginManager); }
+            catch (Exception ex) { Disable(ex); return false; }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static bool IsManualControlActiveCore(PluginManager pluginManager)
+        {
+            var motion = pluginManager.GetPlugin<SimHub.Plugins.Motion.MotionPlugin>();
+            var device = motion?.MotionPluginSettings?.CurrentDevice;
+            if (device == null) return false;
+            // The Hop-in position is a held pose like a Manual control setting; in game mode the
+            // controller would ignore its heave (it only reacts to shock movement, not a steady offset).
+            return device.SimulatedMotionStateAggregator?.IsEnabled == true || device.HopInActive;
+        }
+
         private static void Disable(Exception ex)
         {
             if (s_broken) return;

@@ -46,6 +46,8 @@ namespace MozaPlugin
             if (data.GameRunning && !_lastGameRunningForTorquePeak)
                 _data?.ResetLiveTorquePeak();
             _lastGameRunningForTorquePeak = data.GameRunning;
+            _idleDashboards?.NoteGameData(data.GameRunning, data.RunningGameProcessDetected,
+                !data.GamePaused && !data.GameInMenu && !data.GameReplay && data.NewData?.Spectating != true);
             // Feed the truck-sim stalk controller the current game context so it can
             // gate keyboard output to a running ETS2/ATS session.
             try { _stalksController?.SetGameContext(pluginManager.GameName, data.GameRunning); } catch { }
@@ -80,6 +82,8 @@ namespace MozaPlugin
                 try { _motionFeed.Update(pluginManager, data); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/Motion] Feed: {ex.Message}"); }
             }
+            else
+                _motionFeed.Reset();
 
             // Push SimHub's shared/master LED brightness to the wheel firmware group
             // brightness (rpm/buttons/knobs) when the user moves the slider. The wheel
@@ -131,6 +135,8 @@ namespace MozaPlugin
             // channels' own formulas, evaluated live via the property resolver.
             _baseLfeWorker?.PostFrame(engineOn);
             _pedalHapticsWorker?.PostFrame(engineOn);
+
+            _highSpeedDamping?.Tick(data.GameRunning, data.NewData?.SpeedKmh ?? 0.0);
 
             // Control Mapper variant-provider bridge: drive wheel-change detection
             // each tick when registered; otherwise retry registration up to the

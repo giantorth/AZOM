@@ -96,6 +96,64 @@ namespace MozaPlugin.Devices
         public int[]? KnobSignalModeOrder { get; }
 
         /// <summary>
+        /// Multi-mode thumb dial (wheel cmd <c>28 01</c>): <c>MultiDialKnobOrder[logicalKnob]</c>
+        /// = the dial index the firmware takes for that knob — the same firmware knob
+        /// index as the signal mode (<see cref="SignalModeFirmwareIndex"/>), one per
+        /// encoder (VGS: 3 encoders, no knob LEDs). Null = the
+        /// wheel doesn't offer the feature.
+        /// </summary>
+        public int[]? MultiDialKnobOrder { get; }
+
+        /// <summary>Logical knob for a firmware dial index, or -1.</summary>
+        public int MultiDialLogicalKnob(int dialIndex)
+            => MultiDialKnobOrder == null ? -1 : Array.IndexOf(MultiDialKnobOrder, dialIndex);
+
+        /// <summary>Logical knobs Pit House lets be the dial; null = every encoder.
+        /// KS Pro: the centre knob only.</summary>
+        public int[]? MultiDialKnobs { get; }
+
+        /// <summary>Whether a logical knob can be the multi-mode dial.</summary>
+        public bool IsMultiDialKnob(int logicalKnob)
+            => MultiDialKnobOrder != null && logicalKnob >= 0 && logicalKnob < MultiDialKnobOrder.Length
+               && (MultiDialKnobs == null || Array.IndexOf(MultiDialKnobs, logicalKnob) >= 0);
+
+        /// <summary>The dial knob for a saved choice: the only allowed knob when there
+        /// is one, else the saved knob when allowed, else -1.</summary>
+        public int MultiDialEffectiveKnob(int savedKnob)
+        {
+            if (MultiDialKnobOrder == null) return -1;
+            if (MultiDialKnobs != null && MultiDialKnobs.Length == 1) return MultiDialKnobs[0];
+            return IsMultiDialKnob(savedKnob) ? savedKnob : -1;
+        }
+
+        /// <summary>Rim labels of the thumb wheels a dial side can bind
+        /// (<c>28 02 [side] [index]</c>, index into this array). Null = fixed sides,
+        /// each side bound to its own index.</summary>
+        public string[]? MultiDialThumbWheels { get; }
+
+        /// <summary>Same-column thumb-wheel pairs Pit House only allows one way
+        /// round, as (left, right).</summary>
+        public (int Left, int Right)[]? MultiDialFixedPairs { get; }
+
+        /// <summary>Whether a left/right thumb-wheel binding is allowed (0xFF or -1 =
+        /// none): not the same wheel twice, and no fixed pair inverted.</summary>
+        public bool IsMultiDialSidePairAllowed(int left, int right)
+        {
+            bool l = left >= 0 && left != 0xFF, r = right >= 0 && right != 0xFF;
+            if (l && r && left == right) return false;
+            if (l && r && MultiDialFixedPairs != null)
+                foreach (var p in MultiDialFixedPairs)
+                    if (p.Left == right && p.Right == left) return false;
+            return true;
+        }
+
+        /// <summary>Positions on a knob (its ring LED count), which is the number of
+        /// dial labels it carries; 12 when the ring isn't catalogued.</summary>
+        public int KnobPositionCount(int logicalKnob)
+            => KnobRingLeds != null && logicalKnob >= 0 && logicalKnob < KnobRingLeds.Length
+                ? KnobRingLeds[logicalKnob] : 12;
+
+        /// <summary>
         /// Whether this wheel model has a built-in display sub-device that can render
         /// dashboards. <c>true</c> = drive dashboard telemetry without waiting for the
         /// runtime probe; <c>false</c> = never drive dashboard telemetry (skip the
@@ -203,10 +261,18 @@ namespace MozaPlugin.Devices
             // primary colors (protocol groups 0..KnobCount-1 via cmd 0x27).
             // Group 3 (Rotary) provides per-LED ring control: 12 LEDs/knob on CS Pro,
             // 12/12/8/12/12 on KS Pro (knob 3 has 8 LEDs).
-            ("W17",     "CS Pro",     new WheelModelInfo(16, 8,  false, null, 4, new[] { 12, 12, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 3, 2, 1 })),
+            // Multi-mode dial takes the signal-mode firmware knob index (owner-verified on
+            // W17); W20 shares its layout. KS Pro: centre knob only (fw index 4), and
+            // either side binds any of its four thumb wheels (owner-verified 2026-11-16).
+            ("W17",     "CS Pro",     new WheelModelInfo(16, 8,  false, null, 4, new[] { 12, 12, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 3, 2, 1 }, supportsMultiDial: true)),
             // KS Pro 3/12/3 LED strip appears to live entirely in group 0 (Shift/RPM),
             // not split across RPM + Meter flag sub-device. Driving all 18 as one RPM strip.
-            ("W18",     "KS Pro",     new WheelModelInfo(18, 10, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 4, 3, 1, 2 })),
+            ("W18",     "KS Pro",     new WheelModelInfo(18, 10, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 4, 3, 1, 2 }, supportsMultiDial: true,
+                multiDialKnobs: new[] { 2 }, multiDialThumbWheels: new[] { "TC", "ABS", "DIFF", "BB" },
+                multiDialFixedPairs: new[] { (0, 2), (3, 1) })),
+            // Ford Mustang GTD (firmware "W20"): a CS Pro style wheel with 12 button LEDs instead
+            // of 8; same knobs and knob signal-mode order. 
+            ("W20",     "Ford Mustang GTD", new WheelModelInfo(16, 12, false, null, 4, new[] { 12, 12, 12, 12 }, hasDisplay: true, browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 3, 2, 1 }, supportsMultiDial: true)),
             // KS: 3 rotary encoders, none with LED rings (knobCount stays 0). The
             // encoder count is explicit because the firmware answers ALL FIVE
             // wheel-knob-signal-mode indices regardless of how many knobs exist, so
@@ -247,7 +313,7 @@ namespace MozaPlugin.Devices
             // VGS (Vision GS): has the display-rotation IMU — supportsDisplayRotation:true
             // exposes the off/smooth/immediate rotation-mode control (session-0x02 FF
             // kind=5 push). Verified from VGS PitHouse captures.
-            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true, knobEncoderCount: 3)),
+            ("VGS",     "Vision GS",  new WheelModelInfo(10, 8,  false, null, 0, hasDisplay: true, supportsDisplayRotation: true, knobEncoderCount: 3, supportsMultiDial: true)),
             ("TSW",     "TSW",        new WheelModelInfo(10, 14, false, null, 0, hasDisplay: false, knobEncoderCount: 0)),
             // RS V2: 10 RPM + 10 button LEDs (owner-confirmed, 2026-07-30),
             // screenless. The real RS V2 self-reports "RS Leather # W00"
@@ -306,8 +372,11 @@ namespace MozaPlugin.Devices
             ("ES",      "ES",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, knobEncoderCount: 0)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false, int knobEncoderCount = -1)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false, int knobEncoderCount = -1, bool supportsMultiDial = false, int[]? multiDialKnobs = null, string[]? multiDialThumbWheels = null, (int Left, int Right)[]? multiDialFixedPairs = null)
         {
+            MultiDialKnobs = multiDialKnobs;
+            MultiDialThumbWheels = multiDialThumbWheels;
+            MultiDialFixedPairs = multiDialFixedPairs;
             SupportsDisplayRotation = supportsDisplayRotation;
             RpmLedCount = rpmLedCount;
             ButtonLedCount = buttonLedCount;
@@ -329,6 +398,12 @@ namespace MozaPlugin.Devices
             MaxLedFps = maxLedFps;
             UsesLegacyRpmTelemetry = usesLegacyRpmTelemetry;
             KnobSignalModeOrder = knobSignalModeOrder;
+            if (supportsMultiDial && KnobEncoderCount > 0)
+            {
+                var order = new int[KnobEncoderCount];
+                for (int k = 0; k < order.Length; k++) order[k] = SignalModeFirmwareIndex(k);
+                MultiDialKnobOrder = order;
+            }
         }
 
         /// <summary>

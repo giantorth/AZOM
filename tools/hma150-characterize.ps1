@@ -21,11 +21,13 @@
     .\hma150-characterize.ps1 -Experiment Heave
     .\hma150-characterize.ps1 -Experiment Gating
     .\hma150-characterize.ps1 -Experiment Feedback
+    .\hma150-characterize.ps1 -Experiment HeaveFeel     # which input kicks heave, judged from the seat (~2 min)
+    .\hma150-characterize.ps1 -Experiment HeaveGain     # mm of heave per m/s2 of f6, timed against the 60 s log line (~8 min)
     .\hma150-characterize.ps1 -Experiment Writes -StrokeValue 0.5 -RigL1 520 -RigL2 480
 #>
 param(
     [string]  $ComPort      = "COM6",
-    [ValidateSet("All", "Gain", "Sweep", "Heave", "Gating", "Feedback", "Writes")]
+    [ValidateSet("All", "Gain", "Sweep", "Heave", "Gating", "Feedback", "Writes", "HeaveFeel", "HeaveGain")]
     [string]  $Experiment   = "All",
     [ValidateSet("Pitch", "Roll")]
     [string]  $Axis         = "Pitch",
@@ -99,6 +101,9 @@ $script:selfCheckOk = $false
 $script:ports = @{}         # port -> present
 $script:reads = @{}         # "grp/cmd/idx" -> payload
 $script:logBuf = @{}
+$script:dispAt = -1         # clock ms of the last firmware Output Displacement line
+$script:dispCount = 0
+$script:dispText = ""
 
 function Poll-Serial {
     $n = $serial.BytesToRead
@@ -140,6 +145,9 @@ function Handle-Frame([byte[]]$f) {
         $script:logBuf[$dev] = ""
         $line = $txt.Trim()
         if ($line -match "selfCheckSuccess") { $script:selfCheckOk = $true }
+        if ($line -match "Output Displacement\s*:\s*(.+)$") {
+            $script:dispAt = $script:clock.ElapsedMilliseconds; $script:dispCount++; $script:dispText = $Matches[1].Trim()
+        }
         $noise = $line -match 'I_total|^V=|mos_t|Fault|is_connected|access_dev_num|^Slave\(|^\[\d|^[\d\.,=\-]|^P\d'
         if (-not $noise) {
             $color = "DarkCyan"; if ($line -match "ERRO|error_code") { $color = "Red" }
@@ -411,6 +419,128 @@ function Exp-Writes {
     }
 }
 
+# Which game-mode input moves heave, and how sharply: judged from the seat, since the firmware
+# only logs displacement once a minute. Heave slot 1.0 / 0 and Road Detail 0 for the run, both
+# restored from their reads after. Each group is announced by its number in beeps. Groups 1-4:
+# three 0.3 s pulses, then a 2 s step. Groups 5-7: a 3 Hz sine for 4 s.
+function Read-Slot([byte]$slot) {
+    $script:reads.Remove(("05/{0:x2}" -f $slot))
+    Send 0x1F (@(0x05, $slot) + (New-Object byte[] 8)); Pump 250
+}
+function Feel-Beeps([int]$n) {
+    for ($k = 0; $k -lt $n; $k++) { try { [Console]::Beep(880, 90) } catch {}; Neutral 0.25 }
+    Neutral 0.6
+}
+function Feel-Pulses([int]$n, [string]$label, [scriptblock]$apply) {
+    Feel-Beeps $n
+    Mark ("FEEL {0}: {1}, three 0.3 s pulses then a 2 s step" -f $n, $label)
+    for ($k = 0; $k -lt 3; $k++) {
+        Stream 0.3 { param($t) $in = New-Inputs; & $apply $in 1.0; $in }
+        Neutral 1.2
+    }
+    Stream 2.0 { param($t) $in = New-Inputs; & $apply $in 1.0; $in }
+    Neutral 2.5
+}
+function Feel-Sine([int]$n, [string]$label, [scriptblock]$apply) {
+    Feel-Beeps $n
+    Mark ("FEEL {0}: {1}, 3 Hz sine for 4 s" -f $n, $label)
+    Stream 4.0 { param($t) $in = New-Inputs; & $apply $in ([Math]::Sin(2 * [Math]::PI * 3.0 * $t)); $in }
+    Neutral 2.5
+}
+function Exp-HeaveFeel {
+    if ($SpeedMs -le 0) { $script:SpeedMs = 40.0 }   # in case heave is gated on speed
+    Read-Slot 0x03
+    $oldHeave = $script:reads["05/03"]
+    if (-not $oldHeave -or $oldHeave.Length -lt 10) { throw "Heave slot 03 did not read back: nothing changed, test not run" }
+    foreach ($key in @($script:reads.Keys | Where-Object { $_ -like "06/*" })) { $script:reads.Remove($key) }
+    Send 0x1F (@(0x06) + (New-Object byte[] 8)); Pump 250
+    $oldRoad = $null
+    foreach ($key in @($script:reads.Keys | Where-Object { $_ -like "06/*" })) { if ($script:reads[$key].Length -ge 9) { $oldRoad = $script:reads[$key] } }
+    Mark ("heave slot 03 reads {0:F2} / {1:F2}; road detail {2}" -f (ReadF32 $oldHeave 2), (ReadF32 $oldHeave 6), $(if ($oldRoad) { "{0:F2} / {1:F2}" -f (ReadF32 $oldRoad 1), (ReadF32 $oldRoad 5) } else { "no readback (left alone)" }))
+    $accel = { param($in, $g) $in.f[6] = 8.0 * $g }
+    $accelDown = { param($in, $g) $in.f[6] = -8.0 * $g }
+    $shocks = { param($in, $g) for ($k = 0; $k -lt 4; $k++) { $in.f[8 + $k] = $SHOCK_REST[$k] + 10.0 * $g } }
+    $shocksDown = { param($in, $g) for ($k = 0; $k -lt 4; $k++) { $in.f[8 + $k] = $SHOCK_REST[$k] - 10.0 * $g } }
+    try {
+        Set-Slot 0x03 1.0 0.0
+        if ($oldRoad) { Set-Road 0.0 0.0 }
+        Neutral 2
+        Feel-Pulses 1 "vertical accel f6 +8 m/s2" $accel
+        Feel-Pulses 2 "vertical accel f6 -8 m/s2" $accelDown
+        Feel-Pulses 3 "all four shocks +10 mm" $shocks
+        Feel-Pulses 4 "all four shocks -10 mm" $shocksDown
+        Feel-Sine 5 "all four shocks +/-10 mm" $shocks
+        Feel-Sine 6 "vertical accel f6 +/-8 m/s2" $accel
+        if ($oldRoad) {
+            Set-Road 1.0 0.0
+            Feel-Sine 7 "all four shocks +/-10 mm with Road Detail 1.0" $shocks
+        }
+    } finally {
+        Send 0x1E (@(0x05, 0x03) + $oldHeave[2..9]); Pump 100
+        if ($oldRoad) { Send 0x1E (@(0x06) + $oldRoad[1..8]); Pump 100 }
+        Read-Slot 0x03
+        $back = $script:reads["05/03"]
+        Mark ("heave slot 03 restored: {0}" -f $(if ($back -and $back.Length -ge 10) { "{0:F2} / {1:F2}" -f (ReadF32 $back 2), (ReadF32 $back 6) } else { "no readback" }))
+    }
+}
+
+# Heave per m/s2 of f6 and how it develops: an f6 step started a set time before each 60 s
+# Output Displacement line, so the line reads the heave that far into the step. 8 m/s2 at
+# 150 / 500 / 2000 ms for the time response, 16 and 24 at 500 ms for linearity, -8 for
+# symmetry. Heave slot 1.0 / 0 and Road Detail 0 for the run, both restored after.
+function Exp-HeaveGain {
+    if ($SpeedMs -le 0) { $script:SpeedMs = 40.0 }
+    Read-Slot 0x03
+    $oldHeave = $script:reads["05/03"]
+    if (-not $oldHeave -or $oldHeave.Length -lt 10) { throw "Heave slot 03 did not read back: nothing changed, test not run" }
+    foreach ($key in @($script:reads.Keys | Where-Object { $_ -like "06/*" })) { $script:reads.Remove($key) }
+    Send 0x1F (@(0x06) + (New-Object byte[] 8)); Pump 250
+    $oldRoad = $null
+    foreach ($key in @($script:reads.Keys | Where-Object { $_ -like "06/*" })) { if ($script:reads[$key].Length -ge 9) { $oldRoad = $script:reads[$key] } }
+    Mark ("heave slot 03 reads {0:F2} / {1:F2}; road detail {2}" -f (ReadF32 $oldHeave 2), (ReadF32 $oldHeave 6), $(if ($oldRoad) { "{0:F2} / {1:F2}" -f (ReadF32 $oldRoad 1), (ReadF32 $oldRoad 5) } else { "no readback (left alone)" }))
+    try {
+        Set-Slot 0x03 1.0 0.0
+        if ($oldRoad) { Set-Road 0.0 0.0 }
+        Mark "GAIN waiting for an Output Displacement line (up to 65 s)"
+        $w = [Diagnostics.Stopwatch]::StartNew()
+        while ($script:dispAt -lt 0 -and $w.ElapsedMilliseconds -lt 65000) { Neutral 0.1 }
+        if ($script:dispAt -lt 0) { Mark "GAIN no Output Displacement line seen: skipped"; return }
+        $cases = @(@(8.0, 150), @(8.0, 500), @(8.0, 2000), @(16.0, 500), @(24.0, 500), @(-8.0, 500))
+        foreach ($c in $cases) {
+            $a = [double]$c[0]; $lead = [int]$c[1]
+            $tick = $script:dispAt
+            while ($tick - $lead -lt $script:clock.ElapsedMilliseconds + 3000) { $tick += 60000 }
+            $seen = $script:dispCount; $stepAt = -1
+            while ($script:dispCount -eq $seen -or $script:dispAt -lt $tick - 5000) {
+                $now = $script:clock.ElapsedMilliseconds
+                if ($now -gt $tick + 5000) { break }
+                if ($stepAt -lt 0 -and $now -ge $tick - $lead) {
+                    $stepAt = $now
+                    Mark ("GAIN step f6 {0:+0.0;-0.0} m/s2, aimed {1} ms before the log line" -f $a, $lead)
+                }
+                if ($now -ge $script:nextFrame) {
+                    $script:nextFrame = $now + $script:frameMs
+                    $in = New-Inputs
+                    if ($stepAt -ge 0) { $in.f[6] = $a }
+                    Send 0x22 (Build-Game $in)
+                }
+                Heartbeat; Poll-Serial
+                Start-Sleep -Milliseconds 1
+            }
+            if ($stepAt -ge 0 -and $script:dispAt -ge $stepAt) {
+                Mark ("GAIN RESULT f6 {0:+0.0;-0.0} m/s2, {1} ms into the step: {2}" -f $a, ($script:dispAt - $stepAt), $script:dispText)
+            } else { Mark ("GAIN f6 {0:+0.0;-0.0} lead {1}: log line at {2}, step at {3}: missed" -f $a, $lead, $script:dispAt, $stepAt) }
+            Neutral 3
+        }
+    } finally {
+        Send 0x1E (@(0x05, 0x03) + $oldHeave[2..9]); Pump 100
+        if ($oldRoad) { Send 0x1E (@(0x06) + $oldRoad[1..8]); Pump 100 }
+        Read-Slot 0x03
+        $back = $script:reads["05/03"]
+        Mark ("heave slot 03 restored: {0}" -f $(if ($back -and $back.Length -ge 10) { "{0:F2} / {1:F2}" -f (ReadF32 $back 2), (ReadF32 $back 6) } else { "no readback" }))
+    }
+}
+
 # ---------------------------------------------------------------- main
 Write-Host "==============================================="
 Write-Host " HMA150 characterization: $Experiment ($Axis), $RateHz Hz frames"
@@ -445,6 +575,8 @@ try {
         "Heave"    { Exp-Heave }
         "Gating"   { Exp-Gating }
         "Feedback" { Exp-Feedback }
+        "HeaveFeel" { Exp-HeaveFeel }
+        "HeaveGain" { Exp-HeaveGain }
     }
     Mark "done"
     Neutral 2

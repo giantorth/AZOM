@@ -12,6 +12,8 @@ namespace MozaPlugin.Protocol
         public byte[] ArrayValue;
         public byte DeviceId;
         public int PayloadLength;
+        // Echo of our own write (write group), not a read of the stored value.
+        public bool IsWriteEcho;
     }
 
     /// <summary>
@@ -192,7 +194,11 @@ namespace MozaPlugin.Protocol
                 int valueStart = PayloadStart + cmd.CommandId.Length;
                 int valueLength = payloadLength - cmd.CommandId.Length;
 
-                var result = new ParsedResponse { Name = cmd.Name, DeviceId = deviceId, PayloadLength = valueLength };
+                var result = new ParsedResponse
+                {
+                    Name = cmd.Name, DeviceId = deviceId, PayloadLength = valueLength,
+                    IsWriteEcho = group == cmd.WriteGroup && group != cmd.ReadGroup,
+                };
 
                 if (cmd.PayloadType == "array")
                 {

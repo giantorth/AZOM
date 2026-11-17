@@ -389,7 +389,7 @@ namespace MozaPlugin.Telemetry
         /// layout is untouched, so callers need no tier-def re-emit (the frame
         /// builder reads ch.SimHubProperty live each frame). The dashboard key is
         /// resolved per candidate (wheel:&lt;name&gt; > file:&lt;name&gt;:&lt;sha&gt;
-        /// > builtin:&lt;name&gt;), or the fixed <see cref="MappingDashKeys"/> for
+        /// > builtin:&lt;name&gt;), or <see cref="MappingDashKeyProvider"/>'s key for
         /// a CM2 sender. <paramref name="profile"/>'s name is the key fallback: this
         /// runs before the profile is live, so the resolver can't read it from
         /// <see cref="Profile"/> yet.
@@ -401,7 +401,10 @@ namespace MozaPlugin.Telemetry
             if (plugin == null) return 0;
             var channelMap = plugin.GetActiveChannelMappings(MappingPageGuid);
             if (channelMap == null) return 0;
-            var keys = MappingDashKeys ?? plugin.ChannelMapping.GetActiveDashboardKeyCandidates(profile.Name);
+            var keyProvider = MappingDashKeyProvider;
+            var keys = keyProvider != null
+                ? new[] { keyProvider() }
+                : plugin.ChannelMapping.GetActiveDashboardKeyCandidates(profile.Name);
             foreach (var dashKey in keys)
             {
                 if (channelMap.TryGetValue(dashKey, out var overrides) && overrides != null)
@@ -436,7 +439,7 @@ namespace MozaPlugin.Telemetry
         internal void ReapplyUserChannelMappingsAfterConfigJson()
         {
             // Wheel lane only: id → name now resolves, so rewrite legacy mapping keys.
-            if (MappingDashKeys == null)
+            if (MappingDashKeyProvider == null)
                 MozaPlugin.Instance?.ChannelMapping.MigrateLegacyWheelKeys();
             ReResolveActiveDashboardMappings(onlyIfChanged: true);
         }

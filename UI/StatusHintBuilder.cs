@@ -71,17 +71,57 @@ namespace MozaPlugin.UI
             var connection = plugin.Connection;
             var data = plugin.Data;
 
+            // Rule 0b: LinuxDeviceAccessDenied — the Linux user can't open a MOZA
+            // tty (no connection) or hidraw node (winebus drops the device, so
+            // inputs are missing). hidraw only counts while the HID reader lacks
+            // that PID: winebus may still reach it through evdev.
+            var access = LinuxDeviceAccess.Current;
+            if (access.Nodes.Count > 0)
+            {
+                var openHid = plugin.HidReader?.OpenPidsSnapshot() ?? Array.Empty<ushort>();
+                var ttys = new List<string>();
+                var hids = new List<string>();
+                foreach (var n in access.Nodes)
+                {
+                    if (!n.Denied) continue;
+                    string label = n.Name.Length > 0 ? $"{n.Name} ({n.DevPath})" : n.DevPath;
+                    if (n.Kind == LinuxNodeKind.Tty) ttys.Add(label);
+                    else if (MozaHidReader.ReadsPid(n.Pid) && Array.IndexOf(openHid, n.Pid) < 0) hids.Add(label);
+                }
+                if (ttys.Count > 0 || hids.Count > 0)
+                {
+                    var body = new List<string>();
+                    var subsystems = new List<string>();
+                    if (ttys.Count > 0)
+                    {
+                        body.Add(string.Format(Strings.Banner_LinuxAccess_TtyFmt, string.Join(", ", ttys)));
+                        subsystems.Add("tty");
+                    }
+                    if (hids.Count > 0)
+                    {
+                        body.Add(string.Format(Strings.Banner_LinuxAccess_HidFmt, string.Join(", ", hids)));
+                        subsystems.Add("hidraw");
+                    }
+                    body.Add(string.Format(Strings.Banner_LinuxAccess_FixFmt, string.Join(", ", subsystems)));
+                    list.Add(new StatusHint(
+                        StatusHintKind.LinuxDeviceAccessDenied,
+                        Strings.Banner_LinuxAccess_Title,
+                        string.Join(" ", body)));
+                }
+            }
+
             // Rule 1: PortLockedByOtherApp
             // Hardware visible in the OS registry (or the failing port is the
             // saved MOZA port the probe fallback retried) AND open keeps failing
             // with access-denied AND we're not connected. The double-failure
             // debounce (>= 2) prevents a single transient open failure from
-            // flashing the banner.
+            // flashing the banner. Not when rule 0b already explains the denial.
             if (elapsed >= PortLockedSettling
                 && connection != null
                 && !(data?.IsConnected ?? false)
                 && connection.ConsecutiveOpenFailures >= 2
                 && connection.LastFailure.Kind == ConnectionFailureKind.AccessDenied
+                && !access.IsTtyDenied(connection.LastFailure.PortName ?? "")
                 && (connection.LastFailure.FromProbe || MozaPortDiscovery.Instance.Enumerate().Count >= 1))
             {
                 var port = connection.LastFailure.PortName ?? Strings.Banner_PortFallbackName;

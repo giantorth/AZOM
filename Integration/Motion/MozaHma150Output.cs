@@ -17,16 +17,19 @@ namespace MozaPlugin.Integration.Motion
     {
         /// <summary>Raw game physics, as Motion Manager sends; the controller's effects do the cueing.</summary>
         GameTelemetry = 0,
-        /// <summary>SimHub Motion's pose (its effects profile) as attitude and heave.</summary>
+        /// <summary>SimHub Motion's pose (its effects profile), followed as positions in the controller's full control mode.</summary>
         SimHubPose = 1,
     }
 
     /// <summary>Persisted output settings; the controller stores its own setup.</summary>
     public class MozaHma150OutputSettings : OutputSettingsBase
     {
-        private MozaHma150Source _source;
+        private MozaHma150Source _source = MozaHma150Source.SimHubPose;
         private bool _includeCornerHaptics = true;
+        private int _crestBoost;
+        private bool _slowManualControl = true;
 
+        /// <summary>Defaults to the SimHub pose.</summary>
         public MozaHma150Source Source
         {
             get => _source;
@@ -53,6 +56,127 @@ namespace MozaPlugin.Integration.Motion
                 Output?.ApplySettings();
             }
         }
+
+        /// <summary>Pose source only, 0–100 (0 = off): share of <see cref="MotionGameFeed.CrestPush"/> taken off f6.</summary>
+        public int CrestBoost
+        {
+            get => _crestBoost;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_crestBoost == value) return;
+                _crestBoost = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        private int _engineVibrationPitch = 50;
+        private int _engineTickover;
+        private bool _maxPerformance;
+
+        /// <summary>
+        /// Pose source only, off by default. Off: the pose is kept inside game mode's behaviour (tilt
+        /// scaled to what game mode gives, every actuator within game mode's travel, speed and
+        /// acceleration capped). On: the pose's true angles with no speed or acceleration cap, which
+        /// can make the rig hop or shift.
+        /// </summary>
+        public bool MaxPerformance
+        {
+            get => _maxPerformance;
+            set
+            {
+                if (_maxPerformance == value) return;
+                _maxPerformance = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, 0–100 (0 = off): a heave tick-over pulse of up to 3 mm at idle that fades
+        /// out as the controller's engine vibration fades in (use instead of the profile's engine effect).
+        /// </summary>
+        public int EngineTickover
+        {
+            get => _engineTickover;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_engineTickover == value) return;
+                _engineTickover = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        /// <summary>
+        /// Pose source only, 0–100, 50 = Motion Manager's frequencies (25–60 Hz): pitch of the controller's
+        /// engine vibration, a factor of 2^((value − 50) / 25), so 100 is four times higher and 25 half.
+        /// </summary>
+        public int EngineVibrationPitch
+        {
+            get => _engineVibrationPitch;
+            set
+            {
+                value = Math.Max(0, Math.Min(100, value));
+                if (_engineVibrationPitch == value) return;
+                _engineVibrationPitch = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        private double _mcSeatFromFrontMm, _mcSeatHeightMm;
+        private bool _mcUseDrivenPose = true;
+
+        /// <summary>
+        /// VR motion compensation (mm, 0 = not set): distance from the front actuators' line back to the
+        /// centre of the seat. With <see cref="McSeatHeightMm"/> and the controller's rig length it places
+        /// SimHub's MC pivot (<see cref="Hma150MotionCompensation"/>).
+        /// </summary>
+        public double McSeatFromFrontMm { get => _mcSeatFromFrontMm; set => SetMm(ref _mcSeatFromFrontMm, value); }
+
+        /// <summary>VR MC: height of the seat bottom above the floor with the platform parked, actuators fully retracted (mm, 0 = not set).</summary>
+        public double McSeatHeightMm { get => _mcSeatHeightMm; set => SetMm(ref _mcSeatHeightMm, value); }
+
+        /// <summary>VR MC measurement range (mm); anything below the minimum is stored as 0, not set.</summary>
+        public const double McMinMm = 1.0, McMaxMm = 5000.0;
+
+        /// <summary>
+        /// VR MC, on by default, pose source only: give SimHub's motion compensation the pitch, roll and
+        /// heave the controller is driven to instead of SimHub's pose (they differ by the tilt share, the
+        /// limiter and the controller's own soft limits). Game telemetry always leaves SimHub's pose as it is.
+        /// </summary>
+        public bool McUseDrivenPose
+        {
+            get => _mcUseDrivenPose;
+            set
+            {
+                if (_mcUseDrivenPose == value) return;
+                _mcUseDrivenPose = value;
+                Output?.ApplySettings();
+            }
+        }
+
+        private void SetMm(ref double field, double value)
+        {
+            value = double.IsNaN(value) || double.IsInfinity(value) || value < McMinMm ? 0.0 : Math.Min(McMaxMm, value);
+            if (field == value) return;
+            field = value;
+            Output?.ApplySettings();
+        }
+
+        /// <summary>
+        /// While SimHub's Manual control or Hop-in position moves the platform, use the controller's
+        /// Manual Motion Test (mode 2, <c>0x1E/07</c> setpoints) instead of game mode.
+        /// </summary>
+        public bool SlowManualControl
+        {
+            get => _slowManualControl;
+            set
+            {
+                if (_slowManualControl == value) return;
+                _slowManualControl = value;
+                Output?.ApplySettings();
+            }
+        }
     }
 
     /// <summary>
@@ -61,19 +185,20 @@ namespace MozaPlugin.Integration.Motion
     /// <c>TypeName</c> from this assembly). Pairs with the 6DOF pose-bypass geometry, which
     /// has no corner channels to map.
     ///
-    /// By default, like Motion Manager, it streams the game's raw telemetry (<see cref="MotionGameFeed"/>)
-    /// and leaves cueing and strength to the controller's own Motion Effects sliders; with
-    /// <see cref="MozaHma150Source.SimHubPose"/> it streams SimHub Motion's pose instead
-    /// (<see cref="MotionGameFeed.PoseFrame"/>). SimHub Motion supplies the lifecycle: start,
-    /// idle, stop and failure.
+    /// By default it streams SimHub Motion's pose, which the controller's full control mode follows
+    /// as positions (<see cref="MotionGameFeed.PoseFrame"/>); with
+    /// <see cref="MozaHma150Source.GameTelemetry"/> it streams the game's raw telemetry instead, like
+    /// Motion Manager (<see cref="MotionGameFeed"/>), and leaves cueing and strength to the
+    /// controller's own Motion Effects sliders. SimHub Motion supplies the lifecycle: start, idle,
+    /// stop and failure.
     ///
     /// The port belongs to the plugin's motion lane (<see cref="MozaMotionController"/>),
     /// which this output holds while started:
     /// <list type="bullet">
-    /// <item>Start — connect if needed, engage (self-check, game mode); returns at once, and
-    /// <see cref="IsReadyForLiveMotionData"/> stays false ("Starting") until the
-    /// controller reports game mode.</item>
-    /// <item>Idle — stay in game mode, neutral frames with the in-game flag clear.</item>
+    /// <item>Start — connect if needed, engage (self-check, game or full control mode); returns at
+    /// once, and <see cref="IsReadyForLiveMotionData"/> stays false ("Starting") until the
+    /// controller reports that mode.</item>
+    /// <item>Idle — stay in that mode, neutral frames with the in-game flag clear.</item>
     /// <item>Stop — run state stop, standby, then the port is released.</item>
     /// <item>Lane fault or disconnect — <c>ConnectionState.Failure</c>; SimHub freezes the pose.</item>
     /// </list>
@@ -88,7 +213,13 @@ namespace MozaPlugin.Integration.Motion
         private const int FrameIntervalMs = 30;
         private const int FeedMaxAgeMs = 500;
 
+        // Manual mode: SimHub's Manual control full scale (its sliders reach ±20° and ±200 mm on the
+        // 6DOF bypass geometry, capture 2026-11-11 19-07-06) maps to Motion Manager's ±100 %.
+        private const double ManualFullScaleDegrees = 20.0, ManualFullScaleHeaveMm = 200.0;
+
         private int _counted;
+        private readonly System.Diagnostics.Stopwatch _manualPoll = new System.Diagnostics.Stopwatch();
+        private const int ManualPollMs = 200;
 
         [JsonIgnore]
         public override string Name => DisplayNameText;
@@ -100,7 +231,7 @@ namespace MozaPlugin.Integration.Motion
 
         public override Control SettingsControl => new MozaHma150SettingsControl(this);
 
-        private static MozaMotionController? Lane => MozaPlugin.Instance?.MotionController;
+        private static MozaMotionController? Lane => MozaPlugin.SharedMotionController;
 
         public override IEnumerable<string> GetReservedSerialPorts()
         {
@@ -160,6 +291,7 @@ namespace MozaPlugin.Integration.Motion
             if (Interlocked.Exchange(ref _counted, 1) == 0)
                 lane.Acquire();
             lane.SetIdle(false);
+            PollManualControl(lane);
             lane.Engage(new MotionEngageConfig { FrameIntervalMs = FrameIntervalMs });
             ConnectionState = OutputConnectionState.Connected;
         }
@@ -167,35 +299,96 @@ namespace MozaPlugin.Integration.Motion
         public override void StopInternal()
         {
             var lane = Lane;
+            lane?.SetManualWanted(false);
             lane?.Disengage();
             if (Interlocked.Exchange(ref _counted, 0) == 1)
                 lane?.Release();
         }
 
         public override bool IsReadyForLiveMotionData()
-            => base.IsReadyForLiveMotionData() && Lane?.Phase == MotionLanePhase.Game;
+            => base.IsReadyForLiveMotionData()
+               && (Lane?.Phase == MotionLanePhase.Game || (Lane?.ManualDriven == true && Lane.ManualTestActive));
 
         protected override void UpdateInternal(CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
         {
             var lane = Lane;
+            Stream(lane, geometryResult, currentSettings);
+            // SimHub's VR motion compensation reads this same result right after this call.
+            _motionCompensation.Apply(geometryResult, currentSettings, lane);
+        }
+
+        private readonly Hma150MotionCompensation _motionCompensation = new Hma150MotionCompensation();
+
+        private void Stream(MozaMotionController? lane, CompositeGeometryResult geometryResult, MozaHma150OutputSettings currentSettings)
+        {
+            PollManualControl(lane);
             if (!CheckLane(lane)) return;
-            var game = MozaPlugin.Instance?.MotionFeed.Latest(FeedMaxAgeMs);
+            var primary = geometryResult?.PrimaryGeometryResult;
+            // SimHub's own state, not the driven pose a previous update put in a result SimHub reuses.
+            var simHubState = _motionCompensation.SimHubState(primary);
+            if (lane!.ManualDriven)
+            {
+                // Manual control and Hop-in poses carry no effects, so either state reads the same.
+                var pose = simHubState ?? primary?.FinalMotionState;
+                if (pose != null)
+                    lane.PostManualPose(
+                        (float)(pose.PitchDegrees / ManualFullScaleDegrees),
+                        (float)(pose.RollDegrees / ManualFullScaleDegrees),
+                        (float)(pose.HeaveMm / ManualFullScaleHeaveMm));
+                return;
+            }
+            var feed = MozaPlugin.Instance?.MotionFeed;
+            var game = feed?.Latest(FeedMaxAgeMs);
             if (currentSettings?.Source == MozaHma150Source.SimHubPose)
             {
                 // Final state: the bypass geometry folds corner haptics into it, as SimHub's <PoseAxis> token reads.
-                var primary = geometryResult?.PrimaryGeometryResult;
                 var pose = currentSettings!.IncludeCornerHaptics
-                    ? primary?.FinalMotionState ?? primary?.MotionState
-                    : primary?.MotionState;
+                    ? primary?.FinalMotionState ?? simHubState
+                    : simHubState;
                 if (pose != null)
-                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm, game));
+                {
+                    // The crest signal belongs to the running game: none without a fresh game frame.
+                    double crestPush = game != null ? currentSettings.CrestBoost / 100.0 * feed!.CrestPush : 0.0;
+                    // A held drop needs speed: none below 5 m/s, full from 15 m/s. A car being placed
+                    // on the track reads as "light" and held the full drop for 10 s (capture 13 Nov 2026).
+                    if (game != null)
+                        crestPush *= Math.Max(0.0, Math.Min(1.0, (Math.Abs(game.Fields[7]) - 5.0) / 10.0));
+                    // Max performance: the pose's true angles. Otherwise the share game mode turns into tilt.
+                    double tiltScale = currentSettings.MaxPerformance ? 1.0 : PoseLimiter.DefaultTiltShare;
+                    // Until the lane has entered full control mode it drops this frame (IsPosition) and streams neutral.
+                    lane!.PostFrame(MotionGameFeed.PoseFrame(pose.PitchDegrees, pose.RollDegrees,
+                        pose.HeaveMm, game, crestPush, tiltScale));
+                }
                 return;
             }
             if (game != null) lane!.PostFrame(game);
         }
 
         protected override void KeepAliveInternal(CompositeGeometryResult geometryResult)
-            => CheckLane(Lane);
+        {
+            PollManualControl(Lane);
+            CheckLane(Lane);
+        }
+
+        /// <summary>
+        /// Tell the lane, a few times a second, whether SimHub's Manual control or Hop-in position is
+        /// the motion source; the lane then swaps game mode for the slow manual mode and back on its own.
+        /// </summary>
+        private void PollManualControl(MozaMotionController? lane)
+        {
+            if (lane == null) return;
+            // The SimHub pose source runs the controller in full control mode (pose followed as positions).
+            lane.SetFullControlWanted(Settings?.Source == MozaHma150Source.SimHubPose);
+            lane.SetEngineVibrationPitch((float)Math.Pow(2.0, ((Settings?.EngineVibrationPitch ?? 50) - 50) / 25.0));
+            lane.SetEngineTickover((Settings?.EngineTickover ?? 0) / 100f * 3f);
+            lane.SetMaxPerformance(Settings?.MaxPerformance == true);
+            if (_manualPoll.IsRunning && _manualPoll.ElapsedMilliseconds < ManualPollMs) return;
+            // Between plugin instances (SimHub game switch) there is nothing to ask: keep the last answer.
+            if (MozaPlugin.Instance == null) return;
+            _manualPoll.Restart();
+            lane.SetManualWanted(Settings?.SlowManualControl != false
+                && MozaPlugin.Instance?.MotionManualControlActive == true);
+        }
 
         protected override void BeforeStartingIdle(CompositeGeometryResult geometryResult) => Lane?.SetIdle(true);
 

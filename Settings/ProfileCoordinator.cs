@@ -33,7 +33,8 @@ namespace MozaPlugin.Settings
             try
             {
                 var holder = _plugin.DeviceProfiles?.WheelDashboardKeyProfile;
-                if (holder != null)
+                // The idle dashboard is not the profile's pick.
+                if (holder != null && _plugin.IdleDashboards?.WheelEngaged != true)
                 {
                     var cands = _plugin.ChannelMapping.GetActiveDashboardKeyCandidates();
                     if (cands.Count > 0) holder.TelemetryDashboardKey = cands[0];
@@ -127,6 +128,8 @@ namespace MozaPlugin.Settings
             // telemetry off for new wheels, wheelbase LFE off ShakeIt).
             _plugin._settings = MozaPluginSettings.CreateForNewInstall();
             _plugin.SaveCommonSettings("MozaPluginSettings", _plugin.Settings);
+            _plugin.ApplyStalksSettings();
+            _plugin.LoadBitePointTravel();
             // InitProfileSystem re-pushes the master-mapper defaults from the
             // freshly-seeded profile, replacing the cleared set's snapshot.
             InitProfileSystem();
@@ -442,6 +445,15 @@ namespace MozaPlugin.Settings
         internal void ApplyCm2SavedDashboard(MozaDashProfile? profile)
         {
             if (profile == null) return;
+            ApplyCm2SavedDashboardCore(profile);
+            // The CM2's mappings follow its profile too, and a switch between profiles on
+            // the same dashboard emits no kind=4 — rebind the live channels (wire-neutral).
+            try { _plugin.Cm2Sender?.ReResolveActiveDashboardMappings(onlyIfChanged: true); }
+            catch (Exception ex) { MozaLog.Warn("[AZOM] CM2 mapping re-resolve after profile apply failed: " + ex.Message); }
+        }
+
+        private void ApplyCm2SavedDashboardCore(MozaDashProfile profile)
+        {
             if (string.IsNullOrEmpty(profile.TelemetryDashboardKey))
             {
                 // A profile with no pick yet takes the dashboard the CM2 is on, so the
@@ -662,23 +674,36 @@ namespace MozaPlugin.Settings
             }
         }
 
-        /// <summary>Active wheel's dashboard profile name (cache key / builtin name). "" when unset.</summary>
+        /// <summary>The wheel screen's current dashboard name (cache key / builtin name):
+        /// the idle dashboard while one is showing, else the active wheel profile's pick.
+        /// "" when unset. A write is an explicit pick to the profile and ends the idle
+        /// dashboard until the next game.</summary>
         internal string ActiveTelemetryProfileName
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+            get => _plugin.IdleDashboards?.WheelOverrideName
+                   ?? _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryProfileName = value ?? "";
             }
         }
 
-        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none).</summary>
+        /// <summary>The active wheel profile's own dashboard pick, ignoring a showing idle dashboard.</summary>
+        internal string SavedTelemetryProfileName =>
+            _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryProfileName ?? "";
+
+        /// <summary>Active wheel's user-loaded .mzdash file path (empty = none, and while
+        /// the idle dashboard — always a wheel slot — is showing).</summary>
         internal string ActiveTelemetryMzdashPath
         {
-            get => _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
+            get => _plugin.IdleDashboards?.WheelEngaged == true
+                ? ""
+                : _plugin.DeviceProfiles?.ActiveWheelProfile?.TelemetryMzdashPath ?? "";
             set
             {
+                _plugin.IdleDashboards?.YieldWheel();
                 var p = _plugin.DeviceProfiles?.ActiveWheelProfile;
                 if (p != null) p.TelemetryMzdashPath = value ?? "";
             }
@@ -709,6 +734,35 @@ namespace MozaPlugin.Settings
                     s.WheelMzdashFolderByPageGuid = next;
                 }
             }
+        }
+
+        /// <summary>Steering Wheel Inertia stored for a wheel page; -1 when none.</summary>
+        internal int GetWheelNaturalInertia(Guid pageGuid)
+        {
+            var dict = _plugin.Settings?.WheelNaturalInertiaByPageGuid;
+            return dict != null && dict.TryGetValue(pageGuid, out var v) ? v : -1;
+        }
+
+        internal void SetWheelNaturalInertia(Guid pageGuid, int value)
+        {
+            var s = _plugin.Settings;
+            if (s == null || value < 0) return;
+            lock (_pageBundleSwapLock)
+            {
+                var cur = s.WheelNaturalInertiaByPageGuid;
+                if (cur != null && cur.TryGetValue(pageGuid, out var prev) && prev == value) return;
+                var next = cur == null ? new Dictionary<Guid, int>() : new Dictionary<Guid, int>(cur);
+                next[pageGuid] = value;
+                s.WheelNaturalInertiaByPageGuid = next;
+            }
+        }
+
+        /// <summary>Record a user-set Steering Wheel Inertia for the attached wheel.
+        /// No-op until the wheel identifies — the base still holds the written value.</summary>
+        internal void SetActiveWheelNaturalInertia(int value)
+        {
+            var g = _plugin.GetCurrentWheelPageGuid();
+            if (g.HasValue) SetWheelNaturalInertia(g.Value, value);
         }
 
         /// <summary>
@@ -786,6 +840,83 @@ namespace MozaPlugin.Settings
             }
         }
 
+        /// <summary>Multi-mode dial bundle for the current wheel page; null = no opinion.</summary>
+        internal WheelMultiDialSettings? ActiveWheelMultiDial
+        {
+            get
+            {
+                var g = _plugin.GetCurrentWheelPageGuid();
+                if (!g.HasValue || _plugin.Settings?.WheelMultiDialByPageGuid == null) return null;
+                return _plugin.Settings.WheelMultiDialByPageGuid.TryGetValue(g.Value, out var v) ? v : null;
+            }
+        }
+
+        /// <summary>Get-or-create the per-page multi-mode dial bundle. Null only if no wheel identified.</summary>
+        internal WheelMultiDialSettings? GetOrCreateActiveWheelMultiDial()
+        {
+            var g = _plugin.GetCurrentWheelPageGuid();
+            var settings = _plugin.Settings;
+            if (!g.HasValue || settings == null) return null;
+            lock (_pageBundleSwapLock)
+            {
+                var dict = settings.WheelMultiDialByPageGuid;
+                if (dict != null && dict.TryGetValue(g.Value, out var bundle) && bundle != null)
+                    return bundle;
+                bundle = new WheelMultiDialSettings();
+                var next = dict == null
+                    ? new Dictionary<Guid, WheelMultiDialSettings>()
+                    : new Dictionary<Guid, WheelMultiDialSettings>(dict);
+                next[g.Value] = bundle;
+                settings.WheelMultiDialByPageGuid = next;
+                return bundle;
+            }
+        }
+
+        /// <summary>
+        /// Adopt the wheel's reported dial labels when none are saved. Returns true
+        /// when the saved table differs from the wheel's, i.e. it needs pushing.
+        /// Serial read thread.
+        /// </summary>
+        internal bool SeedMultiDialLabelsFromWheel(List<(string Left, string Right)> wheel, Devices.WheelModelInfo? model)
+        {
+            var bundle = GetOrCreateActiveWheelMultiDial();
+            if (bundle == null || wheel == null) return false;
+            if (bundle.Labels == null)
+            {
+                var seeded = new List<MultiDialLabel>(wheel.Count);
+                foreach (var (l, r) in wheel)
+                    seeded.Add(new MultiDialLabel { Left = l ?? "", Right = r ?? "" });
+                bundle.Labels = seeded;
+                PersistSettings();
+                return false;
+            }
+            var saved = MultiDialWireLabels(bundle, model);
+            if (saved.Count != wheel.Count) return true;
+            for (int i = 0; i < saved.Count; i++)
+                if (saved[i].Left != (wheel[i].Left ?? "") || saved[i].Right != (wheel[i].Right ?? ""))
+                    return true;
+            return false;
+        }
+
+        /// <summary>
+        /// The label table as sent: one entry per position of the dial knob (its
+        /// ring LED count), padded with empty labels; the saved length when no
+        /// knob is chosen yet.
+        /// </summary>
+        internal static List<(string Left, string Right)> MultiDialWireLabels(WheelMultiDialSettings bundle, Devices.WheelModelInfo? model)
+        {
+            var labels = bundle.Labels;
+            int knob = model?.MultiDialEffectiveKnob(bundle.Knob) ?? -1;
+            int n = knob >= 0 ? model!.KnobPositionCount(knob) : labels?.Count ?? 0;
+            var wire = new List<(string, string)>(n);
+            for (int i = 0; i < n; i++)
+            {
+                var l = labels != null && i < labels.Count ? labels[i] : null;
+                wire.Add((l?.Left ?? "", l?.Right ?? ""));
+            }
+            return wire;
+        }
+
         /// <summary>
         /// Seed wheel-reported sleep-light + idle-effect/speed values into the
         /// per-page bundles. Only fills sentinel (-1/null) fields — user UI
@@ -815,6 +946,22 @@ namespace MozaPlugin.Settings
                     SeedIdleBundleField(r);
                     return;
             }
+            if (r.Name.StartsWith("wheel-knob-breath-color", StringComparison.Ordinal))
+                SeedKnobBreathColor(r);
+        }
+
+        private void SeedKnobBreathColor(ParsedResponse r)
+        {
+            if (r.ArrayValue == null || r.ArrayValue.Length < 3) return;
+            if (!int.TryParse(r.Name.Substring("wheel-knob-breath-color".Length), out int knob1)) return;
+            int knob = knob1 - 1;
+            if (knob < 0 || knob >= MozaData.WheelKnobMax) return;
+            var bundle = GetOrCreateActiveWheelIdle();
+            if (bundle == null) return;
+            var saved = bundle.KnobBreathColors;
+            if (saved != null && knob < saved.Length && saved[knob] >= 0) return;
+            bundle.SetKnobBreathColor(knob, (r.ArrayValue[0] << 16) | (r.ArrayValue[1] << 8) | r.ArrayValue[2]);
+            PersistSettings();
         }
 
         private void SeedSleepBundleField(ParsedResponse r)

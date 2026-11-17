@@ -34,7 +34,7 @@ namespace MozaPlugin.Devices.Motion
         private const int StaleFrameMs = 500;
         private const int SelfCheckTimeoutMs = 30_000;
         private const int GameEntryTimeoutMs = 15_000;
-        private const int GameLossToleranceMs = 1_500;
+        private const int ModeLossToleranceMs = 1_500;
         private const int PortSelfTestTimeoutMs = 40_000;
         private const int LogRingSize = 200;
         private const int EnrolReadSpacingMs = 15;
@@ -45,6 +45,9 @@ namespace MozaPlugin.Devices.Motion
         private const int StandbyTimeoutMs = 5_000;
         private const int DesiredCheckMs = 1_000;
         private const int DesiredPushAttempts = 3;
+        private const int ManualModeTimeoutMs = 10_000;
+        // Actuators follow the controller into mode 3 ~3.3 s after it (capture 2026-11-11).
+        private const int ManualActuatorSettleMs = 3_500;
         private const float DefaultEngineStrength = DefaultEngineStrengthPercent / 100f, DefaultTactile = 0.4f;
 
         /// <summary>Engine vibration strength used while the profile sets none (the "iRacing gt3" preset's).</summary>
@@ -115,7 +118,7 @@ namespace MozaPlugin.Devices.Motion
         private long _lastHeartbeatMs = -HeartbeatMs;
         private long _lastPortPollMs = -PortPollMs;
         private long _nextFrameMs;
-        private long _gameLostSinceMs = -1;
+        private long _modeLostSinceMs = -1;
         private long _framesSent;
         private bool _vibrating;
         private int _frameIntervalMs = 30;
@@ -123,6 +126,23 @@ namespace MozaPlugin.Devices.Motion
         private bool _released;
         private long _lastConnectAttemptMs = -ConnectRetryMs;
         private IReadOnlyList<MotionConfigIssue> _lastIssues = Array.Empty<MotionConfigIssue>();
+        // Manual mode (controller mode 2) while SimHub's Manual control or Hop-in position is the
+        // motion source: wanted = the output's request, driven = the lane has left game mode for it.
+        private volatile bool _manualDriven;
+        private volatile bool _manualWanted;
+        // Pose streaming in the controller's full control mode (mode 11) instead of game mode:
+        // wanted = the output's request, _fullControl = what the current / last engage entered.
+        private volatile bool _fullControlWanted;
+        private volatile bool _fullControl;
+        private MotionMode StreamMode => _fullControl ? MotionMode.FullControl : MotionMode.Game;
+        private float[]? _manualPose;          // pitch, roll, heave −1..1, posted by the output
+        private long _manualPosedAtMs;
+        private readonly float[] _manualSent = new float[3];
+        private long _nextManualMs;
+        private const int ManualSetpointIntervalMs = 100;
+        private const float ManualSetpointStep = 0.005f;
+        private static readonly byte[] ManualAxes =
+            { MozaMotionProtocol.ManualAxisPitch, MozaMotionProtocol.ManualAxisRoll, MozaMotionProtocol.ManualAxisHeave };
 
         // ---- port demand
         private int _holds;
@@ -183,6 +203,19 @@ namespace MozaPlugin.Devices.Motion
 
         private bool Wanted => Volatile.Read(ref _holds) > 0 || Volatile.Read(ref _pendingEngage) != null;
 
+        /// <summary>Something holds the lane or the platform is running: keep it across a plugin reload.</summary>
+        public bool InUse
+        {
+            get
+            {
+                var phase = _phase;
+                return Wanted || phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
+                    || phase == MotionLanePhase.SelfChecking || phase == MotionLanePhase.ManualTest;
+            }
+        }
+
+        public bool IsDisposed => !_running;
+
         // ------------------------------------------------------------ output API
 
         /// <summary>
@@ -198,6 +231,7 @@ namespace MozaPlugin.Devices.Motion
             var phase = _phase;
             if (phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
                 || phase == MotionLanePhase.SelfChecking) return;
+            if (phase == MotionLanePhase.ManualTest && _manualDriven) return;
             if (phase == MotionLanePhase.Faulted) _phase = MotionLanePhase.Ready;
             Interlocked.Exchange(ref _pendingEngageSinceMs, _clock.ElapsedMilliseconds);
             Volatile.Write(ref _pendingEngage, config);
@@ -221,6 +255,85 @@ namespace MozaPlugin.Devices.Motion
             Volatile.Write(ref _postedFrame, frame);
             Interlocked.Exchange(ref _postedAtMs, _clock.ElapsedMilliseconds);
         }
+
+        /// <summary>Manual mode: SimHub's pose as setpoints, −1..+1 each (+ = pitch up, roll right, heave up).</summary>
+        public void PostManualPose(float pitch, float roll, float heave)
+        {
+            Volatile.Write(ref _manualPose, new[] { pitch, roll, heave });
+            Interlocked.Exchange(ref _manualPosedAtMs, _clock.ElapsedMilliseconds);
+        }
+
+        /// <summary>True while the lane is in, entering or leaving manual mode for the output.</summary>
+        public bool ManualDriven => _manualDriven;
+
+        /// <summary>
+        /// The output's motion source is SimHub's Manual control or Hop-in position: while true the
+        /// lane leaves game mode for manual mode (mode 2) and follows <see cref="PostManualPose"/>;
+        /// false returns to game mode.
+        /// </summary>
+        public void SetManualWanted(bool wanted) => _manualWanted = wanted;
+
+        /// <summary>
+        /// Stream in the controller's full control mode (mode 11), where the frame's pitch, roll and
+        /// f6 are followed as a held pose, instead of game mode. A change while streaming re-enters.
+        /// </summary>
+        public void SetFullControlWanted(bool wanted) => _fullControlWanted = wanted;
+
+        /// <summary>
+        /// Full control: false (default) keeps every actuator within game mode's travel and caps speed and
+        /// acceleration (<see cref="PoseLimiter"/>); true follows the pose as posted, each of pitch
+        /// and roll held only to the angle that moves an actuator 65 mm, leaving the rest to the
+        /// controller's own soft limit.
+        /// </summary>
+        public void SetMaxPerformance(bool on) => _maxPerformance = on;
+        private volatile bool _maxPerformance;
+        private bool _maxPerformanceApplied;   // lane tick only: the setting FullControlPose last ran with
+
+        // The controller levels mode 11 heave off as 25.5·tanh(f6 / 25.5) mm; f6 = 25.5·atanh(mm / 25.5) undoes it.
+        private const double HeaveScaleMm = 25.5, HeaveMaxShare = 0.9;
+        private const double MaxPerformanceAxisTravelMm = 65.0;
+        private readonly PoseLimiter _poseLimiter = new PoseLimiter();
+
+        /// <summary>Max Available Stroke as read from the controller (0.9 until it is), which scales the full control travel limits.</summary>
+        private double StrokeShare()
+        {
+            float stroke = Volatile.Read(ref _maxStroke);
+            return float.IsNaN(stroke) ? 0.9 : Math.Max(0f, Math.Min(1f, stroke));
+        }
+
+        /// <summary>Half the actuator spacing along and across the rig (mm); a 1000 × 700 rig until read.</summary>
+        private void RigHalves(out double halfLength, out double halfWidth)
+        {
+            float l = Volatile.Read(ref _rigLength), w = Volatile.Read(ref _rigWidth);
+            halfLength = (float.IsNaN(l) || l < 100f ? 1000f : l) / 2.0;
+            halfWidth = (float.IsNaN(w) || w < 100f ? 700f : w) / 2.0;
+        }
+
+        /// <summary>Full control: multiplier on the engine vibration's frequency (1 = Motion Manager's 25–60 Hz).</summary>
+        public void SetEngineVibrationPitch(float factor)
+            => _enginePitch = float.IsNaN(factor) ? 1f : Math.Max(0.25f, Math.Min(4f, factor));
+        private volatile float _enginePitch = 1f;
+
+        /// <summary>Full control: height (mm) of a heave tick-over pulse made by the lane at low revs; 0 = none.</summary>
+        public void SetEngineTickover(float mm)
+            => _tickoverMm = float.IsNaN(mm) ? 0f : Math.Max(0f, Math.Min(3f, mm));
+        // The pulse never exceeds TickoverMaxMm, whatever the start-up kick and throttle add; one pulse is at most TickoverMaxHeight of the strength.
+        private const float TickoverMaxMm = 4f, TickoverMaxHeight = 1.15f;
+        private volatile float _tickoverMm;
+        private double _tickPhase;
+        private long _lastStreamMs;
+        private readonly Random _tickRandom = new Random();
+        // Full control: last pose sent (f0, f1, f6) and the ease between a live pose and neutral frames.
+        private const int PoseBlendMs = 2500;
+        private const float EngineRunningRpm = 500f;
+        private readonly float[] _poseSent = new float[3];
+        private readonly float[] _poseBlendFrom = new float[3];
+        private bool _poseLive;
+        private long _poseBlendStartMs = -100_000;
+        private float _tickHeight = 1f;
+        private double _tickRate = 1.0, _tickDuty = 0.45;
+        private bool _engineWasOn = true;   // armed only once the engine has been seen stopped
+        private long _engineStartMs = -100_000;
 
         /// <summary>SimHub idle: keep game mode, stream neutral frames with the in-game flag clear.</summary>
         public void SetIdle(bool idle) => _idle = idle;
@@ -254,6 +367,9 @@ namespace MozaPlugin.Devices.Motion
                 StartSequence(TravelSelfCheckSequence());
             });
         }
+
+        /// <summary>True once the controller reports mode 2 in manual mode; setpoints are sent only then.</summary>
+        public bool ManualTestActive => _phase == MotionLanePhase.ManualTest && _modeCurrent == (int)MotionMode.ManualTest;
 
         /// <summary>Max Available Stroke (0..1). Write inferred from the 0x1F/04 read; read back.</summary>
         public void WriteMaxStroke(float value)
@@ -497,7 +613,8 @@ namespace MozaPlugin.Devices.Motion
                 if (_wasConnected)
                 {
                     _wasConnected = false;
-                    bool streaming = _phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame;
+                    bool streaming = _phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame
+                        || _phase == MotionLanePhase.ManualTest;
                     _sequence = null;
                     ResetDeviceState();
                     _phase = MotionLanePhase.Disconnected;
@@ -571,7 +688,16 @@ namespace MozaPlugin.Devices.Motion
                 {
                     _frameIntervalMs = Math.Max(5, engage.FrameIntervalMs);
                     _faultReason = null;
-                    StartSequence(EngageSequence());
+                    if (_manualWanted)
+                    {
+                        // SimHub's Manual control is already open: skip game mode, which it would
+                        // only pass through; the lane enters it when Manual control closes.
+                        _manualDriven = true;
+                        Volatile.Write(ref _manualPose, null);
+                        StartSequence(ManualTestSequence(fromGame: false));
+                    }
+                    else
+                        StartSequence(EngageSequence());
                 }
                 else if (!Wanted)
                     StartSequence(ReleaseSequence());
@@ -580,7 +706,47 @@ namespace MozaPlugin.Devices.Motion
             if (_phase == MotionLanePhase.Game || _phase == MotionLanePhase.EnteringGame)
                 StreamTick(now);
             if (_phase == MotionLanePhase.Game)
-                WatchGameMode(now);
+                WatchMode(now, StreamMode, _fullControl ? "full control" : "game");
+            else if (_phase == MotionLanePhase.ManualTest && _manualDriven && _sequence == null)
+                WatchMode(now, MotionMode.ManualTest, "manual");
+            // The output's source changed between game telemetry and the SimHub pose while streaming: re-enter.
+            if (_sequence == null && _phase == MotionLanePhase.Game && !_manualWanted && _fullControlWanted != _fullControl)
+                StartSequence(SwitchStreamModeSequence());
+            // SimHub's Manual control or Hop-in went on or off: swap game mode for manual mode and back.
+            if (_sequence == null)
+            {
+                if (_manualWanted && _phase == MotionLanePhase.Game)
+                {
+                    _manualDriven = true;
+                    Volatile.Write(ref _manualPose, null);
+                    StartSequence(ManualTestSequence(fromGame: true));
+                }
+                else if (!_manualWanted && _manualDriven && _phase == MotionLanePhase.ManualTest)
+                    StartSequence(ManualTestExitSequence());
+            }
+            if (_manualDriven && _sequence == null && ManualTestActive)
+                ManualSetpointTick(now);
+        }
+
+        /// <summary>
+        /// Manual mode: send each axis's target when it has moved, at most every 100 ms; SimHub idle
+        /// or a stale pose holds the centre. The controller ramps to each target at its own rate.
+        /// </summary>
+        private void ManualSetpointTick(long now)
+        {
+            if (now < _nextManualMs) return;
+            _nextManualMs = now + ManualSetpointIntervalMs;
+            var pose = Volatile.Read(ref _manualPose);
+            bool fresh = pose != null && now - Interlocked.Read(ref _manualPosedAtMs) <= StaleFrameMs;
+            for (int i = 0; i < ManualAxes.Length; i++)
+            {
+                float target = _idle || !fresh ? 0f : Math.Max(-1f, Math.Min(1f, pose![i]));
+                if (float.IsNaN(target)) continue;
+                if (Math.Abs(target - _manualSent[i]) < ManualSetpointStep
+                    && !(target == 0f && _manualSent[i] != 0f)) continue;
+                Send(MozaMotionProtocol.BuildManualSetpoint(ManualAxes[i], target));
+                _manualSent[i] = target;
+            }
         }
 
         /// <summary>Open the port when wanted and present; an engage that can't connect gives up.</summary>
@@ -626,7 +792,40 @@ namespace MozaPlugin.Devices.Motion
                 frame = MotionTelemetryFrame.Neutral(inGame: true);
             else
                 frame = posted;
-            _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
+            // A posted frame is only followed in the shape this lane streams. The output posts the SimHub
+            // pose as positions (mm of heave) for full control mode and raw game telemetry (heave as
+            // acceleration) for game mode; around a source change the two can disagree for a few
+            // ticks, and one mode's numbers must never go out in the other's frame.
+            bool live = ReferenceEquals(frame, posted);
+            if (live && frame.IsPosition != _fullControl)
+            {
+                frame = MotionTelemetryFrame.Neutral(inGame: true);
+                live = false;
+            }
+            long dtMs = _lastStreamMs > 0 ? Math.Min(200, now - _lastStreamMs) : _frameIntervalMs;
+            _lastStreamMs = now;
+            float level = 1f, pitch = 1f;
+            if (!_fullControl)
+                _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame));
+            else
+            {
+                // iRacing reports a few hundred rpm for a car that is not running yet (capture 13 Nov
+                // 2026), so in full control mode the engine counts as running from EngineRunningRpm.
+                bool engineRunning = frame.EngineRpm >= EngineRunningRpm;
+                float tickMm = 0f, tickCeilingMm = 0f;
+                level = 0f;
+                if (engineRunning)
+                {
+                    pitch = _enginePitch;
+                    tickMm = EngineTickover(frame, now, dtMs, out level, out tickCeilingMm);
+                }
+                // Only a live frame with the engine stopped arms the start-up kick: a pause, a stale feed
+                // or SimHub idle (neutral frames) leaves it as it was, so resuming does not kick again.
+                else if (live) _engineWasOn = false;
+                FullControlPose(frame, live, now, dtMs, tickMm, tickCeilingMm, out float f0, out float f1, out float f6);
+                // The posted frame is shared with the thread that built it: send a copy with the pose in.
+                _connection.SendStream(StreamKind.MotionTelemetry, MozaMotionProtocol.BuildTelemetryFrame(frame, f0, f1, f6));
+            }
             Interlocked.Increment(ref _framesSent);
 
             // Engine vibration rides along with live frames; when it stops, one zero-gain
@@ -635,11 +834,167 @@ namespace MozaPlugin.Devices.Motion
             {
                 var (strength, tactile) = VibrationScale();
                 _connection.SendStream(StreamKind.MotionEngineVibration, MozaMotionProtocol.BuildEngineVibration(
-                    MozaMotionProtocol.EngineVibrationHz(frame.EngineRpm), frame.Throttle, strength, tactile));
+                    MozaMotionProtocol.EngineVibrationHz(frame.EngineRpm), frame.Throttle, strength, tactile, pitch, level));
                 _vibrating = true;
             }
             else if (_vibrating)
                 SilenceVibration();
+        }
+
+        private static float Smoothstep(float x)
+        {
+            x = Math.Max(0f, Math.Min(1f, x));
+            return x * x * (3f - 2f * x);
+        }
+
+        /// <summary>
+        /// Full control engine effects for a running engine. The controller's engine vibration plays at the
+        /// chosen pitch. With a tick-over strength set, a heave pulse made here, in step with the
+        /// frames, covers low revs (gone between 40 % and 70 % of the redline) and the vibration
+        /// fades in over it (<paramref name="vibrationLevel"/>: silent below 30 %, full from 55 %). A
+        /// pulse rendered by SimHub's own engine effect is sampled at the 33 Hz frame rate and arrives
+        /// uneven (capture 13 Nov 2026), hence the one made here. Returns the pulse's height (mm) on
+        /// this frame; <paramref name="ceilingMm"/> is the most it can be at these revs, which the
+        /// pose limiter keeps free so the pulse stays inside the travel.
+        /// </summary>
+        private float EngineTickover(MotionTelemetryFrame frame, long now, long dtMs, out float vibrationLevel, out float ceilingMm)
+        {
+            vibrationLevel = _tickoverMm > 0f ? Smoothstep((frame.EngineRpmFraction - 0.30f) / 0.25f) : 1f;
+            float amp = _tickoverMm * (1f - Smoothstep((frame.EngineRpmFraction - 0.40f) / 0.30f));
+            // Start-up: the first 2.5 s after the engine fires kick up to 2.5 times as hard.
+            if (!_engineWasOn) { _engineStartMs = now; _engineWasOn = true; }
+            long sinceStart = now - _engineStartMs;
+            if (sinceStart < 2500) amp *= 1f + 1.5f * (1f - sinceStart / 2500f);
+            // Load: up to 40 % more with the throttle open.
+            amp *= 1f + 0.4f * Math.Max(0f, Math.Min(1f, frame.Throttle));
+            ceilingMm = Math.Min(TickoverMaxMm, amp * TickoverMaxHeight);
+            if (amp <= 0f) return 0f;
+            // Pulse rate follows the revs (about 7 Hz at a 1600 rpm idle), within what 33 frames a
+            // second can draw. Each pulse gets its own height and length so it does not drone.
+            double hz = Math.Max(4.0, Math.Min(11.0, frame.EngineRpm / 230.0)) * _tickRate;
+            _tickPhase += hz * dtMs / 1000.0;
+            if (_tickPhase >= 1.0)
+            {
+                _tickPhase %= 1.0;
+                _tickHeight = 0.65f + (TickoverMaxHeight - 0.65f) * (float)_tickRandom.NextDouble();
+                _tickRate = 0.88 + 0.24 * _tickRandom.NextDouble();
+                _tickDuty = 0.35 + 0.2 * _tickRandom.NextDouble();
+            }
+            return _tickPhase < _tickDuty ? Math.Min(TickoverMaxMm, amp * _tickHeight) : 0f;
+        }
+
+        /// <summary>
+        /// The pose to send in full control mode for this frame. A change of source (live pose to neutral frames
+        /// and back: game start, pause, exit, SimHub idle, stale data, a frame of the wrong shape) is
+        /// eased over <see cref="PoseBlendMs"/>, since the controller follows whatever it is sent.
+        /// Then the travel, speed and acceleration limits (<see cref="PoseLimiter"/>), with
+        /// <paramref name="tickCeilingMm"/> of travel kept free for the tick-over pulse, or with Max
+        /// performance only each angle's own bound. Heave, pulse included, goes through the inverse
+        /// of the controller's soft limit.
+        /// </summary>
+        private void FullControlPose(MotionTelemetryFrame frame, bool live, long now, long dtMs, float tickMm, float tickCeilingMm,
+            out float f0, out float f1, out float f6)
+        {
+            if (live != _poseLive)
+            {
+                _poseLive = live;
+                _poseBlendStartMs = now;
+                Array.Copy(_poseSent, _poseBlendFrom, 3);
+            }
+            bool maxPerformance = _maxPerformance;
+            if (maxPerformance != _maxPerformanceApplied)
+            {
+                _maxPerformanceApplied = maxPerformance;
+                // Into Max performance: ease from the pose last sent to the unlimited one. Back out, the
+                // limiter carries on from the pose and speed Follow kept.
+                if (maxPerformance)
+                {
+                    _poseBlendStartMs = now;
+                    _poseBlendFrom[0] = (float)_poseLimiter.Pitch;
+                    _poseBlendFrom[1] = (float)_poseLimiter.Roll;
+                    _poseBlendFrom[2] = (float)_poseLimiter.HeaveMm;
+                }
+            }
+            float p = frame.Fields[0], r = frame.Fields[1], h = frame.Fields[6];
+            long since = now - _poseBlendStartMs;
+            if (since < PoseBlendMs)
+            {
+                float k = Smoothstep(since / (float)PoseBlendMs);
+                p = _poseBlendFrom[0] + (p - _poseBlendFrom[0]) * k;
+                r = _poseBlendFrom[1] + (r - _poseBlendFrom[1]) * k;
+                h = _poseBlendFrom[2] + (h - _poseBlendFrom[2]) * k;
+            }
+            _poseSent[0] = p; _poseSent[1] = r; _poseSent[2] = h;
+
+            RigHalves(out double halfLength, out double halfWidth);
+            double stroke = StrokeShare();
+            if (maxPerformance)
+            {
+                // As posted: only each angle's own bound (65 mm at an actuator), no combined travel or rate cap.
+                double maxPitch = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfLength));
+                double maxRoll = Math.Asin(Math.Min(1.0, MaxPerformanceAxisTravelMm / halfWidth));
+                _poseLimiter.Follow(Math.Max(-maxPitch, Math.Min(maxPitch, p)), Math.Max(-maxRoll, Math.Min(maxRoll, r)), h,
+                    dtMs / 1000.0, halfLength, halfWidth, stroke);
+            }
+            else
+            {
+                _poseLimiter.Step(p, r, h, dtMs / 1000.0, halfLength, halfWidth, stroke,
+                    PoseLimiter.SafeMaxSpeedMmS, PoseLimiter.SafeMaxAccelMmS2, tickCeilingMm);
+                // While a shrunk travel is still being moved into, the pulse gets only the room left.
+                tickMm = Math.Min(tickMm, (float)_poseLimiter.FreeTravelMm(stroke));
+            }
+            f0 = (float)_poseLimiter.Pitch;
+            f1 = (float)_poseLimiter.Roll;
+            f6 = (float)PoseLimiter.Inverse(_poseLimiter.HeaveMm + tickMm, HeaveScaleMm, HeaveMaxShare);
+
+            // What the platform is expected to do, for SimHub's VR motion compensation. Heave as the
+            // controller levels it off (Inverse holds the ask within HeaveMaxShare); the tick-over
+            // pulse is a vibration, not a pose, so it is left out.
+            double heaveCap = HeaveScaleMm * HeaveMaxShare;
+            var driven = new MotionDrivenPose(_poseLimiter.IntendedPitchMm, _poseLimiter.IntendedRollMm,
+                Math.Max(-heaveCap, Math.Min(heaveCap, _poseLimiter.HeaveMm)), halfLength, halfWidth);
+            lock (_drivenPoseLock)
+            {
+                _drivenPose = driven;
+                _drivenPoseAtMs = now;
+            }
+        }
+
+        // Written by the lane tick, read by the output's worker thread; the lock only guards the copy.
+        private readonly object _drivenPoseLock = new object();
+        private MotionDrivenPose _drivenPose;
+        private long _drivenPoseAtMs = long.MinValue;
+
+        private void ClearDrivenPose()
+        {
+            lock (_drivenPoseLock) _drivenPoseAtMs = long.MinValue;
+        }
+
+        /// <summary>
+        /// Full control only: the pose last driven, if the lane streams full control and sent it within
+        /// <paramref name="maxAgeMs"/>; false otherwise (game mode, manual mode, not streaming).
+        /// </summary>
+        public bool TryGetDrivenPose(int maxAgeMs, out MotionDrivenPose pose)
+        {
+            pose = default;
+            if (!_fullControl || _phase != MotionLanePhase.Game) return false;
+            long at;
+            lock (_drivenPoseLock)
+            {
+                pose = _drivenPose;
+                at = _drivenPoseAtMs;
+            }
+            return at != long.MinValue && _clock.ElapsedMilliseconds - at <= maxAgeMs;
+        }
+
+        /// <summary>Front-to-rear actuator spacing as read from the controller (mm); null until read or below 100 mm.</summary>
+        public double? RigLengthReadMm
+        {
+            get
+            {
+                float l = Volatile.Read(ref _rigLength);
+                return float.IsNaN(l) || l < 100f ? (double?)null : l;
+            }
         }
 
         private void SilenceVibration()
@@ -649,12 +1004,12 @@ namespace MozaPlugin.Devices.Motion
                 MozaMotionProtocol.BuildEngineVibrationSilent());
         }
 
-        private void WatchGameMode(long now)
+        private void WatchMode(long now, MotionMode mode, string name)
         {
-            if (_modeCurrent == (int)MotionMode.Game) { _gameLostSinceMs = -1; return; }
-            if (_gameLostSinceMs < 0) { _gameLostSinceMs = now; return; }
-            if (now - _gameLostSinceMs > GameLossToleranceMs)
-                Fault($"controller left game mode (mode {_modeCurrent}, flags 0x{_flags:X2}{ErrorSuffix()})");
+            if (_modeCurrent == (int)mode) { _modeLostSinceMs = -1; return; }
+            if (_modeLostSinceMs < 0) { _modeLostSinceMs = now; return; }
+            if (now - _modeLostSinceMs > ModeLossToleranceMs)
+                Fault($"controller left {name} mode (mode {_modeCurrent}, flags 0x{_flags:X2}{ErrorSuffix()})");
         }
 
         private string ErrorSuffix()
@@ -667,6 +1022,7 @@ namespace MozaPlugin.Devices.Motion
         {
             _faultReason = reason;
             _phase = MotionLanePhase.Faulted;
+            _manualDriven = false;
             _sequence = null;
             MozaLog.Warn($"[AZOM/Motion] {reason}");
         }
@@ -708,7 +1064,8 @@ namespace MozaPlugin.Devices.Motion
             while (_paced.TryDequeue(out _)) { }
             _activeErrors.Clear();
             _logPartial.Clear();
-            _gameLostSinceMs = -1;
+            _modeLostSinceMs = -1;
+            _manualDriven = false;
         }
 
         private void ResetEffects()
@@ -847,27 +1204,61 @@ namespace MozaPlugin.Devices.Motion
 
             // Prototype-proven entry: stream neutral frames and repeat set-mode 1 until the
             // controller reports mode 1 (it passes through 5/3); run state 03 after ~300 ms.
+            // Full control (11) is entered the same way (bench 12 Nov 2026: passes through 3, ~3.5 s).
             _phase = MotionLanePhase.EnteringGame;
+            _fullControl = _fullControlWanted;
+            var target = StreamMode;
+            // Mode 3 on the way in levels the platform, so the limiter starts from a level pose.
+            _poseLimiter.Reset();
+            ClearDrivenPose();
+            Array.Clear(_poseSent, 0, 3);
+            _poseLive = false;
+            _maxPerformanceApplied = _maxPerformance;
             _nextFrameMs = 0;
             long start = _clock.ElapsedMilliseconds;
             bool runSent = false;
-            while (_modeCurrent != (int)MotionMode.Game)
+            while (_modeCurrent != (int)target)
             {
                 long elapsed = _clock.ElapsedMilliseconds - start;
-                if (elapsed > GameEntryTimeoutMs) { Fault($"controller did not enter game mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
-                Send(MozaMotionProtocol.BuildSetMode(MotionMode.Game));
+                if (elapsed > GameEntryTimeoutMs) { Fault($"controller did not enter {(_fullControl ? "full control" : "game")} mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                Send(MozaMotionProtocol.BuildSetMode(target));
                 if (!runSent && elapsed > 300) { SendRunState(MotionRunState.Run); runSent = true; }
                 yield return 33;
             }
             if (!runSent) SendRunState(MotionRunState.Run);
-            _gameLostSinceMs = -1;
+            _modeLostSinceMs = -1;
             _phase = MotionLanePhase.Game;
-            MozaLog.Info("[AZOM/Motion] Game mode");
+            MozaLog.Info(_fullControl ? "[AZOM/Motion] Full control mode (SimHub pose as positions)" : "[AZOM/Motion] Game mode");
+        }
+
+        /// <summary>
+        /// Game mode to full control mode or back while streaming. A cold entry reaches either mode through
+        /// mode 3 (return to centre), which levels the platform; whether the controller does that by
+        /// itself between modes 1 and 11 is not known, and full control starts from a level pose. So level
+        /// explicitly first, as leaving game mode for manual mode does: hold, mode 3, wait for the
+        /// actuators, then the normal entry.
+        /// </summary>
+        private IEnumerator<int> SwitchStreamModeSequence()
+        {
+            // Neutral frames keep streaming in this phase (StreamTick), as they do on a cold entry.
+            _phase = MotionLanePhase.EnteringGame;
+            SendRunState(MotionRunState.Hold);
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.PositionCalibration));
+            long deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            while (_modeCurrent != (int)MotionMode.PositionCalibration)
+            {
+                if (_clock.ElapsedMilliseconds > deadline) { Fault($"controller did not reach the ready position (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                yield return 50;
+            }
+            yield return ManualActuatorSettleMs;
+            var engage = EngageSequence();
+            while (engage.MoveNext()) yield return engage.Current;
         }
 
         private IEnumerator<int> DisengageSequence()
         {
             _phase = MotionLanePhase.Disengaging;
+            _manualDriven = false;
             _connection.ClearStreamSlots((int)StreamKind.MotionTelemetry, 2);
             // Motion Manager's last 0x22/09 when it leaves game mode has every gain at zero.
             if (_vibrating)
@@ -922,6 +1313,95 @@ namespace MozaPlugin.Devices.Motion
             yield return 300;
             Send(MozaMotionProtocol.BuildSetMode(MotionMode.Idle));
             _phase = MotionLanePhase.Ready;
+        }
+
+        /// <summary>
+        /// Into manual mode as Motion Manager does it (capture 2026-11-11): Start = self-check (mode 7),
+        /// mode 0, run state hold, mode 3; ticking "Manual Motion Test" = mode 2. Leaving game mode
+        /// skips straight to hold + mode 3, the mode the controller passes through on the way into
+        /// game mode.
+        /// </summary>
+        private IEnumerator<int> ManualTestSequence(bool fromGame)
+        {
+            // Same port-setup gate as EngageSequence; from game mode it already passed.
+            if (!fromGame)
+            {
+                var issues = CurrentIssues();
+                if (issues.Count > 0)
+                {
+                    Fault("configuration: " + string.Join("; ", issues));
+                    yield break;
+                }
+            }
+            _phase = MotionLanePhase.ManualTest;
+            Array.Clear(_manualSent, 0, _manualSent.Length);
+            _nextManualMs = 0;
+            if (fromGame)
+            {
+                _connection.ClearStreamSlots((int)StreamKind.MotionTelemetry, 2);
+                if (_vibrating) SilenceVibration();
+                MozaLog.Info("[AZOM/Motion] Manual mode: leaving game mode");
+            }
+            if (!_selfCheckPassed)
+            {
+                _selfCheckSeen = false;
+                MozaLog.Info("[AZOM/Motion] Manual mode: travel self-check");
+                Send(MozaMotionProtocol.BuildSetMode(MotionMode.TravelSelfCheck));
+                long checkDeadline = _clock.ElapsedMilliseconds + SelfCheckTimeoutMs;
+                while (!_selfCheckSeen)
+                {
+                    if (_clock.ElapsedMilliseconds > checkDeadline) { Fault("travel self-check did not report success"); yield break; }
+                    yield return 20;
+                }
+                yield return 300;
+            }
+            if (!fromGame)
+            {
+                Send(MozaMotionProtocol.BuildSetMode(MotionMode.Idle));
+                yield return 30;
+            }
+            SendRunState(MotionRunState.Hold);
+            if (!fromGame) yield return 15;
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.PositionCalibration));
+            long deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            while (_modeCurrent != (int)MotionMode.PositionCalibration)
+            {
+                if (_clock.ElapsedMilliseconds > deadline) { Fault($"controller did not reach the ready position (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                yield return 50;
+            }
+            yield return ManualActuatorSettleMs;
+
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.ManualTest));
+            deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            long resendAt = _clock.ElapsedMilliseconds + 1_000;
+            while (_modeCurrent != (int)MotionMode.ManualTest)
+            {
+                if (_clock.ElapsedMilliseconds > deadline) { Fault($"controller did not enter manual mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
+                if (_clock.ElapsedMilliseconds >= resendAt)
+                {
+                    Send(MozaMotionProtocol.BuildSetMode(MotionMode.ManualTest));
+                    resendAt = _clock.ElapsedMilliseconds + 1_000;
+                }
+                yield return 50;
+            }
+            _modeLostSinceMs = -1;
+            MozaLog.Info("[AZOM/Motion] Manual mode (SimHub Manual control / Hop-in)");
+        }
+
+        /// <summary>
+        /// Out of manual mode as Motion Manager's toggle off does (mode 3, the ready position), then
+        /// the normal engage into game mode. One sequence, so an output stop replaces all of it.
+        /// </summary>
+        private IEnumerator<int> ManualTestExitSequence()
+        {
+            Send(MozaMotionProtocol.BuildSetMode(MotionMode.PositionCalibration));
+            long deadline = _clock.ElapsedMilliseconds + ManualModeTimeoutMs;
+            while (_modeCurrent != (int)MotionMode.PositionCalibration && _clock.ElapsedMilliseconds < deadline)
+                yield return 50;
+            _manualDriven = false;
+            MozaLog.Info($"[AZOM/Motion] Manual mode off (mode {_modeCurrent})");
+            var engage = EngageSequence();
+            while (engage.MoveNext()) yield return engage.Current;
         }
 
         private IEnumerator<int> PortSelfTestSequence(Dictionary<int, MotionCorner> roles)
@@ -1108,7 +1588,7 @@ namespace MozaPlugin.Devices.Motion
             var phase = _phase;
             if (_connection.IsConnected
                 && (phase == MotionLanePhase.Game || phase == MotionLanePhase.EnteringGame
-                    || phase == MotionLanePhase.SelfChecking))
+                    || phase == MotionLanePhase.SelfChecking || phase == MotionLanePhase.ManualTest))
             {
                 try
                 {

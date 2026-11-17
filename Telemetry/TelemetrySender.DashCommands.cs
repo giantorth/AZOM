@@ -56,6 +56,18 @@ namespace MozaPlugin.Telemetry
             => _propertyPushQueue.SendU8(kind, value);
 
         /// <summary>
+        /// Push the multi-mode dial label table (FF kind=18). Only while Active: an
+        /// FF record into an unopened session is lost and has wedged a wheel before
+        /// (see DeviceLog). False = not sent; the caller re-pushes once Active.
+        /// </summary>
+        public bool SendMultiDialLabels(System.Collections.Generic.IReadOnlyList<(string Left, string Right)> labels)
+        {
+            if (labels == null || _state != TelemetryState.Active || !_connection.IsConnected) return false;
+            _propertyPushQueue.SendBody(SessionPropertyPushBuilder.BuildMultiDialLabelsBody(labels));
+            return true;
+        }
+
+        /// <summary>
         /// Send a session-data chunk via <see cref="_connection"/> and register
         /// it with the retransmit queue so it gets re-emitted until acked. For
         /// non-chunk frames the retransmitter Track() is a no-op (ignored by

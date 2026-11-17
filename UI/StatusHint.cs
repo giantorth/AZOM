@@ -54,6 +54,9 @@ namespace MozaPlugin.UI
         ProfileNotAddedMotion,
         // Host SimHub is older than the minimum the plugin supports.
         SimHubOutdated,
+        // Wine/Linux: the user has no read/write permission on a MOZA tty or
+        // hidraw node (missing udev rule). Remediation is a udev rule + replug.
+        LinuxDeviceAccessDenied,
     }
 
     /// <summary>

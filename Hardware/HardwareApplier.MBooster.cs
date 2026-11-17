@@ -215,8 +215,8 @@ namespace MozaPlugin.Hardware
                         controller.SendPlainDamping(press, release, dev);
                 }
                 // Load-cell registers like the ones above: only from the axis
-                // that owns them, never a passive Brake-role pedal's config.
-                if (ownsPedalFeelHardware && role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake)
+                // that owns them, whatever its role.
+                if (ownsPedalFeelHardware)
                 {
                     if (cfg.SensorOutputRatioPct >= 0
                         && DiffersFloat("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct))

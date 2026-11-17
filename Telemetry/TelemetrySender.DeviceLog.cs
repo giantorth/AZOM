@@ -123,7 +123,12 @@ namespace MozaPlugin.Telemetry
         internal void FeedFfRecords(byte session, int seq, byte[] chunkPayload, bool crcValid)
         {
             if (chunkPayload == null || chunkPayload.Length <= 4) return;
-            if (!DeviceLogPullEnabled) return;
+            bool wantLog = DeviceLogPullEnabled;
+            // The wheel reports its stored multi-mode dial labels (kind=18) at
+            // session init; only reassemble for that on wheels with the dial.
+            bool wantDial = MultiDialLabelsReceived != null
+                            && WheelModelInfoProvider?.Invoke()?.MultiDialKnobOrder != null;
+            if (!wantLog && !wantDial) return;
             _ffScratch.Clear();
             _ffStream.Append(session, seq, chunkPayload, crcValid, _ffScratch);
             for (int i = 0; i < _ffScratch.Count; i++)
@@ -131,11 +136,19 @@ namespace MozaPlugin.Telemetry
                 var rec = _ffScratch[i];
                 // kind=14 is bidirectional: 4-byte value = a request (ours,
                 // echoed back), anything larger = the log payload.
-                if (rec.Kind == SessionPropertyPushBuilder.KindDeviceLogRequest
+                if (wantLog && rec.Kind == SessionPropertyPushBuilder.KindDeviceLogRequest
                     && rec.Value.Length > 4)
                     OnDeviceLogPayload(rec.Session, rec.Value);
+                else if (wantDial && rec.Kind == SessionPropertyPushBuilder.MultiDialLabelsKind
+                    && SessionPropertyPushBuilder.TryParseMultiDialLabels(rec.Value, out var labels))
+                    MultiDialLabelsReceived?.Invoke(labels);
             }
         }
+
+        /// <summary>Wheel-reported multi-mode dial label table (b2h kind=18).
+        /// Serial read thread — handlers must not send from it. Assigned (not
+        /// +=) by MozaPlugin so a reused sender never keeps a stale plugin.</summary>
+        internal Action<System.Collections.Generic.List<(string Left, string Right)>>? MultiDialLabelsReceived { get; set; }
 
         /// <summary>Handle a b2h kind=14 device-log payload. Serial read thread:
         /// parses and stores, but parks the kind=15 receipt for the tick thread

@@ -11,7 +11,7 @@
   - **`0x27` per-actuator block** (8 floats, first ≈ 1000) and **`0x1F/09`** (always 0): meaning unknown.
   - **`0x22/09` record 0** (265 Hz, gain 0.00018, constant) — which haptic effect; and the gain ↔ slider mapping of the engine harmonics (sliders were never moved under capture).
   - **Lighting table `0x1E/0B`** parameter names: the lighting page was never exercised; only the shape (3 global bytes + 3 zones × 8 params with RGB values) is known.
-  - **Mode 2 as a streaming target**: only discrete `0x1E/07` slider setpoints were captured (9 frames / 73 s). Whether the controller accepts and smooths a continuous setpoint stream at game rates is untested — relevant to any host-side-cueing integration (e.g. SimHub's Motion plugin, [`../simhub.md`](../simhub.md) § Motion plugin).
+  - **Mode 2 as a streaming target**: only discrete `0x1E/07` slider setpoints were captured (9 frames / 73 s). The plugin now streams setpoints on change at up to 10 Hz per axis while SimHub's Manual control or Hop-in is active, and the controller (fw 2.35) follows with its own slow ramp; whether it accepts and smooths a stream at game rates is still untested — relevant to any host-side-cueing integration (e.g. SimHub's Motion plugin, [`../simhub.md`](../simhub.md) § Motion plugin).
   - **HID interface** of the controller: enumerated, never used by Motion Manager. Report descriptor not captured.
 -
 - **EEPROM direct access** — group 10 protocol found in rs21_parameter.db but never observed in USB captures; needs live verification.
