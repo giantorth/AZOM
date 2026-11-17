@@ -41,6 +41,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **Knob breathing colours;** one swatch per knob when the knob sleep light is set to Breathing, saved per wheel.
 - **Multi-mode dial on the Inputs tab (CS Pro, KS Pro, Mustang GTD, Vision GS);** set a knob to MULTI-MODE, include the thumb wheels and set control labels per position, saved per wheel.
+- **KS Pro multi-mode dial on the centre knob only, with Left and Right thumb-wheel pickers (TC, ABS, DIFF, BB);** pairings Pit House doesn't allow are greyed out.
 
 ### Connection and detection
 

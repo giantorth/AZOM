@@ -921,6 +921,10 @@ namespace MozaPlugin.Settings
         public int Knob { get; set; } = -1;      // logical knob; wire index via WheelModelInfo.MultiDialKnobOrder
         public int Left { get; set; } = -1;      // cmd 0x28 02 00, 1 = included
         public int Right { get; set; } = -1;     // cmd 0x28 02 01, 1 = included
+        // Wheels with a thumb-wheel choice (WheelModelInfo.MultiDialThumbWheels): the
+        // bound wheel's index, 0xFF = none. Unset falls back to Left/Right.
+        public int LeftWheel { get; set; } = -1;
+        public int RightWheel { get; set; } = -1;
         public List<MultiDialLabel>? Labels { get; set; }   // FF kind=18, by position
 
         public WheelMultiDialSettings Clone()
@@ -934,7 +938,8 @@ namespace MozaPlugin.Settings
             }
             return new WheelMultiDialSettings
             {
-                Enabled = Enabled, Knob = Knob, Left = Left, Right = Right, Labels = labels,
+                Enabled = Enabled, Knob = Knob, Left = Left, Right = Right,
+                LeftWheel = LeftWheel, RightWheel = RightWheel, Labels = labels,
             };
         }
     }

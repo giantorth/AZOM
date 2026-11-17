@@ -73,13 +73,28 @@ namespace MozaPlugin
             if (bundle.Knob < 0)
             {
                 int knob = model.MultiDialLogicalKnob((int)((packed >> 4) & 0x0F));
-                if (knob >= 0)
+                if (model.IsMultiDialKnob(knob))
                 {
                     bundle.Knob = knob;
                     changed = true;
                 }
             }
             if (changed) _profileCoordinator.PersistSettings();
+        }
+
+        /// <summary>Seed an unset right thumb wheel from the reply to the telemetry
+        /// start's <c>28 02 01</c> read. The reply (<c>[v][v]</c>, 0x0F = none) doesn't
+        /// echo the side; that read is the only <c>28 02</c> the plugin sends.</summary>
+        private void TryFollowMultiDialRightRead(byte a, byte b)
+        {
+            var wheels = WheelModelInfo?.MultiDialThumbWheels;
+            if (wheels == null || a != b) return;
+            int wire = a == 0x0F ? 0xFF : a;
+            if (wire != 0xFF && wire >= wheels.Length) return;
+            var bundle = _profileCoordinator.GetOrCreateActiveWheelMultiDial();
+            if (bundle == null || bundle.RightWheel >= 0 || bundle.Right >= 0) return;
+            bundle.RightWheel = wire;
+            _profileCoordinator.PersistSettings();
         }
     }
 }

@@ -187,6 +187,8 @@ namespace MozaPlugin
                         _data.Last28x01BytesValid = true;
                         _data.Last28xReplyTickMs = Environment.TickCount;
                     }
+                    else if (data[3] == 0x02)
+                        TryFollowMultiDialRightRead(data[4], data[5]);
                 }
                 _deviceManager.MarkWheelResponse(MozaProtocol.SwapNibbles(data[1]));
                 return;

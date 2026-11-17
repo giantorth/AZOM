@@ -320,7 +320,7 @@ namespace MozaPlugin.Protocol
             // Multi-mode thumb dial (cmd 0x28), write-only: the C0 71 28 read replies
             // belong to the parity polls (see MozaPlugin.Inbound). Knob index is the
             // firmware knob index (WheelModelInfo.MultiDialKnobOrder); side value = the
-            // side's own index when included, 0xFF when not.
+            // bound thumb wheel's index (KS Pro) or the side's own index, 0xFF = none.
             AddCommand("wheel-multifn-enable",     "wheel", 0xFF, 63, new byte[] { 40, 0 },    1, "int");
             AddCommand("wheel-multifn-knob",       "wheel", 0xFF, 63, new byte[] { 40, 1 },    1, "int");
             AddCommand("wheel-multifn-left",       "wheel", 0xFF, 63, new byte[] { 40, 2, 0 }, 1, "int");

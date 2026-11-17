@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Threading;
 using MozaControls;
 using MozaPlugin.Hardware;
+using MozaPlugin.Resources;
 using MozaPlugin.Settings;
 
 namespace MozaPlugin.Devices.Ui
@@ -23,11 +24,14 @@ namespace MozaPlugin.Devices.Ui
         {
             public readonly UIElement Card;
             public readonly OffOnToggle Left, Right;
+            public readonly ComboBox LeftWheel, RightWheel;
             public readonly StackPanel Rows;
             public readonly List<(TextBox Left, TextBox Right)> Boxes = new List<(TextBox, TextBox)>();
-            public MultiDialView(UIElement card, OffOnToggle left, OffOnToggle right, StackPanel rows)
+            public MultiDialView(UIElement card, OffOnToggle left, OffOnToggle right,
+                ComboBox leftWheel, ComboBox rightWheel, StackPanel rows)
             {
-                Card = card; Left = left; Right = right; Rows = rows;
+                Card = card; Left = left; Right = right;
+                LeftWheel = leftWheel; RightWheel = rightWheel; Rows = rows;
             }
         }
 
@@ -36,8 +40,10 @@ namespace MozaPlugin.Devices.Ui
 
         private MultiDialView[] MultiDialViews => _mdViews ??= new[]
         {
-            new MultiDialView(WiMultiDialCard, WiMultiDialLeft, WiMultiDialRight, WiMultiDialLabelRows),
-            new MultiDialView(WkMultiDialCard, WkMultiDialLeft, WkMultiDialRight, WkMultiDialLabelRows),
+            new MultiDialView(WiMultiDialCard, WiMultiDialLeft, WiMultiDialRight,
+                WiMultiDialLeftWheel, WiMultiDialRightWheel, WiMultiDialLabelRows),
+            new MultiDialView(WkMultiDialCard, WkMultiDialLeft, WkMultiDialRight,
+                WkMultiDialLeftWheel, WkMultiDialRightWheel, WkMultiDialLabelRows),
         };
 
         // Signal-mode selector pick: BUTTON / KNOB, or MULTI-MODE (SignalChipMultiMode).
@@ -67,9 +73,10 @@ namespace MozaPlugin.Devices.Ui
         // Make `knob` the dial (moving it off any other knob) and switch the mode on.
         private void SetMultiDialKnob(int knob, bool force)
         {
-            var order = _plugin!.WheelModelInfo?.MultiDialKnobOrder;
+            var model = _plugin!.WheelModelInfo;
+            var order = model?.MultiDialKnobOrder;
             var bundle = _plugin.GetOrCreateActiveWheelMultiDial();
-            if (bundle == null || order == null || knob < 0 || knob >= order.Length) return;
+            if (bundle == null || order == null || model?.IsMultiDialKnob(knob) != true) return;
             bool wasOn = bundle.Enabled == 1;
             bool knobChanged = bundle.Knob != knob;
             bundle.Knob = knob;
@@ -97,11 +104,29 @@ namespace MozaPlugin.Devices.Ui
                 v.Card.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 if (!show) continue;
 
-                SetToggle(v.Left, bundle!.Left == 1);
-                SetToggle(v.Right, bundle.Right == 1);
+                // Wheels with a thumb-wheel choice get pickers instead of the toggles.
+                var dial = bundle!;
+                var m = model!;
+                var wheels = m.MultiDialThumbWheels;
+                var toggleVis = wheels == null ? Visibility.Visible : Visibility.Collapsed;
+                var pickVis = wheels == null ? Visibility.Collapsed : Visibility.Visible;
+                v.Left.Visibility = v.Right.Visibility = toggleVis;
+                v.LeftWheel.Visibility = v.RightWheel.Visibility = pickVis;
+                if (wheels != null)
+                {
+                    int l = HardwareApplier.MultiDialSideWire(dial, m, 0);
+                    int r = HardwareApplier.MultiDialSideWire(dial, m, 1);
+                    SyncThumbWheelCombo(v.LeftWheel, wheels, l, w => m.IsMultiDialSidePairAllowed(w, r));
+                    SyncThumbWheelCombo(v.RightWheel, wheels, r, w => m.IsMultiDialSidePairAllowed(l, w));
+                }
+                else
+                {
+                    SetToggle(v.Left, dial.Left == 1);
+                    SetToggle(v.Right, dial.Right == 1);
+                }
 
-                EnsureMultiDialLabelRows(v, model!.KnobPositionCount(knob));
-                var labels = bundle.Labels;
+                EnsureMultiDialLabelRows(v, m.KnobPositionCount(knob));
+                var labels = dial.Labels;
                 for (int i = 0; i < v.Boxes.Count; i++)
                 {
                     var l = labels != null && i < labels.Count ? labels[i] : null;
@@ -114,6 +139,60 @@ namespace MozaPlugin.Devices.Ui
         private static void SetToggle(OffOnToggle toggle, bool on)
         {
             if ((toggle.IsChecked == true) != on) toggle.IsChecked = on;
+        }
+
+        private static readonly DataTemplate s_unavailableItemTemplate = (DataTemplate)System.Windows.Markup.XamlReader.Parse(
+            "<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">" +
+                "<TextBlock Text=\"{Binding}\" FontStyle=\"Italic\" TextDecorations=\"Strikethrough\"/>" +
+            "</DataTemplate>");
+
+        // Items: Off, then the thumb wheels by wire index. Picks the pairing rules
+        // forbid are greyed out. -1 (no opinion) selects nothing.
+        private static void SyncThumbWheelCombo(ComboBox combo, string[] wheels, int wire, Func<int, bool> allowed)
+        {
+            bool rebuild = combo.Items.Count != wheels.Length + 1;
+            for (int i = 0; !rebuild && i < wheels.Length; i++)
+                rebuild = !Equals(((ComboBoxItem)combo.Items[i + 1]).Content, wheels[i]);
+            if (rebuild)
+            {
+                combo.Items.Clear();
+                combo.Items.Add(new ComboBoxItem { Content = Strings.Option_Off });
+                foreach (var w in wheels) combo.Items.Add(new ComboBoxItem { Content = w });
+            }
+            for (int i = 0; i < wheels.Length; i++)
+            {
+                var item = (ComboBoxItem)combo.Items[i + 1];
+                bool ok = allowed(i);
+                item.IsEnabled = ok;
+                // The theme's disabled grey is too faint to read as unavailable.
+                item.ContentTemplate = ok ? null : s_unavailableItemTemplate;
+            }
+            int want = wire == 0xFF ? 0 : wire >= 0 && wire < wheels.Length ? wire + 1 : -1;
+            if (combo.SelectedIndex != want) combo.SelectedIndex = want;
+        }
+
+        private void WiMultiDialWheel_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents || _plugin == null) return;
+            var model = _plugin.WheelModelInfo;
+            var combo = (ComboBox)sender;
+            if (model?.MultiDialThumbWheels == null || combo.SelectedIndex < 0) return;
+            var bundle = _plugin.GetOrCreateActiveWheelMultiDial();
+            if (bundle == null) return;
+            bool left = ReferenceEquals(sender, WiMultiDialLeftWheel) || ReferenceEquals(sender, WkMultiDialLeftWheel);
+            int wire = combo.SelectedIndex == 0 ? 0xFF : combo.SelectedIndex - 1;
+            int other = HardwareApplier.MultiDialSideWire(bundle, model, left ? 1 : 0);
+            bool allowed = left ? model.IsMultiDialSidePairAllowed(wire, other)
+                                : model.IsMultiDialSidePairAllowed(other, wire);
+            if (allowed)
+            {
+                if (left) bundle.LeftWheel = wire;
+                else bundle.RightWheel = wire;
+                _plugin.HardwareApplier.WriteIfWheelDetected(left ? "wheel-multifn-left" : "wheel-multifn-right", wire);
+                _plugin.SaveSettings();
+            }
+            using (_suppressor.Begin())
+                RefreshMultiDial(true);
         }
 
         // Leave a box the user is typing in alone — the refresh tick would fight them.

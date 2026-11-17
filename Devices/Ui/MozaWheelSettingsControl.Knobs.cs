@@ -252,8 +252,7 @@ namespace MozaPlugin.Devices.Ui
             int encoderCount = ResolveKnobEncoderCount();
             var ov = _plugin?.ActiveWheelProfile;
             var model = _plugin?.WheelModelInfo;
-            int dialKnobs = model?.MultiDialKnobOrder?.Length ?? 0;
-            int dialKnob = Hardware.HardwareApplier.MultiDialForcedButtonKnob(_plugin?.ActiveWheelMultiDial, model);
+            int dialKnob =Hardware.HardwareApplier.MultiDialForcedButtonKnob(_plugin?.ActiveWheelMultiDial, model);
             using (_suppressor.Begin())
             foreach (var set in _wiKnobSignalSets)
             {
@@ -270,7 +269,7 @@ namespace MozaPlugin.Devices.Ui
                 {
                     var chip = set.Chips[k];
                     var multi = (ListBoxItem)chip.Items[SignalChipMultiMode];
-                    multi.Visibility = k < dialKnobs ? Visibility.Visible : Visibility.Collapsed;
+                    multi.Visibility = model?.IsMultiDialKnob(k) == true ? Visibility.Visible : Visibility.Collapsed;
                     int v = k == dialKnob ? SignalChipMultiMode : ResolveKnobSignalMode(ov, k);
                     bool present = k < encoderCount;
                     // Show every present knob's selector once firmware reports

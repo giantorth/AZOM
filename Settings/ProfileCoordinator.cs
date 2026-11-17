@@ -906,9 +906,8 @@ namespace MozaPlugin.Settings
         internal static List<(string Left, string Right)> MultiDialWireLabels(WheelMultiDialSettings bundle, Devices.WheelModelInfo? model)
         {
             var labels = bundle.Labels;
-            int n = bundle.Knob >= 0 && model != null
-                ? model.KnobPositionCount(bundle.Knob)
-                : labels?.Count ?? 0;
+            int knob = model?.MultiDialEffectiveKnob(bundle.Knob) ?? -1;
+            int n = knob >= 0 ? model!.KnobPositionCount(knob) : labels?.Count ?? 0;
             var wire = new List<(string, string)>(n);
             for (int i = 0; i < n; i++)
             {

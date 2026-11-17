@@ -251,6 +251,8 @@ namespace MozaPlugin.Devices.Extensions
                     if (dial.Knob    < 0 && src.Knob    >= 0) dial.Knob    = src.Knob;
                     if (dial.Left    < 0 && src.Left    >= 0) dial.Left    = src.Left;
                     if (dial.Right   < 0 && src.Right   >= 0) dial.Right   = src.Right;
+                    if (dial.LeftWheel  < 0 && src.LeftWheel  >= 0) dial.LeftWheel  = src.LeftWheel;
+                    if (dial.RightWheel < 0 && src.RightWheel >= 0) dial.RightWheel = src.RightWheel;
                     if (dial.Labels == null && src.Labels != null) dial.Labels = src.Labels;
                 }
             }

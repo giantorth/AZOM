@@ -359,10 +359,15 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,4">
                                         <TextBlock Text="{x:Static res:Strings.Option_Left}" Style="{StaticResource DialRowLabel}"/>
                                         <ctrl:OffOnToggle x:Name="WiMultiDialLeft" Click="WiMultiDialSide_Click"/>
+                                        <!-- Thumb-wheel pick, on wheels that offer a choice (KS Pro); replaces the toggle. -->
+                                        <ComboBox x:Name="WiMultiDialLeftWheel" Width="90" Visibility="Collapsed"
+                                                  SelectionChanged="WiMultiDialWheel_Changed"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,4">
                                         <TextBlock Text="{x:Static res:Strings.Option_Right}" Style="{StaticResource DialRowLabel}"/>
                                         <ctrl:OffOnToggle x:Name="WiMultiDialRight" Click="WiMultiDialSide_Click"/>
+                                        <ComboBox x:Name="WiMultiDialRightWheel" Width="90" Visibility="Collapsed"
+                                                  SelectionChanged="WiMultiDialWheel_Changed"/>
                                     </StackPanel>
                                 </StackPanel>
                                 <!-- Header centred over both label column sets. -->
@@ -702,10 +707,14 @@
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.Option_Left}" Style="{StaticResource DialRowLabel}"/>
                                     <ctrl:OffOnToggle x:Name="WkMultiDialLeft" Click="WiMultiDialSide_Click"/>
+                                    <ComboBox x:Name="WkMultiDialLeftWheel" Width="90" Visibility="Collapsed"
+                                              SelectionChanged="WiMultiDialWheel_Changed"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,4">
                                     <TextBlock Text="{x:Static res:Strings.Option_Right}" Style="{StaticResource DialRowLabel}"/>
                                     <ctrl:OffOnToggle x:Name="WkMultiDialRight" Click="WiMultiDialSide_Click"/>
+                                    <ComboBox x:Name="WkMultiDialRightWheel" Width="90" Visibility="Collapsed"
+                                              SelectionChanged="WiMultiDialWheel_Changed"/>
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Margin="14,4,0,0" HorizontalAlignment="Left">

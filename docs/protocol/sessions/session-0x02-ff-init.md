@@ -116,8 +116,8 @@ repeat for each position (12 on the 4-knob rim captured):
 Note the **big-endian** lengths and text, unlike the LE envelope. Empty labels
 are `len = 0`. An all-empty 12-position table is 144 bytes (`size = 148`). The
 record carries **no knob id**; which knob is the dial is set separately by
-`28 01`. The KS Pro's centre dial has fewer detents
-(owner: 8 labels), which hasn't been captured.
+`28 01`. The KS Pro sends 8 positions (bug report 152GYZ3E, fw 1.2.7.12, wheel
+on an R16), and its unset right labels there are `len = FFFFFFFF`, not 0.
 
 Verified live 2026-11-13 (`usb-capture/r16-ffb-style-20261113-220624.pcapng`,
 t=636–783): 24 h2b records, all with `inner_crc == crc32(kindAndValue)`; the final

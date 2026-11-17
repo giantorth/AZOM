@@ -329,14 +329,28 @@ namespace MozaPlugin.Hardware
         /// when the dial is off, unset, or not offered by this wheel.</summary>
         internal static int MultiDialForcedButtonKnob(WheelMultiDialSettings? dial, WheelModelInfo? model)
         {
-            var order = model?.MultiDialKnobOrder;
-            if (dial == null || dial.Enabled != 1 || order == null) return -1;
-            return dial.Knob >= 0 && dial.Knob < order.Length && dial.Knob < MozaData.WheelKnobMax ? dial.Knob : -1;
+            if (dial == null || dial.Enabled != 1 || model == null) return -1;
+            int knob = model.MultiDialEffectiveKnob(dial.Knob);
+            return knob >= 0 && knob < MozaData.WheelKnobMax ? knob : -1;
         }
 
-        /// <summary>Wire value for a dial side (<c>28 02 [side]</c>): the side's own
-        /// index when included, 0xFF when not.</summary>
+        /// <summary>Wire value for a fixed dial side (<c>28 02 [side]</c>): the side's
+        /// own index when included, 0xFF when not.</summary>
         internal static int MultiDialSideValue(int side, int included) => included == 1 ? side : 0xFF;
+
+        /// <summary>Wire value for dial side 0 (left) / 1 (right), or -1 = no opinion.
+        /// On wheels with a thumb-wheel choice an unset pick falls back to the fixed
+        /// encoding, which is what earlier versions wrote.</summary>
+        internal static int MultiDialSideWire(WheelMultiDialSettings dial, WheelModelInfo? model, int side)
+        {
+            if (model?.MultiDialThumbWheels != null)
+            {
+                int wheel = side == 0 ? dial.LeftWheel : dial.RightWheel;
+                if (wheel >= 0) return wheel;
+            }
+            int included = side == 0 ? dial.Left : dial.Right;
+            return included >= 0 ? MultiDialSideValue(side, included) : -1;
+        }
 
         // ── Coalescing gate for UI-driven flash-backed wheel writes ──
         // A slider raises ValueChanged per tick, so dragging "Sleep speed" or a
@@ -1157,21 +1171,18 @@ namespace MozaPlugin.Hardware
                 var dialOrder = model.MultiDialKnobOrder;
                 if (dialOrder != null && multiDial != null)
                 {
-                    if (multiDial.Knob >= 0 && multiDial.Knob < dialOrder.Length
-                        && WheelCfgChangedForApply("wheel-multifn-knob", dialOrder[multiDial.Knob]))
-                        _deviceManager.WriteSetting("wheel-multifn-knob", dialOrder[multiDial.Knob]);
-                    if (multiDial.Left >= 0)
-                    {
-                        int v = MultiDialSideValue(0, multiDial.Left);
-                        if (WheelCfgChangedForApply("wheel-multifn-left", v))
-                            _deviceManager.WriteSetting("wheel-multifn-left", v);
-                    }
-                    if (multiDial.Right >= 0)
-                    {
-                        int v = MultiDialSideValue(1, multiDial.Right);
-                        if (WheelCfgChangedForApply("wheel-multifn-right", v))
-                            _deviceManager.WriteSetting("wheel-multifn-right", v);
-                    }
+                    // A single-knob dial (KS Pro) is that knob whenever it's in use.
+                    int wireKnob = multiDial.Knob >= 0 || multiDial.Enabled == 1
+                        ? model.MultiDialEffectiveKnob(multiDial.Knob) : -1;
+                    if (wireKnob >= 0
+                        && WheelCfgChangedForApply("wheel-multifn-knob", dialOrder[wireKnob]))
+                        _deviceManager.WriteSetting("wheel-multifn-knob", dialOrder[wireKnob]);
+                    int leftWire = MultiDialSideWire(multiDial, model, 0);
+                    if (leftWire >= 0 && WheelCfgChangedForApply("wheel-multifn-left", leftWire))
+                        _deviceManager.WriteSetting("wheel-multifn-left", leftWire);
+                    int rightWire = MultiDialSideWire(multiDial, model, 1);
+                    if (rightWire >= 0 && WheelCfgChangedForApply("wheel-multifn-right", rightWire))
+                        _deviceManager.WriteSetting("wheel-multifn-right", rightWire);
                     if (multiDial.Enabled >= 0
                         && WheelCfgChangedForApply("wheel-multifn-enable", multiDial.Enabled))
                         _deviceManager.WriteSetting("wheel-multifn-enable", multiDial.Enabled);
