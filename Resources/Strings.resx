@@ -360,9 +360,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>No joystick configuration reported by the wheel yet. Connect the wheel and wait for the identity probe to complete.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetry</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>SET FOLDER…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio Dashes</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Device Dashes</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Not found</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>No copy for this wheel</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Wheel not connected</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display not detected</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>None</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>CLEAR</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DETECT</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Set a folder of .mzdash files as a dashboard library</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Auto-detect the dashboard folder for the connected wheel</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>STOP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>CHANNEL MAPPINGS</value></data>
@@ -514,7 +522,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Pick a .mzdash file or library entry first.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(no configJson state received yet)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Cannot resolve raw bytes for "{0}" — pick a local file instead.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Folder: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload queued — pushing "{0}" to the wheel…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload not started — wheel not connected or no management session yet.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Upload complete (status 0x{0})</value></data>
@@ -525,18 +532,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Pick a .mzdash file to upload</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza dashboard (*.mzdash)|*.mzdash|All files (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Select folder containing .mzdash dashboard files</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Auto-detect dashboard folder</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House dashboard folder not found at:
-{0}
-
-Install MOZA Pit House and load a dashboard, or use Set Folder… to point at a custom location.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>No dashboard folder for the connected wheel (UID {0}).
-Looked under:
-{1}
-
-Open a dashboard in MOZA Pit House for this wheel first.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>No wheel-specific dashboard folders found under _dashes. Open MOZA Pit House and load a dashboard, then try again.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Multiple dashboard folders found ({0}) and no wheel is connected. Connect your wheel and try again, or use Set Folder… to choose manually.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>This will permanently delete all plugin settings and profiles.
 
 Are you sure?</value></data>
@@ -824,6 +819,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Tactile feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Button debounce (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Preview not available</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard not found in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Pressed</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Released</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Custom hue picker</value></data>

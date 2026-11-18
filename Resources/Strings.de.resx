@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Das Lenkrad hat noch keine Joystick-Konfiguration gemeldet. Lenkrad anschließen und auf den Abschluss der Identity-Probe warten.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetrie</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ORDNER WÄHLEN…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio-Dashboards</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Geräte-Dashboards</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Eigener</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Nicht gefunden</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Keine Kopie für dieses Lenkrad</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Lenkrad nicht verbunden</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display nicht erkannt</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Keiner</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>ENTFERNEN</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-ERKENNUNG</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Einen Ordner mit .mzdash-Dateien als Dashboard-Bibliothek festlegen</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Den Dashboard-Ordner für das verbundene Lenkrad automatisch erkennen</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANAL-ZUORDNUNGEN</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Wählen Sie zuerst eine .mzdash-Datei oder einen Bibliothekseintrag.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(noch kein configJson-Status empfangen)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Rohdaten für „{0}“ können nicht aufgelöst werden – wählen Sie stattdessen eine lokale Datei.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Ordner: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload in Warteschlange – „{0}“ wird an das Lenkrad gesendet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload nicht gestartet – Lenkrad nicht verbunden oder noch keine Verwaltungssitzung.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Upload abgeschlossen (Status 0x{0})</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Wählen Sie eine .mzdash-Datei zum Hochladen</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-Dashboard (*.mzdash)|*.mzdash|Alle Dateien (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Ordner mit .mzdash-Dashboard-Dateien auswählen</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Dashboard-Ordner automatisch erkennen</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House-Dashboard-Ordner nicht gefunden unter:
-{0}
-
-Installieren Sie MOZA Pit House und laden Sie ein Dashboard, oder verwenden Sie „Ordner festlegen…“, um einen eigenen Speicherort anzugeben.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Kein Dashboard-Ordner für das verbundene Lenkrad (UID {0}).
-Gesucht unter:
-{1}
-
-Öffnen Sie zuerst ein Dashboard in MOZA Pit House für dieses Lenkrad.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Keine lenkradspezifischen Dashboard-Ordner unter _dashes gefunden. Öffnen Sie MOZA Pit House, laden Sie ein Dashboard und versuchen Sie es erneut.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Mehrere Dashboard-Ordner gefunden ({0}) und kein Lenkrad verbunden. Verbinden Sie Ihr Lenkrad und versuchen Sie es erneut, oder verwenden Sie „Ordner festlegen…“, um manuell zu wählen.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Dadurch werden alle Plugin-Einstellungen und Profile dauerhaft gelöscht.
 
 Sind Sie sicher?</value></data>
@@ -817,6 +812,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktiles Feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Tasten-Entprellung (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Vorschau nicht verfügbar</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard nicht gefunden in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Gedrückt</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Losgelassen</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Eigene Farbtonauswahl</value></data>

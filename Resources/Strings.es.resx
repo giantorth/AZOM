@@ -336,9 +336,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>El volante aún no ha reportado configuración de joystick. Conecta el volante y espera a que termine la sonda de identidad.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetría</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ELEGIR CARPETA…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Tableros de Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Tableros del dispositivo</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Personalizada</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>No encontrada</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Sin copia para este volante</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Volante no conectado</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Pantalla no detectada</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Ninguna</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>QUITAR</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTODETECTAR</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Elegir una carpeta de archivos .mzdash como biblioteca de tableros</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Detectar automáticamente la carpeta de tableros para el volante conectado</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>PRUEBA</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>DETENER</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>ASIGNACIÓN DE CANALES</value></data>
@@ -490,7 +498,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Primero seleccione un archivo .mzdash o una entrada de la biblioteca.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(aún no se ha recibido el estado configJson)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>No se pueden obtener los bytes sin procesar de «{0}»; seleccione un archivo local en su lugar.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Carpeta: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Carga en cola: enviando «{0}» al volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Carga no iniciada: el volante no está conectado o aún no hay sesión de gestión.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Carga completada (estado 0x{0})</value></data>
@@ -501,18 +508,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleccione un archivo .mzdash para subir</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Panel Moza (*.mzdash)|*.mzdash|Todos los archivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleccione la carpeta con archivos de panel .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Detectar carpeta de paneles automáticamente</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>No se encontró la carpeta de paneles de MOZA Pit House en:
-{0}
-
-Instale MOZA Pit House y cargue un panel, o use «Establecer carpeta…» para indicar una ubicación personalizada.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>No hay carpeta de paneles para el volante conectado (UID {0}).
-Se buscó en:
-{1}
-
-Abra primero un panel en MOZA Pit House para este volante.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>No se encontraron carpetas de paneles por volante en _dashes. Abra MOZA Pit House, cargue un panel y vuelva a intentarlo.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Se encontraron varias carpetas de paneles ({0}) y no hay ningún volante conectado. Conecte su volante e inténtelo de nuevo, o use «Establecer carpeta…» para elegir manualmente.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Esto eliminará permanentemente todos los ajustes y perfiles del complemento.
 
 ¿Está seguro?</value></data>
@@ -822,6 +817,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Respuesta táctil</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Antirrebote de botones (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Vista previa no disponible</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Tablero no encontrado en {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Pulsado</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Suelto</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Selector de tono personalizado</value></data>

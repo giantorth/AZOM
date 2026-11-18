@@ -178,16 +178,38 @@
                     </ctrl:SegmentedControl>
                     <!-- Folder pickers only mean anything in library mode; shown
                          and hidden with the combo row in the card to the left. -->
-                    <StackPanel x:Name="UploadFolderPanel" Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <!-- Studio and PitHouse rows are scanned automatically; Custom is optional. -->
+                    <Grid x:Name="UploadFolderPanel" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <!-- Rows in scan order (DashboardLibraryFolders); later wins on a duplicate name. -->
+                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource KvKeyText}" Margin="0,0,12,4"
+                                   VerticalAlignment="Top" Text="{x:Static res:Strings.Label_DashFolderPitHouse}"/>
+                        <TextBlock x:Name="UploadFolderPitHouseText" Grid.Row="0" Grid.Column="1" Style="{StaticResource KvValueText}"
+                                   Margin="0,0,0,4" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource KvKeyText}" Margin="0,0,12,4"
+                                   VerticalAlignment="Top" Text="{x:Static res:Strings.Label_DashFolderStudio}"/>
+                        <TextBlock x:Name="UploadFolderStudioText" Grid.Row="1" Grid.Column="1" Style="{StaticResource KvValueText}"
+                                   Margin="0,0,0,4" TextWrapping="Wrap"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource KvKeyText}" Margin="0,0,12,4"
+                                   VerticalAlignment="Top" Text="{x:Static res:Strings.Label_DashFolderCustom}"/>
+                        <TextBlock x:Name="UploadFolderCustomText" Grid.Row="2" Grid.Column="1" Style="{StaticResource KvValueText}"
+                                   Margin="0,0,0,4" TextWrapping="Wrap"/>
+                        <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,2,0,0">
                             <Button Content="{x:Static res:Strings.Button_SetFolder}" Click="UploadSetFolder_Click" Margin="0,0,4,0"
                                     ToolTip="{x:Static res:Strings.Tooltip_SetFolder}"/>
-                            <Button Content="{x:Static res:Strings.Button_AutoDetect}" Click="UploadAutoDetect_Click"
-                                    ToolTip="{x:Static res:Strings.Tooltip_AutoDetect}"/>
+                            <Button x:Name="UploadClearFolderButton" Content="{x:Static res:Strings.Button_ClearFolder}"
+                                    Click="UploadClearFolder_Click" Visibility="Collapsed"/>
                         </StackPanel>
-                        <TextBlock x:Name="UploadFolderInfo" Style="{StaticResource MutedHintText}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
+                    </Grid>
                 </StackPanel>
             </ctrl:SectionCard>
         </Grid>

@@ -106,6 +106,8 @@ namespace MozaPlugin.Devices.Ui
         // One-shot: load the folder library ourselves if nothing else has, so a
         // wheel-less session still gets a populated picker.
         private bool _libraryColdLoadTried;
+        // LoadedLibraryFolders + wheel/display state the folder rows last showed.
+        private string? _shownLibraryFolders;
 
         // ── Upload source pickers ───────────────────────────────────────
 
@@ -204,11 +206,10 @@ namespace MozaPlugin.Devices.Ui
             // Also re-probe the exe so a mid-session PitHouse install recovers
             // without restarting SimHub.
             ProbeStudio(force: true);
-            var folder = _plugin?.ActiveTelemetryMzdashFolder;
-            if (!string.IsNullOrEmpty(folder))
+            if (_plugin != null)
             {
-                _plugin!.ReloadDashboardLibrary(folder);
-                _libraryFolderStamp = ComputeLibraryStamp(_plugin.DashboardLibraryFolders(folder));
+                _plugin.ReloadDashboardLibrary();
+                _libraryFolderStamp = ComputeLibraryStamp(_plugin.DashboardLibraryFolders());
             }
             SeedUploadLibrary(force: true);
         }
@@ -483,68 +484,13 @@ namespace MozaPlugin.Devices.Ui
             }
         }
 
-        private void UploadAutoDetect_Click(object sender, RoutedEventArgs e)
-        {
-            if (_plugin == null) return;
-
-            string dashesRoot = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MOZA Pit House", "_dashes");
-
-            if (!System.IO.Directory.Exists(dashesRoot))
-            {
-                MessageBox.Show(
-                    string.Format(Strings.Upload_AutoDetect_NotFound, dashesRoot),
-                    Strings.Upload_AutoDetect_Caption,
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            byte[] uid = _plugin.Data?.WheelMcuUid ?? Array.Empty<byte>();
-            string uidHex = uid.Length == 12 ? WheelUiHelpers.UidToHex(uid) : "";
-
-            string? picked = null;
-            string? failReason = null;
-
-            if (!string.IsNullOrEmpty(uidHex))
-            {
-                string? match = System.IO.Directory.EnumerateDirectories(dashesRoot)
-                    .FirstOrDefault(p => string.Equals(
-                        new System.IO.DirectoryInfo(p).Name,
-                        uidHex,
-                        StringComparison.OrdinalIgnoreCase));
-                if (match != null)
-                    picked = match;
-                else
-                    failReason = string.Format(Strings.Upload_AutoDetect_NoFolderForWheel, uidHex, dashesRoot);
-            }
-            else
-            {
-                var guidDirs = System.IO.Directory.GetDirectories(dashesRoot)
-                    .Where(p => System.Text.RegularExpressions.Regex.IsMatch(
-                        new System.IO.DirectoryInfo(p).Name, "^[0-9a-fA-F]{24}$"))
-                    .ToList();
-                if (guidDirs.Count == 1)
-                    picked = guidDirs[0];
-                else if (guidDirs.Count == 0)
-                    failReason = Strings.Upload_AutoDetect_NoFolders;
-                else
-                    failReason = string.Format(Strings.Upload_AutoDetect_Multiple, guidDirs.Count);
-            }
-
-            if (picked == null)
-            {
-                MessageBox.Show(failReason, Strings.Upload_AutoDetect_Caption,
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            ApplyUploadFolder(picked);
-        }
+        private void UploadClearFolder_Click(object sender, RoutedEventArgs e) => ApplyUploadFolder("");
 
         private void ApplyUploadFolder(string path)
         {
             if (_plugin == null) return;
+            // A pick that duplicates an automatic source adds nothing.
+            if (_plugin.IsAutomaticLibraryFolder(path)) path = "";
             _plugin.ActiveTelemetryMzdashFolder = path;
             _plugin.SaveSettings();
             _plugin.ReloadDashboardLibrary(path);
@@ -557,15 +503,16 @@ namespace MozaPlugin.Devices.Ui
 
         private void UpdateUploadFolderInfo()
         {
-            if (UploadFolderInfo == null) return;
-            // Report every folder the library actually reads, not just the
-            // configured one — Dashboard Studio's project root is in there too,
-            // and a dashboard appearing from a path the user never set is
-            // otherwise baffling.
-            var folders = _plugin?.DashboardLibraryFolders();
-            UploadFolderInfo.Text = (folders == null || folders.Count == 0)
-                ? ""
-                : string.Format(Strings.Upload_FolderPrefix, string.Join("  +  ", folders));
+            if (UploadFolderStudioText == null || _plugin == null) return;
+            var s = _plugin.GetDashboardLibrarySources();
+            UploadFolderStudioText.Text = s.Studio ?? Strings.Status_DashFolderNotFound;
+            UploadFolderPitHouseText.Text = s.PitHouseWheel
+                ?? (s.DisplayKnown ? Strings.Status_DashFolderNoWheelCopy
+                    : s.WheelConnected ? Strings.Status_DashFolderNoDisplay
+                    : Strings.Status_DashFolderWheelNotConnected);
+            bool hasCustom = s.Custom.Length > 0;
+            UploadFolderCustomText.Text = hasCustom ? s.Custom : Strings.Status_DashFolderNone;
+            UploadClearFolderButton.Visibility = hasCustom ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UploadLibraryCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -901,9 +848,7 @@ namespace MozaPlugin.Devices.Ui
 
             // Nothing has loaded the folder library yet (no wheel detected this
             // session). Do it once ourselves rather than showing an empty picker.
-            if (!_libraryColdLoadTried
-                && _plugin.DashCache.FolderProfileCount == 0
-                && !string.IsNullOrEmpty(_plugin.ActiveTelemetryMzdashFolder))
+            if (!_libraryColdLoadTried && _plugin.LoadedLibraryFolders == null)
             {
                 _libraryColdLoadTried = true;
                 // ReadAllBytes + ParseMzdash per file, recursive — off the dispatcher
@@ -914,6 +859,18 @@ namespace MozaPlugin.Devices.Ui
                     try { plugin.ReloadDashboardLibrary(); }
                     catch (Exception ex) { MozaLog.Warn($"[AZOM] Dashboard library cold load failed: {ex.Message}"); }
                 });
+            }
+
+            // A reload, wheel detection, or a display UID with no PitHouse folder
+            // changes the folder rows without changing the name count.
+            var det = _plugin.DetectionState;
+            string folders = (_plugin.LoadedLibraryFolders ?? "") + "|"
+                + (det.NewWheelDetected || det.OldWheelDetected) + "|"
+                + WheelUiHelpers.UidToHex(_plugin.Data?.DisplayMcuUid ?? Array.Empty<byte>());
+            if (folders != _shownLibraryFolders)
+            {
+                _shownLibraryFolders = folders;
+                UpdateUploadFolderInfo();
             }
 
             int count = _plugin.DashCache.CachedNameCount;

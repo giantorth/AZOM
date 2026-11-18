@@ -828,6 +828,8 @@ namespace MozaPlugin.Devices
                 // MCU UID alone satisfies IsDisplayDetected — re-trigger the
                 // deferred telemetry start (empty-model-name wheels rely on it).
                 NoteDisplayIdentityReady();
+                // The UID names PitHouse's synced dashboard folder.
+                _plugin.ReloadDashboardLibraryIfSourcesChanged();
                 return;
             }
 
@@ -1153,10 +1155,8 @@ namespace MozaPlugin.Devices
                             if (initialProfile != null)
                                 _plugin.ApplyProfileOnConnect(initialProfile);
 
-                            // Auto-load the dashboard library: this wheel's
-                            // configured mzdash folder plus MOZA Dashboard
-                            // Studio's own project root (see
-                            // MozaPlugin.ReloadDashboardLibrary).
+                            // Auto-load the dashboard library (see
+                            // MozaPlugin.DashboardLibraryFolders).
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;
                             MozaLog.Debug("[AZOM] Loading dashboard library from: "
                                 + string.Join(", ", _plugin.DashboardLibraryFolders(ovFolder)));

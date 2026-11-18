@@ -334,9 +334,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Nessuna configurazione joystick riportata dal volante. Connetti il volante e attendi il completamento del probe di identità.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetria</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>IMPOSTA CARTELLA…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Dashboard di Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Dashboard del dispositivo</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Personalizzata</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Non trovata</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Nessuna copia per questo volante</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Volante non connesso</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display non rilevato</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Nessuna</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>RIMUOVI</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>RILEVAMENTO AUTOMATICO</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Imposta una cartella di file .mzdash come libreria dashboard</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Rileva automaticamente la cartella dashboard per il volante connesso</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>PROVA</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>FERMA</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>MAPPATURE CANALI</value></data>
@@ -488,7 +496,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Seleziona prima un file .mzdash o una voce della libreria.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(nessuno stato configJson ancora ricevuto)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Impossibile risolvere i byte grezzi per «{0}» — scegli invece un file locale.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Cartella: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Caricamento in coda — invio di «{0}» al volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Caricamento non avviato — volante non connesso o nessuna sessione di gestione.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Caricamento completato (stato 0x{0})</value></data>
@@ -499,18 +506,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleziona un file .mzdash da caricare</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Cruscotto Moza (*.mzdash)|*.mzdash|Tutti i file (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleziona la cartella con i file dashboard .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Rileva automaticamente la cartella dei cruscotti</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Cartella dei cruscotti di MOZA Pit House non trovata in:
-{0}
-
-Installa MOZA Pit House e carica un cruscotto, oppure usa «Imposta cartella…» per indicare un percorso personalizzato.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Nessuna cartella dei cruscotti per il volante connesso (UID {0}).
-Cercato in:
-{1}
-
-Apri prima un cruscotto in MOZA Pit House per questo volante.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Nessuna cartella dei cruscotti specifica per il volante trovata in _dashes. Apri MOZA Pit House, carica un cruscotto e riprova.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Trovate più cartelle dei cruscotti ({0}) e nessun volante connesso. Collega il volante e riprova, oppure usa «Imposta cartella…» per scegliere manualmente.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Questa operazione eliminerà definitivamente tutte le impostazioni e i profili del plugin.
 
 Sei sicuro?</value></data>
@@ -820,6 +815,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Feedback tattile</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce pulsanti (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Anteprima non disponibile</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard non trovata in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Premuto</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Rilasciato</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Selettore di tonalità personalizzato</value></data>

@@ -40,7 +40,7 @@ will "find" our own stub instead of PitHouse.
     <Name>\1.png, 2.png          ← preview images
   images\
     MD5\<32-hex>.png             ← shared widget image pool
-  <24-hex wheel MCU UID>\        ← the copy PitHouse SYNCS TO that wheel
+  <24-hex display MCU UID>\      ← the copy PitHouse SYNCS TO that wheel
     <Name>\<Name>.mzdash
 ```
 
@@ -49,7 +49,7 @@ Studio references `MD5/<32hex>.png`, and that file resolves against `imageRoot`
 (`_dashes\images\MD5\`) — Studio never copies it into the project folder, so a Studio project
 directory typically contains *only* `<Name>.mzdash`. This differs from a dashboard **downloaded
 from the wheel** or exported by PitHouse, which carries its own `Resource\MD5\` subtree. The
-uploader has to search both (`DashboardUploader.ImageSearchDirectories`); searching only the
+uploader has to search both (`DashboardImageResolver.SearchDirectories`); searching only the
 per-dashboard `Resource\MD5\` silently drops every custom image from the bundle and the widget
 renders blank on the wheel.
 
@@ -70,14 +70,20 @@ slash into a second backslash and the collapse then eats real separators.
 newly created dashboard**. It does *not* constrain what Studio can open — see below.
 
 **Neither tree is a superset of the other**, which is why the plugin's dashboard library reads
-both. Studio authors into `projectRoot`, so a dashboard you just created exists only there;
-PitHouse's per-wheel tree holds whatever was synced to that specific wheel, including
-dashboards that were never in the local project set. `MozaPlugin.ReloadDashboardLibrary()` is
-the single entry point that composes the list and hands it to
-`DashboardCache.LoadFromFolders(...)`, which scans in order with **later folders winning** on
-a duplicate profile name — the user's configured folder is scanned last, so it wins. The
-Files tab's folder line reports every folder actually scanned, so a dashboard appearing from
-a path the user never configured isn't baffling.
+both, automatically. Studio authors into `projectRoot`, so a dashboard you just created exists
+only there; PitHouse's per-wheel tree holds whatever was synced to that specific wheel,
+including dashboards that were never in the local project set. The per-wheel folder is named
+after the wheel's **display sub-device** MCU UID, not the wheel's own: the folder
+`8ae5d086b2fcad7486dbe208` matches the wrapped reply `c3 71 86 8a e5 d0 86 b2 fc ad 74 86 db e2
+08` (`display-mcu-uid`, `MozaData.DisplayMcuUid`), while the same wheel's direct `0x86` reply
+is a different UID. The library reloads when the display UID arrives after the post-detection
+load. The display re-probe stops at the first identity field, so a lost UID reply is re-asked
+alone (`SendDisplayUidProbe`) every poll tick, up to 12 times per wheel session. One optional **custom folder** per wheel page is scanned
+on top. `MozaPlugin.DashboardLibraryFolders()` composes the list and
+`DashboardCache.LoadFromFolders(...)` scans it with **later folders winning** on a duplicate
+profile name: PitHouse's synced copy, then Studio's editable one, then the custom folder. The
+Files tab's source card shows each of the three on its own row, in that scan order; the custom row has Set folder
+and Clear, and a custom pick equal to an automatic folder is not stored.
 
 ## Command line
 
@@ -143,8 +149,12 @@ Observed behaviour, captured at PitHouse startup:
 
 - Those PNGs are what `WheelDashboardEntry.PreviewImageFilePaths` refers to, and what the
   wheel receives alongside the mzdash in an upload bundle.
-- Missing widget images are logged and skipped rather than failing the render:
-  `QML AnimatedImage: Error Reading Animated Image File file:///…/_dashes/images/MD5/<md5>.png`.
+- Missing widget images: Studio 1.0.7.3 logged and skipped them (widget drawn blank):
+  `QML AnimatedImage: Error Reading Animated Image File file:///…/MD5/<md5>.png`.
+  **Studio 1.0.7.7 fails the whole render instead** — it writes no PNGs and logs
+  `offscreen preview failed screen 0 "Resource failed to load: file:///…/MD5/<md5>.png"`.
+- For an mzdash outside PitHouse's trees (the plugin's preview copies), Studio looks for
+  images only in `<dir>\Resource\MD5\`, not in `imageRoot`.
 - The process exits on its own when the render completes.
 
 On the PitHouse side this is driven from `Sync_DashboardManager::startProcess` (for the
@@ -156,11 +166,15 @@ Studio.exe` invocation and log `Failed to start process with ID` when the spawn 
 ([`UI/DashboardPreviewRenderer.cs`](../UI/DashboardPreviewRenderer.cs)). It never renders in
 place: the selected dashboard's mzdash bytes (wheel cache, library folder, builtin or custom
 file) are copied to `%LOCALAPPDATA%\MozaSimHubPlugin\DashboardPreviews\<sha1>\<Name>\<Name>.mzdash`,
-along with any `Resource\` subtree beside the source, and Studio renders that copy. The cache
-is keyed by content hash, so an unchanged dashboard renders once; renders are serialized,
-time out after 60 s, and the cache is pruned to the newest 64 entries. With no Studio
-install, no mzdash for the selection, or a failed render, a same-sized "Preview not
-available" placeholder is shown; FSR1/CM1 (built-in pages, no mzdash) hide the preview.
+along with any `Resource\` subtree beside the source, and every referenced image found only in
+the shared pool is copied into the copy's `Resource\MD5\` (same search as the uploader,
+`DashboardImageResolver`) — without that, Studio 1.0.7.7 renders nothing for any dashboard
+using a pool image. Studio renders that copy. The cache is keyed by content hash, so an
+unchanged dashboard renders once; double-clicking the preview forces a re-render. Renders are
+serialized, time out after 60 s, and the cache is pruned to the newest 64 entries. When no
+preview can be made, the placeholder reads "Dashboard not found in <folders>" if the
+dashboard has no file in the library folders, otherwise "Preview not available"; FSR1/CM1
+(built-in pages, no mzdash) hide the preview.
 
 The flag is also why stray headless `MOZA Dashboard Studio.exe` processes appear at PitHouse
 startup — exactly what a naïve "is Studio already running?" check would trip over.

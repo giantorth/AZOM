@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>方向盘尚未上报摇杆配置。请连接方向盘并等待身份探测完成。</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>遥测</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>设置文件夹…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio 仪表盘</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>设备仪表盘</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>自定义</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>未找到</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>此方向盘无副本</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>方向盘未连接</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>未检测到显示屏</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>无</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>清除</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>自动检测</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>将一个包含 .mzdash 文件的文件夹设为仪表盘库</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>自动检测已连接方向盘的仪表盘文件夹</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>测试</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>停止</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>通道映射</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>请先选择一个 .mzdash 文件或库条目。</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>（尚未收到 configJson 状态）</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>无法解析 “{0}” 的原始字节——请改为选择本地文件。</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>文件夹：{0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>上传已排队——正在将 “{0}” 推送到方向盘…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>自动检测仪表盘文件夹</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>未在以下位置找到 MOZA Pit House 仪表盘文件夹：
-{0}
-
-请安装 MOZA Pit House 并加载一个仪表盘，或使用“设置文件夹…”指向自定义位置。</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>找不到已连接方向盘（UID {0}）的仪表盘文件夹。
-已查找：
-{1}
-
-请先在 MOZA Pit House 中为此方向盘打开一个仪表盘。</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>在 _dashes 下未找到特定方向盘的仪表盘文件夹。请打开 MOZA Pit House 加载一个仪表盘后重试。</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>找到多个仪表盘文件夹（{0}）且未连接方向盘。请连接方向盘后重试，或使用“设置文件夹…”手动选择。</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>这将永久删除所有插件设置和配置文件。
 
 确定吗？</value></data>
@@ -817,6 +812,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>触觉反馈</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>按键去抖 (毫秒)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>预览不可用</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>在 {0} 中未找到仪表盘</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>已按下</value></data>
   <data name="Status_Released" xml:space="preserve"><value>已松开</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>自定义色调选择器</value></data>

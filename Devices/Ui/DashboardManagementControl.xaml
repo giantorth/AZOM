@@ -173,7 +173,9 @@
                             <Path Data="{StaticResource IconChevronLeft}" Style="{StaticResource PagerChevron}"/>
                         </Button>
                         <StackPanel Grid.Column="1">
-                            <Grid>
+                            <!-- Double-click re-renders. Transparent so the placeholder's
+                                 empty interior takes the click too. -->
+                            <Grid Background="Transparent" MouseLeftButtonDown="DashboardPreview_MouseLeftButtonDown">
                                 <Image x:Name="DashboardPreviewImage" Stretch="Uniform" StretchDirection="DownOnly"
                                        MaxHeight="130" RenderOptions.BitmapScalingMode="HighQuality"/>
                                 <!-- Stand-in sized like a typical render (975×310 at 130 high)
@@ -182,7 +184,8 @@
                                     <Rectangle Stroke="{DynamicResource BorderBrightBrush}" StrokeThickness="1"
                                                StrokeDashArray="4 3" RadiusX="4" RadiusY="4"/>
                                     <TextBlock x:Name="DashboardPreviewStatus" Style="{StaticResource MutedHintText}"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               TextWrapping="Wrap" TextAlignment="Center" Margin="10,0"/>
                                 </Grid>
                             </Grid>
                             <TextBlock x:Name="DashboardPreviewPageLabel" HorizontalAlignment="Center" Margin="0,4,0,0"

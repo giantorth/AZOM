@@ -2,6 +2,20 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.5]
+
+## Added
+
+- **Double-click the dashboard preview to re-render it;** if no preview can be shown, it names the folder the dashboard wasn't found in.
+
+## Changed
+
+- **Dashboard library folders reworked;** Dashboard Studio's projects and PitHouse's copy for the connected wheel are scanned automatically, each shown on its own row, with one optional custom folder that can be cleared (Auto-detect removed).
+
+## Fixed
+
+- **Dashboard previews render again with Dashboard Studio 1.0.7.7;** dashboards using images from Studio's shared image folder showed no preview, and older previews drew those widgets blank.
+
 ## [1.7.4]
 
 ## Highlights
