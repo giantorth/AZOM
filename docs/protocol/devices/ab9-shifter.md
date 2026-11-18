@@ -141,6 +141,20 @@ Ten layouts, contiguous over `0x00..0x09`:
 The `R+n` layouts place reverse ahead of first rather than past top gear, which is
 why they interleave with the `n+R` ones instead of forming their own block.
 
+**Firmware 1.1.6.2 redrew `0x01` (5+R Layout 2)** (per device owner; bundle
+`F0W2VVDJ` is an AB9 on 1.1.6.2 with `0x01` stored). Applies to AB9 and AB6:
+
+| Firmware | Top row | Bottom row |
+|---|---|---|
+| < 1.1.6.2 | 1 / 3 / R | 2 / 4 / 5 |
+| ≥ 1.1.6.2 | R / 2 / 4 | 1 / 3 / 5 |
+
+The firmware version is the group-`0x04` identity reply (`7E 04 04 12 00 00 00 00`
+→ `84 21 <4 bytes>`), wire order `[major, minor, build, patch]`, displayed
+`major.minor.patch.build` like the wheelbase: `01 01 02 06` = 1.1.6.2. The HID gear
+buttons still name the logical gear, so only the drawn gate changes
+(`Devices/Ab9GateLayouts.cs`).
+
 Rows marked *capture* are the six mode-change events at 5/10/15/20/25/30 s in the
 shifter-mode capture — PitHouse only ever exercised those, which is why `0x01..0x03`
 and `0x08` were long recorded here as unexplained gaps. They are not gaps: all four

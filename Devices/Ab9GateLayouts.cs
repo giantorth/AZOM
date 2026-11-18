@@ -22,6 +22,9 @@ namespace MozaPlugin.Devices
     {
         private const int R = Ab9Gear.Reverse;
 
+        // Firmware 1.1.6.2 moved 5+R Layout 2 to R/2/4 over 1/3/5.
+        private static readonly Ab9GateSlot[] FivePlusR_L2_Revised = Build(new[] { R, 2, 4 }, new[] { 1, 3, 5 });
+
         private static readonly Dictionary<Ab9Mode, Ab9GateSlot[]> Layouts = new Dictionary<Ab9Mode, Ab9GateSlot[]>
         {
             [Ab9Mode.FivePlusR_L1]  = Build(new[] { 1, 3, 5 },    new[] { 2, 4, R }),
@@ -35,9 +38,13 @@ namespace MozaPlugin.Devices
             [Ab9Mode.RPlusEight]    = Build(new[] { R, 1, 3, 5, 7 }, new[] { 0, 2, 4, 6, 8 }),
         };
 
-        /// <summary>Slots for an H-pattern layout; null for <see cref="Ab9Mode.Sequential"/> or an unknown value.</summary>
-        public static Ab9GateSlot[]? Get(Ab9Mode mode)
-            => Layouts.TryGetValue(mode, out var slots) ? slots : null;
+        /// <summary>Slots for an H-pattern layout; null for <see cref="Ab9Mode.Sequential"/> or an unknown value.
+        /// <paramref name="revisedFw"/>: the device runs firmware 1.1.6.2 or later.</summary>
+        public static Ab9GateSlot[]? Get(Ab9Mode mode, bool revisedFw)
+        {
+            if (revisedFw && mode == Ab9Mode.FivePlusR_L2) return FivePlusR_L2_Revised;
+            return Layouts.TryGetValue(mode, out var slots) ? slots : null;
+        }
 
         // 0 = no gate end in that column/row.
         private static Ab9GateSlot[] Build(int[] top, int[] bottom)

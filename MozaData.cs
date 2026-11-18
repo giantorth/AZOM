@@ -173,6 +173,14 @@ namespace MozaPlugin
         /// substituted something. <see cref="NoAb9Reading"/> until it answers.</summary>
         public volatile int Ab9ModeReadback = NoAb9Reading;
 
+        /// <summary>AB9/AB6 group-0x04 reply in wire order; null until it answers.</summary>
+        public volatile byte[]? Ab9FwVersion;
+
+        public string Ab9FwVersionText => FormatFwVersion(Ab9FwVersion);
+
+        /// <summary>Firmware 1.1.6.2 redrew the 5+R Layout 2 gate (see Ab9GateLayouts).</summary>
+        public bool Ab9HasRevisedLayouts => FwVersionAtLeast(Ab9FwVersion, 1, 1, 6, 2);
+
         /// <summary>Clear every probe reading back to "never answered". Called at
         /// AB9 connect so an unplug/swap can't leave the previous device's numbers
         /// standing next to the new one's silence.</summary>
@@ -180,6 +188,7 @@ namespace MozaPlugin
         {
             Ab9State2b = Ab9StateErr2b = Ab9McuTemp2b = NoAb9Reading;
             Ab9ModeReadback = NoAb9Reading;
+            Ab9FwVersion = null;
         }
 
         // State
@@ -657,6 +666,16 @@ namespace MozaPlugin
         private static string FormatFwVersion(byte[]? b) =>
             b == null || b.Length < 4 ? "unknown" : $"{b[0]}.{b[1]}.{b[3]}.{b[2]}";
 
+        /// <summary>Group-0x04 reply <paramref name="v"/> is at least a.b.c.d in
+        /// MOZA's display order; false while unknown.</summary>
+        private static bool FwVersionAtLeast(byte[]? v, int a, int b, int c, int d)
+        {
+            if (v == null || v.Length < 4) return false;
+            long have = ((long)v[0] << 24) | ((long)v[1] << 16) | ((long)v[3] << 8) | v[2];
+            long want = ((long)a << 24) | ((long)b << 16) | ((long)c << 8) | (uint)d;
+            return have >= want;
+        }
+
         // Wheel firmware re-probe rounds spent this session. Lives with the data
         // it fills, so a fresh MozaData (plugin reload) gets a fresh budget.
         public int WheelFwVersionProbeRetries;
@@ -847,14 +866,7 @@ namespace MozaPlugin
             public string FwVersionText => FormatFwVersion(FwVersion);
 
             /// <summary>Firmware at least a.b.c.d in MOZA's display order.</summary>
-            public bool FwAtLeast(int a, int b, int c, int d)
-            {
-                var v = FwVersion;
-                if (v == null || v.Length < 4) return false;
-                long have = ((long)v[0] << 24) | ((long)v[1] << 16) | ((long)v[3] << 8) | v[2];
-                long want = ((long)a << 24) | ((long)b << 16) | ((long)c << 8) | (uint)d;
-                return have >= want;
-            }
+            public bool FwAtLeast(int a, int b, int c, int d) => FwVersionAtLeast(FwVersion, a, b, c, d);
 
             /// <summary>Store a parsed <c>fcs-*</c> reply (read or write echo). Returns
             /// false for other commands.</summary>
@@ -1282,6 +1294,11 @@ namespace MozaPlugin
         {
             if (data == null) return;
             if (Fcs.TryUpdate(commandName, 0, data)) return;
+            if (commandName == "ab9-id-04")
+            {
+                Ab9FwVersion = (byte[])data.Clone();
+                return;
+            }
 
             // **A5 gate**: drop wheel-LED colour responses while live telemetry is
             // actively flowing. Even though writes are no longer gated (cmd 0x27 / cmd

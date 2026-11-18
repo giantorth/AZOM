@@ -225,6 +225,8 @@ namespace MozaPlugin.UI
             sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
                       : plugin.Settings?.Ab9DetectionEnabled == false ? "(detection disabled)"
                       : "(disconnected)");
+            if (ab9Connected)
+                sb.Append($" (FW {plugin.Data.Ab9FwVersionText})");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");

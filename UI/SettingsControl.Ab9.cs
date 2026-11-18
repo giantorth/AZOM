@@ -123,10 +123,11 @@ namespace MozaPlugin.UI
                 Ab9GateView.Poll = () =>
                 {
                     var mode = _plugin.Settings?.ProfileStore?.CurrentProfile?.Ab9?.Mode ?? DefaultAb9Mode;
+                    bool revisedFw = data.Ab9HasRevisedLayouts;
                     // No HID: the buttons hold the last session's state, so draw neutral.
-                    if (!data.IsAb9HidConnected) return (mode, Ab9Gear.Neutral, false, false);
+                    if (!data.IsAb9HidConnected) return (mode, revisedFw, Ab9Gear.Neutral, false, false);
                     var b = data.Ab9ButtonStates;
-                    return (mode, Ab9Gear.FromButtons(b), Ab9Gear.SeqUp(b), Ab9Gear.SeqDown(b));
+                    return (mode, revisedFw, Ab9Gear.FromButtons(b), Ab9Gear.SeqUp(b), Ab9Gear.SeqDown(b));
                 };
             }
 

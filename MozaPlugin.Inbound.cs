@@ -458,6 +458,8 @@ namespace MozaPlugin
             // through the switch untouched, so this stays a no-op for the ten
             // stored-setting reads the connect burst already issues.
             _data?.UpdateFromCommand(r.Name, r.IntValue);
+            if (r.ArrayValue != null)
+                _data?.UpdateFromArray(r.Name, r.ArrayValue);
 
             MozaLog.Debug($"[AZOM/AB9] {r.Name} = {r.IntValue}");
         }
