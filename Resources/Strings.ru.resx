@@ -935,4 +935,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Максимальная производительность</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Максимальная производительность следует полным углам SimHub без ограничения скорости. При настройках SimHub на максимуме или близко к нему ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Точка вращения от сиденья: {0:0} мм назад, {1:0} мм вниз</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Поиск FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ОСИ В РЕАЛЬНОМ ВРЕМЕНИ</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Рычаг газа</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Джойстик X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Джойстик Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Поворот джойстика</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Мини-джойстик X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Мини-джойстик Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Джойстик XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Мини-джойстик</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>РЕЖИМЫ ДЖОЙСТИКА</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Правая рукоять</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Не подключено</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Встроенный джойстик</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Подсветка кнопок</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Цвета светодиодов</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>ЦВЕТА СВЕТОДИОДОВ</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>MOZA Farming Control System подключена, но устройство не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Несколько раз переместите рычаг газа до упора вперёд и назад, затем нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Отведите джойстик до упора во всех направлениях, медленно вращая по часовой стрелке, а затем против, и нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Несколько раз поверните джойстик до упора влево и вправо, затем нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Несколько раз отведите мини-джойстик до упора во всех направлениях, затем нажмите ГОТОВО.</value></data>
 </root>

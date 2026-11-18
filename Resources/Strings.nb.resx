@@ -940,4 +940,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Maks ytelse</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Dreiepunkt fra setet: {0:0} mm bakover, {1:0} mm ned</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Søker etter FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>AKSER LIVE</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Gasspak</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Styrespak X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Styrespak Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Styrespak vridning</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Tommelspak X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Tommelspak Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Styrespak XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Tommelspak</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>STYRESPAKMODUSER</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Høyre spak</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Ikke tilkoblet</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Innebygd styrespak</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Knappelysmodus</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED-farger</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED-FARGER</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Et MOZA Farming Control System er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Beveg gasspaken helt frem og helt tilbake noen ganger, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Beveg styrespaken helt ut i alle retninger, sirkle sakte med klokken og deretter mot klokken, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Vri styrespaken helt til venstre og helt til høyre noen ganger, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Beveg tommelspaken helt ut i alle retninger noen ganger, og trykk deretter FERDIG.</value></data>
 </root>

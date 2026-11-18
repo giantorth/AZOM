@@ -386,8 +386,9 @@ namespace MozaPlugin
             try { Devices.Led.MozaDashLedDeviceManager.Latest?.TickKeepalive(); }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Dash LED keepalive tick failed: {ex.Message}"); }
 
-            try { Devices.Led.MozaBaseLedDeviceManager.TickKeepaliveAll(); }
-            catch (Exception ex) { MozaLog.Warn($"[AZOM] Base LED keepalive tick failed: {ex.Message}"); }
+            // Base ambient strips + FCS button LEDs.
+            try { Devices.Led.MozaMaskLedDeviceManager.TickKeepaliveAll(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Base/FCS LED keepalive tick failed: {ex.Message}"); }
         }
 
         // Display-UID re-asks this wheel session; 12 × 5 s ≈ a tracked read's 60 s sunset.

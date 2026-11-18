@@ -932,4 +932,26 @@
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Woof bark</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf woof bark grr arf woof bark. Woof bark grr arf woof.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Woof bark: {0:0} mm yip, {1:0} mm arf</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Sniff sniff… FCS?</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>WOOF WOOF!!</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Yowff!</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Arf X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Arf Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Arf twirl!</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Paw X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Paw Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Arf XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Paw!</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>ARF ARF!!</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Right paw!</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Whimper…</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Good boy!</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Snarf!</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Rrrf!</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>WROOF!!</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Moo? Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof!</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Yowff! Paw forward, paw back, Woof DONE!</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Arf arf! Chase tail one way, chase tail other way, Woof DONE!</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Arf twirl! Twirl twirl, Woof DONE!</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Paw paw paw paw! Woof DONE!</value></data>
 </root>

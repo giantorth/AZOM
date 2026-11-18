@@ -935,4 +935,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Hiệu năng tối đa</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Tâm xoay so với ghế: {0:0} mm về sau, {1:0} mm xuống dưới</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Đang tìm FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>TRỤC TRỰC TIẾP</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Cần ga</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Cần điều khiển X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Cần điều khiển Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Xoay cần điều khiển</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Cần ngón cái X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Cần ngón cái Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Cần điều khiển XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Cần ngón cái</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>CHẾ ĐỘ CẦN ĐIỀU KHIỂN</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Cần bên phải</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Chưa kết nối</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Cần điều khiển tích hợp</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Chế độ đèn nút</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Màu đèn LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>MÀU ĐÈN LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Một MOZA Farming Control System đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Đẩy cần ga hết cỡ về trước và về sau vài lần, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Đưa cần điều khiển hết cỡ theo mọi hướng, xoay chậm theo chiều kim đồng hồ rồi ngược chiều, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Xoay cần điều khiển hết cỡ sang trái và sang phải vài lần, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Đưa cần ngón cái hết cỡ theo mọi hướng vài lần, rồi nhấn XONG.</value></data>
 </root>

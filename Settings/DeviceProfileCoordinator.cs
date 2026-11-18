@@ -55,6 +55,8 @@ namespace MozaPlugin.Settings
             foreach (var kv in reg.Wheels) Wire(DeviceProfileKind.Wheel, kv.Key, kv.Value);
             foreach (var kv in reg.Bases) Wire(DeviceProfileKind.Base, kv.Key, kv.Value);
             foreach (var kv in reg.Dashes) Wire(DeviceProfileKind.Dash, kv.Key, kv.Value);
+            if (reg.Fcs != null)
+                foreach (var kv in reg.Fcs) Wire(DeviceProfileKind.Fcs, kv.Key, kv.Value);
         }
 
         /// <summary>Detach every store subscription (teardown / ClearSettings).</summary>
@@ -114,6 +116,10 @@ namespace MozaPlugin.Settings
                         return p;
                     });
                     break;
+                case MozaFcsDeviceProfileStore f:
+                    Wire<MozaFcsDeviceProfile, MozaFcsDeviceProfileStore>(kind, guid, f,
+                        () => new MozaFcsDeviceProfile { Name = "Default" });
+                    break;
             }
         }
 
@@ -126,6 +132,19 @@ namespace MozaPlugin.Settings
         internal MozaBaseDeviceProfileStore? BaseStore(Guid guid, bool seed) =>
             GetOrSeed(DeviceProfileKind.Base, guid, seed, r => r.Bases, (r, d) => r.Bases = d,
                 () => DeviceProfileMigration.BuildBaseStore(_plugin.Settings.LegacyDeviceProfileSnapshot, guid));
+
+        internal MozaFcsDeviceProfileStore? FcsStore(Guid guid, bool seed) =>
+            GetOrSeed(DeviceProfileKind.Fcs, guid, seed, r => r.Fcs, (r, d) => r.Fcs = d,
+                () => new MozaFcsDeviceProfileStore());
+
+        /// <summary>The FCS page (one per rig). Null while no FCS is attached.</summary>
+        internal static Guid FcsPageGuid => Guid.Parse(MozaDeviceConstants.FcsGuid);
+
+        internal MozaFcsDeviceProfile? ActiveFcsProfile =>
+            _plugin.DetectionState.FcsDetected ? FcsStore(FcsPageGuid, seed: true)?.CurrentProfile : null;
+
+        /// <summary>The FCS page's profile whether or not the device is attached (UI).</summary>
+        internal MozaFcsDeviceProfile? FcsProfile(bool seed = true) => FcsStore(FcsPageGuid, seed)?.CurrentProfile;
 
         internal MozaDashProfileStore? DashStore(Guid guid, bool seed) =>
             GetOrSeed(DeviceProfileKind.Dash, guid, seed, r => r.Dashes, (r, d) => r.Dashes = d,
@@ -375,6 +394,7 @@ namespace MozaPlugin.Settings
             {
                 DeviceProfileKind.Wheel => WheelStore(guid, false)?.CurrentProfile,
                 DeviceProfileKind.Base => BaseStore(guid, false)?.CurrentProfile,
+                DeviceProfileKind.Fcs => FcsStore(guid, false)?.CurrentProfile,
                 _ => DashStore(guid, false)?.CurrentProfile,
             };
             MozaLog.Info($"[AZOM] {kind} profile changed (page {guid:N}): "
@@ -404,6 +424,10 @@ namespace MozaPlugin.Settings
                     case DeviceProfileKind.Base:
                         if (CurrentBasePageGuid != guid) return;
                         _plugin.HardwareApplier.ApplyBaseAmbientToHardware();
+                        break;
+                    case DeviceProfileKind.Fcs:
+                        if (!_plugin.DetectionState.FcsDetected) return;
+                        _plugin.HardwareApplier.ApplyFcsToHardware();
                         break;
                     case DeviceProfileKind.Dash:
                         if (CurrentDashPageGuid != guid) return;
@@ -437,6 +461,9 @@ namespace MozaPlugin.Settings
                 yield return $"base  {Describe(kv.Key)}: {kv.Value?.CurrentProfile?.Name ?? "<none>"} ({kv.Value?.Profiles.Count ?? 0} profiles)";
             foreach (var kv in reg.Dashes)
                 yield return $"dash  {Describe(kv.Key)}: {kv.Value?.CurrentProfile?.Name ?? "<none>"} ({kv.Value?.Profiles.Count ?? 0} profiles)";
+            if (reg.Fcs != null)
+                foreach (var kv in reg.Fcs)
+                    yield return $"fcs   FCS: {kv.Value?.CurrentProfile?.Name ?? "<none>"} ({kv.Value?.Profiles.Count ?? 0} profiles)";
         }
 
         private static string Describe(Guid g)

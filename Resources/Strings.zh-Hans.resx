@@ -935,4 +935,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>最大性能</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>最大性能会跟随 SimHub 的完整角度，且不限制速度。当 SimHub 的设置处于或接近最大值时，您的设备很可能会跳动或移位。使用风险自负。</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>旋转中心相对座椅：向后 {0:0} mm，向下 {1:0} mm</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>正在搜索 FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>实时轴</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>油门杆</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>摇杆 X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>摇杆 Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>摇杆扭转</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>拇指摇杆 X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>拇指摇杆 Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>摇杆 XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>拇指摇杆</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>摇杆模式</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>右侧摇杆</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>内置摇杆</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>按键灯光模式</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED 颜色</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED 颜色</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>已连接 MOZA Farming Control System，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>将油门杆推到最前并拉到最后几次，然后按完成。</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>将摇杆推到各个方向的尽头，先顺时针再逆时针缓慢画圈，然后按完成。</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>将摇杆向左和向右扭转到底几次，然后按完成。</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>将拇指摇杆向各个方向推到尽头几次，然后按完成。</value></data>
 </root>

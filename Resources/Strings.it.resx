@@ -938,4 +938,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Prestazioni massime</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Perno dal sedile: {0:0} mm indietro, {1:0} mm in basso</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Ricerca FCS in corso...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ASSI IN TEMPO REALE</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Leva acceleratore</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Rotazione joystick</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Levetta X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Levetta Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Levetta</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>MODALITÀ JOYSTICK</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Impugnatura destra</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Non collegato</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Joystick integrato</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Illuminazione pulsanti</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Colori LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>COLORI LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Un MOZA Farming Control System è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Sposta la leva dell'acceleratore tutta avanti e tutta indietro alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Porta il joystick a fine corsa in ogni direzione, ruotando lentamente in senso orario e poi antiorario, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Ruota il joystick tutto a sinistra e tutto a destra alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Porta la levetta a fine corsa in ogni direzione alcune volte, poi premi FATTO.</value></data>
 </root>

@@ -567,6 +567,13 @@ namespace MozaPlugin
             set => s_dashDeviceExtensionActive = value;
         }
 
+        private static volatile bool s_fcsDeviceExtensionActive;
+        internal bool FcsDeviceExtensionActive
+        {
+            get => s_fcsDeviceExtensionActive;
+            set => s_fcsDeviceExtensionActive = value;
+        }
+
         private static volatile bool s_baseAmbientDeviceExtensionActive;
         internal bool BaseAmbientDeviceExtensionActive
         {
@@ -653,6 +660,7 @@ namespace MozaPlugin
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsPedalsOnHub => _connectionCoordinator?.PedalsOnHub == true;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
+        internal bool IsFcsDetected => DetectionState.FcsDetected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;
         internal MozaStandalonePeripheralRegistry? PeripheralRegistry => _peripheralRegistry;

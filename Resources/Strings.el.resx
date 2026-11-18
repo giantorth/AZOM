@@ -934,4 +934,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Μέγιστη απόδοση</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Η μέγιστη απόδοση ακολουθεί τις πλήρεις γωνίες του SimHub χωρίς όριο ταχύτητας. Με τις ρυθμίσεις του SimHub στο μέγιστο ή κοντά σε αυτό, το rig σας είναι πιθανό να αναπηδήσει ή να μετακινηθεί. Χρήση με δική σας ευθύνη.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Σημείο περιστροφής από το κάθισμα: {0:0} mm πίσω, {1:0} mm κάτω</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Αναζήτηση FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ΑΞΟΝΕΣ ΖΩΝΤΑΝΑ</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Μοχλός γκαζιού</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Χειριστήριο X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Χειριστήριο Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Περιστροφή χειριστηρίου</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Μοχλίσκος X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Μοχλίσκος Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Χειριστήριο XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Μοχλίσκος</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΕΣ ΧΕΙΡΙΣΤΗΡΙΟΥ</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Δεξιός μοχλός</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Μη συνδεδεμένο</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Ενσωματωμένο χειριστήριο</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Φωτισμός κουμπιών</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Χρώματα LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Ένα MOZA Farming Control System είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Μετακινήστε τον μοχλό γκαζιού τέρμα μπροστά και τέρμα πίσω μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Μετακινήστε το χειριστήριο μέχρι το άκρο προς κάθε κατεύθυνση, κάνοντας αργούς κύκλους δεξιόστροφα και μετά αριστερόστροφα, και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Περιστρέψτε το χειριστήριο τέρμα αριστερά και τέρμα δεξιά μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Μετακινήστε τον μοχλίσκο μέχρι το άκρο προς κάθε κατεύθυνση μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
 </root>

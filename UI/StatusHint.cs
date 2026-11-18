@@ -47,6 +47,8 @@ namespace MozaPlugin.UI
         // An mBooster answered with ShakeIt selected, but the mBooster device has
         // not been added under SimHub > Devices.
         ProfileNotAddedMBooster,
+        // An FCS is connected but its device has not been added under SimHub > Devices.
+        ProfileNotAddedFcs,
         // The motion controller is connected but SimHub's Motion plugin is off.
         MotionPluginDisabled,
         // The motion controller is connected but the active SimHub Motion setup has

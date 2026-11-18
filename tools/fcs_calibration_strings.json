@@ -1,0 +1,62 @@
+{
+  "Hint_FcsCalThrottle": {
+    "en": "Move the throttle lever all the way forward and all the way back a few times, then press DONE.",
+    "de": "Bewegen Sie den Gashebel einige Male ganz nach vorne und ganz nach hinten und drücken Sie dann FERTIG.",
+    "el": "Μετακινήστε τον μοχλό γκαζιού τέρμα μπροστά και τέρμα πίσω μερικές φορές και πατήστε ΤΕΛΟΣ.",
+    "es": "Mueva la palanca de aceleración hasta el tope hacia delante y hacia atrás varias veces y pulse LISTO.",
+    "fr": "Poussez le levier d'accélération à fond vers l'avant puis vers l'arrière plusieurs fois, puis appuyez sur TERMINÉ.",
+    "it": "Sposta la leva dell'acceleratore tutta avanti e tutta indietro alcune volte, poi premi FATTO.",
+    "ko": "스로틀 레버를 끝까지 앞뒤로 몇 번 움직인 다음 완료를 누르세요.",
+    "nb": "Beveg gasspaken helt frem og helt tilbake noen ganger, og trykk deretter FERDIG.",
+    "pt": "Mova a alavanca do acelerador totalmente para a frente e para trás algumas vezes e pressione CONCLUÍDO.",
+    "qps-ploc": "Yowff! Paw forward, paw back, Woof DONE!",
+    "ru": "Несколько раз переместите рычаг газа до упора вперёд и назад, затем нажмите ГОТОВО.",
+    "vi": "Đẩy cần ga hết cỡ về trước và về sau vài lần, rồi nhấn XONG.",
+    "zh-Hans": "将油门杆推到最前并拉到最后几次，然后按完成。"
+  },
+  "Hint_FcsCalJoystickXy": {
+    "en": "Move the joystick to its edge in every direction, circling slowly clockwise and then counter-clockwise, then press DONE.",
+    "de": "Bewegen Sie den Joystick in jede Richtung bis zum Anschlag, kreisen Sie langsam im und dann gegen den Uhrzeigersinn und drücken Sie dann FERTIG.",
+    "el": "Μετακινήστε το χειριστήριο μέχρι το άκρο προς κάθε κατεύθυνση, κάνοντας αργούς κύκλους δεξιόστροφα και μετά αριστερόστροφα, και πατήστε ΤΕΛΟΣ.",
+    "es": "Mueva el joystick hasta el tope en todas las direcciones, girando despacio en sentido horario y luego antihorario, y pulse LISTO.",
+    "fr": "Amenez le joystick en butée dans toutes les directions en tournant lentement dans le sens horaire puis antihoraire, puis appuyez sur TERMINÉ.",
+    "it": "Porta il joystick a fine corsa in ogni direzione, ruotando lentamente in senso orario e poi antiorario, poi premi FATTO.",
+    "ko": "조이스틱을 모든 방향의 끝까지 움직이며 시계 방향으로, 그다음 반시계 방향으로 천천히 원을 그린 후 완료를 누르세요.",
+    "nb": "Beveg styrespaken helt ut i alle retninger, sirkle sakte med klokken og deretter mot klokken, og trykk deretter FERDIG.",
+    "pt": "Mova o joystick até o limite em todas as direções, girando devagar no sentido horário e depois anti-horário, e pressione CONCLUÍDO.",
+    "qps-ploc": "Arf arf! Chase tail one way, chase tail other way, Woof DONE!",
+    "ru": "Отведите джойстик до упора во всех направлениях, медленно вращая по часовой стрелке, а затем против, и нажмите ГОТОВО.",
+    "vi": "Đưa cần điều khiển hết cỡ theo mọi hướng, xoay chậm theo chiều kim đồng hồ rồi ngược chiều, rồi nhấn XONG.",
+    "zh-Hans": "将摇杆推到各个方向的尽头，先顺时针再逆时针缓慢画圈，然后按完成。"
+  },
+  "Hint_FcsCalTwist": {
+    "en": "Twist the joystick fully left and fully right a few times, then press DONE.",
+    "de": "Drehen Sie den Joystick einige Male ganz nach links und ganz nach rechts und drücken Sie dann FERTIG.",
+    "el": "Περιστρέψτε το χειριστήριο τέρμα αριστερά και τέρμα δεξιά μερικές φορές και πατήστε ΤΕΛΟΣ.",
+    "es": "Gire el joystick por completo a la izquierda y a la derecha varias veces y pulse LISTO.",
+    "fr": "Tournez le joystick à fond à gauche puis à droite plusieurs fois, puis appuyez sur TERMINÉ.",
+    "it": "Ruota il joystick tutto a sinistra e tutto a destra alcune volte, poi premi FATTO.",
+    "ko": "조이스틱을 왼쪽과 오른쪽 끝까지 몇 번 비튼 다음 완료를 누르세요.",
+    "nb": "Vri styrespaken helt til venstre og helt til høyre noen ganger, og trykk deretter FERDIG.",
+    "pt": "Gire o joystick totalmente para a esquerda e para a direita algumas vezes e pressione CONCLUÍDO.",
+    "qps-ploc": "Arf twirl! Twirl twirl, Woof DONE!",
+    "ru": "Несколько раз поверните джойстик до упора влево и вправо, затем нажмите ГОТОВО.",
+    "vi": "Xoay cần điều khiển hết cỡ sang trái và sang phải vài lần, rồi nhấn XONG.",
+    "zh-Hans": "将摇杆向左和向右扭转到底几次，然后按完成。"
+  },
+  "Hint_FcsCalThumbstick": {
+    "en": "Move the thumbstick to its edge in every direction a few times, then press DONE.",
+    "de": "Bewegen Sie den Daumenstick einige Male in jede Richtung bis zum Anschlag und drücken Sie dann FERTIG.",
+    "el": "Μετακινήστε τον μοχλίσκο μέχρι το άκρο προς κάθε κατεύθυνση μερικές φορές και πατήστε ΤΕΛΟΣ.",
+    "es": "Mueva el mini joystick hasta el tope en todas las direcciones varias veces y pulse LISTO.",
+    "fr": "Amenez le mini-joystick en butée dans toutes les directions plusieurs fois, puis appuyez sur TERMINÉ.",
+    "it": "Porta la levetta a fine corsa in ogni direzione alcune volte, poi premi FATTO.",
+    "ko": "썸스틱을 모든 방향의 끝까지 몇 번 움직인 다음 완료를 누르세요.",
+    "nb": "Beveg tommelspaken helt ut i alle retninger noen ganger, og trykk deretter FERDIG.",
+    "pt": "Mova o mini joystick até o limite em todas as direções algumas vezes e pressione CONCLUÍDO.",
+    "qps-ploc": "Paw paw paw paw! Woof DONE!",
+    "ru": "Несколько раз отведите мини-джойстик до упора во всех направлениях, затем нажмите ГОТОВО.",
+    "vi": "Đưa cần ngón cái hết cỡ theo mọi hướng vài lần, rồi nhấn XONG.",
+    "zh-Hans": "将拇指摇杆向各个方向推到尽头几次，然后按完成。"
+  }
+}

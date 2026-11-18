@@ -1,0 +1,17 @@
+{
+  "Banner_ProfileNotAddedFcs_Body": {
+    "en": "A MOZA Farming Control System is connected, but the device hasn't been added in SimHub. Open Devices > Add device > {0}.",
+    "de": "Ein MOZA Farming Control System ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte > Gerät hinzufügen > {0}.",
+    "el": "Ένα MOZA Farming Control System είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές > Προσθήκη συσκευής > {0}.",
+    "es": "Hay un MOZA Farming Control System conectado, pero el dispositivo no se ha añadido en SimHub. Abra Dispositivos > Añadir dispositivo > {0}.",
+    "fr": "Un MOZA Farming Control System est connecté, mais le périphérique n'a pas été ajouté dans SimHub. Ouvrez Périphériques > Ajouter un périphérique > {0}.",
+    "it": "Un MOZA Farming Control System è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi > Aggiungi dispositivo > {0}.",
+    "ko": "MOZA Farming Control System이 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 > 장치 추가 > {0}을(를) 여세요.",
+    "nb": "Et MOZA Farming Control System er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter > Legg til enhet > {0}.",
+    "pt": "Um MOZA Farming Control System está conectado, mas o dispositivo não foi adicionado no SimHub. Abra Dispositivos > Adicionar dispositivo > {0}.",
+    "qps-ploc": "Moo? Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof!",
+    "ru": "MOZA Farming Control System подключена, но устройство не добавлено в SimHub. Откройте «Устройства» > «Добавить устройство» > {0}.",
+    "vi": "Một MOZA Farming Control System đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị > Thêm thiết bị > {0}.",
+    "zh-Hans": "已连接 MOZA Farming Control System，但该设备尚未在 SimHub 中添加。请打开 设备 > 添加设备 > {0}。"
+  }
+}

@@ -58,28 +58,10 @@ namespace MozaPlugin
             // request/response protocol — capture for diagnostics visibility,
             // then short-circuit so MozaResponseParser doesn't waste cycles
             // trying to match them against the command database.
-            if (data.Length >= 4
-                && data[0] == MozaProtocol.FirmwareDebugGroup
-                && data[2] == 0x05)
+            var text = _firmwareDebugLog.RecordFrame(data);
+            if (text != null)
             {
                 byte rawDeviceId = data[1];
-                string text;
-                try
-                {
-                    // Body is ASCII text starting at data[3]. Trim trailing
-                    // newline / null padding so the ring buffer entries are
-                    // compact and don't contain control chars that mess up
-                    // the diagnostics text layout. Non-printable bytes
-                    // become '?' under the ASCII decode's error replacement.
-                    text = System.Text.Encoding.ASCII
-                        .GetString(data, 3, data.Length - 3)
-                        .TrimEnd('\n', '\r', '\0');
-                }
-                catch
-                {
-                    text = $"<{data.Length - 3} bytes>";
-                }
-                _firmwareDebugLog.Record(rawDeviceId, text);
                 // The wheel streams these 0x0E logs (dev 0x71) continuously whenever it
                 // is physically connected — they only stop on a real rim/link drop. So
                 // they are positive "wheel is alive" evidence: count them against the

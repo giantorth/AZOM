@@ -40,6 +40,8 @@ namespace MozaPlugin.Devices
         // mBooster pedals ShakeIt device, one channel per pedal role. Permanent once
         // shipped: changing it orphans the user's ShakeIt profile.
         public const string MBoosterShakeItGuid = "5badc96c-de60-4fdf-8070-bba8088ff3dc";
+        // FCS farming panel: six button LEDs. Also the FCS device-profile page GUID.
+        public const string FcsGuid = "ef182ec0-0a1b-4435-a533-e4eadd7b323d";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -335,6 +337,9 @@ namespace MozaPlugin.Devices
         /// <summary>Returns true if the DeviceTypeID is the mBooster ShakeIt device.</summary>
         public static bool IsMBoosterShakeItDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, MBoosterShakeItGuid);
+
+        public static bool IsFcsDevice(string deviceTypeId) =>
+            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, FcsGuid);
 
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>

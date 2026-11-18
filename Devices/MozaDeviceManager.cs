@@ -713,6 +713,7 @@ namespace MozaPlugin.Devices
                 // override above wins; this covers a future hub/base-relayed shifter.
                 case "shifter":  return MozaProtocol.DeviceHPattern;
                 case "ab9":      return MozaProtocol.DeviceAb9;
+                case "fcs":      return MozaProtocol.DeviceMain;
                 default:         return MozaProtocol.DeviceBase;
             }
         }

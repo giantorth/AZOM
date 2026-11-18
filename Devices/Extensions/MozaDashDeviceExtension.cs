@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Windows.Controls;
-using GameReaderCommon;
 using Newtonsoft.Json.Linq;
 using SimHub.Plugins;
 using SimHub.Plugins.Devices;
-using SimHub.Plugins.Devices.DeviceExtensions;
-using SimHub.Plugins.OutputPlugins.GraphicalDash.LedModules;
 using MozaPlugin.Devices.Led;
 using MozaPlugin.Devices.Ui;
 
@@ -18,22 +14,20 @@ namespace MozaPlugin.Devices.Extensions
     /// Injects a virtual LED driver so SimHub's effects UI works for the dash,
     /// then bridges computed LED colors to MOZA hardware via bitmask telemetry.
     /// </summary>
-    internal class MozaDashDeviceExtension : DeviceExtension
+    internal class MozaDashDeviceExtension : MozaLedDeviceExtensionBase<MozaDashLedDeviceManager>
     {
         private MozaDashExtensionSettings _settings = new MozaDashExtensionSettings();
-        private MozaDashLedDeviceManager? _ledDriver;
-        private bool _driverInjected;
-        // Injection target + SimHub's original driver, restored in End().
-        private LedModuleSettings? _injectedSettings;
-        private object? _originalDriver;
 
         public override string ExtentionTabTitle => "MOZA Dashboard";
 
+        protected override string LogLabel => "dash";
+        protected override MozaDashLedDeviceManager CreateDriver() => new MozaDashLedDeviceManager();
+        protected override void UpdateDriverConnection(MozaDashLedDeviceManager driver) => driver.UpdateConnectionState();
+        // Release clears the Latest diagnostics static.
+        protected override void ReleaseDriver(MozaDashLedDeviceManager driver) => driver.Release();
+
         public override void Init(PluginManager pluginManager)
         {
-            // Injection is deferred to DataUpdate() — calling it here would run before
-            // LedModuleDevice.SetSettings(), causing a KeyNotFoundException in that call.
-
             pluginManager.AttachDelegate(
                 LinkedDevice.DeviceDescriptor.Name + "_MozaDashActive",
                 this.GetType(),
@@ -42,53 +36,6 @@ namespace MozaPlugin.Devices.Extensions
             var plugin = MozaPlugin.Instance;
             if (plugin != null)
                 plugin.DashDeviceExtensionActive = true;
-        }
-
-        /// <summary>
-        /// Find the LedModuleDevice sub-device and replace its DeviceDriver
-        /// with our MozaDashLedDeviceManager that always reports connected.
-        /// </summary>
-        // Latched when the host has no DeviceDriver setter, so the 60 Hz retry
-        // in DataUpdate stops constructing a manager per frame.
-        private bool _injectionGaveUp;
-
-        private string DeviceName => LinkedDevice?.DeviceDescriptor?.Name ?? "?";
-
-        private void InjectLedDriver()
-        {
-            if (_driverInjected || _injectionGaveUp) return;
-
-            try
-            {
-                foreach (var instance in LinkedDevice.GetInstances())
-                {
-                    if (instance is LedModuleDevice lmd && lmd.ledModuleSettings != null)
-                    {
-                        if (!LedDriverInjection.CanInject)
-                        {
-                            _injectionGaveUp = true;
-                            MozaLog.Warn("[AZOM] Could not find DeviceDriver setter on LedModuleSettings (dash)");
-                            return;
-                        }
-
-                        _ledDriver = new MozaDashLedDeviceManager();
-                        _ledDriver.LedModuleSettings = lmd.ledModuleSettings;
-                        _injectedSettings = lmd.ledModuleSettings;
-                        _originalDriver = LedDriverInjection.Swap(lmd.ledModuleSettings, _ledDriver);
-                        _driverInjected = true;
-                        MozaLog.Debug("[AZOM] Injected virtual LED driver for dashboard");
-                        return;
-                    }
-                }
-                // Retried every DataUpdate until injected, so repeat-suppressed.
-                MozaLog.DebugIfChanged("dash-ext-nolmd:" + DeviceName,
-                    $"[AZOM] No LedModuleDevice found on dash device instance ({DeviceName})");
-            }
-            catch (Exception ex)
-            {
-                MozaLog.ErrorIfChanged("dash-ext-inject:" + DeviceName,
-                    $"[AZOM] Error injecting dash LED driver ({DeviceName}): {ex.Message}");
-            }
         }
 
         public override void End(PluginManager pluginManager)
@@ -104,24 +51,7 @@ namespace MozaPlugin.Devices.Extensions
                 MozaLog.Debug("[AZOM] Dash device extension ended");
             }
 
-            // Restore SimHub's original driver and drop ours (Release clears the
-            // Latest diagnostics static) so neither outlives the extension.
-            LedDriverInjection.Restore(_injectedSettings, _ledDriver, _originalDriver);
-            _injectedSettings = null;
-            _originalDriver = null;
-            try { _ledDriver?.Release(); } catch { }
-            _ledDriver = null;
-            _driverInjected = false;
-        }
-
-        public override void DataUpdate(PluginManager pluginManager, ref GameData data)
-        {
-            // Inject here (not Init) so LedModuleDevice.SetSettings() has already run.
-            if (!_driverInjected)
-                InjectLedDriver();
-
-            // Notify SimHub when detection state changes so it resumes/pauses Display() calls
-            _ledDriver?.UpdateConnectionState();
+            RestoreLedDriver();
         }
 
         /// <summary>This dash's own profile store (CM2 or CM1).</summary>

@@ -6,6 +6,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Added
 
+- **MOZA Farming Control System (FCS) support;** SimHub device with its six button LEDs, live inputs, calibration, joystick modes, and per-game light mode, colours and standby effect.
 - **Double-click the dashboard preview to re-render it;** if no preview can be shown, it names the folder the dashboard wasn't found in.
 
 ## Changed

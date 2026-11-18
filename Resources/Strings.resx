@@ -942,4 +942,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Max performance</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Max performance follows SimHub's full angles with no limit on speed. Your rig is likely to hop or shift with SimHub's settings at or close to maximum. Use at your own risk.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Pivot from the seat: {0:0} mm behind, {1:0} mm down</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Searching for FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>LIVE AXES</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Throttle lever</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Joystick twist</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Thumbstick X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Thumbstick Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Thumbstick</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>JOYSTICK MODES</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Right rod</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Built-in joystick</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Button light mode</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED colors</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED COLORS</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>A MOZA Farming Control System is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Move the throttle lever all the way forward and all the way back a few times, then press DONE.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Move the joystick to its edge in every direction, circling slowly clockwise and then counter-clockwise, then press DONE.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Twist the joystick fully left and fully right a few times, then press DONE.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Move the thumbstick to its edge in every direction a few times, then press DONE.</value></data>
 </root>

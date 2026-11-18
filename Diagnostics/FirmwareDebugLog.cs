@@ -66,11 +66,11 @@ namespace MozaPlugin.Diagnostics
         /// Empty text is recorded too (continuation frames split mid-string)
         /// so the ordering between adjacent fragments is preserved.
         /// </summary>
-        public void Record(byte rawDeviceId, string text)
+        public void Record(byte rawDeviceId, string text, string? sourceName = null)
         {
             var entry = new Entry(
                 DateTime.UtcNow,
-                SourceNameFor(rawDeviceId),
+                sourceName ?? SourceNameFor(rawDeviceId),
                 text ?? string.Empty);
             lock (_gate)
             {
@@ -95,6 +95,32 @@ namespace MozaPlugin.Diagnostics
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Record an inbound <c>[0x0E][dev][0x05][ascii…]</c> frame (dispatch layout,
+        /// framing stripped) and return its text, or null when the frame isn't a
+        /// subtype-0x05 log line. <paramref name="sourceName"/> overrides the label
+        /// derived from the device byte (a standalone device's 0x21 isn't the base).
+        /// </summary>
+        public string? RecordFrame(byte[] data, string? sourceName = null)
+        {
+            if (data == null || data.Length < 4 || data[0] != 0x0E || data[2] != 0x05)
+                return null;
+            string text;
+            try
+            {
+                // Trim newline / null padding; non-printables decode as '?'.
+                text = System.Text.Encoding.ASCII
+                    .GetString(data, 3, data.Length - 3)
+                    .TrimEnd('\n', '\r', '\0');
+            }
+            catch
+            {
+                text = $"<{data.Length - 3} bytes>";
+            }
+            Record(data[1], text, sourceName);
+            return text;
         }
 
         /// <summary>Wheel param-store fault summary: (write-fail count, read-fail

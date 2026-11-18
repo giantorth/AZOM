@@ -36,11 +36,12 @@ namespace MozaPlugin.Devices
         private readonly DeviceDetectionState _detectionState;
         private readonly Func<bool> _isShuttingDown;
 
-        // Supported peripheral PIDs: pedals, handbrake, and the HGP/SGP shifters
-        // (each gets its own dedicated lane + config surface — see
+        // Supported peripheral PIDs: pedals, handbrake, the HGP/SGP shifters and the
+        // FCS (each gets its own dedicated lane + config surface — see
         // StandalonePeripheralDescriptor).
         private static bool IsSupportedPid(ushort pid) =>
-            MozaUsbIds.IsPedalsPid(pid) || MozaUsbIds.IsHandbrakePid(pid) || MozaUsbIds.IsShifterPid(pid);
+            MozaUsbIds.IsPedalsPid(pid) || MozaUsbIds.IsHandbrakePid(pid) || MozaUsbIds.IsShifterPid(pid)
+            || MozaUsbIds.IsFcsPid(pid);
 
         public MozaStandalonePeripheralRegistry(
             MozaPlugin plugin,
@@ -171,7 +172,11 @@ namespace MozaPlugin.Devices
             foreach (var c in snapshot)
             {
                 if (!c.IsConnected) continue;
-                try { c.PendingResponses.TickRetransmits(c.Connection.SendDeviceCommand); }
+                try
+                {
+                    c.PendingResponses.TickRetransmits(c.Connection.SendDeviceCommand);
+                    c.TickPeriodic();
+                }
                 catch (Exception ex) { MozaLog.Warn($"[AZOM] Standalone {c.Category} retransmit tick failed: {ex.Message}"); }
             }
         }

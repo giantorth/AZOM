@@ -29,7 +29,6 @@ namespace MozaPlugin.Devices.Ui
         // 500ms RefreshWheel tick, separate from it so HID input feels live
         // even when no telemetry is streaming.
         private DispatcherTimer? _inputsLiveTimer;
-        private readonly DateTime[] _wiButtonLastPressed = new DateTime[MozaData.MaxButtons];
 
         // Run the live timer only while the Inputs tab is showing (the ES wheel's
         // headerless single page is the Inputs tab too).
@@ -61,83 +60,25 @@ namespace MozaPlugin.Devices.Ui
 
         // ── Live paddle bars + active buttons ──────────────────────────
 
-        // Signature of the last rendered button list ("3,7*," — star = pressed) so
-        // the Inlines are only rebuilt when the visible content changes.
-        private string _wiActiveButtonsSig = "";
+        private ActiveButtonsRenderer? _wiActiveButtons;
 
         private void RefreshInputsLive()
         {
             if (_data == null || WiLeftPaddleBar == null) return;
+            _wiActiveButtons ??= new ActiveButtonsRenderer(WiActiveButtonsText, MozaData.MaxButtons);
             bool connected = _plugin?.HidReader != null && _data.IsHidConnected;
             if (!connected)
             {
                 WiLeftPaddleBar.Value = 0;
                 WiRightPaddleBar.Value = 0;
                 WiCombinedPaddleBar.Value = 0;
-                if (_wiActiveButtonsSig != "none")
-                {
-                    _wiActiveButtonsSig = "none";
-                    WiActiveButtonsText.Inlines.Clear();
-                    WiActiveButtonsText.Inlines.Add(new Run("None"));
-                }
+                _wiActiveButtons.ShowNone();
                 return;
             }
             WiLeftPaddleBar.Value     = _data.LeftPaddlePosition;
             WiRightPaddleBar.Value    = _data.RightPaddlePosition;
             WiCombinedPaddleBar.Value = _data.CombinedPaddlePosition;
-            RefreshActiveButtons();
-        }
-
-        private void RefreshActiveButtons()
-        {
-            if (_data == null || _data.ButtonCount == 0)
-            {
-                if (_wiActiveButtonsSig != "none")
-                {
-                    _wiActiveButtonsSig = "none";
-                    WiActiveButtonsText.Inlines.Clear();
-                    WiActiveButtonsText.Inlines.Add(new Run("None"));
-                }
-                return;
-            }
-            var now = DateTime.UtcNow;
-            int count = _data.ButtonCount;
-            var sig = new System.Text.StringBuilder(count * 3);
-            for (int i = 0; i < count; i++)
-            {
-                bool pressed = _data.ButtonStates[i];
-                if (pressed) _wiButtonLastPressed[i] = now;
-                if ((now - _wiButtonLastPressed[i]).TotalSeconds < 1.0)
-                {
-                    sig.Append(i + 1);
-                    if (pressed) sig.Append('*');
-                    sig.Append(',');
-                }
-            }
-            string signature = sig.Length == 0 ? "none" : sig.ToString();
-            if (signature == _wiActiveButtonsSig) return;   // 30 Hz caller; only rebuild on change
-            _wiActiveButtonsSig = signature;
-
-            WiActiveButtonsText.Inlines.Clear();
-            if (signature == "none")
-            {
-                WiActiveButtonsText.Inlines.Add(new Run("None"));
-                return;
-            }
-            bool first = true;
-            for (int i = 0; i < count; i++)
-            {
-                if ((now - _wiButtonLastPressed[i]).TotalSeconds >= 1.0) continue;
-                if (!first) WiActiveButtonsText.Inlines.Add(new Run(", "));
-                first = false;
-                var run = new Run((i + 1).ToString());
-                if (_data.ButtonStates[i])
-                {
-                    run.FontWeight = FontWeights.Bold;
-                    run.Foreground = Brushes.White;
-                }
-                WiActiveButtonsText.Inlines.Add(run);
-            }
+            _wiActiveButtons.Refresh(_data.ButtonStates, _data.ButtonCount);
         }
 
         // 0=Buttons → no live bars visible

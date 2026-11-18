@@ -1000,5 +1000,27 @@ namespace MozaPlugin.Resources
         public static string Motion_Panel_MaxPerformance => Get("Motion_Panel_MaxPerformance");
         public static string Motion_Panel_MaxPerformanceWarning => Get("Motion_Panel_MaxPerformanceWarning");
         public static string Motion_Panel_VrMcPivotBehindFmt => Get("Motion_Panel_VrMcPivotBehindFmt");
+        public static string Status_SearchingForFcs => Get("Status_SearchingForFcs");
+        public static string Section_LiveAxes => Get("Section_LiveAxes");
+        public static string Label_FcsThrottleLever => Get("Label_FcsThrottleLever");
+        public static string Label_FcsJoystickX => Get("Label_FcsJoystickX");
+        public static string Label_FcsJoystickY => Get("Label_FcsJoystickY");
+        public static string Label_FcsJoystickTwist => Get("Label_FcsJoystickTwist");
+        public static string Label_FcsThumbstickX => Get("Label_FcsThumbstickX");
+        public static string Label_FcsThumbstickY => Get("Label_FcsThumbstickY");
+        public static string Label_FcsJoystickXy => Get("Label_FcsJoystickXy");
+        public static string Label_FcsThumbstick => Get("Label_FcsThumbstick");
+        public static string Section_JoystickModes => Get("Section_JoystickModes");
+        public static string Label_RightRod => Get("Label_RightRod");
+        public static string Option_RodNotConnected => Get("Option_RodNotConnected");
+        public static string Option_RodBuiltIn => Get("Option_RodBuiltIn");
+        public static string SliderLabel_ButtonLightMode => Get("SliderLabel_ButtonLightMode");
+        public static string Label_LedColors => Get("Label_LedColors");
+        public static string Section_LedColors => Get("Section_LedColors");
+        public static string Banner_ProfileNotAddedFcs_Body => Get("Banner_ProfileNotAddedFcs_Body");
+        public static string Hint_FcsCalThrottle => Get("Hint_FcsCalThrottle");
+        public static string Hint_FcsCalJoystickXy => Get("Hint_FcsCalJoystickXy");
+        public static string Hint_FcsCalTwist => Get("Hint_FcsCalTwist");
+        public static string Hint_FcsCalThumbstick => Get("Hint_FcsCalThumbstick");
     }
 }

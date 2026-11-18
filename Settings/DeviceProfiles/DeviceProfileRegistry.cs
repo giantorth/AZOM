@@ -9,6 +9,7 @@ namespace MozaPlugin.Settings
         Wheel = 0,
         Base = 1,
         Dash = 2,
+        Fcs = 3,
     }
 
     /// <summary>
@@ -31,6 +32,9 @@ namespace MozaPlugin.Settings
 
         public Dictionary<Guid, MozaDashProfileStore> Dashes { get; set; }
             = new Dictionary<Guid, MozaDashProfileStore>();
+
+        public Dictionary<Guid, MozaFcsDeviceProfileStore> Fcs { get; set; }
+            = new Dictionary<Guid, MozaFcsDeviceProfileStore>();
     }
 
     /// <summary>Deep-copy helpers shared by the device profiles and the migration.</summary>

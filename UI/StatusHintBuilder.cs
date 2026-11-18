@@ -325,6 +325,19 @@ namespace MozaPlugin.UI
                         Devices.Extensions.DeviceDefinitionDeployer.MBoosterShakeItDeviceName)));
             }
 
+            // Rule 6c: ProfileNotAddedFcs. Own USB device, so no wheelbase gate.
+            if (elapsed >= ProfileNotAddedSettling
+                && !plugin.DeviceDefinitionDeployed
+                && plugin.IsFcsDetected
+                && !plugin.FcsDeviceExtensionActive)
+            {
+                const string fcsDeviceName = Devices.Extensions.DeviceDefinitionDeployer.FcsDeviceName;
+                list.Add(new StatusHint(
+                    StatusHintKind.ProfileNotAddedFcs,
+                    string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, fcsDeviceName),
+                    string.Format(Strings.Banner_ProfileNotAddedFcs_Body, fcsDeviceName)));
+            }
+
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —
             // either the Motion plugin is off or its active setup has no HMA150 output.
             // Presence, not connection: the lane only opens the port while motion runs.
