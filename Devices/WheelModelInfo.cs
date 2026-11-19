@@ -83,6 +83,17 @@ namespace MozaPlugin.Devices
         public int KnobRingLedTotal { get; }
 
         /// <summary>
+        /// Per-knob position of ring LED 0, in LED steps clockwise from 12 o'clock
+        /// (UI layout only). Null = LED 0 at the top on every knob.
+        /// KS Pro centre knob: LED 0 sits one step clockwise of the top.
+        /// </summary>
+        public int[]? KnobRingRotation { get; }
+
+        /// <summary>Ring-LED-0 offset for a knob; 0 when not catalogued.</summary>
+        public int KnobRingRotationFor(int knob)
+            => KnobRingRotation != null && knob >= 0 && knob < KnobRingRotation.Length ? KnobRingRotation[knob] : 0;
+
+        /// <summary>
         /// Maps the firmware per-knob signal-mode index (the <c>i</c> in
         /// <c>wheel-knob-signal-mode{i}</c> / sub-id <c>[42, i]</c>) to the
         /// logical knob index used everywhere else (LED rings, colours, UI
@@ -269,7 +280,7 @@ namespace MozaPlugin.Devices
             // not split across RPM + Meter flag sub-device. Driving all 18 as one RPM strip.
             ("W18",     "KS Pro",     new WheelModelInfo(18, 10, false, null, 5, new[] { 12, 12, 8, 12, 12 }, hasDisplay: true,  browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 4, 3, 1, 2 }, supportsMultiDial: true,
                 multiDialKnobs: new[] { 2 }, multiDialThumbWheels: new[] { "TC", "ABS", "DIFF", "BB" },
-                multiDialFixedPairs: new[] { (0, 2), (3, 1) })),
+                multiDialFixedPairs: new[] { (0, 2), (3, 1) }, knobRingRotation: new[] { 0, 0, 1, 0, 0 })),
             // Ford Mustang GTD (firmware "W20"): a CS Pro style wheel with 12 button LEDs instead
             // of 8; same knobs and knob signal-mode order. 
             ("W20",     "Ford Mustang GTD", new WheelModelInfo(16, 12, false, null, 4, new[] { 12, 12, 12, 12 }, hasDisplay: true, browSegmentSize: 3, knobSignalModeOrder: new[] { 0, 3, 2, 1 }, supportsMultiDial: true)),
@@ -372,8 +383,9 @@ namespace MozaPlugin.Devices
             ("ES",      "ES",         new WheelModelInfo(10, 0,  false, null, 0, hasDisplay: false, hasSleepLight: false, knobEncoderCount: 0)),
         };
 
-        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false, int knobEncoderCount = -1, bool supportsMultiDial = false, int[]? multiDialKnobs = null, string[]? multiDialThumbWheels = null, (int Left, int Right)[]? multiDialFixedPairs = null)
+        public WheelModelInfo(int rpmLedCount, int buttonLedCount, bool hasFlagLeds, int[]? buttonLedMap, int knobCount = 0, int[]? knobRingLeds = null, bool? hasDisplay = null, int browSegmentSize = 0, bool hasSleepLight = true, int maxLedFps = 0, bool usesLegacyRpmTelemetry = false, int[]? knobSignalModeOrder = null, bool supportsDisplayRotation = false, int knobEncoderCount = -1, bool supportsMultiDial = false, int[]? multiDialKnobs = null, string[]? multiDialThumbWheels = null, (int Left, int Right)[]? multiDialFixedPairs = null, int[]? knobRingRotation = null)
         {
+            KnobRingRotation = knobRingRotation;
             MultiDialKnobs = multiDialKnobs;
             MultiDialThumbWheels = multiDialThumbWheels;
             MultiDialFixedPairs = multiDialFixedPairs;

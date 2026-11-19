@@ -17,6 +17,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **AB9/AB6 gate shows the 5+R Layout 2 used by firmware 1.1.6.2 and later;** R/2/4 over 1/3/5.
 - **Dashboard previews render again with Dashboard Studio 1.0.7.7;** dashboards using images from Studio's shared image folder showed no preview, and older previews drew those widgets blank.
+- **KS Pro centre knob colour dots match the real LED positions;** each dot edited the LED one position clockwise of it.
 
 ## [1.7.4]
 
