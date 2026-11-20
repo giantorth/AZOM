@@ -640,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>描述问题：你做了什么，方向盘或仪表盘有什么反应，以及从何时开始。</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>联系方式（可选 — 电子邮件或 Discord）</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>提交将向插件开发者上传一个诊断包（插件日志和串口跟踪，硬件标识已脱敏）。</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>隐私政策</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>提交错误报告</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>正在上传…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>报告已提交。编号：{0}</value></data>

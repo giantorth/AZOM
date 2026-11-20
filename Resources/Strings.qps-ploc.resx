@@ -637,6 +637,7 @@
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Snarf Bork Grrowl Wan Awoo!</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Yowl Yowl!</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Rrrf Arf Arf Wuff Boof Yip!</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Arf Woof!</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Snarf…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Wan {0}!</value></data>

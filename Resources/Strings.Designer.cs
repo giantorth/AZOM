@@ -719,6 +719,7 @@ namespace MozaPlugin.Resources
         public static string Placeholder_BugReportDescription => Get("Placeholder_BugReportDescription");
         public static string Label_BugReportContact => Get("Label_BugReportContact");
         public static string Hint_BugReportConsent => Get("Hint_BugReportConsent");
+        public static string Link_PrivacyPolicy => Get("Link_PrivacyPolicy");
         public static string Button_SubmitBugReport => Get("Button_SubmitBugReport");
         public static string Status_BugReportUploading => Get("Status_BugReportUploading");
         public static string Status_BugReportSubmitted => Get("Status_BugReportSubmitted");

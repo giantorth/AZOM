@@ -639,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요: 무엇을 했는지, 휠이나 대시보드가 어떻게 반응했는지, 언제부터 시작됐는지.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>연락처 (선택 — 이메일 또는 Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>제출하면 진단 번들(플러그인 로그와 시리얼 추적, 하드웨어 식별자는 가려짐)이 플러그인 개발자에게 업로드됩니다.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>개인정보 처리방침</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>버그 신고 보내기</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>업로드 중…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>신고가 접수되었습니다. 참조: {0}</value></data>

@@ -645,6 +645,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe el problema: qué hiciste, qué hizo el volante o el salpicadero, y cuándo empezó.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contacto (opcional — correo o Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Al enviarlo se sube un paquete de diagnóstico (registros del plugin y una traza serie, con los identificadores de hardware ocultos) al desarrollador del plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Política de privacidad</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Enviar informe de error</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Subiendo…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Informe enviado. Referencia: {0}</value></data>

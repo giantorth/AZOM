@@ -645,6 +645,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beskriv problemet: hva du gjorde, hva rattet eller dashbordet gjorde, og når det startet.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (valgfritt — e-post eller Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Innsending laster opp en diagnosepakke (plugin-logger og et seriell-spor, med maskerte maskinvare-ID-er) til plugin-utvikleren.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Personvernerklæring</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Send feilrapport</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Laster opp…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Rapport sendt. Referanse: {0}</value></data>

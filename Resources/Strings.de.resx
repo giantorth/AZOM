@@ -640,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beschreiben Sie das Problem: was Sie getan haben, was das Lenkrad oder Dashboard getan hat und wann es begann.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (optional — E-Mail oder Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Beim Senden wird ein Diagnosepaket (Plugin-Protokolle und ein seriellen Mitschnitt, Hardware-Kennungen entfernt) an den Plugin-Entwickler übertragen.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Datenschutzerklärung</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Fehlerbericht senden</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Wird gesendet…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Bericht gesendet. Referenz: {0}</value></data>

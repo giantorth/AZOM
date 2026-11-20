@@ -639,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descreva o problema: o que você fez, o que o volante ou o painel fez e quando começou.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contato (opcional — e-mail ou Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Ao enviar, um pacote de diagnóstico (logs do plugin e um trace serial, com identificadores de hardware anonimizados) é enviado ao desenvolvedor do plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Política de privacidade</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Enviar relatório de erro</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Enviando…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Relatório enviado. Referência: {0}</value></data>

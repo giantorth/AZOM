@@ -640,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Mô tả sự cố: bạn đã làm gì, vô lăng hoặc màn hình đã làm gì, và nó bắt đầu khi nào.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Liên hệ (không bắt buộc — email hoặc Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Khi gửi, một gói chẩn đoán (bản ghi plugin và dấu vết cổng nối tiếp, đã ẩn định danh phần cứng) sẽ được tải lên cho người phát triển plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Chính sách quyền riêng tư</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Gửi báo cáo lỗi</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Đang tải lên…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Đã gửi báo cáo. Mã tham chiếu: {0}</value></data>

@@ -640,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Опишите проблему: что вы делали, как повёл себя руль или приборная панель и когда это началось.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Контакт (необязательно — email или Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>При отправке разработчику плагина загружается диагностический архив (журналы плагина и трассировка последовательного порта; идентификаторы оборудования скрыты).</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Политика конфиденциальности</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Отправить отчёт об ошибке</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Отправка…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Отчёт отправлен. Номер: {0}</value></data>

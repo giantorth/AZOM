@@ -188,7 +188,7 @@ namespace MozaPlugin.UI
                     if (p.DevicePath.Length > 0 || p.Serial.Length > 0)
                     {
                         string com = Protocol.WineComNameResolver.ResolveComName(p.PortName) ?? "(unresolved)";
-                        sb.AppendLine($"           dev {p.DevicePath}  serial {p.Serial}  bus {p.InstanceId}  wine COM {com}");
+                        sb.AppendLine($"           dev {p.DevicePath}  serial {Redact(p.Serial)}  bus {p.InstanceId}  wine COM {com}");
                     }
                 }
             }

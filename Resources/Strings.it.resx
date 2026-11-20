@@ -643,6 +643,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descrivi il problema: cosa hai fatto, cosa ha fatto il volante o il display, e quando è iniziato.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contatto (opzionale — email o Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>L'invio carica un pacchetto diagnostico (log del plugin e una traccia seriale, con gli identificativi hardware oscurati) allo sviluppatore del plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Informativa sulla privacy</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Invia segnalazione</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Caricamento…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Segnalazione inviata. Riferimento: {0}</value></data>

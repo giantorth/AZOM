@@ -648,6 +648,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>

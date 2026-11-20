@@ -639,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα: τι κάνατε, τι έκανε το τιμόνι ή το ταμπλό, και πότε ξεκίνησε.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Επικοινωνία (προαιρετικό — email ή Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Με την υποβολή αποστέλλεται ένα πακέτο διαγνωστικών (αρχεία καταγραφής του πρόσθετου και ίχνος σειριακής επικοινωνίας, με τα αναγνωριστικά υλικού αφαιρεμένα) στον προγραμματιστή.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Πολιτική απορρήτου</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Υποβολή αναφοράς σφάλματος</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Αποστολή…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Η αναφορά υποβλήθηκε. Κωδικός: {0}</value></data>

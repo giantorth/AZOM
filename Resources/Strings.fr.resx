@@ -640,6 +640,7 @@ Id : {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Décrivez le problème : ce que vous avez fait, ce que le volant ou le tableau de bord a fait, et quand cela a commencé.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (facultatif — e-mail ou Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>L'envoi transmet une archive de diagnostic (journaux du plugin et une trace série, identifiants matériels masqués) au développeur du plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Envoyer le rapport de bug</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Envoi…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Rapport envoyé. Référence : {0}</value></data>
