@@ -20,6 +20,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Dashboard previews render again with Dashboard Studio 1.0.7.7;** dashboards using images from Studio's shared image folder showed no preview, and older previews drew those widgets blank.
 - **KS Pro centre knob colour dots match the real LED positions;** each dot edited the LED one position clockwise of it.
 - **USB serial numbers masked in Linux diagnostics;** the device list in bug reports showed them in full.
+- **Added wheel and wheelbase devices no longer stuck on "detecting";** when SimHub loaded its devices before the plugin, they never linked up and the "add device" banners stayed.
 
 ## [1.7.4]
 

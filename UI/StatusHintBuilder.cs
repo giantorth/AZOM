@@ -233,7 +233,7 @@ namespace MozaPlugin.UI
             if (profileGate)
             {
                 // Rule 3: ProfileNotAddedDash
-                if (detection.DashDetected && !plugin.DashDeviceExtensionActive)
+                if (detection.DashDetected && !MozaPlugin.DashDeviceExtensionActive)
                 {
                     const string dashDeviceName = "MOZA CM2 Racing Dash";
                     list.Add(new StatusHint(
@@ -247,7 +247,7 @@ namespace MozaPlugin.UI
                 // fall back to the legacy shared name while the model is unknown.
                 bool baseDeviceExpected =
                     detection.BaseAmbientLedSupported || plugin.WheelbaseWantsShakeItHaptics;
-                if (baseDeviceExpected && !plugin.BaseAmbientDeviceExtensionActive)
+                if (baseDeviceExpected && !MozaPlugin.BaseAmbientDeviceExtensionActive)
                 {
                     var basePrefix = Devices.BaseModelInfo.ExtractPrefix(plugin.Data?.BaseModelName);
                     string baseDeviceName = basePrefix.Length != 0
@@ -329,7 +329,7 @@ namespace MozaPlugin.UI
             if (elapsed >= ProfileNotAddedSettling
                 && !plugin.DeviceDefinitionDeployed
                 && plugin.IsFcsDetected
-                && !plugin.FcsDeviceExtensionActive)
+                && !MozaPlugin.FcsDeviceExtensionActive)
             {
                 const string fcsDeviceName = Devices.Extensions.DeviceDefinitionDeployer.FcsDeviceName;
                 list.Add(new StatusHint(

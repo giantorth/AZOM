@@ -103,7 +103,7 @@ namespace MozaPlugin.Devices
         private static readonly Dictionary<string, string> PrefixToGuid =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        private static bool _registryInitialized;
+        private static volatile bool _registryInitialized;
         private static readonly object _registryLock = new object();
         private static string? _registryPath;
 
@@ -117,8 +117,9 @@ namespace MozaPlugin.Devices
         private static Dictionary<string, string>? _pendingSaveSnapshot;
 
         /// <summary>
-        /// Initialize the GUID registry. Call once from plugin Init.
-        /// Populates the lookup tables from backward-compat GUIDs,
+        /// Initialize the GUID registry. Idempotent; every lookup below calls it, because
+        /// SimHub can start its Devices plugin (extension filter + extension Init) before
+        /// ours. Populates the lookup tables from backward-compat GUIDs,
         /// UUID v5 generation for all WheelModelInfo.KnownModels,
         /// and any previously saved dynamic mappings from disk.
         /// </summary>
@@ -164,6 +165,7 @@ namespace MozaPlugin.Devices
         /// </summary>
         public static string ResolveWheelGuid(string modelPrefix)
         {
+            EnsureRegistry();
             string guid;
             Dictionary<string, string> snapshot;
             lock (_registryLock)
@@ -237,6 +239,8 @@ namespace MozaPlugin.Devices
             if (Matches(deviceTypeId, WheelOldProtoGuid))
                 return OldProtocolMarker;
 
+            EnsureRegistry();
+
             // Dynamic registry lookup (covers backward-compat + UUID v5 + unknown
             // models). Locked because ResolveWheelGuid can mutate GuidToPrefix
             // from another thread; _registryLock is reentrant-safe here.
@@ -273,6 +277,8 @@ namespace MozaPlugin.Devices
 
             if (Matches(deviceTypeId, BaseAmbientGuid))
                 return "";
+
+            EnsureRegistry();
 
             lock (_registryLock)
             {
@@ -345,6 +351,14 @@ namespace MozaPlugin.Devices
         private static bool Matches(string deviceTypeId, string id) =>
             deviceTypeId.Equals(id, StringComparison.OrdinalIgnoreCase)
             || deviceTypeId.StartsWith(id + "_", StringComparison.OrdinalIgnoreCase);
+
+        // Lookups read the dicts under _registryLock, which InitializeRegistry holds while
+        // populating, so a reader that sees the flag early still waits for the fill.
+        private static void EnsureRegistry()
+        {
+            if (!_registryInitialized)
+                InitializeRegistry();
+        }
 
         private static void Register(string prefix, string guid)
         {

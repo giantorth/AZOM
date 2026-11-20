@@ -59,13 +59,9 @@ namespace MozaPlugin.Devices.Extensions
             // Injection is deferred to DataUpdate() — calling it here would run before
             // LedModuleDevice.SetSettings(), causing a KeyNotFoundException in that call.
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-            {
-                plugin.DeviceExtensionActive = true;
-                if (_expectedModelPrefix != null && _expectedModelPrefix.Length > 0)
-                    plugin.RegisterActiveModelPrefix(_expectedModelPrefix);
-            }
+            MozaPlugin.DeviceExtensionActive = true;
+            if (_expectedModelPrefix != null && _expectedModelPrefix.Length > 0)
+                MozaPlugin.RegisterActiveModelPrefix(_expectedModelPrefix);
 
             // Report active only when the matching wheel model is connected
             pluginManager.AttachDelegate(
@@ -119,9 +115,7 @@ namespace MozaPlugin.Devices.Extensions
                             if (modelInfoNow != null)
                                 ApplyCounts(lmd.ledModuleSettings, modelInfoNow);
 
-                            var plugin = MozaPlugin.Instance;
-                            if (plugin != null)
-                                plugin.DeviceExtensionActive = true;
+                            MozaPlugin.DeviceExtensionActive = true;
 
                             MozaLog.Debug("[AZOM] Injected virtual LED driver — effects UI should be available");
                         }
@@ -145,14 +139,10 @@ namespace MozaPlugin.Devices.Extensions
                 LinkedDevice.DeviceDescriptor.Name + "_MozaWheelActive",
                 this.GetType());
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-            {
-                plugin.DeviceExtensionActive = false;
-                if (_expectedModelPrefix != null)
-                    plugin.UnregisterActiveModelPrefix(_expectedModelPrefix);
-                MozaLog.Debug("[AZOM] Device extension ended");
-            }
+            MozaPlugin.DeviceExtensionActive = false;
+            if (_expectedModelPrefix != null)
+                MozaPlugin.UnregisterActiveModelPrefix(_expectedModelPrefix);
+            MozaLog.Debug("[AZOM] Device extension ended");
 
             // Restore SimHub's original driver, then drop ours from the static
             // instance registry so neither is retained for the process lifetime

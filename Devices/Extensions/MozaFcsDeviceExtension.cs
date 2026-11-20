@@ -36,9 +36,7 @@ namespace MozaPlugin.Devices.Extensions
                 this.GetType(),
                 () => MozaPlugin.Instance?.IsFcsDetected ?? false);
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-                plugin.FcsDeviceExtensionActive = true;
+            MozaPlugin.FcsDeviceExtensionActive = true;
         }
 
         public override void End(PluginManager pluginManager)
@@ -47,9 +45,7 @@ namespace MozaPlugin.Devices.Extensions
                 LinkedDevice.DeviceDescriptor.Name + "_MozaFcsActive",
                 this.GetType());
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-                plugin.FcsDeviceExtensionActive = false;
+            MozaPlugin.FcsDeviceExtensionActive = false;
 
             RestoreLedDriver();
         }

@@ -550,32 +550,33 @@ namespace MozaPlugin
         internal bool IsWheelLedGroupPresent(int group) => DetectionState.IsWheelLedGroupPresent(group);
         // Extension registration state is static: device extensions outlive a
         // plugin reload (game switch) without End/Init, so per-instance state
-        // would read "not added" on the new instance.
+        // would read "not added" on the new instance. Setters are static too: SimHub
+        // can Init device extensions before our plugin Init sets Instance.
 
         /// <summary>Device extension owns wheel LED settings; plugin profile-apply skips wheel writes.</summary>
         private static volatile bool s_deviceExtensionActive;
-        internal bool DeviceExtensionActive
+        internal static bool DeviceExtensionActive
         {
             get => s_deviceExtensionActive;
             set => s_deviceExtensionActive = value;
         }
 
         private static volatile bool s_dashDeviceExtensionActive;
-        internal bool DashDeviceExtensionActive
+        internal static bool DashDeviceExtensionActive
         {
             get => s_dashDeviceExtensionActive;
             set => s_dashDeviceExtensionActive = value;
         }
 
         private static volatile bool s_fcsDeviceExtensionActive;
-        internal bool FcsDeviceExtensionActive
+        internal static bool FcsDeviceExtensionActive
         {
             get => s_fcsDeviceExtensionActive;
             set => s_fcsDeviceExtensionActive = value;
         }
 
         private static volatile bool s_baseAmbientDeviceExtensionActive;
-        internal bool BaseAmbientDeviceExtensionActive
+        internal static bool BaseAmbientDeviceExtensionActive
         {
             get => s_baseAmbientDeviceExtensionActive;
             set => s_baseAmbientDeviceExtensionActive = value;
@@ -612,7 +613,7 @@ namespace MozaPlugin
         /// </summary>
         private static volatile HashSet<string> s_activeModelPrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        internal void RegisterActiveModelPrefix(string prefix)
+        internal static void RegisterActiveModelPrefix(string prefix)
         {
             if (!string.IsNullOrEmpty(prefix) && prefix != MozaDeviceConstants.OldProtocolMarker)
             {
@@ -622,7 +623,7 @@ namespace MozaPlugin
             }
         }
 
-        internal void UnregisterActiveModelPrefix(string prefix)
+        internal static void UnregisterActiveModelPrefix(string prefix)
         {
             if (!string.IsNullOrEmpty(prefix))
             {
