@@ -298,6 +298,20 @@ namespace MozaPlugin.Devices
             "shifter-brightness", "shifter-colors",
         };
 
+        // FCS: identity + every stored 0x4E setting + rod type (Pit House's connect sweep).
+        internal static readonly string[] FcsSettingsReadCommands = new[]
+        {
+            "fcs-fw-version", "fcs-mcu-uid",
+            "fcs-axis-mode0-get", "fcs-axis-mode1-get", "fcs-axis-mode2-get",
+            "fcs-axis-threshold0-get", "fcs-axis-threshold1-get", "fcs-axis-threshold2-get",
+            "fcs-light-mode-get", "fcs-brightness-get", "fcs-standby-mode-get",
+            "fcs-led-color0-get", "fcs-led-color1-get", "fcs-led-color2-get",
+            "fcs-led-color3-get", "fcs-led-color4-get", "fcs-led-color5-get",
+            "fcs-standby-interval2-get", "fcs-standby-interval3-get", "fcs-standby-interval4-get",
+            "fcs-standby-interval5-get", "fcs-standby-interval6-get",
+            "fcs-right-rod-type",
+        };
+
         internal static readonly string[] PedalsSettingsReadCommands = new[]
         {
             "pedals-throttle-dir", "pedals-throttle-min", "pedals-throttle-max",
@@ -514,6 +528,24 @@ namespace MozaPlugin.Devices
             _plugin.HardwareApplier.ArmShifterConnectApply(ShifterModelKind.Sgp);
             if (issueReads) _deviceManager.ReadSettings(SgpSettingsReadCommands);
             MozaLog.Info("[AZOM] SGP shifter detected");
+        }
+
+        /// <summary>First-sight FCS detection (standalone lane only; it issues its own
+        /// read list, so <paramref name="issueReads"/> is normally false).</summary>
+        public void MarkFcsDetected(bool issueReads = true)
+        {
+            if (_detectionState.FcsDetected)
+            {
+                if (_detectionState.FcsOwner == null) _detectionState.FcsOwner = _deviceManager;
+                return;
+            }
+            _detectionState.FcsOwner = _deviceManager;
+            _detectionState.FcsDetected = true;
+            _plugin.HardwareApplier.ArmFcsConnectApply();
+            if (issueReads) _deviceManager.ReadSettingsPaced(FcsSettingsReadCommands);
+            if (DeviceDefinitionDeployer.DeployForFcs(_connection.DiscoveredPid))
+                _plugin.DeviceDefinitionDeployed = true;
+            MozaLog.Info("[AZOM] FCS detected");
         }
 
         /// <summary>A base/hub-relayed shifter (single 0x1A bus, no PID) can't be told
@@ -828,6 +860,8 @@ namespace MozaPlugin.Devices
                 // MCU UID alone satisfies IsDisplayDetected — re-trigger the
                 // deferred telemetry start (empty-model-name wheels rely on it).
                 NoteDisplayIdentityReady();
+                // The UID names PitHouse's synced dashboard folder.
+                _plugin.ReloadDashboardLibraryIfSourcesChanged();
                 return;
             }
 
@@ -1153,10 +1187,8 @@ namespace MozaPlugin.Devices
                             if (initialProfile != null)
                                 _plugin.ApplyProfileOnConnect(initialProfile);
 
-                            // Auto-load the dashboard library: this wheel's
-                            // configured mzdash folder plus MOZA Dashboard
-                            // Studio's own project root (see
-                            // MozaPlugin.ReloadDashboardLibrary).
+                            // Auto-load the dashboard library (see
+                            // MozaPlugin.DashboardLibraryFolders).
                             var ovFolder = _plugin.ActiveTelemetryMzdashFolder;
                             MozaLog.Debug("[AZOM] Loading dashboard library from: "
                                 + string.Join(", ", _plugin.DashboardLibraryFolders(ovFolder)));

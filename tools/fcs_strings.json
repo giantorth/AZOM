@@ -1,0 +1,104 @@
+{
+  "Status_SearchingForFcs": {
+    "en": "Searching for FCS...", "de": "Suche nach FCS...", "el": "Αναζήτηση FCS...", "es": "Buscando FCS...",
+    "fr": "Recherche du FCS...", "it": "Ricerca FCS in corso...", "ko": "FCS 검색 중...", "nb": "Søker etter FCS...",
+    "pt": "Procurando FCS...", "qps-ploc": "Sniff sniff… FCS?", "ru": "Поиск FCS...", "vi": "Đang tìm FCS...",
+    "zh-Hans": "正在搜索 FCS..."
+  },
+  "Section_LiveAxes": {
+    "en": "LIVE AXES", "de": "ACHSEN LIVE", "el": "ΑΞΟΝΕΣ ΖΩΝΤΑΝΑ", "es": "EJES EN VIVO",
+    "fr": "AXES EN DIRECT", "it": "ASSI IN TEMPO REALE", "ko": "실시간 축", "nb": "AKSER LIVE",
+    "pt": "EIXOS AO VIVO", "qps-ploc": "WOOF WOOF!!", "ru": "ОСИ В РЕАЛЬНОМ ВРЕМЕНИ", "vi": "TRỤC TRỰC TIẾP",
+    "zh-Hans": "实时轴"
+  },
+  "Label_FcsThrottleLever": {
+    "en": "Throttle lever", "de": "Gashebel", "el": "Μοχλός γκαζιού", "es": "Palanca de aceleración",
+    "fr": "Levier d'accélération", "it": "Leva acceleratore", "ko": "스로틀 레버", "nb": "Gasspak",
+    "pt": "Alavanca do acelerador", "qps-ploc": "Yowff!", "ru": "Рычаг газа", "vi": "Cần ga",
+    "zh-Hans": "油门杆"
+  },
+  "Label_FcsJoystickX": {
+    "en": "Joystick X", "de": "Joystick X", "el": "Χειριστήριο X", "es": "Joystick X",
+    "fr": "Joystick X", "it": "Joystick X", "ko": "조이스틱 X", "nb": "Styrespak X",
+    "pt": "Joystick X", "qps-ploc": "Arf X", "ru": "Джойстик X", "vi": "Cần điều khiển X",
+    "zh-Hans": "摇杆 X"
+  },
+  "Label_FcsJoystickY": {
+    "en": "Joystick Y", "de": "Joystick Y", "el": "Χειριστήριο Y", "es": "Joystick Y",
+    "fr": "Joystick Y", "it": "Joystick Y", "ko": "조이스틱 Y", "nb": "Styrespak Y",
+    "pt": "Joystick Y", "qps-ploc": "Arf Y", "ru": "Джойстик Y", "vi": "Cần điều khiển Y",
+    "zh-Hans": "摇杆 Y"
+  },
+  "Label_FcsJoystickTwist": {
+    "en": "Joystick twist", "de": "Joystick-Drehung", "el": "Περιστροφή χειριστηρίου", "es": "Giro del joystick",
+    "fr": "Rotation du joystick", "it": "Rotazione joystick", "ko": "조이스틱 비틀기", "nb": "Styrespak vridning",
+    "pt": "Giro do joystick", "qps-ploc": "Arf twirl!", "ru": "Поворот джойстика", "vi": "Xoay cần điều khiển",
+    "zh-Hans": "摇杆扭转"
+  },
+  "Label_FcsThumbstickX": {
+    "en": "Thumbstick X", "de": "Daumenstick X", "el": "Μοχλίσκος X", "es": "Mini joystick X",
+    "fr": "Mini-joystick X", "it": "Levetta X", "ko": "썸스틱 X", "nb": "Tommelspak X",
+    "pt": "Mini joystick X", "qps-ploc": "Paw X", "ru": "Мини-джойстик X", "vi": "Cần ngón cái X",
+    "zh-Hans": "拇指摇杆 X"
+  },
+  "Label_FcsThumbstickY": {
+    "en": "Thumbstick Y", "de": "Daumenstick Y", "el": "Μοχλίσκος Y", "es": "Mini joystick Y",
+    "fr": "Mini-joystick Y", "it": "Levetta Y", "ko": "썸스틱 Y", "nb": "Tommelspak Y",
+    "pt": "Mini joystick Y", "qps-ploc": "Paw Y", "ru": "Мини-джойстик Y", "vi": "Cần ngón cái Y",
+    "zh-Hans": "拇指摇杆 Y"
+  },
+  "Label_FcsJoystickXy": {
+    "en": "Joystick XY", "de": "Joystick XY", "el": "Χειριστήριο XY", "es": "Joystick XY",
+    "fr": "Joystick XY", "it": "Joystick XY", "ko": "조이스틱 XY", "nb": "Styrespak XY",
+    "pt": "Joystick XY", "qps-ploc": "Arf XY", "ru": "Джойстик XY", "vi": "Cần điều khiển XY",
+    "zh-Hans": "摇杆 XY"
+  },
+  "Label_FcsThumbstick": {
+    "en": "Thumbstick", "de": "Daumenstick", "el": "Μοχλίσκος", "es": "Mini joystick",
+    "fr": "Mini-joystick", "it": "Levetta", "ko": "썸스틱", "nb": "Tommelspak",
+    "pt": "Mini joystick", "qps-ploc": "Paw!", "ru": "Мини-джойстик", "vi": "Cần ngón cái",
+    "zh-Hans": "拇指摇杆"
+  },
+  "Section_JoystickModes": {
+    "en": "JOYSTICK MODES", "de": "JOYSTICK-MODI", "el": "ΛΕΙΤΟΥΡΓΙΕΣ ΧΕΙΡΙΣΤΗΡΙΟΥ", "es": "MODOS DEL JOYSTICK",
+    "fr": "MODES DU JOYSTICK", "it": "MODALITÀ JOYSTICK", "ko": "조이스틱 모드", "nb": "STYRESPAKMODUSER",
+    "pt": "MODOS DO JOYSTICK", "qps-ploc": "ARF ARF!!", "ru": "РЕЖИМЫ ДЖОЙСТИКА", "vi": "CHẾ ĐỘ CẦN ĐIỀU KHIỂN",
+    "zh-Hans": "摇杆模式"
+  },
+  "Label_RightRod": {
+    "en": "Right rod", "de": "Rechter Griff", "el": "Δεξιός μοχλός", "es": "Palanca derecha",
+    "fr": "Poignée droite", "it": "Impugnatura destra", "ko": "오른쪽 스틱", "nb": "Høyre spak",
+    "pt": "Alavanca direita", "qps-ploc": "Right paw!", "ru": "Правая рукоять", "vi": "Cần bên phải",
+    "zh-Hans": "右侧摇杆"
+  },
+  "Option_RodNotConnected": {
+    "en": "Not connected", "de": "Nicht verbunden", "el": "Μη συνδεδεμένο", "es": "No conectado",
+    "fr": "Non connecté", "it": "Non collegato", "ko": "연결되지 않음", "nb": "Ikke tilkoblet",
+    "pt": "Não conectado", "qps-ploc": "Whimper…", "ru": "Не подключено", "vi": "Chưa kết nối",
+    "zh-Hans": "未连接"
+  },
+  "Option_RodBuiltIn": {
+    "en": "Built-in joystick", "de": "Eingebauter Joystick", "el": "Ενσωματωμένο χειριστήριο", "es": "Joystick integrado",
+    "fr": "Joystick intégré", "it": "Joystick integrato", "ko": "내장 조이스틱", "nb": "Innebygd styrespak",
+    "pt": "Joystick integrado", "qps-ploc": "Good boy!", "ru": "Встроенный джойстик", "vi": "Cần điều khiển tích hợp",
+    "zh-Hans": "内置摇杆"
+  },
+  "SliderLabel_ButtonLightMode": {
+    "en": "Button light mode", "de": "Tastenbeleuchtung", "el": "Φωτισμός κουμπιών", "es": "Iluminación de botones",
+    "fr": "Éclairage des boutons", "it": "Illuminazione pulsanti", "ko": "버튼 조명 모드", "nb": "Knappelysmodus",
+    "pt": "Iluminação dos botões", "qps-ploc": "Snarf!", "ru": "Подсветка кнопок", "vi": "Chế độ đèn nút",
+    "zh-Hans": "按键灯光模式"
+  },
+  "Label_LedColors": {
+    "en": "LED colors", "de": "LED-Farben", "el": "Χρώματα LED", "es": "Colores de los LED",
+    "fr": "Couleurs des LED", "it": "Colori LED", "ko": "LED 색상", "nb": "LED-farger",
+    "pt": "Cores dos LEDs", "qps-ploc": "Rrrf!", "ru": "Цвета светодиодов", "vi": "Màu đèn LED",
+    "zh-Hans": "LED 颜色"
+  },
+  "Section_LedColors": {
+    "en": "LED COLORS", "de": "LED-FARBEN", "el": "ΧΡΩΜΑΤΑ LED", "es": "COLORES DE LOS LED",
+    "fr": "COULEURS DES LED", "it": "COLORI LED", "ko": "LED 색상", "nb": "LED-FARGER",
+    "pt": "CORES DOS LEDS", "qps-ploc": "WROOF!!", "ru": "ЦВЕТА СВЕТОДИОДОВ", "vi": "MÀU ĐÈN LED",
+    "zh-Hans": "LED 颜色"
+  }
+}

@@ -642,30 +642,10 @@ namespace MozaPlugin.Hardware
         // only if it differs. A shifter that answers no read at all is never written by
         // this path at all — see ShifterConnectPending. Later profile applies and tab
         // writes share the cache.
-        // Static like the base cache: a plugin reload reconstructs the applier and
-        // re-applies the profile, and must not re-write what the shifter already holds.
-        private static readonly System.Collections.Generic.Dictionary<string, long> s_shifterCfgCache
-            = new System.Collections.Generic.Dictionary<string, long>(System.StringComparer.Ordinal);
-        // Settings still awaiting their connect-time readback, plus when each model was armed.
-        private static readonly System.Collections.Generic.HashSet<string> s_shifterConnectPending
-            = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
-        private static readonly System.Collections.Generic.Dictionary<ShifterModelKind, long> s_shifterArmedTicks
-            = new System.Collections.Generic.Dictionary<ShifterModelKind, long>();
-        // Models whose shifter has delivered at least one parsed settings readback since
-        // it was armed. That is the evidence that makes the grace below safe to act on:
-        // one missing reply from a talking device is a dropped frame, whereas a device
-        // that has answered NOTHING must not be configured blind (see ShifterConnectPending).
-        private static readonly System.Collections.Generic.HashSet<ShifterModelKind> s_shifterAnsweredAny
-            = new System.Collections.Generic.HashSet<ShifterModelKind>();
-        // Edge guard so the "not answering" notice is logged once per arm, not per apply.
-        private static readonly System.Collections.Generic.HashSet<ShifterModelKind> s_shifterSilentLogged
-            = new System.Collections.Generic.HashSet<ShifterModelKind>();
-        // Leaf lock: readbacks land on the serial read/dispatch threads, applies on the
-        // UI/profile thread and the reconnect tick. No I/O under it.
-        private static readonly object s_shifterCfgLock = new object();
+        // Shared with the FCS (see ReadbackReconcileCache); keyed by device tag.
         // How long a setting waits for its connect-time readback before the apply path
-        // may write it. Only ever acted on for a shifter that has answered something.
-        private const double ShifterReadbackGraceMs = 15_000.0;
+        // may write it. Only ever acted on for a device that has answered something.
+        private static readonly ReadbackReconcileCache s_readbackCfg = new ReadbackReconcileCache(15_000.0);
 
         private static readonly string[] s_hgpProfileCommands =
             { "shifter-direction", "shifter-paddle-sync", "shifter-hid-mode" };
@@ -682,93 +662,31 @@ namespace MozaPlugin.Hardware
         private static bool IsShifterCfgCommand(string command) =>
             command == "shifter-apply-mode" || System.Array.IndexOf(s_sgpProfileCommands, command) >= 0;
 
-        private static string ShifterCfgKey(ShifterModelKind model, string command) => model + ":" + command;
         private static long PackShifterColors(int s1, int s2) => ((long)s1 << 8) | (long)s2;
 
-        /// <summary>True (and records the value) iff it differs from the shifter's last
-        /// known value for this setting, or nothing is known yet.</summary>
         private static bool ShifterCfgChanged(ShifterModelKind model, string command, long value)
-        {
-            string key = ShifterCfgKey(model, command);
-            lock (s_shifterCfgLock)
-            {
-                if (s_shifterCfgCache.TryGetValue(key, out var prev) && prev == value) return false;
-                s_shifterCfgCache[key] = value;
-                return true;
-            }
-        }
+            => s_readbackCfg.Changed(model.ToString(), command, value);
 
         /// <summary>User-initiated write: it always goes out. Record it and retire any
         /// pending connect reconcile for the setting so the readback can't re-write it.</summary>
         private static void ShifterCfgNoteUserWrite(ShifterModelKind model, string command, long value)
-        {
-            string key = ShifterCfgKey(model, command);
-            lock (s_shifterCfgLock)
-            {
-                s_shifterCfgCache[key] = value;
-                s_shifterConnectPending.Remove(key);
-            }
-        }
+            => s_readbackCfg.NoteUserWrite(model.ToString(), command, value);
 
         /// <summary>Called at detect in place of a profile apply: each profile-backed
         /// setting is written when, and only if, its readback shows a different value.</summary>
         internal void ArmShifterConnectApply(ShifterModelKind model)
-        {
-            lock (s_shifterCfgLock)
-            {
-                s_shifterArmedTicks[model] = System.DateTime.UtcNow.Ticks;
-                // Fresh connect, fresh evidence — this shifter has to prove again that it
-                // answers before the grace below can release a blind write.
-                s_shifterAnsweredAny.Remove(model);
-                s_shifterSilentLogged.Remove(model);
-                foreach (var cmd in ShifterProfileCommands(model))
-                    s_shifterConnectPending.Add(ShifterCfgKey(model, cmd));
-            }
-        }
+            => s_readbackCfg.Arm(model.ToString(), ShifterProfileCommands(model));
 
         /// <summary>True while this setting's connect-time readback is still due, so the
-        /// apply path leaves the write to the reconcile.
-        ///
-        /// <para>After <see cref="ShifterReadbackGraceMs"/> the setting is released — but
-        /// ONLY for a shifter that has answered at least one settings read. From a talking
-        /// device a single missing reply is a dropped frame and the profile should still
-        /// land. A shifter that has answered nothing at all stays pending forever: writing
-        /// to it is an EEPROM commit aimed at a device whose current values we cannot see,
-        /// and bundle <c>W3H1TH2S</c> (2026-09-21) is what that looks like — a standalone
-        /// HGP that returned a zero-length payload to all 44 reads and had three settings
-        /// pushed into it anyway once the old timeout elapsed. The Shifter tab still writes
-        /// on user action, so such a device remains configurable by hand.</para></summary>
+        /// apply path leaves the write to the reconcile. A shifter that has answered
+        /// nothing stays pending forever (bundle <c>W3H1TH2S</c>: a standalone HGP that
+        /// returned zero-length payloads had settings pushed into it blind); the Shifter
+        /// tab still writes on user action.</summary>
         private static bool ShifterConnectPending(ShifterModelKind model, string command)
-        {
-            string key = ShifterCfgKey(model, command);
-            bool pending, logSilent = false;
-            lock (s_shifterCfgLock)
-            {
-                if (!s_shifterConnectPending.Contains(key)) return false;
-
-                bool withinGrace = s_shifterArmedTicks.TryGetValue(model, out var armed)
-                    && (System.DateTime.UtcNow.Ticks - armed)
-                       < (long)(ShifterReadbackGraceMs * System.TimeSpan.TicksPerMillisecond);
-                if (withinGrace) return true;
-
-                if (s_shifterAnsweredAny.Contains(model))
-                {
-                    s_shifterConnectPending.Remove(key);
-                    pending = false;
-                }
-                else
-                {
-                    logSilent = s_shifterSilentLogged.Add(model);
-                    pending = true;
-                }
-            }
-
-            if (logSilent)
+            => s_readbackCfg.Pending(model.ToString(), command, () =>
                 MozaLog.Info($"[AZOM] {model} shifter has not answered any settings read — " +
                     "holding back its profile writes (a device whose stored values can't be " +
-                    "read is not written blind); the Shifter tab still applies changes on request");
-            return pending;
-        }
+                    "read is not written blind); the Shifter tab still applies changes on request"));
 
         /// <summary>Shifter settings readback (serial read/dispatch thread). The device
         /// value is ground truth: adopt it, and if this setting's connect-time reconcile
@@ -788,16 +706,7 @@ namespace MozaPlugin.Hardware
                 deviceValue = intValue;
             }
 
-            string key = ShifterCfgKey(model, command);
-            bool reconcile;
-            lock (s_shifterCfgLock)
-            {
-                s_shifterCfgCache[key] = deviceValue;
-                // Proof this shifter reports its stored values, which is what lets the
-                // grace in ShifterConnectPending release any reply that goes missing.
-                s_shifterAnsweredAny.Add(model);
-                reconcile = s_shifterConnectPending.Remove(key);
-            }
+            bool reconcile = s_readbackCfg.Prime(model.ToString(), command, deviceValue);
             if (!reconcile) return;
             var profile = _plugin.Settings?.ProfileStore?.CurrentProfile;
             if (profile != null) ApplyShifterCommand(model, profile, command);

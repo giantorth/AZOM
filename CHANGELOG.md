@@ -2,6 +2,26 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.5]
+
+## Added
+
+- **MOZA Farming Control System (FCS) support;** SimHub device with its six button LEDs, live inputs, calibration, joystick modes, and per-game light mode, colours and standby effect.
+- **Double-click the dashboard preview to re-render it;** if no preview can be shown, it names the folder the dashboard wasn't found in.
+- **Privacy policy;** linked from the bug-report form and published at giant.orth.cc/privacy.
+
+## Changed
+
+- **Dashboard library folders reworked;** Dashboard Studio's projects and PitHouse's copy for the connected wheel are scanned automatically, each shown on its own row, with one optional custom folder that can be cleared (Auto-detect removed).
+
+## Fixed
+
+- **AB9/AB6 gate shows the 5+R Layout 2 used by firmware 1.1.6.2 and later;** R/2/4 over 1/3/5.
+- **Dashboard previews render again with Dashboard Studio 1.0.7.7;** dashboards using images from Studio's shared image folder showed no preview, and older previews drew those widgets blank.
+- **KS Pro centre knob colour dots match the real LED positions;** each dot edited the LED one position clockwise of it.
+- **USB serial numbers masked in Linux diagnostics;** the device list in bug reports showed them in full.
+- **Added wheel and wheelbase devices no longer stuck on "detecting";** when SimHub loaded its devices before the plugin, they never linked up and the "add device" banners stayed.
+
 ## [1.7.4]
 
 ## Highlights

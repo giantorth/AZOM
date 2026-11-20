@@ -12,6 +12,7 @@ namespace MozaPlugin.Protocol
         WheelKnobs = 2,
         BaseStrip0 = 3,
         BaseStrip1 = 4,
+        Fcs = 5,
     }
 
     /// <summary>Payload shape of a zone's bitmask write.</summary>
@@ -23,6 +24,8 @@ namespace MozaPlugin.Protocol
         ActiveLe4,
         /// <summary>active as a big-endian int setting — old-protocol <c>41 FD DE</c>.</summary>
         ActiveInt,
+        /// <summary>active(u8) + window(u8) — FCS <c>01 09 [lit] [owned]</c>.</summary>
+        ActiveWindowU8,
     }
 
     /// <summary>
@@ -512,6 +515,14 @@ namespace MozaPlugin.Protocol
                     var frame = cmd.NewWriteFrame(layout.DeviceId, 4);
                     if (frame == null) return null;
                     PutLe32(frame, cmd.PayloadOffset, active);
+                    return MozaCommand.SealFrame(frame);
+                }
+                case LedMaskEncoding.ActiveWindowU8:
+                {
+                    var frame = cmd.NewWriteFrame(layout.DeviceId, 2);
+                    if (frame == null) return null;
+                    frame[cmd.PayloadOffset] = (byte)active;
+                    frame[cmd.PayloadOffset + 1] = (byte)window;
                     return MozaCommand.SealFrame(frame);
                 }
                 default:

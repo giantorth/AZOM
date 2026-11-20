@@ -336,9 +336,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Rattet har ikke rapportert joystick-konfigurasjon ennå. Koble til rattet og vent til identitetsprøven er ferdig.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetri</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>VELG MAPPE…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio-dashboards</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Enhets-dashboards</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Egendefinert</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Ikke funnet</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Ingen kopi for dette rattet</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Rattet er ikke tilkoblet</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Skjerm ikke funnet</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Ingen</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>FJERN</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DETEKTER</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Velg en mappe med .mzdash-filer som dashboard-bibliotek</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Auto-detekter dashboard-mappen for det tilkoblede rattet</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANALTILPASNINGER</value></data>
@@ -490,7 +498,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Velg en .mzdash-fil eller et biblioteksoppføring først.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(ingen configJson-tilstand mottatt ennå)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Kan ikke hente rådata for «{0}» – velg en lokal fil i stedet.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Mappe: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Opplasting i kø – sender «{0}» til rattet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Opplasting ikke startet – rattet er ikke tilkoblet eller ingen administrasjonsøkt ennå.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Opplasting fullført (status 0x{0})</value></data>
@@ -501,18 +508,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Velg en .mzdash-fil å laste opp</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-dashbord (*.mzdash)|*.mzdash|Alle filer (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Velg mappe som inneholder .mzdash-dashbordfiler</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Oppdag dashbordmappe automatisk</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Fant ikke MOZA Pit House-dashbordmappen på:
-{0}
-
-Installer MOZA Pit House og last inn et dashbord, eller bruk «Angi mappe…» for å peke på et egendefinert sted.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Ingen dashbordmappe for det tilkoblede rattet (UID {0}).
-Søkte under:
-{1}
-
-Åpne et dashbord i MOZA Pit House for dette rattet først.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Fant ingen rattspesifikke dashbordmapper under _dashes. Åpne MOZA Pit House, last inn et dashbord, og prøv igjen.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Fant flere dashbordmapper ({0}) og ingen ratt er tilkoblet. Koble til rattet og prøv igjen, eller bruk «Angi mappe…» for å velge manuelt.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Dette sletter alle plugin-innstillinger og profiler permanent.
 
 Er du sikker?</value></data>
@@ -650,6 +645,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beskriv problemet: hva du gjorde, hva rattet eller dashbordet gjorde, og når det startet.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (valgfritt — e-post eller Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Innsending laster opp en diagnosepakke (plugin-logger og et seriell-spor, med maskerte maskinvare-ID-er) til plugin-utvikleren.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Personvernerklæring</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Send feilrapport</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Laster opp…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Rapport sendt. Referanse: {0}</value></data>
@@ -822,6 +818,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktil tilbakemelding</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Knapp-debounce (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Forhåndsvisning ikke tilgjengelig</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Fant ikke dashbordet i {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Trykket</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Sluppet</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Egendefinert fargetonevelger</value></data>
@@ -944,4 +941,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Maks ytelse</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Maks ytelse følger SimHubs fulle vinkler uten fartsgrense. Med SimHub-innstillingene på eller nær maksimum vil riggen din sannsynligvis hoppe eller flytte seg. Bruk på eget ansvar.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Dreiepunkt fra setet: {0:0} mm bakover, {1:0} mm ned</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Søker etter FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>AKSER LIVE</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Gasspak</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Styrespak X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Styrespak Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Styrespak vridning</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Tommelspak X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Tommelspak Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Styrespak XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Tommelspak</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>STYRESPAKMODUSER</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Høyre spak</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Ikke tilkoblet</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Innebygd styrespak</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Knappelysmodus</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED-farger</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED-FARGER</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Et MOZA Farming Control System er tilkoblet, men enheten er ikke lagt til i SimHub. Åpne Enheter &gt; Legg til enhet &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Beveg gasspaken helt frem og helt tilbake noen ganger, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Beveg styrespaken helt ut i alle retninger, sirkle sakte med klokken og deretter mot klokken, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Vri styrespaken helt til venstre og helt til høyre noen ganger, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Beveg tommelspaken helt ut i alle retninger noen ganger, og trykk deretter FERDIG.</value></data>
 </root>

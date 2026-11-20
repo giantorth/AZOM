@@ -518,6 +518,8 @@ This plugin ships per-wheel art through this mechanism — see
 
 Tells SimHub which `DeviceExtension` to attach to which device type. SimHub discovers implementations via assembly scanning.
 
+**Load order:** the filter and each extension's `Init` run from `DevicesPlugin.Init` → `LoadDevices`, once per process. Plugin `Init`s run sequentially on one thread, ordered by `GetPluginPriority` (both `DevicesPlugin` and a typical `IDataPlugin` get 1) and then by the DLL scan order, so `DevicesPlugin` can run before your plugin's `Init`. The filter result is fixed for the session, so anything it or an extension's `Init` reads must not depend on your plugin's `Init` having run, including the plugin instance singleton.
+
 ```csharp
 using SimHub.Plugins.Devices;
 using SimHub.Plugins.Devices.DeviceExtensions;

@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Vô lăng chưa báo cáo cấu hình joystick nào. Hãy kết nối vô lăng và đợi quá trình dò nhận dạng hoàn tất.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Đo từ xa</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ĐẶT THƯ MỤC…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Bảng điều khiển Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Bảng điều khiển thiết bị</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Tùy chỉnh</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Không tìm thấy</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Không có bản sao cho vô-lăng này</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Vô-lăng chưa kết nối</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Không phát hiện màn hình</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Không</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>XÓA</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>TỰ ĐỘNG PHÁT HIỆN</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Đặt một thư mục chứa tệp .mzdash làm thư viện bảng điều khiển</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Tự động phát hiện thư mục bảng điều khiển cho vô lăng đang kết nối</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>THỬ</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>DỪNG</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>ÁNH XẠ KÊNH</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Trước tiên hãy chọn một tệp .mzdash hoặc một mục thư viện.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(chưa nhận được trạng thái configJson)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Không thể lấy dữ liệu byte cho "{0}" — hãy chọn một tệp cục bộ.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Thư mục: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Đã đưa tải lên vào hàng đợi — đang gửi "{0}" đến vô-lăng…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Chưa bắt đầu tải lên — vô-lăng chưa kết nối hoặc chưa có phiên quản lý.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Tải lên hoàn tất (trạng thái 0x{0})</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Chọn tệp .mzdash để tải lên</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Bảng đồng hồ Moza (*.mzdash)|*.mzdash|Tất cả tệp (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Chọn thư mục chứa các tệp bảng đồng hồ .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Tự động dò thư mục bảng đồng hồ</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Không tìm thấy thư mục bảng đồng hồ MOZA Pit House tại:
-{0}
-
-Hãy cài đặt MOZA Pit House và tải một bảng đồng hồ, hoặc dùng «Đặt thư mục…» để trỏ tới vị trí tùy chỉnh.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Không có thư mục bảng đồng hồ cho vô-lăng đang kết nối (UID {0}).
-Đã tìm trong:
-{1}
-
-Hãy mở một bảng đồng hồ trong MOZA Pit House cho vô-lăng này trước.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Không tìm thấy thư mục bảng đồng hồ riêng cho vô-lăng trong _dashes. Hãy mở MOZA Pit House, tải một bảng đồng hồ rồi thử lại.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Tìm thấy nhiều thư mục bảng đồng hồ ({0}) và không có vô-lăng nào được kết nối. Hãy kết nối vô-lăng rồi thử lại, hoặc dùng «Đặt thư mục…» để chọn thủ công.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Thao tác này sẽ xóa vĩnh viễn toàn bộ thiết lập và hồ sơ của plugin.
 
 Bạn có chắc không?</value></data>
@@ -645,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Mô tả sự cố: bạn đã làm gì, vô lăng hoặc màn hình đã làm gì, và nó bắt đầu khi nào.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Liên hệ (không bắt buộc — email hoặc Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Khi gửi, một gói chẩn đoán (bản ghi plugin và dấu vết cổng nối tiếp, đã ẩn định danh phần cứng) sẽ được tải lên cho người phát triển plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Chính sách quyền riêng tư</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Gửi báo cáo lỗi</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Đang tải lên…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Đã gửi báo cáo. Mã tham chiếu: {0}</value></data>
@@ -817,6 +813,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Phản hồi xúc giác</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Chống dội nút (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Không có bản xem trước</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Không tìm thấy bảng điều khiển trong {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Đang nhấn</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Đã nhả</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Bộ chọn sắc độ tùy chỉnh</value></data>
@@ -939,4 +936,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Hiệu năng tối đa</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Hiệu năng tối đa bám theo toàn bộ góc của SimHub mà không giới hạn tốc độ. Khi các thiết lập SimHub ở mức tối đa hoặc gần tối đa, rig của bạn nhiều khả năng sẽ nảy lên hoặc xê dịch. Bạn tự chịu rủi ro khi sử dụng.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Tâm xoay so với ghế: {0:0} mm về sau, {1:0} mm xuống dưới</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Đang tìm FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>TRỤC TRỰC TIẾP</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Cần ga</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Cần điều khiển X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Cần điều khiển Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Xoay cần điều khiển</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Cần ngón cái X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Cần ngón cái Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Cần điều khiển XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Cần ngón cái</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>CHẾ ĐỘ CẦN ĐIỀU KHIỂN</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Cần bên phải</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Chưa kết nối</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Cần điều khiển tích hợp</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Chế độ đèn nút</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Màu đèn LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>MÀU ĐÈN LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Một MOZA Farming Control System đang được kết nối, nhưng thiết bị chưa được thêm trong SimHub. Mở Thiết bị &gt; Thêm thiết bị &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Đẩy cần ga hết cỡ về trước và về sau vài lần, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Đưa cần điều khiển hết cỡ theo mọi hướng, xoay chậm theo chiều kim đồng hồ rồi ngược chiều, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Xoay cần điều khiển hết cỡ sang trái và sang phải vài lần, rồi nhấn XONG.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Đưa cần ngón cái hết cỡ theo mọi hướng vài lần, rồi nhấn XONG.</value></data>
 </root>

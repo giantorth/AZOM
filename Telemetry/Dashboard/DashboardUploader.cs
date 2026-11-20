@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.RegularExpressions;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {
@@ -78,7 +77,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// <c>Resource/</c> subtree) or an embedded/wheel-cache mzdash can still
         /// bundle its images. Anything still unresolved is logged with every
         /// path tried, and those widgets render blank on the wheel.
-        /// See <see cref="ImageSearchDirectories"/>.
+        /// See <see cref="DashboardImageResolver.SearchDirectories"/>.
         /// </summary>
         public static UploadPayload BuildUpload(byte[] mzdashContent, string dashboardName,
                                                 uint token, long timestampMs,
@@ -153,7 +152,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             files.Add((destMzdash, normalizedMzdash));
             int bundledPngs = 0;
             // No source-dir guard: images also resolve from PitHouse's SHARED
-            // pool (see ImageSearchDirectories), which is where Dashboard Studio
+            // pool (see DashboardImageResolver), which is where Dashboard Studio
             // keeps them, so a dashboard with no Resource/ subtree — or one that
             // came from the wheel cache with no directory at all — can still
             // bundle its PNGs.
@@ -209,64 +208,13 @@ namespace MozaPlugin.Telemetry.Dashboard
             };
         }
 
-        // Matches the content-addressed image ref forms used in mzdash JSON:
-        // `MD5/<32hex>.<ext>`, with either forward slash (Linux paths in
-        // widget src attributes) or backslash (Windows paths in some
-        // PitHouse-generated JSON). The wheel's image store preserves the
-        // original extension — a 2026-08-16 PitHouse ground-truth capture
-        // bundled `/home/moza/resource/images/MD5/<hex>.jpg` verbatim — so
-        // the scan accepts every raster format the display firmware renders.
-        private static readonly Regex ImageRefRegex = new Regex(
-            @"MD5[/\\]([0-9a-fA-F]{32})\.(png|jpg|jpeg|bmp|gif)",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
         /// <summary>
-        /// Walk the mzdash text for distinct <c>MD5/&lt;32hex&gt;.&lt;ext&gt;</c>
-        /// image references and resolve each against
-        /// <c>&lt;sourceDir&gt;/Resource/MD5/&lt;hex&gt;.&lt;ext&gt;</c>. Missing
-        /// files are logged at warn level and skipped — the bundle still
-        /// uploads (file_count = 1 + N_resolved) but widgets bound to a
-        /// missing image render blank on the wheel.
+        /// Each distinct image the mzdash references, read from disk (see
+        /// <see cref="DashboardImageResolver.SearchDirectories"/>). Missing
+        /// files are logged and skipped — the bundle still uploads
+        /// (file_count = 1 + N_resolved) but widgets bound to a missing image
+        /// render blank on the wheel.
         /// </summary>
-        /// <summary>
-        /// Directories to search for <c>&lt;32hex&gt;.&lt;ext&gt;</c>, most
-        /// specific first.
-        ///
-        /// <para>Two layouts exist in the wild and only the first was
-        /// originally handled:</para>
-        /// <list type="bullet">
-        /// <item><c>&lt;dir&gt;/Resource/MD5/</c> — a dashboard downloaded from
-        /// the wheel, or a PitHouse export bundle, which carries its own
-        /// copies. Lowercase variants are tried too: the FS is case-insensitive
-        /// on Windows but not under Proton.</item>
-        /// <item><c>&lt;imageRoot&gt;/MD5/</c> — the SHARED pool MOZA Dashboard
-        /// Studio actually authors against (default
-        /// <c>%LOCALAPPDATA%\MOZA Pit House\_dashes\images</c>). Studio does not
-        /// copy an image into the project folder, so a dashboard created there
-        /// has no <c>Resource/</c> subtree at all and its custom images were
-        /// silently dropped from the upload.</item>
-        /// </list>
-        /// </summary>
-        private static IEnumerable<string> ImageSearchDirectories(string sourceDirectory)
-        {
-            if (!string.IsNullOrEmpty(sourceDirectory))
-            {
-                yield return Path.Combine(sourceDirectory, "Resource", "MD5");
-                yield return Path.Combine(sourceDirectory, "resource", "MD5");
-                yield return Path.Combine(sourceDirectory, "Resource", "md5");
-                yield return Path.Combine(sourceDirectory, "resource", "md5");
-            }
-
-            string? imageRoot = null;
-            try { imageRoot = UI.DashboardStudioLauncher.ResolveImageRoot(); }
-            catch { /* discovery is best-effort; the sourceDir paths still apply */ }
-            if (!string.IsNullOrEmpty(imageRoot))
-            {
-                yield return Path.Combine(imageRoot!, "MD5");
-                yield return Path.Combine(imageRoot!, "md5");
-            }
-        }
-
         private static IEnumerable<(string hex, string ext, byte[] bytes)> ResolveImageReferences(
             byte[] mzdashUtf8, string sourceDirectory)
         {
@@ -281,43 +229,29 @@ namespace MozaPlugin.Telemetry.Dashboard
                 yield break;
             }
 
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match m in ImageRefRegex.Matches(json))
+            foreach (var img in DashboardImageResolver.Resolve(json, sourceDirectory))
             {
-                string hex = m.Groups[1].Value.ToLowerInvariant();
-                string ext = m.Groups[2].Value.ToLowerInvariant();
-                if (!seen.Add(hex)) continue;
-
-                string fileName = hex + "." + ext;
-                var searched = new List<string>(6);
-                string? candidate = null;
-                foreach (var dir in ImageSearchDirectories(sourceDirectory))
-                {
-                    string p = Path.Combine(dir, fileName);
-                    searched.Add(p);
-                    if (File.Exists(p)) { candidate = p; break; }
-                }
-                if (candidate == null)
+                if (img.Path == null)
                 {
                     MozaLog.Warn(
-                        $"[AZOM] Upload: image asset MD5/{fileName} referenced by mzdash but not " +
+                        $"[AZOM] Upload: image asset MD5/{img.FileName} referenced by mzdash but not " +
                         $"found — widget bound to it will render blank. Looked in: "
-                        + string.Join(", ", searched));
+                        + string.Join(", ", img.Searched));
                     continue;
                 }
 
                 byte[] bytes;
                 try
                 {
-                    bytes = File.ReadAllBytes(candidate);
+                    bytes = File.ReadAllBytes(img.Path);
                 }
                 catch (Exception ex)
                 {
-                    MozaLog.Warn($"[AZOM] Upload: failed to read {candidate}: {ex.Message}");
+                    MozaLog.Warn($"[AZOM] Upload: failed to read {img.Path}: {ex.Message}");
                     continue;
                 }
 
-                yield return (hex, ext, bytes);
+                yield return (img.Hex, img.Ext, bytes);
             }
         }
 

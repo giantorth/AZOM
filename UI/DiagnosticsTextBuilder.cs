@@ -188,7 +188,7 @@ namespace MozaPlugin.UI
                     if (p.DevicePath.Length > 0 || p.Serial.Length > 0)
                     {
                         string com = Protocol.WineComNameResolver.ResolveComName(p.PortName) ?? "(unresolved)";
-                        sb.AppendLine($"           dev {p.DevicePath}  serial {p.Serial}  bus {p.InstanceId}  wine COM {com}");
+                        sb.AppendLine($"           dev {p.DevicePath}  serial {Redact(p.Serial)}  bus {p.InstanceId}  wine COM {com}");
                     }
                 }
             }
@@ -225,6 +225,8 @@ namespace MozaPlugin.UI
             sb.Append(!string.IsNullOrEmpty(ab9Port) ? "→ " + ab9Port
                       : plugin.Settings?.Ab9DetectionEnabled == false ? "(detection disabled)"
                       : "(disconnected)");
+            if (ab9Connected)
+                sb.Append($" (FW {plugin.Data.Ab9FwVersionText})");
             string hubPort = plugin.HubConnection?.IsConnected == true
                 ? plugin.HubConnection.LastPortName ?? "" : "";
             sb.Append("  |  Hub ");
@@ -300,7 +302,7 @@ namespace MozaPlugin.UI
             var lanes = plugin.PeripheralRegistry?.Snapshot();
             if (lanes == null || lanes.Count == 0)
                 return "(no directly-USB-attached peripherals — this lane claims the pedals / handbrake / " +
-                       "HGP / SGP PIDs from the registry; a unit behind a wheelbase or hub is a relayed " +
+                       "HGP / SGP / FCS PIDs from the registry; a unit behind a wheelbase or hub is a relayed " +
                        "sub-device on that pipe instead)";
 
             var sb = new StringBuilder();
@@ -324,6 +326,8 @@ namespace MozaPlugin.UI
                         ? (data.PedalsSettingsRead ? "yes" : "no")
                     : c.Category == MozaDeviceCategory.Handbrake
                         ? (data.HandbrakeSettingsRead ? "yes" : "no")
+                    : c.Category == MozaDeviceCategory.Fcs
+                        ? (data.Fcs.SettingsRead ? "yes" : "no")
                         : "n/a";
                 // capture= is this lane's CaptureLabel, i.e. the exact "source" column
                 // its frames carry in serial-capture-*.txt — ties a row to its traffic.

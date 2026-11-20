@@ -173,6 +173,14 @@ namespace MozaPlugin
         /// substituted something. <see cref="NoAb9Reading"/> until it answers.</summary>
         public volatile int Ab9ModeReadback = NoAb9Reading;
 
+        /// <summary>AB9/AB6 group-0x04 reply in wire order; null until it answers.</summary>
+        public volatile byte[]? Ab9FwVersion;
+
+        public string Ab9FwVersionText => FormatFwVersion(Ab9FwVersion);
+
+        /// <summary>Firmware 1.1.6.2 redrew the 5+R Layout 2 gate (see Ab9GateLayouts).</summary>
+        public bool Ab9HasRevisedLayouts => FwVersionAtLeast(Ab9FwVersion, 1, 1, 6, 2);
+
         /// <summary>Clear every probe reading back to "never answered". Called at
         /// AB9 connect so an unplug/swap can't leave the previous device's numbers
         /// standing next to the new one's silence.</summary>
@@ -180,6 +188,7 @@ namespace MozaPlugin
         {
             Ab9State2b = Ab9StateErr2b = Ab9McuTemp2b = NoAb9Reading;
             Ab9ModeReadback = NoAb9Reading;
+            Ab9FwVersion = null;
         }
 
         // State
@@ -657,6 +666,16 @@ namespace MozaPlugin
         private static string FormatFwVersion(byte[]? b) =>
             b == null || b.Length < 4 ? "unknown" : $"{b[0]}.{b[1]}.{b[3]}.{b[2]}";
 
+        /// <summary>Group-0x04 reply <paramref name="v"/> is at least a.b.c.d in
+        /// MOZA's display order; false while unknown.</summary>
+        private static bool FwVersionAtLeast(byte[]? v, int a, int b, int c, int d)
+        {
+            if (v == null || v.Length < 4) return false;
+            long have = ((long)v[0] << 24) | ((long)v[1] << 16) | ((long)v[3] << 8) | v[2];
+            long want = ((long)a << 24) | ((long)b << 16) | ((long)c << 8) | (uint)d;
+            return have >= want;
+        }
+
         // Wheel firmware re-probe rounds spent this session. Lives with the data
         // it fills, so a fresh MozaData (plugin reload) gets a fresh budget.
         public int WheelFwVersionProbeRetries;
@@ -816,6 +835,95 @@ namespace MozaPlugin
             return true;
         }
 
+        // ===== FCS farming panel (own USB pipe, group 0x4E) =====
+        // -1 = not read yet. Colours packed R<<16|G<<8|B.
+        public sealed class FcsState
+        {
+            public const int LedCount = 6;
+            public const int AxisCount = 6;
+            public const int MaxButtons = 128;
+
+            // Axis-mode groups: 0 thumbstick XY, 1 joystick XY, 2 joystick Z.
+            public readonly int[] AxisMode = NewNegativeOnes(3);
+            public readonly int[] AxisThreshold = NewNegativeOnes(3);   // u16 of full travel
+            public volatile int LightMode = -1;     // 0 off, 1 non-telemetry, 2 telemetry
+            public volatile int Brightness = -1;    // 0..100
+            public volatile int StandbyMode = -1;   // 0..6
+            public readonly int[] Colors = NewNegativeOnes(LedCount);
+            public readonly int[] StandbyIntervals = NewNegativeOnes(7);  // by effect; 2..6 used
+            public volatile int RightRodType = -1;  // 0 none, 1 built-in, 2 MHG, 3 MA3X, 4 MH16
+            public readonly int[] CalibCheck = NewNegativeOnes(6);       // per firmware axis, 1 = pass
+            public volatile byte[]? FwVersion;
+            public volatile byte[]? McuUid;
+            public volatile bool SettingsRead;
+
+            // HID: axis positions 0..100 in report order X, Y, Rx, Ry, Rz, Z.
+            public readonly int[] AxisPct = new int[AxisCount];
+            public readonly bool[] ButtonStates = new bool[MaxButtons];
+            public volatile int ButtonCount;
+            public volatile bool IsHidConnected;
+
+            public string FwVersionText => FormatFwVersion(FwVersion);
+
+            /// <summary>Firmware at least a.b.c.d in MOZA's display order.</summary>
+            public bool FwAtLeast(int a, int b, int c, int d) => FwVersionAtLeast(FwVersion, a, b, c, d);
+
+            /// <summary>Store a parsed <c>fcs-*</c> reply (read or write echo). Returns
+            /// false for other commands.</summary>
+            public bool TryUpdate(string? name, int value, byte[]? array)
+            {
+                if (name == null || !name.StartsWith("fcs-", StringComparison.Ordinal)) return false;
+                string n = name.EndsWith("-get", StringComparison.Ordinal) || name.EndsWith("-set", StringComparison.Ordinal)
+                    ? name.Substring(0, name.Length - 4) : name;
+                int idx;
+                if (array != null)
+                {
+                    if (n.StartsWith("fcs-led-color", StringComparison.Ordinal)
+                        && (idx = Idx(n, "fcs-led-color")) >= 0 && idx < LedCount && array.Length >= 3)
+                        Colors[idx] = (array[0] << 16) | (array[1] << 8) | array[2];
+                    else if (n == "fcs-fw-version") FwVersion = (byte[])array.Clone();
+                    else if (n == "fcs-mcu-uid") McuUid = (byte[])array.Clone();
+                    return true;
+                }
+                if (n.StartsWith("fcs-axis-mode", StringComparison.Ordinal)
+                    && (idx = Idx(n, "fcs-axis-mode")) >= 0 && idx < 3)
+                    AxisMode[idx] = value;
+                else if (n.StartsWith("fcs-axis-threshold", StringComparison.Ordinal)
+                    && (idx = Idx(n, "fcs-axis-threshold")) >= 0 && idx < 3)
+                    AxisThreshold[idx] = value;
+                else if (n.StartsWith("fcs-standby-interval", StringComparison.Ordinal)
+                    && (idx = Idx(n, "fcs-standby-interval")) >= 2 && idx < 7)
+                    StandbyIntervals[idx] = value;
+                else if (n.StartsWith("fcs-calib-check", StringComparison.Ordinal)
+                    && (idx = Idx(n, "fcs-calib-check")) >= 0 && idx < 6)
+                    CalibCheck[idx] = value;
+                else switch (n)
+                {
+                    case "fcs-light-mode":     LightMode = value; SettingsRead = true; break;
+                    case "fcs-brightness":     Brightness = value; break;
+                    case "fcs-standby-mode":   StandbyMode = value; break;
+                    case "fcs-right-rod-type": RightRodType = value; break;
+                }
+                return true;
+            }
+
+            /// <summary>Forget device state when the FCS goes away.</summary>
+            public void Reset()
+            {
+                Fill(AxisMode); Fill(AxisThreshold); Fill(Colors); Fill(StandbyIntervals); Fill(CalibCheck);
+                LightMode = Brightness = StandbyMode = RightRodType = -1;
+                FwVersion = null;
+                McuUid = null;
+                SettingsRead = false;
+            }
+
+            private static void Fill(int[] a) { for (int i = 0; i < a.Length; i++) a[i] = -1; }
+
+            // 0-based index suffix ("fcs-led-color3" → 3).
+            private static int Idx(string n, string prefix) => ParseDigits(n, prefix.Length, n.Length);
+        }
+        public readonly FcsState Fcs = new FcsState();
+
         // ===== Universal Hub port status (-1 = not read yet) =====
         // Index 0..3 = hub ports 1..4. Device code: 0 = empty, else bus id − 0x10.
         public readonly int[] HubPortDevice = NewNegativeOnes(4);
@@ -940,6 +1048,7 @@ namespace MozaPlugin
 
         public void UpdateFromCommand(string commandName, int value)
         {
+            if (Fcs.TryUpdate(commandName, value, null)) return;
             switch (commandName)
             {
                 // Temperatures
@@ -1184,6 +1293,12 @@ namespace MozaPlugin
         public void UpdateFromArray(string commandName, byte[] data)
         {
             if (data == null) return;
+            if (Fcs.TryUpdate(commandName, 0, data)) return;
+            if (commandName == "ab9-id-04")
+            {
+                Ab9FwVersion = (byte[])data.Clone();
+                return;
+            }
 
             // **A5 gate**: drop wheel-LED colour responses while live telemetry is
             // actively flowing. Even though writes are no longer gated (cmd 0x27 / cmd

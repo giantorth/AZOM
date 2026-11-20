@@ -9,12 +9,13 @@ namespace MozaControls
     /// <summary>
     /// AB9 / AB6 shift gate for the selected layout, styled after PitHouse's
     /// layout icons, with the engaged gear highlighted. Poll() supplies the
-    /// layout, the engaged gear (Ab9Gear.Reverse / Neutral / 1..8) and the
+    /// layout, whether the firmware is 1.1.6.2+, the engaged gear
+    /// (Ab9Gear.Reverse / Neutral / 1..8) and the
     /// sequential up/down state.
     /// </summary>
     public class Ab9GateView : FrameworkElement
     {
-        public Func<(Ab9Mode mode, int gear, bool up, bool down)>? Poll { get; set; }
+        public Func<(Ab9Mode mode, bool revisedFw, int gear, bool up, bool down)>? Poll { get; set; }
 
         // Geometry in units of the column pitch.
         private const double RowSpan = 2.4;   // top knob centre → bottom knob centre
@@ -31,7 +32,7 @@ namespace MozaControls
         private readonly Brush _knob, _reverse, _active, _glow, _label, _activeLabel;
         private readonly Typeface _face = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
         private bool _hooked;
-        private (Ab9Mode mode, int gear, bool up, bool down)? _state;
+        private (Ab9Mode mode, bool revisedFw, int gear, bool up, bool down)? _state;
 
         public Ab9GateView()
         {
@@ -68,7 +69,7 @@ namespace MozaControls
         {
             double w = ActualWidth, h = ActualHeight;
             if (w <= 0 || h <= 0 || _state == null) return;
-            var (mode, gear, up, down) = _state.Value;
+            var (mode, revisedFw, gear, up, down) = _state.Value;
 
             if (mode == Ab9Mode.Sequential)
             {
@@ -76,7 +77,7 @@ namespace MozaControls
                 return;
             }
 
-            var slots = Ab9GateLayouts.Get(mode);
+            var slots = Ab9GateLayouts.Get(mode, revisedFw);
             if (slots == null) return;
 
             int cols = 0;

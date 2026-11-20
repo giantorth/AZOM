@@ -61,6 +61,16 @@ namespace MozaControls
             set => SetValue(SelectedSlotProperty, value);
         }
 
+        /// <summary>Position of slot 0, in slot steps clockwise from 12 o'clock.</summary>
+        public static readonly DependencyProperty SlotRotationProperty =
+            DependencyProperty.Register(nameof(SlotRotation), typeof(int), typeof(KnobRingViz),
+                new FrameworkPropertyMetadata(0, (d, e) => ((KnobRingViz)d).Rebuild()));
+        public int SlotRotation
+        {
+            get => (int)GetValue(SlotRotationProperty);
+            set => SetValue(SlotRotationProperty, value);
+        }
+
         public event EventHandler<int>? SlotSelected;
 
         private Canvas? _canvas;
@@ -140,7 +150,7 @@ namespace MozaControls
             int n = RingColors?.Count ?? 12;
             for (int i = 0; i < n; i++)
             {
-                double a = -Math.PI / 2 + (i / (double)n) * 2 * Math.PI;
+                double a = -Math.PI / 2 + ((i + SlotRotation) / (double)n) * 2 * Math.PI;
                 double dx = cx + Math.Cos(a) * ringR;
                 double dy = cy + Math.Sin(a) * ringR;
                 Color c = RingColors != null && i < RingColors.Count ? RingColors[i] : Colors.Black;

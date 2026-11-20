@@ -614,6 +614,49 @@ namespace MozaPlugin.Protocol
             AddCommand("ab9-id-10",     "ab9", 0x10, 0xFF, new byte[] { }, 17, "array");
             AddCommand("ab9-id-11",     "ab9", 0x11, 0xFF, new byte[] { }, 2,  "array");
 
+            // ===== FCS FARMING CONTROL SYSTEM (dev id 0x12 on its own USB-CDC, PID 0x0030) =====
+            // Everything rides group 0x4E: [op][param][index]?[value]. op 01 = write
+            // (echoed), 02 = read (value bytes zeroed, same width), 03 = calibration,
+            // 04 = status. Read and write differ by the op byte, hence the -get/-set
+            // pairs. Parsed with busHint "fcs". See docs/protocol/devices/fcs.md.
+            void AddFcs(string name, byte[] id, int bytes, string type)
+            {
+                var get = new byte[id.Length + 1];
+                var set = new byte[id.Length + 1];
+                get[0] = 0x02; set[0] = 0x01;
+                System.Buffer.BlockCopy(id, 0, get, 1, id.Length);
+                System.Buffer.BlockCopy(id, 0, set, 1, id.Length);
+                AddCommand(name + "-get", "fcs", 0x4E, 0xFF, get, bytes, type);
+                AddCommand(name + "-set", "fcs", 0xFF, 0x4E, set, bytes, type);
+            }
+            // Index 0 = thumbstick XY, 1 = joystick XY, 2 = joystick Z.
+            for (byte i = 0; i < 3; i++)
+            {
+                AddFcs($"fcs-axis-mode{i}",      new byte[] { 0x01, i }, 1, "int");   // 0 axis, 1 button
+                AddFcs($"fcs-axis-threshold{i}", new byte[] { 0x02, i }, 2, "int");   // u16 of full travel
+            }
+            AddFcs("fcs-light-mode",    new byte[] { 0x03 }, 1, "int");   // 0 off, 1 non-telemetry, 2 telemetry
+            AddFcs("fcs-brightness",    new byte[] { 0x04 }, 1, "int");   // 0..100
+            for (byte led = 0; led < 6; led++)
+                AddFcs($"fcs-led-color{led}", new byte[] { 0x05, led }, 3, "array");
+            AddFcs("fcs-standby-mode",  new byte[] { 0x06 }, 1, "int");   // 0..6
+            // Interval per standby effect 2..6, BE u16 ms.
+            for (byte m = 2; m <= 6; m++)
+                AddFcs($"fcs-standby-interval{m}", new byte[] { 0x07, m }, 2, "int");
+            // Live telemetry LEDs: colours [idx R G B]×≤5 and mask [lit][owned].
+            AddCommand("fcs-live-colors", "fcs", 0xFF, 0x4E, new byte[] { 0x01, 0x08 }, 20, "array");
+            AddCommand("fcs-live-mask",   "fcs", 0xFF, 0x4E, new byte[] { 0x01, 0x09 }, 2,  "array");
+            // Calibration: payload [control][action]; control 1 thumbstick, 2 joystick XY,
+            // 3 throttle, 4 joystick Z; action 1 start, 0 stop, 2 cancel.
+            AddCommand("fcs-calibrate",   "fcs", 0xFF, 0x4E, new byte[] { 0x03 }, 2, "array");
+            // Status: right-rod type and per-axis calibration result (1 = pass).
+            AddCommand("fcs-right-rod-type", "fcs", 0x4E, 0xFF, new byte[] { 0x04, 0x03 }, 1, "int");
+            for (byte a = 0; a < 6; a++)
+                AddCommand($"fcs-calib-check{a}", "fcs", 0x4E, 0xFF, new byte[] { 0x04, 0x04, a }, 1, "int");
+            // Identity (same request shapes as Pit House's cascade).
+            AddCommand("fcs-fw-version",  "fcs", 0x04, 0xFF, new byte[] { }, 4, "array");
+            AddCommand("fcs-mcu-uid",     "fcs", 0x06, 0xFF, new byte[] { }, 0, "array");
+
             // ===== mBOOSTER PEDALS (dev id 0x12 on its own USB-CDC) =====
             // The mBooster vibration motor lives on its own PID 0x0008 composite
             // device; per protocol note § 6 the pedal-config surface (groups 35/36)

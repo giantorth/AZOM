@@ -1,0 +1,291 @@
+#!/usr/bin/env python3
+"""Decode MOZA FCS (Farming Control System, USB 346E:0030) traffic.
+
+Reads a USBPcap pcapng (picks the PID 0x0030 device) or a JSONL frame dump
+({"t","dir","hex"} lines from tools/pcap-inventory --jsonl or a sim rig wire
+trace) and prints, per section:
+
+  identity  - identity cascade replies (strings, version, product-code fields)
+  settings  - group 0x4E traffic with PitHouse parameter names; the 2 s read
+              poll is collapsed to value changes unless --polls
+  log       - firmware debug log (group 0x0E) reassembled into lines, with the
+              "Table 9, Param N" writes named
+  hid       - HID report (EP 0x83) axis sweeps and button edges (pcapng only)
+
+Protocol reference: docs/protocol/devices/fcs.md.
+
+Usage:
+    tools/fcs-decode <capture.pcapng|frames.jsonl> [--section settings,log] [--polls]
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import struct
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from moza_wire import scan_moza_frames_checked  # noqa: E402
+from usbpcap import (MOZA_VID, TRANSFER_BULK, TRANSFER_INTERRUPT,  # noqa: E402
+                     device_descriptor_ids, iter_usb_packets)
+
+FCS_PID = 0x0030
+GRP_SETTINGS = 0x4E
+GRP_LOG = 0x0E
+
+OPS = {1: "write", 2: "read", 3: "calib", 4: "status"}
+
+# op 1/2 parameter id -> (PitHouse name(s), index labels or None, value width)
+PARAMS = {
+    0x01: ("AxisMode", {0: "thumbstickXYMode", 1: "joystickXYMode", 2: "joystickZMode"}, 1),
+    0x02: ("ButtonModeThreshold", {0: "thumbstickXYButtonModeThreshold",
+                                   1: "joystickXYButtonModeThreshold",
+                                   2: "joystickZButtonModeThreshold"}, 2),
+    0x03: ("buttonGroupState", None, 1),
+    0x04: ("buttonGroupBrightness", None, 1),
+    0x05: ("ledColor", {i: f"led{i + 1}" for i in range(6)}, 3),
+    0x06: ("buttonGroupStandbyMode", None, 1),
+    0x07: ("standbyInterval", {2: "buttonGroupStandbyBreathInterval",
+                               3: "buttonGroupStandbyColoredInterval",
+                               4: "buttonGroupStandbyRainbowInterval",
+                               5: "buttonGroupStandbyQuicksandInterval",
+                               6: "buttonGroupStandbyPulseInterval"}, 2),
+}
+CALIB = {1: "thumbstick", 2: "joystickXy", 3: "throttle", 4: "joystickZ"}
+CALIB_ACTION = {0: "stop", 1: "start", 2: "cancel"}
+STATUS = {0x03: "rightRodType", 0x04: "checkCalib"}
+CHECK_AXIS = {0: "throttle", 1: "joystickX", 2: "joystickY", 3: "joystickZ",
+              4: "thumbstickY", 5: "thumbstickX"}
+ENUMS = {
+    "AxisMode": {0: "Axis", 1: "Button"},
+    "buttonGroupState": {0: "Off", 1: "Non-telemetry", 2: "Telemetry"},
+    "buttonGroupStandbyMode": {0: "Off", 1: "Constant", 2: "Breathing", 3: "Color cycle",
+                               4: "Rainbow", 5: "Quicksand", 6: "Pulse"},
+    "rightRodType": {0: "not connected", 1: "built-in joystick", 2: "MHG",
+                     3: "MA3X", 4: "MH16"},
+}
+
+# Firmware "Table 9" EEPROM parameter numbers (from the 0x0E log).
+FW_PARAMS = {6: "brightness", 7: "buttonGroupState", 8: "standbyMode", 61: "power_on_num"}
+for _i, _e in enumerate(range(9, 14)):
+    FW_PARAMS[_e] = f"interval[effect {_i + 2}]"
+for _led in range(6):
+    for _c, _ch in enumerate("rgb"):
+        FW_PARAMS[14 + _led * 3 + _c] = f"led{_led + 1}.{_ch}"
+for _ax in range(6):
+    for _k, _f in enumerate(("max", "mid", "min")):
+        FW_PARAMS[32 + _ax * 3 + _k] = f"axis{_ax}.{_f} (float32 bits)"
+for _b in range(5):
+    FW_PARAMS[51 + _b] = f"axis_button_bound[{_b}]"
+    FW_PARAMS[56 + _b] = f"axis_map_button_enable[{_b}]"
+
+HID_AXES = ("X(joystickX)", "Y(joystickY)", "Rx(thumbstickX)", "Ry(thumbstickY)",
+            "Rz(throttle)", "Z(joystickZ)")
+
+
+def describe(p: bytes, reply: bool = False) -> str:
+    if not p:
+        return "(empty)"
+    op = p[0]
+    name = OPS.get(op, f"op{op:02x}")
+    if op == 1 and len(p) == 4 and p[1] == 0x09:
+        return f"tele mask lit={p[2]:06b} owned={p[3]:06b}"
+    if op == 1 and len(p) >= 6 and p[1] == 0x08 and (len(p) - 2) % 4 == 0:
+        return "tele colours " + " ".join(
+            f"led{p[i] + 1}=#{p[i + 1:i + 4].hex().upper()}" for i in range(2, len(p), 4))
+    if op in (1, 2) and len(p) >= 2 and p[1] in PARAMS:
+        base, idx_names, width = PARAMS[p[1]]
+        rest = p[2:]
+        label = base
+        if idx_names is not None and rest:
+            label = idx_names.get(rest[0], f"{base}[{rest[0]}]")
+            rest = rest[1:]
+        if op == 2 and not reply and not any(rest):
+            return f"{name} {label}?"
+        val = rest[:width]
+        if width == 3:
+            v = f"#{val.hex().upper()}"
+        else:
+            iv = int.from_bytes(val, "big") if val else 0
+            enum = ENUMS.get(base, ENUMS.get(label, {}))
+            v = f"{iv}" + (f" ({enum[iv]})" if iv in enum else "")
+            if width == 2 and base == "ButtonModeThreshold":
+                v += f" ({iv / 655.35:.0f}%)"
+        return f"{name} {label} = {v}"
+    if op == 3 and len(p) >= 3:
+        return f"calib {CALIB.get(p[1], p[1])} {CALIB_ACTION.get(p[2], p[2])}"
+    if op == 4 and len(p) >= 3:
+        what = STATUS.get(p[1], f"status{p[1]:02x}")
+        if p[1] == 0x04 and len(p) >= 4:
+            return f"status {what}[{CHECK_AXIS.get(p[2], p[2])}] -> {p[3]}"
+        enum = ENUMS.get(what, {})
+        return f"status {what} -> {p[2]}" + (f" ({enum[p[2]]})" if p[2] in enum else "")
+    return f"{name} {p[1:].hex()}"
+
+
+def load_frames(path: str):
+    """Yield (t, dir, frame_bytes). Returns (frames, hid_packets_or_None)."""
+    if path.endswith(".jsonl"):
+        frames = []
+        for line in open(path):
+            r = json.loads(line)
+            if r.get("dir") not in ("h2b", "b2h"):
+                continue  # annotation rows (e.g. sim control changes)
+            frames.append((r["t"], r["dir"], bytes.fromhex(r["hex"])))
+        return frames, None
+    ids, counts = {}, {}
+    for pkt in iter_usb_packets(path):
+        d = device_descriptor_ids(pkt)
+        if d is not None:
+            ids[pkt.device] = d
+        if pkt.transfer == TRANSFER_BULK and pkt.payload:
+            counts[pkt.device] = counts.get(pkt.device, 0) + 1
+    cand = [dv for dv, vp in ids.items() if vp == (MOZA_VID, FCS_PID)]
+    if not cand:
+        print(f"# no {MOZA_VID:04x}:{FCS_PID:04x} descriptor; using busiest bulk device", file=sys.stderr)
+        cand = [max(counts, key=counts.get)] if counts else []
+    if not cand:
+        sys.exit("no candidate device")
+    dev = cand[0]
+    print(f"# FCS = USBPcap device {dev}", file=sys.stderr)
+    frames, hid = [], []
+    for pkt in iter_usb_packets(path):
+        if pkt.device != dev:
+            continue
+        if pkt.transfer == TRANSFER_BULK and pkt.payload:
+            d = "b2h" if pkt.is_in else "h2b"
+            for fr in scan_moza_frames_checked(pkt.payload):
+                frames.append((pkt.t, d, fr))
+        elif pkt.transfer == TRANSFER_INTERRUPT and pkt.endpoint == 0x83 and len(pkt.payload) == 29:
+            hid.append((pkt.t, pkt.payload))
+    return frames, hid
+
+
+def section_identity(frames, t0):
+    seen = set()
+    for t, d, fr in frames:
+        g = fr[2]
+        if d != "b2h" or g not in (0x82, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8F, 0x90, 0x91):
+            continue
+        p = fr[4:-1]
+        key = (g, p[:1])
+        if key in seen:
+            continue
+        seen.add(key)
+        if g in (0x87, 0x88, 0x8F):
+            print(f"  grp {g & 0x7F:02x}/{p[0]:02x}  '{p[1:].rstrip(b'\0').decode('latin1')}'")
+        elif g == 0x90:
+            print(f"  grp 10/{p[0]:02x}  <serial half, {len(p) - 1} B>")
+        elif g == 0x86:
+            print(f"  grp 06     <hw id, {len(p)} B>")
+        elif g == 0x84:
+            print(f"  grp 04     {p.hex()}  (fw {p[0]}.{p[1]}.{p[3]}.{p[2]})")
+        else:
+            print(f"  grp {g & 0x7F:02x}     {p.hex()}")
+
+
+def section_settings(frames, t0, polls):
+    last_read = {}
+    pending = {}
+    for t, d, fr in frames:
+        g = fr[2]
+        if g not in (GRP_SETTINGS, GRP_SETTINGS | 0x80):
+            continue
+        p = fr[4:-1]
+        is_poll = len(p) >= 2 and (p[0] == 2 or (p[0] == 4 and p[1] == 3))
+        if is_poll and not polls:
+            if d == "h2b":
+                continue
+            key = p[:3] if p[1] in (1, 2, 5, 7) else p[:2]
+            if p[0] == 4:
+                key = p[:2]
+            if last_read.get(key) == p:
+                continue
+            first = key not in last_read
+            last_read[key] = p
+            tag = "initial" if first else "CHANGED"
+            print(f"{t - t0:9.3f} poll  {tag:7} {describe(p, True)}")
+            continue
+        arrow = "->" if d == "h2b" else "<-"
+        if d == "b2h" and pending.get(p[:3]) == p:
+            continue  # plain echo of the write just printed
+        if d == "h2b":
+            pending[p[:3]] = p
+        print(f"{t - t0:9.3f} {arrow:5} {p.hex():14} {describe(p, d == 'b2h')}")
+
+
+def section_log(frames, t0):
+    import re
+    pat = re.compile(r"Table 9, Param (\d+) Written: (\d+)")
+    buf = ""
+    for t, d, fr in frames:
+        if d != "b2h" or fr[2] != GRP_LOG:
+            continue
+        buf += fr[5:-1].decode("latin1")
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            line = pat.sub(lambda m: f"{m.group(0)} [{FW_PARAMS.get(int(m.group(1)), '?')}]", line)
+            print(f"{t - t0:9.3f} {line}")
+
+
+def section_hid(hid, t0):
+    if not hid:
+        print("  (no HID reports — JSONL input or no EP 0x83 traffic)")
+        return
+    prev_btn = None
+    rest = None
+    moving = [None] * 6
+    lo = [65535] * 6
+    hi = [0] * 6
+    for t, rep in hid:
+        ax = struct.unpack_from("<6H", rep, 1)
+        btn = int.from_bytes(rep[13:29], "little")
+        if rest is None:
+            rest = ax
+            print(f"{t - t0:9.3f} rest: " + " ".join(f"{HID_AXES[i]}={ax[i]}" for i in range(6)))
+        for i in range(6):
+            lo[i] = min(lo[i], ax[i])
+            hi[i] = max(hi[i], ax[i])
+            off = abs(ax[i] - rest[i]) > 2000
+            if off and moving[i] is None:
+                moving[i] = t
+            elif not off and moving[i] is not None and t - moving[i] > 0.3:
+                print(f"{moving[i] - t0:9.3f} {HID_AXES[i]} moved until {t - t0:.3f}")
+                moving[i] = None
+        if btn != prev_btn:
+            if prev_btn is not None:
+                on = [i + 1 for i in range(128) if btn >> i & 1 and not prev_btn >> i & 1]
+                off_ = [i + 1 for i in range(128) if prev_btn >> i & 1 and not btn >> i & 1]
+                print(f"{t - t0:9.3f} buttons +{on} -{off_}")
+            prev_btn = btn
+    print(f"  reports={len(hid)}  range: " +
+          " ".join(f"{HID_AXES[i]}={lo[i]}..{hi[i]}" for i in range(6)))
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("input")
+    ap.add_argument("--section", default="identity,settings,log,hid")
+    ap.add_argument("--polls", action="store_true", help="print every 0x4E read poll")
+    args = ap.parse_args()
+    frames, hid = load_frames(args.input)
+    if not frames:
+        print("no MOZA frames", file=sys.stderr)
+        return 1
+    t0 = frames[0][0]
+    for s in args.section.split(","):
+        print(f"== {s}")
+        if s == "identity":
+            section_identity(frames, t0)
+        elif s == "settings":
+            section_settings(frames, t0, args.polls)
+        elif s == "log":
+            section_log(frames, t0)
+        elif s == "hid":
+            section_hid(hid, t0)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

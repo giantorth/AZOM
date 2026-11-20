@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices
@@ -40,6 +41,19 @@ namespace MozaPlugin.Devices
         /// non-shifter peripherals. Routes this lane's <c>shifter-*</c> replies into the
         /// right per-device mirror; the SGP is the one with LEDs.</summary>
         public ShifterModelKind ShifterModel { get; }
+        /// <summary>Presence-probe cadence once connected, in ms. 0 = only the
+        /// registry's 5 s <c>Refresh</c> poll.</summary>
+        public int KeepaliveMs { get; }
+        /// <summary>Untracked reads re-issued every <see cref="PeriodicReadMs"/> once
+        /// the binary channel is confirmed (live status the device doesn't push).</summary>
+        public string[]? PeriodicReadCommands { get; }
+        public int PeriodicReadMs { get; }
+        /// <summary>Label for this device's 0x0E log lines in the firmware debug log;
+        /// null drops them.</summary>
+        public string? FirmwareLogSource { get; }
+        /// <summary>Called with each parsed reply of this lane after the MozaData
+        /// mirror is updated (e.g. to prime a connect-time reconcile cache).</summary>
+        public Action<MozaPlugin, ParsedResponse>? OnReadback { get; }
 
         public StandalonePeripheralDescriptor(
             MozaDeviceCategory category,
@@ -51,7 +65,12 @@ namespace MozaPlugin.Devices
             Action<DeviceProber, bool> markDetected,
             Func<DeviceDetectionState, bool> isDetected,
             string[]? settingsReadCommands = null,
-            ShifterModelKind shifterModel = ShifterModelKind.Unknown)
+            ShifterModelKind shifterModel = ShifterModelKind.Unknown,
+            int keepaliveMs = 0,
+            string[]? periodicReadCommands = null,
+            int periodicReadMs = 0,
+            string? firmwareLogSource = null,
+            Action<MozaPlugin, ParsedResponse>? onReadback = null)
         {
             Category = category;
             PidFilter = pidFilter ?? throw new ArgumentNullException(nameof(pidFilter));
@@ -63,6 +82,11 @@ namespace MozaPlugin.Devices
             IsDetected = isDetected ?? throw new ArgumentNullException(nameof(isDetected));
             SettingsReadCommands = settingsReadCommands;
             ShifterModel = shifterModel;
+            KeepaliveMs = keepaliveMs;
+            PeriodicReadCommands = periodicReadCommands;
+            PeriodicReadMs = periodicReadMs;
+            FirmwareLogSource = firmwareLogSource;
+            OnReadback = onReadback;
         }
 
         // Directly-USB-attached peripherals with a config surface. Each reads its own
@@ -128,6 +152,25 @@ namespace MozaPlugin.Devices
                 ShifterSgpReads,
                 shifterModel: ShifterModelKind.Sgp);
 
+        // FCS: Pit House heartbeats every 500 ms and polls the right-rod type every
+        // 2 s; the firmware log carries calibration results and EEPROM writes.
+        public static readonly StandalonePeripheralDescriptor Fcs =
+            new StandalonePeripheralDescriptor(
+                MozaDeviceCategory.Fcs,
+                pid => MozaUsbIds.IsFcsPid(pid),
+                MozaProbeTarget.FcsOnly,
+                MozaProtocol.DeviceMain,
+                "fcs-",
+                "fcs",
+                (prober, issueReads) => prober.MarkFcsDetected(issueReads),
+                s => s.FcsDetected,
+                DeviceProber.FcsSettingsReadCommands,
+                keepaliveMs: 500,
+                periodicReadCommands: new[] { "fcs-right-rod-type" },
+                periodicReadMs: 2000,
+                firmwareLogSource: "fcs",
+                onReadback: (plugin, r) => plugin.HardwareApplier.PrimeFcsCfgFromDevice(r.Name, r.IntValue, r.ArrayValue));
+
         /// <summary>Descriptor for a discovered port's category + PID, or null if
         /// unsupported. HGP and SGP share category <c>Shifter</c> and are disambiguated
         /// by PID (only the SGP has LEDs).</summary>
@@ -135,6 +178,7 @@ namespace MozaPlugin.Devices
         {
             if (category == MozaDeviceCategory.Pedals) return Pedals;
             if (category == MozaDeviceCategory.Handbrake) return Handbrake;
+            if (category == MozaDeviceCategory.Fcs) return Fcs;
             if (category == MozaDeviceCategory.Shifter)
                 return MozaUsbIds.IsShifterSgpPid(pid) ? Sgp
                      : MozaUsbIds.IsShifterHgpPid(pid) ? Hgp
@@ -205,7 +249,8 @@ namespace MozaPlugin.Devices
             ReferenceEquals(_detectionState.PedalsOwner, _deviceManager)
             || ReferenceEquals(_detectionState.HandbrakeOwner, _deviceManager)
             || ReferenceEquals(_detectionState.HgpOwner, _deviceManager)
-            || ReferenceEquals(_detectionState.SgpOwner, _deviceManager);
+            || ReferenceEquals(_detectionState.SgpOwner, _deviceManager)
+            || ReferenceEquals(_detectionState.FcsOwner, _deviceManager);
 
         public StandalonePeripheralController(
             StandalonePeripheralDescriptor descriptor,
@@ -286,8 +331,33 @@ namespace MozaPlugin.Devices
         public void Poll()
         {
             if (_disposed || !_connection.IsConnected) return;
+            _lastKeepaliveTicks = Stopwatch.GetTimestamp();
             _deviceManager.SendPresenceProbe(MozaProtocol.DeviceMain);
         }
+
+        private long _lastKeepaliveTicks;
+        private long _lastPeriodicReadTicks;
+
+        /// <summary>Descriptor-driven keepalive + periodic status reads. Called from
+        /// the registry's 250 ms retry tick.</summary>
+        internal void TickPeriodic()
+        {
+            if (_disposed || !_connection.IsConnected) return;
+            long now = Stopwatch.GetTimestamp();
+            if (_desc.KeepaliveMs > 0 && Elapsed(now, _lastKeepaliveTicks) >= _desc.KeepaliveMs)
+                Poll();
+            var reads = _desc.PeriodicReadCommands;
+            if (reads != null && _binaryConfirmed
+                && Elapsed(now, _lastPeriodicReadTicks) >= _desc.PeriodicReadMs)
+            {
+                _lastPeriodicReadTicks = now;
+                foreach (var cmd in reads)
+                    _deviceManager.ReadSettingUntracked(cmd);
+            }
+        }
+
+        private static long Elapsed(long now, long then)
+            => then == 0 ? long.MaxValue : (now - then) * 1000 / Stopwatch.Frequency;
 
         private void OnConnectionDisconnected()
         {
@@ -304,8 +374,12 @@ namespace MozaPlugin.Devices
             if (_disposed || _isShuttingDown()) return;
             if (data == null || data.Length < 2) return;
 
-            // Firmware debug noise.
-            if (data[0] == MozaProtocol.FirmwareDebugGroup) return;
+            if (data[0] == MozaProtocol.FirmwareDebugGroup)
+            {
+                if (_desc.FirmwareLogSource != null)
+                    _plugin.FirmwareDebugLogForDiagnostics.RecordFrame(data, _desc.FirmwareLogSource);
+                return;
+            }
 
             // Presence-probe ACK: 7e 00 80 swap(dev) chk → data = {0x80, dev}.
             // This pipe is dedicated and the PID already told us the category, so
@@ -357,6 +431,7 @@ namespace MozaPlugin.Devices
                 if (r.ArrayValue != null)
                     _data.UpdateFromArray(r.Name, r.ArrayValue);
             }
+            _desc.OnReadback?.Invoke(_plugin, r);
             _prober.DetectDevices(r.Name, r.IntValue, r.DeviceId);
         }
 

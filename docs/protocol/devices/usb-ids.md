@@ -32,9 +32,16 @@ expected to stay in sync.
 | `0x0024` | Stalks      | MOZA Stalks                   | confirmed   |
 | `0x0025` | Dashboard   | CM2 Racing Dash               | confirmed   |
 | `0x002F` | PedalHaptics| S12 pedal vibration           | confirmed   |
+| `0x0030` | Fcs         | Farming Control System        | confirmed   |
 | `0x1000` | Ab9         | AB9 active shifter            | confirmed   |
 | `0x1002` | Ab9         | AB6 active shifter            | confirmed   |
 | `0x2000` | Motion      | MOZA Motion Controller (HMA150 motion platform) | confirmed   |
+
+PID `0x0030` is the **MOZA Farming Control System** (product string `MOZA
+Farming Control System`, CDC ACM + CDC data + a HID joystick interface),
+confirmed from the device descriptor in `usb-capture/fcs/` (2026-11). The
+standalone peripheral lane claims it; the HID reader routes its joystick to
+the FCS surface only. Protocol: [`fcs.md`](fcs.md).
 
 PID `0x2000` is the **MOZA Motion Controller** — the USB box that drives the
 HMA150 4-corner motion platform (product string `MOZA Motion Controller`,
@@ -85,6 +92,7 @@ CDC device.
 | `Dashboard` | Dedicated `MozaSerialConnection` filtered to dashboard PIDs only (`0x0025`), separate from the wheelbase connection so a standalone CM2 works alongside a base | Registry direct-claims the dashboard port by PID (no probe scan); screen telemetry / config writes address `dev_id=0x12` (CM2 bridge/main). A CM2 *behind* a wheelbase has no own port and is the dash sub-device at `dev_id=0x14` on the wheelbase connection. |
 | `PedalHaptics` | [`PedalHapticsDeviceController`](../../../Devices/PedalHaptics/PedalHapticsDeviceController.cs) (multi-device under [`MozaPedalHapticsRegistry`](../../../Devices/PedalHaptics/MozaPedalHapticsRegistry.cs)), one dedicated connection per S12 plugged straight into the PC, addressed `0x12`. A unit behind a base/hub has no port of its own and is reached on that pipe through the extended envelope (`0x1F` + extended id `0x1E`) instead. See [`pedal-haptics.md`](pedal-haptics.md). | `MozaProbeTarget.PedalHaptics` — registry-only, claimed by PID; probe fallback force-disabled, so this never writes scan bytes to a port it was not handed. |
 | `Motion`    | [`MozaMotionController`](../../../Devices/Motion/MozaMotionController.cs) — one dedicated connection, held whenever the controller is present (heartbeat, enrolment, game-mode streaming for the SimHub Motion output). Not read over HID. Wire protocol: [`../motion/`](../motion/). | `MozaProbeTarget.Motion` — registry-only, claimed by PID; probe fallback force-disabled |
+| `Fcs`       | Dedicated [`StandalonePeripheralController`](../../../Devices/StandalonePeripheralController.cs) lane (descriptor `Fcs`), addressed `0x12`: 500 ms heartbeat, connect-time `0x4E` read sweep, 2 s right-rod poll, `0x0E` log kept. HID joystick read as `MozaHidClass.Fcs`. See [`fcs.md`](fcs.md). | `MozaProbeTarget.FcsOnly` — registry-only, claimed by PID; probe fallback force-disabled |
 | `Unknown`   | Both `Wheelbase` and `Ab9` connections accept unknown PIDs as fallback    | Each runs its own probe; the first matching response wins             |
 
 ## Discovery path

@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MozaPlugin.Telemetry.Dashboard;
 
 namespace MozaPlugin.UI
 {
@@ -22,7 +23,9 @@ namespace MozaPlugin.UI
     /// </summary>
     internal static class DashboardPreviewRenderer
     {
-        private const string DoneMarker = ".rendered";
+        // Renamed when the render inputs change, so older entries re-render.
+        // v2: shared-pool widget images copied in.
+        private const string DoneMarker = ".rendered-v2";
         private static readonly TimeSpan RenderTimeout = TimeSpan.FromSeconds(60);
         private const int MaxCachedEntries = 64;
 
@@ -44,34 +47,50 @@ namespace MozaPlugin.UI
         /// on a cache hit.
         /// </summary>
         /// <param name="sourceDir">Directory the mzdash came from, or empty. Its
-        /// <c>Resource\</c> subtree is copied alongside so per-dashboard widget
-        /// images resolve; the shared pool resolves via Studio's own imageRoot.</param>
-        public static Task<IReadOnlyList<string>> GetOrRenderAsync(string name, byte[] mzdash, string? sourceDir)
+        /// <c>Resource\</c> subtree is copied alongside, plus any referenced image
+        /// found only in the shared pool — Studio resolves images solely against
+        /// the project's <c>Resource\MD5\</c>.</param>
+        /// <param name="force">Ignore the cached render and run Studio again.</param>
+        public static Task<IReadOnlyList<string>> GetOrRenderAsync(
+            string name, byte[] mzdash, string? sourceDir, bool force = false)
         {
             string key = HashHex(mzdash);
             string entryDir = Path.Combine(CacheRoot, key);
-            var cached = ReadRendered(entryDir);
-            if (cached != null) return Task.FromResult(cached);
+            if (!force)
+            {
+                var cached = ReadRendered(entryDir);
+                if (cached != null) return Task.FromResult(cached);
+            }
 
             lock (s_lock)
             {
+                // An in-flight render started on a miss or a force, so it is already fresh.
                 if (s_inFlight.TryGetValue(key, out var running)) return running;
-                var task = Task.Run(() => RenderAsync(key, entryDir, name, mzdash, sourceDir));
+                var task = Task.Run(() => RenderAsync(key, entryDir, name, mzdash, sourceDir, force));
                 s_inFlight[key] = task;
-                task.ContinueWith(_ => { lock (s_lock) s_inFlight.Remove(key); },
-                    TaskScheduler.Default);
+                task.ContinueWith(_ =>
+                {
+                    lock (s_lock)
+                    {
+                        if (s_inFlight.TryGetValue(key, out var current) && current == task)
+                            s_inFlight.Remove(key);
+                    }
+                }, TaskScheduler.Default);
                 return task;
             }
         }
 
         private static async Task<IReadOnlyList<string>> RenderAsync(
-            string key, string entryDir, string name, byte[] mzdash, string? sourceDir)
+            string key, string entryDir, string name, byte[] mzdash, string? sourceDir, bool force)
         {
             await s_renderGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                var cached = ReadRendered(entryDir);
-                if (cached != null) return cached;
+                if (!force)
+                {
+                    var cached = ReadRendered(entryDir);
+                    if (cached != null) return cached;
+                }
 
                 string? exe = DashboardStudioLauncher.FindStudioExe();
                 if (exe == null) return Array.Empty<string>();
@@ -83,6 +102,7 @@ namespace MozaPlugin.UI
                 string mzdashPath = Path.Combine(projectDir, safe + ".mzdash");
                 File.WriteAllBytes(mzdashPath, mzdash);
                 CopyResources(sourceDir, projectDir);
+                CopyReferencedImages(mzdash, sourceDir, projectDir, name);
 
                 var sw = Stopwatch.StartNew();
                 if (!RunStudio(exe, mzdashPath, name)) return Array.Empty<string>();
@@ -161,6 +181,28 @@ namespace MozaPlugin.UI
                 string dest = Path.Combine(projectDir, "Resource", file.Substring(src.Length).TrimStart('\\', '/'));
                 Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
                 File.Copy(file, dest, overwrite: true);
+            }
+        }
+
+        // Studio 1.0.7.7 fails the whole render on one missing image (older
+        // versions drew the widget blank), and a Studio-authored dashboard keeps
+        // its images in the shared pool, not under its own Resource\.
+        private static void CopyReferencedImages(byte[] mzdash, string? sourceDir, string projectDir, string name)
+        {
+            string text = Encoding.UTF8.GetString(mzdash);
+            string destDir = Path.Combine(projectDir, "Resource", "MD5");
+            foreach (var img in DashboardImageResolver.Resolve(text, sourceDir))
+            {
+                string dest = Path.Combine(destDir, img.FileName);
+                if (File.Exists(dest)) continue;
+                if (img.Path == null)
+                {
+                    MozaLog.Warn($"[AZOM] Dashboard preview: image MD5/{img.FileName} for '{name}' not found. Looked in: "
+                                 + string.Join(", ", img.Searched));
+                    continue;
+                }
+                Directory.CreateDirectory(destDir);
+                File.Copy(img.Path, dest);
             }
         }
 

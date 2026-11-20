@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>휠이 아직 조이스틱 구성을 보고하지 않았습니다. 휠을 연결하고 식별 프로브가 완료될 때까지 기다리세요.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>텔레메트리</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>폴더 설정…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio 대시보드</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>장치 대시보드</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>사용자 지정</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>찾을 수 없음</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>이 휠의 사본 없음</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>휠이 연결되지 않음</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>디스플레이가 감지되지 않음</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>없음</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>지우기</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>자동 감지</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>.mzdash 파일 폴더를 대시보드 라이브러리로 설정합니다</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>연결된 휠의 대시보드 폴더를 자동으로 감지합니다</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>테스트</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>정지</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>채널 매핑</value></data>
@@ -484,7 +492,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>먼저 .mzdash 파일이나 라이브러리 항목을 선택하세요.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(아직 configJson 상태를 받지 못함)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>"{0}"의 원시 바이트를 확인할 수 없습니다 — 대신 로컬 파일을 선택하세요.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>폴더: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>업로드 대기 중 — "{0}"을(를) 휠로 전송하는 중…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>업로드를 시작하지 못함 — 휠이 연결되지 않았거나 관리 세션이 아직 없습니다.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>업로드 완료 (상태 0x{0})</value></data>
@@ -495,18 +502,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>업로드할 .mzdash 파일을 선택하세요</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 대시보드 (*.mzdash)|*.mzdash|모든 파일 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>.mzdash 대시보드 파일이 있는 폴더를 선택하세요</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>대시보드 폴더 자동 감지</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House 대시보드 폴더를 찾을 수 없습니다:
-{0}
-
-MOZA Pit House를 설치하고 대시보드를 로드하거나, 사용자 지정 위치를 지정하려면 폴더 설정…을 사용하세요.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>연결된 휠(UID {0})에 대한 대시보드 폴더가 없습니다.
-검색한 위치:
-{1}
-
-먼저 MOZA Pit House에서 이 휠의 대시보드를 여세요.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>_dashes 아래에서 휠별 대시보드 폴더를 찾을 수 없습니다. MOZA Pit House를 열어 대시보드를 로드한 뒤 다시 시도하세요.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>여러 대시보드 폴더({0}개)가 발견되었고 연결된 휠이 없습니다. 휠을 연결하고 다시 시도하거나, 폴더 설정…으로 직접 선택하세요.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>모든 플러그인 설정과 프로필이 영구적으로 삭제됩니다.
 
 계속하시겠습니까?</value></data>
@@ -644,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>문제를 설명해 주세요: 무엇을 했는지, 휠이나 대시보드가 어떻게 반응했는지, 언제부터 시작됐는지.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>연락처 (선택 — 이메일 또는 Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>제출하면 진단 번들(플러그인 로그와 시리얼 추적, 하드웨어 식별자는 가려짐)이 플러그인 개발자에게 업로드됩니다.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>개인정보 처리방침</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>버그 신고 보내기</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>업로드 중…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>신고가 접수되었습니다. 참조: {0}</value></data>
@@ -816,6 +812,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>촉각 피드백</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>버튼 디바운스 (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>미리보기를 사용할 수 없음</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>{0}에서 대시보드를 찾을 수 없음</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>눌림</value></data>
   <data name="Status_Released" xml:space="preserve"><value>놓임</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>사용자 지정 색조 선택기</value></data>
@@ -938,4 +935,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>최대 성능</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>최대 성능은 속도 제한 없이 SimHub의 전체 각도를 따릅니다. SimHub 설정이 최대이거나 최대에 가까우면 리그가 튀거나 밀릴 가능성이 높습니다. 사용에 따른 위험은 본인이 부담합니다.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>시트 기준 회전 중심: 뒤로 {0:0} mm, 아래로 {1:0} mm</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>FCS 검색 중...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>실시간 축</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>스로틀 레버</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>조이스틱 X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>조이스틱 Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>조이스틱 비틀기</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>썸스틱 X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>썸스틱 Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>조이스틱 XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>썸스틱</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>조이스틱 모드</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>오른쪽 스틱</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>연결되지 않음</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>내장 조이스틱</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>버튼 조명 모드</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED 색상</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED 색상</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>MOZA Farming Control System이 연결되어 있지만 장치가 SimHub에 추가되지 않았습니다. 장치 &gt; 장치 추가 &gt; {0}을(를) 여세요.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>스로틀 레버를 끝까지 앞뒤로 몇 번 움직인 다음 완료를 누르세요.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>조이스틱을 모든 방향의 끝까지 움직이며 시계 방향으로, 그다음 반시계 방향으로 천천히 원을 그린 후 완료를 누르세요.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>조이스틱을 왼쪽과 오른쪽 끝까지 몇 번 비튼 다음 완료를 누르세요.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>썸스틱을 모든 방향의 끝까지 몇 번 움직인 다음 완료를 누르세요.</value></data>
 </root>

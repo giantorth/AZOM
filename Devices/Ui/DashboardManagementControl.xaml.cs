@@ -1150,8 +1150,18 @@ namespace MozaPlugin.Devices.Ui
         private string _previewStamp = "";
         private int _previewRequest;
         private bool _previewKeyValid;
+        // Folders searched for the selected dashboard when it has no file on disk;
+        // null when the file exists (or nothing is selected).
+        private string? _previewMissingFrom;
 
-        private void UpdateDashboardPreview()
+        private void DashboardPreview_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 2) return;
+            e.Handled = true;
+            UpdateDashboardPreview(force: true);
+        }
+
+        private void UpdateDashboardPreview(bool force = false)
         {
             if (_plugin == null || DashboardPreviewPanel == null) return;
             // FSR1/CM1 show built-in pages with no mzdash behind them.
@@ -1176,13 +1186,17 @@ namespace MozaPlugin.Devices.Ui
                 : _plugin.DashCache?.TryGetFolderFilePath(name);
             string stamp = FileStamp(path);
             byte[]? cached = name != null && !custom ? _plugin.DashCache?.TryGetRawContent(name) : null;
-            if (_previewKeyValid && name == _previewName && ReferenceEquals(cached, _previewCacheRef)
+            if (!force && _previewKeyValid && name == _previewName && ReferenceEquals(cached, _previewCacheRef)
                 && stamp == _previewStamp) return;
             if (name != _previewName) _previewPage = 0;
             _previewKeyValid = true;
             _previewName = name;
             _previewCacheRef = cached;
             _previewStamp = stamp;
+            _previewMissingFrom = name == null || stamp.Length > 0 ? null
+                : custom ? (string.IsNullOrEmpty(path) ? null : System.IO.Path.GetDirectoryName(path))
+                : string.Join("; ", _plugin.DashboardLibraryFolders());
+            if (string.IsNullOrEmpty(_previewMissingFrom)) _previewMissingFrom = null;
             int request = ++_previewRequest;
 
             byte[]? bytes = null;
@@ -1219,7 +1233,7 @@ namespace MozaPlugin.Devices.Ui
                 return;
             }
 
-            var render = DashboardPreviewRenderer.GetOrRenderAsync(name, bytes, sourceDir);
+            var render = DashboardPreviewRenderer.GetOrRenderAsync(name, bytes, sourceDir, force);
             if (!render.IsCompleted)
             {
                 _previewPages = Array.Empty<ImageSource>();
@@ -1242,7 +1256,9 @@ namespace MozaPlugin.Devices.Ui
             _previewPages = images ?? Array.Empty<ImageSource>();
             // Stay on the same page across a re-render of the same dashboard.
             if (_previewPage >= _previewPages.Count) _previewPage = 0;
-            SetPreviewPlaceholder(_previewPages.Count > 0 ? null : Strings.Status_PreviewUnavailable);
+            SetPreviewPlaceholder(_previewPages.Count > 0 ? null
+                : _previewMissingFrom != null ? string.Format(Strings.Status_PreviewDashboardNotFoundFmt, _previewMissingFrom)
+                : Strings.Status_PreviewUnavailable);
             DashboardPreviewPanel.Visibility = Visibility.Visible;
             ShowPreviewPage();
         }

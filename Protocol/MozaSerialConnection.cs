@@ -148,6 +148,8 @@ namespace MozaPlugin.Protocol
         PedalHaptics,
         // MOZA Motion Controller (PID 0x2000). Registry-only; probe fallback disabled.
         Motion,
+        // MOZA Farming Control System (PID 0x0030). Registry-only; probe fallback disabled.
+        FcsOnly,
     }
 
     public class MozaSerialConnection : IDisposable

@@ -234,6 +234,14 @@ namespace MozaPlugin.Devices
             SendRawProbe(g, dev, new byte[] { 0x10, 0x00 });
         }
 
+        /// <summary>The 0x06 MCU-UID frame of <see cref="SendDisplayProbe()"/> on its own.
+        /// Untracked like that cascade; the reply lands on <c>display-mcu-uid</c>.</summary>
+        public void SendDisplayUidProbe()
+        {
+            if (!_connection.IsConnected) return;
+            SendRawProbe(MozaProtocol.TelemetrySendGroup, MozaProtocol.DeviceWheel, new byte[] { 0x06 });
+        }
+
         /// <summary>
         /// Zero-length form of the numeric base-firmware query
         /// (<c>7E 00 04 12 CK</c>). The tracked <c>base-fw-version</c> read sends
@@ -705,6 +713,7 @@ namespace MozaPlugin.Devices
                 // override above wins; this covers a future hub/base-relayed shifter.
                 case "shifter":  return MozaProtocol.DeviceHPattern;
                 case "ab9":      return MozaProtocol.DeviceAb9;
+                case "fcs":      return MozaProtocol.DeviceMain;
                 default:         return MozaProtocol.DeviceBase;
             }
         }

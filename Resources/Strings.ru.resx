@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Руль ещё не сообщил конфигурацию джойстика. Подключите руль и дождитесь завершения опроса идентификации.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Телеметрия</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ВЫБРАТЬ ПАПКУ…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Панели Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Панели устройства</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Своя</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Не найдена</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Нет копии для этого руля</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Руль не подключён</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Дисплей не обнаружен</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Нет</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>УБРАТЬ</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>АВТО-ОПРЕДЕЛЕНИЕ</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Указать папку с файлами .mzdash как библиотеку панелей</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Автоопределить папку панелей для подключённого руля</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>ТЕСТ</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>СТОП</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>НАЗНАЧЕНИЕ КАНАЛОВ</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Сначала выберите файл .mzdash или запись из библиотеки.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(состояние configJson ещё не получено)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Не удаётся получить байты для «{0}» — выберите локальный файл.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Папка: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Загрузка в очереди — отправка «{0}» на руль…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Загрузка не начата — руль не подключён или сеанс управления ещё не установлен.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Загрузка завершена (статус 0x{0})</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Выберите файл .mzdash для загрузки</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Панель Moza (*.mzdash)|*.mzdash|Все файлы (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Выберите папку с файлами панелей .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Автоопределение папки панелей</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Папка панелей MOZA Pit House не найдена в:
-{0}
-
-Установите MOZA Pit House и загрузите панель или используйте «Указать папку…», чтобы выбрать своё расположение.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Нет папки панелей для подключённого руля (UID {0}).
-Искали в:
-{1}
-
-Сначала откройте панель для этого руля в MOZA Pit House.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>В _dashes не найдено папок панелей для конкретного руля. Откройте MOZA Pit House, загрузите панель и повторите попытку.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Найдено несколько папок панелей ({0}), и ни один руль не подключён. Подключите руль и повторите попытку или используйте «Указать папку…» для ручного выбора.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Это безвозвратно удалит все настройки и профили плагина.
 
 Вы уверены?</value></data>
@@ -645,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Опишите проблему: что вы делали, как повёл себя руль или приборная панель и когда это началось.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Контакт (необязательно — email или Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>При отправке разработчику плагина загружается диагностический архив (журналы плагина и трассировка последовательного порта; идентификаторы оборудования скрыты).</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Политика конфиденциальности</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Отправить отчёт об ошибке</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Отправка…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Отчёт отправлен. Номер: {0}</value></data>
@@ -817,6 +813,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Тактильная отдача</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Антидребезг кнопок (мс)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Предпросмотр недоступен</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Панель не найдена в {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Нажато</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Отпущено</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Выбор своего оттенка</value></data>
@@ -939,4 +936,26 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Максимальная производительность</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Максимальная производительность следует полным углам SimHub без ограничения скорости. При настройках SimHub на максимуме или близко к нему ваш риг, скорее всего, будет подпрыгивать или смещаться. Используйте на свой страх и риск.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Точка вращения от сиденья: {0:0} мм назад, {1:0} мм вниз</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Поиск FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ОСИ В РЕАЛЬНОМ ВРЕМЕНИ</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Рычаг газа</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Джойстик X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Джойстик Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Поворот джойстика</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Мини-джойстик X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Мини-джойстик Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Джойстик XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Мини-джойстик</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>РЕЖИМЫ ДЖОЙСТИКА</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Правая рукоять</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Не подключено</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Встроенный джойстик</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Подсветка кнопок</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Цвета светодиодов</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>ЦВЕТА СВЕТОДИОДОВ</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>MOZA Farming Control System подключена, но устройство не добавлено в SimHub. Откройте «Устройства» &gt; «Добавить устройство» &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Несколько раз переместите рычаг газа до упора вперёд и назад, затем нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Отведите джойстик до упора во всех направлениях, медленно вращая по часовой стрелке, а затем против, и нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Несколько раз поверните джойстик до упора влево и вправо, затем нажмите ГОТОВО.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Несколько раз отведите мини-джойстик до упора во всех направлениях, затем нажмите ГОТОВО.</value></data>
 </root>

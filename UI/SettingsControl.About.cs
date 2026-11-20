@@ -35,12 +35,14 @@ namespace MozaPlugin.UI
         private const string AboutDiscordUrl = "https://discord.gg/J4enw43e62";
         private const string AboutSponsorUrl = "https://github.com/sponsors/giantorth";
         private const string AboutKofiUrl    = "https://ko-fi.com/giantorth";
+        private const string PrivacyPolicyUrl = "https://giant.orth.cc/privacy/";
 
         private void AboutGuidesIndexButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutGuidesUrl);
         private void AboutGitHubButton_Click(object sender, System.Windows.RoutedEventArgs e)  => OpenExternalUrl(AboutGitHubUrl);
         private void AboutDiscordButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutDiscordUrl);
         private void AboutSponsorButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutSponsorUrl);
         private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => OpenExternalUrl(AboutKofiUrl);
+        private void BugReportPrivacyLink_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(PrivacyPolicyUrl);
 
         // Guide list published by the site at build time, in site order. Fetched
         // once per AppDomain; the built-in list below shows until it arrives and

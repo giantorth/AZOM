@@ -253,68 +253,15 @@ namespace MozaPlugin.Devices.Ui
         private Grid BuildLedGrid(PaletteKind kind, string label, int ledsPerStrip)
         {
             int stride = BaseModelInfo.MaxLedsPerStrip;
-            int total = ledsPerStrip * 2;
+            var grid = SwatchRow.Build(this, label, ledsPerStrip * 2,
+                c => new PerLedTag(kind, c / ledsPerStrip, c % ledsPerStrip,
+                    (c / ledsPerStrip) * stride + c % ledsPerStrip),
+                PerLedSwatch_Click, out var columns);
 
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            for (int c = 0; c < total; c++)
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            for (int ui = 1; ui <= total; ui++)
-            {
-                var num = new TextBlock
-                {
-                    Text = ui.ToString(),
-                    Width = 28,
-                    TextAlignment = TextAlignment.Center,
-                    Opacity = 0.6,
-                    Margin = new Thickness(1, 0, 1, 2),
-                };
-                Grid.SetRow(num, 0);
-                Grid.SetColumn(num, ui);
-                grid.Children.Add(num);
-            }
-
-            var caption = new TextBlock
-            {
-                Text = label,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 2, 12, 2),
-                Style = TryFindResource("LabelText") as Style,
-            };
-            Grid.SetRow(caption, 1);
-            Grid.SetColumn(caption, 0);
-            grid.Children.Add(caption);
-
+            // Swatches by flat palette index (strip * stride + led).
             var swatches = new Border[stride * 2];
-            for (int strip = 0; strip < 2; strip++)
-            {
-                for (int led = 0; led < ledsPerStrip; led++)
-                {
-                    int index = strip * stride + led;
-                    int column = 1 + strip * ledsPerStrip + led;
-                    var swatch = new Border
-                    {
-                        Width = 28,
-                        Height = 24,
-                        Margin = new Thickness(1, 2, 1, 2),
-                        BorderBrush = TryFindResource("BorderBrightBrush") as Brush,
-                        BorderThickness = new Thickness(1),
-                        CornerRadius = new CornerRadius(4),
-                        Cursor = Cursors.Hand,
-                        Background = Brushes.Black,
-                        Tag = new PerLedTag(kind, strip, led, index),
-                    };
-                    swatch.MouseLeftButtonUp += PerLedSwatch_Click;
-                    Grid.SetRow(swatch, 1);
-                    Grid.SetColumn(swatch, column);
-                    grid.Children.Add(swatch);
-                    swatches[index] = swatch;
-                }
-            }
-
+            foreach (var s in columns)
+                swatches[((PerLedTag)s.Tag).Index] = s;
             _perLedSwatches[kind] = swatches;
             return grid;
         }

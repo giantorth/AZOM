@@ -233,7 +233,7 @@ namespace MozaPlugin.UI
             if (profileGate)
             {
                 // Rule 3: ProfileNotAddedDash
-                if (detection.DashDetected && !plugin.DashDeviceExtensionActive)
+                if (detection.DashDetected && !MozaPlugin.DashDeviceExtensionActive)
                 {
                     const string dashDeviceName = "MOZA CM2 Racing Dash";
                     list.Add(new StatusHint(
@@ -247,7 +247,7 @@ namespace MozaPlugin.UI
                 // fall back to the legacy shared name while the model is unknown.
                 bool baseDeviceExpected =
                     detection.BaseAmbientLedSupported || plugin.WheelbaseWantsShakeItHaptics;
-                if (baseDeviceExpected && !plugin.BaseAmbientDeviceExtensionActive)
+                if (baseDeviceExpected && !MozaPlugin.BaseAmbientDeviceExtensionActive)
                 {
                     var basePrefix = Devices.BaseModelInfo.ExtractPrefix(plugin.Data?.BaseModelName);
                     string baseDeviceName = basePrefix.Length != 0
@@ -323,6 +323,19 @@ namespace MozaPlugin.UI
                     Strings.Banner_ProfileNotAddedMBooster_Title,
                     string.Format(Strings.Banner_ProfileNotAddedMBooster_Body,
                         Devices.Extensions.DeviceDefinitionDeployer.MBoosterShakeItDeviceName)));
+            }
+
+            // Rule 6c: ProfileNotAddedFcs. Own USB device, so no wheelbase gate.
+            if (elapsed >= ProfileNotAddedSettling
+                && !plugin.DeviceDefinitionDeployed
+                && plugin.IsFcsDetected
+                && !MozaPlugin.FcsDeviceExtensionActive)
+            {
+                const string fcsDeviceName = Devices.Extensions.DeviceDefinitionDeployer.FcsDeviceName;
+                list.Add(new StatusHint(
+                    StatusHintKind.ProfileNotAddedFcs,
+                    string.Format(Strings.Banner_ProfileNotAdded_TitleFmt, fcsDeviceName),
+                    string.Format(Strings.Banner_ProfileNotAddedFcs_Body, fcsDeviceName)));
             }
 
             // Rule 7: the motion controller is on USB but SimHub Motion can't drive it —

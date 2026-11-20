@@ -386,9 +386,14 @@ namespace MozaPlugin
             try { Devices.Led.MozaDashLedDeviceManager.Latest?.TickKeepalive(); }
             catch (Exception ex) { MozaLog.Warn($"[AZOM] Dash LED keepalive tick failed: {ex.Message}"); }
 
-            try { Devices.Led.MozaBaseLedDeviceManager.TickKeepaliveAll(); }
-            catch (Exception ex) { MozaLog.Warn($"[AZOM] Base LED keepalive tick failed: {ex.Message}"); }
+            // Base ambient strips + FCS button LEDs.
+            try { Devices.Led.MozaMaskLedDeviceManager.TickKeepaliveAll(); }
+            catch (Exception ex) { MozaLog.Warn($"[AZOM] Base/FCS LED keepalive tick failed: {ex.Message}"); }
         }
+
+        // Display-UID re-asks this wheel session; 12 × 5 s ≈ a tracked read's 60 s sunset.
+        private int _displayUidProbeTries;
+        private const int DisplayUidProbeMaxTries = 12;
 
         private void PollStatus(object sender, ElapsedEventArgs e)
         {
@@ -661,6 +666,20 @@ namespace MozaPlugin
                 && WheelModelInfo != null
                 && WheelModelInfo.HasDisplay != false)
                 _deviceManager.SendDisplayProbe();
+            // The full re-probe stops at the first identity field, so a lost UID
+            // reply is never asked for again. The UID names PitHouse's synced
+            // dashboard folder: re-ask it alone, capped like a tracked read.
+            else if (DetectionState.NewWheelDetected
+                && IsDisplayDetected
+                && _data.DisplayMcuUid.Length == 0
+                && WheelModelInfo != null
+                && WheelModelInfo.HasDisplay != false
+                && _displayUidProbeTries < DisplayUidProbeMaxTries)
+            {
+                _displayUidProbeTries++;
+                _deviceManager.SendDisplayUidProbe();
+            }
+            if (!DetectionState.NewWheelDetected) _displayUidProbeTries = 0;
 
             // Display-boot wedge watchdog. The W17 (CS Pro) takes ~20 s for its
             // display sub-device to come up after a hot-attach; KS Pro and other

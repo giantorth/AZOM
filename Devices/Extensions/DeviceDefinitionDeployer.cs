@@ -218,6 +218,10 @@ namespace MozaPlugin.Devices.Extensions
             written += mbooster.Written;
             total += mbooster.Total;
 
+            var fcs = RedeployAllFcs();
+            written += fcs.Written;
+            total += fcs.Total;
+
             MozaLog.Info(
                 $"[AZOM] Redeployed all device definitions: {written}/{total} written " +
                 $"(wheelbase pid={wheelbasePid}, dash pid={dashboardPid}; restart SimHub to pick them up)");

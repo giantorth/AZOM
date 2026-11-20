@@ -229,6 +229,26 @@ namespace MozaPlugin.UI
         public static string? ResolveImageRoot() =>
             ResolveIniDirectory("imageRoot", DefaultImageRoot);
 
+        /// <summary>
+        /// PitHouse's synced copy for one wheel, <c>_dashes\&lt;24-hex display MCU UID&gt;</c>,
+        /// or null when the UID is unknown or PitHouse never synced that wheel.
+        /// </summary>
+        public static string? ResolveWheelSyncFolder(string uidHex)
+        {
+            if (string.IsNullOrEmpty(uidHex)) return null;
+            try
+            {
+                string root = Path.Combine(LocalAppData, "MOZA Pit House", "_dashes");
+                if (!Directory.Exists(root)) return null;
+                // Case-insensitive: the name is hex and Proton's FS is case-sensitive.
+                foreach (var dir in Directory.EnumerateDirectories(root))
+                    if (string.Equals(Path.GetFileName(dir), uidHex, StringComparison.OrdinalIgnoreCase))
+                        return dir;
+            }
+            catch { }
+            return null;
+        }
+
         private static string? ResolveIniDirectory(string key, string fallback)
         {
             string? fromIni = ReadIniValue(PitHouseSettingsIniPath, "DashboardStudio", key);

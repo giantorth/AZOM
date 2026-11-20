@@ -316,6 +316,8 @@ namespace MozaPlugin.Devices.Ui
                 int ledCount = ledsPerKnob != null && k < ledsPerKnob.Length ? ledsPerKnob[k] : 12;
                 if (ledCount <= 0) ledCount = 12;
                 int startIdx = _plugin?.WheelModelInfo?.KnobRingStartIndex(k) ?? (k * 12);
+                int rotation = _plugin?.WheelModelInfo?.KnobRingRotationFor(k) ?? 0;
+                if (viz.SlotRotation != rotation) viz.SlotRotation = rotation;
                 if (viz.RingColors == null || viz.RingColors.Count != ledCount)
                 {
                     var fresh = new System.Collections.ObjectModel.ObservableCollection<Color>();

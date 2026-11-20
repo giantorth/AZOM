@@ -446,9 +446,17 @@ namespace MozaPlugin.Resources
         public static string Hint_NoJoystickConfig => Get("Hint_NoJoystickConfig");
         public static string Label_EnableDashboardTelemetry => Get("Label_EnableDashboardTelemetry");
         public static string Button_SetFolder => Get("Button_SetFolder");
+        public static string Label_DashFolderStudio => Get("Label_DashFolderStudio");
+        public static string Label_DashFolderPitHouse => Get("Label_DashFolderPitHouse");
+        public static string Label_DashFolderCustom => Get("Label_DashFolderCustom");
+        public static string Status_DashFolderNotFound => Get("Status_DashFolderNotFound");
+        public static string Status_DashFolderNoWheelCopy => Get("Status_DashFolderNoWheelCopy");
+        public static string Status_DashFolderWheelNotConnected => Get("Status_DashFolderWheelNotConnected");
+        public static string Status_DashFolderNoDisplay => Get("Status_DashFolderNoDisplay");
+        public static string Status_DashFolderNone => Get("Status_DashFolderNone");
+        public static string Button_ClearFolder => Get("Button_ClearFolder");
         public static string Button_AutoDetect => Get("Button_AutoDetect");
         public static string Tooltip_SetFolder => Get("Tooltip_SetFolder");
-        public static string Tooltip_AutoDetect => Get("Tooltip_AutoDetect");
         public static string Button_SendTestPattern => Get("Button_SendTestPattern");
         public static string Button_StopTest => Get("Button_StopTest");
         public static string Section_ChannelMappings => Get("Section_ChannelMappings");
@@ -596,7 +604,6 @@ namespace MozaPlugin.Resources
         public static string Status_PickMzdashFirst => Get("Status_PickMzdashFirst");
         public static string Status_NoConfigJsonState => Get("Status_NoConfigJsonState");
         public static string Upload_CannotResolveBytes => Get("Upload_CannotResolveBytes");
-        public static string Upload_FolderPrefix => Get("Upload_FolderPrefix");
         public static string Upload_Queued => Get("Upload_Queued");
         public static string Upload_NotStarted => Get("Upload_NotStarted");
         public static string Upload_Complete => Get("Upload_Complete");
@@ -607,11 +614,6 @@ namespace MozaPlugin.Resources
         public static string Upload_FileDialog_Title => Get("Upload_FileDialog_Title");
         public static string Upload_FileDialog_Filter => Get("Upload_FileDialog_Filter");
         public static string Upload_FolderDialog_Description => Get("Upload_FolderDialog_Description");
-        public static string Upload_AutoDetect_Caption => Get("Upload_AutoDetect_Caption");
-        public static string Upload_AutoDetect_NotFound => Get("Upload_AutoDetect_NotFound");
-        public static string Upload_AutoDetect_NoFolderForWheel => Get("Upload_AutoDetect_NoFolderForWheel");
-        public static string Upload_AutoDetect_NoFolders => Get("Upload_AutoDetect_NoFolders");
-        public static string Upload_AutoDetect_Multiple => Get("Upload_AutoDetect_Multiple");
         public static string Dialog_ClearAllSettings_Body => Get("Dialog_ClearAllSettings_Body");
         public static string Dialog_ClearAllSettings_Caption => Get("Dialog_ClearAllSettings_Caption");
         public static string Dialog_RedeployDefinitions_Caption => Get("Dialog_RedeployDefinitions_Caption");
@@ -717,6 +719,7 @@ namespace MozaPlugin.Resources
         public static string Placeholder_BugReportDescription => Get("Placeholder_BugReportDescription");
         public static string Label_BugReportContact => Get("Label_BugReportContact");
         public static string Hint_BugReportConsent => Get("Hint_BugReportConsent");
+        public static string Link_PrivacyPolicy => Get("Link_PrivacyPolicy");
         public static string Button_SubmitBugReport => Get("Button_SubmitBugReport");
         public static string Status_BugReportUploading => Get("Status_BugReportUploading");
         public static string Status_BugReportSubmitted => Get("Status_BugReportSubmitted");
@@ -875,6 +878,7 @@ namespace MozaPlugin.Resources
         public static string Motion_Effect_TactileFeedback => Get("Motion_Effect_TactileFeedback");
         public static string SliderLabel_StalkDebounce => Get("SliderLabel_StalkDebounce");
         public static string Status_PreviewUnavailable => Get("Status_PreviewUnavailable");
+        public static string Status_PreviewDashboardNotFoundFmt => Get("Status_PreviewDashboardNotFoundFmt");
         public static string Status_Pressed => Get("Status_Pressed");
         public static string Status_Released => Get("Status_Released");
         public static string Tooltip_CustomHuePicker => Get("Tooltip_CustomHuePicker");
@@ -997,5 +1001,27 @@ namespace MozaPlugin.Resources
         public static string Motion_Panel_MaxPerformance => Get("Motion_Panel_MaxPerformance");
         public static string Motion_Panel_MaxPerformanceWarning => Get("Motion_Panel_MaxPerformanceWarning");
         public static string Motion_Panel_VrMcPivotBehindFmt => Get("Motion_Panel_VrMcPivotBehindFmt");
+        public static string Status_SearchingForFcs => Get("Status_SearchingForFcs");
+        public static string Section_LiveAxes => Get("Section_LiveAxes");
+        public static string Label_FcsThrottleLever => Get("Label_FcsThrottleLever");
+        public static string Label_FcsJoystickX => Get("Label_FcsJoystickX");
+        public static string Label_FcsJoystickY => Get("Label_FcsJoystickY");
+        public static string Label_FcsJoystickTwist => Get("Label_FcsJoystickTwist");
+        public static string Label_FcsThumbstickX => Get("Label_FcsThumbstickX");
+        public static string Label_FcsThumbstickY => Get("Label_FcsThumbstickY");
+        public static string Label_FcsJoystickXy => Get("Label_FcsJoystickXy");
+        public static string Label_FcsThumbstick => Get("Label_FcsThumbstick");
+        public static string Section_JoystickModes => Get("Section_JoystickModes");
+        public static string Label_RightRod => Get("Label_RightRod");
+        public static string Option_RodNotConnected => Get("Option_RodNotConnected");
+        public static string Option_RodBuiltIn => Get("Option_RodBuiltIn");
+        public static string SliderLabel_ButtonLightMode => Get("SliderLabel_ButtonLightMode");
+        public static string Label_LedColors => Get("Label_LedColors");
+        public static string Section_LedColors => Get("Section_LedColors");
+        public static string Banner_ProfileNotAddedFcs_Body => Get("Banner_ProfileNotAddedFcs_Body");
+        public static string Hint_FcsCalThrottle => Get("Hint_FcsCalThrottle");
+        public static string Hint_FcsCalJoystickXy => Get("Hint_FcsCalJoystickXy");
+        public static string Hint_FcsCalTwist => Get("Hint_FcsCalTwist");
+        public static string Hint_FcsCalThumbstick => Get("Hint_FcsCalThumbstick");
     }
 }

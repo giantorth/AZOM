@@ -209,6 +209,9 @@ namespace MozaPlugin
         internal void UpdateWheelLed(WheelLedGroup group, Action<IWheelLedFields> mutator) => _profileCoordinator.UpdateWheelLed(group, mutator);
         internal void UpdateDashProfile(Guid dashPageGuid, Action<MozaDashProfile> mutator) => _profileCoordinator.UpdateDashProfile(dashPageGuid, mutator);
         internal void UpdateBaseProfile(Guid? basePageGuid, Action<MozaBaseDeviceProfile> mutator) => _profileCoordinator.UpdateBaseProfile(basePageGuid, mutator);
+        /// <summary>The attached FCS's LED profile; null while no FCS is detected.</summary>
+        internal MozaFcsDeviceProfile? ActiveFcsProfile => _deviceProfiles?.ActiveFcsProfile;
+        internal void UpdateFcsProfile(Action<MozaFcsDeviceProfile> mutator) => _profileCoordinator.UpdateFcsProfile(mutator);
         internal void UpdateActiveProfile(Action<MozaProfile> mutator) => _profileCoordinator.UpdateActiveProfile(mutator);
         internal bool ActiveTelemetryEnabled
         {

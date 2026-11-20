@@ -562,6 +562,15 @@ namespace MozaPlugin.Settings
             mutator(profile);
         }
 
+        /// <summary>Apply <paramref name="mutator"/> to the FCS page's current profile.</summary>
+        internal void UpdateFcsProfile(Action<MozaFcsDeviceProfile> mutator)
+        {
+            if (mutator == null) return;
+            var profile = _plugin.DeviceProfiles?.FcsProfile();
+            if (profile == null) return;
+            mutator(profile);
+        }
+
         /// <summary>
         /// Apply <paramref name="mutator"/> to the current main profile (or no-op if
         /// no profile is selected). Used by UI handlers that own main-tab fields
