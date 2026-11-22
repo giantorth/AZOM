@@ -21,6 +21,7 @@ All notable changes to the AZOM plugin are documented here.
 - **KS Pro centre knob colour dots match the real LED positions;** each dot edited the LED one position clockwise of it.
 - **USB serial numbers masked in Linux diagnostics;** the device list in bug reports showed them in full.
 - **Added wheel and wheelbase devices no longer stuck on "detecting";** when SimHub loaded its devices before the plugin, they never linked up and the "add device" banners stayed.
+- **HMA150 port self-test names the failed axis check;** a rejected corner assignment timed out after 40 s and left the controller in self-test mode.
 
 ## [1.7.4]
 

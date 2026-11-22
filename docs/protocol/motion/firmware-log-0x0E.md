@@ -21,15 +21,19 @@ reply id (`0x61`/`0x71`/`0x81`/`0x91`…).
 | `[INFO]serial_reply_app.c:333 port:N axis:R` (×8) | after the host reads or writes the port→role table |
 | `[INFO]safety_control.c:422 Set next mode:N` | on every `0x1E/03` write |
 | `[INFO]safety_control.c:472 Controller Set curr mode:N` | when the controller reaches a mode (5 precedes every target) |
-| `[INFO]controller_model.c:183 ModelMode Set CtrlMode:C` + `[INFO]common_wrapper.c:57 controller_mode change to [C]` | model mode: 1 (standby / self-test), 2 (mode 3), 5 (game), 6 (self-check) |
+| `[INFO]controller_model.c:183 ModelMode Set CtrlMode:C` + `[INFO]common_wrapper.c:57 controller_mode change to [C]` | model mode: 1 (standby / self-test), 2 (mode 3), 5 (game), 6 (self-check), 9 (mode 8) |
 | `[ERRO]diag_svr_event.c:86 error_code 259 occurs` / `[ERRO]err_diag_svr.c:69 Travel Not Check` | entering mode 7 |
 | `[INFO]common_wrapper.c:57 pitch_offset:[0.00854], roll_offset:[0.00014]` / `selfCheckSuccess` / `error_code 259 clear` | mode 7 done |
+| `[INFO]controller_model.c:227 e2p port: (N), axis: (R)` | each `0x1E/02` role write (`ports and self test`, bundle `AX787D2P`; not logged in `Selftest`) |
+| `[ERRO]diag_svr_event.c:86 error_code 257 occurs` / `[ERRO]err_diag_svr.c:69 Port Not Bound` | entering mode 8 (also over a bound map, `Selftest`); `error_code 257 clear` when the port self-test passes |
+| `[INFO]common_wrapper.c:57 Front_Axis Failed` / `Back_Axis Failed`, each followed by `check_pitch:[-0.00275], pitch_horizon:[0.00195]` and `check_roll:[-0.01757], roll_horizon:[-0.00903]` | a port self-test axis check failed: front at +6.8 s, back at +13.5 s after `set mode 8` (bundle `AX787D2P`); nothing is logged for an axis that passes |
+| `[INFO]param_manage.c:340 Table 2, Param 9`…`16`, `27 Written: V 0.00000` | end of the port self-test: the port map (Param 8 + role = port, Param 27 = 4) after a pass, 0 in every one after a failure ([`identity-and-ports.md`](identity-and-ports.md#port--axis-role-table)) |
 | `[INFO]controller_model.c:57 Device Type : 1, eeprom data: 1` / `:61 Output Displacement : a b c d` / `:67 Calib Length : 500.00000,Width : 500.00000` | every 60 s on a free-running timer, in every mode (13, 0, 2, 3, 1) — not triggered by a mode change or any host request (`startup-shutdown`: mode 3 at 16.48 s, line at 19.24 s; `nurburgring`: 14.05 s then 74.04 s; the bench run sent no `0x0E` requests and still got it every 60 s). Displacements in mm, four actuators (e.g. `8.48902 -3.39236 -7.96388 3.91752`; `-80` ×4 in standby, `0` ×4 at the ready position). Mode 1 adds `:75 pitch : P, roll : R` (= f0/f1 of the last `0x22/00` frame) and `:79 In Game Flag : 1, Gear Shift : 0`; mode 2 adds `:85 Manual Input : pitch roll heave`. See [`game-stream-0x22.md`](game-stream-0x22.md#controller-output-and-heave) |
 | `[ERRO]controller_cmd.c:502 Set device type to : 1` | each `0x1E/0A 01` |
 | `[INFO]param_manage.c:340 Table 12, Param N Written: V 0.00000` (N = 5..36) and `Table 2, Param 26 Written: 1` | lighting-table writes (`0x1E/0B`) and device type |
 | `LightManageConfig_SetCmd: Global: switch=1, brightness=NaN` | first `0x0B` write |
 | `[INFO]diag_svr_event.c:108 error_code 269 clear` | Motion Manager connects after a boot with error 269 |
-| `Controller ErrCode:8` / `ErrCode:4` | boot fault pending / actuators missing |
+| `Controller ErrCode:8` / `ErrCode:4` / `ErrCode:32` | boot fault pending / actuators missing / port map not bound (with error 257; `ErrCode:0` after it clears) |
 | `Controller ErrCode:512` with `curr_mode:9 target_mode:0` (actuators also mode 9) | for a whole session while plugin 1.6.2's AB9 lane held the port and sent AB9 traffic (`0x20/0E`, `0x20/07`, `0x20/13`, a ~90 Hz `0x20/0A 05` stream, `0x2B` reads); whether that traffic caused it is unknown (bundle `CS-V2 20261002-194331`) |
 | `[WARN]serial_reply_app.c:604 unknownAPP cmd: 43` | each group `0x2B` request |
 | `=========== Fault Pre-Data (100 samples) ===========`, `[1] I_total=… P0=… P1=… P2=… P3=…` … `[100]`, `=========== Fault Post-Data (100 samples) ===========`, `[101]` … `[200]` | once, at a cold start with a stored fault |
