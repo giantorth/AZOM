@@ -754,6 +754,7 @@ namespace MozaPlugin.UI
                           + $"fed rpm={Secs(ka.Value.RpmFedSec)} btn={Secs(ka.Value.BtnFedSec)} "
                           + $"knob={Secs(ka.Value.KnobFedSec)} skips={ka.Value.Skips} "
                           + $"knobActive={(ka.Value.KnobActiveMask < 0 ? "—" : $"0x{ka.Value.KnobActiveMask:X2}")} "
+                          + $"rpmOwned={(ka.Value.RpmOwned ? "yes" : "no")} "
                           + $"hostClosed={(ka.Value.HostClosed ? "yes" : "no")} game={(plugin.IsGameActive ? "yes" : "no")}");
             }
 
