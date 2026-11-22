@@ -958,4 +958,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>将摇杆推到各个方向的尽头，先顺时针再逆时针缓慢画圈，然后按完成。</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>将摇杆向左和向右扭转到底几次，然后按完成。</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>将拇指摇杆向各个方向推到尽头几次，然后按完成。</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>正在保存拨片校准…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>方向盘未确认拨片校准。</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>拨片校准失败。</value></data>
 </root>

@@ -958,4 +958,7 @@ Id : {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Amenez le joystick en butée dans toutes les directions en tournant lentement dans le sens horaire puis antihoraire, puis appuyez sur TERMINÉ.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Tournez le joystick à fond à gauche puis à droite plusieurs fois, puis appuyez sur TERMINÉ.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Amenez le mini-joystick en butée dans toutes les directions plusieurs fois, puis appuyez sur TERMINÉ.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Enregistrement de l'étalonnage des palettes…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Le volant n'a pas confirmé l'étalonnage des palettes.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>L'étalonnage des palettes a échoué.</value></data>
 </root>

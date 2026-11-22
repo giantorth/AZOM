@@ -955,4 +955,7 @@
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Arf arf! Chase tail one way, chase tail other way, Woof DONE!</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Arf twirl! Twirl twirl, Woof DONE!</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Paw paw paw paw! Woof DONE!</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Yip Boof Woof…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Grr Woof Rrrf Boof Arf.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Grr Arf!</value></data>
 </root>

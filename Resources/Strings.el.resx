@@ -957,4 +957,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Μετακινήστε το χειριστήριο μέχρι το άκρο προς κάθε κατεύθυνση, κάνοντας αργούς κύκλους δεξιόστροφα και μετά αριστερόστροφα, και πατήστε ΤΕΛΟΣ.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Περιστρέψτε το χειριστήριο τέρμα αριστερά και τέρμα δεξιά μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Μετακινήστε τον μοχλίσκο μέχρι το άκρο προς κάθε κατεύθυνση μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Αποθήκευση βαθμονόμησης πτερυγίων…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Το τιμόνι δεν επιβεβαίωσε τη βαθμονόμηση πτερυγίων.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Η βαθμονόμηση πτερυγίων απέτυχε.</value></data>
 </root>

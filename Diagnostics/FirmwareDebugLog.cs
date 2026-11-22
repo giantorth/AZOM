@@ -78,12 +78,14 @@ namespace MozaPlugin.Diagnostics
                 while (_entries.Count > MaxEntries)
                     _entries.RemoveFirst();
                 _totalReceived++;
-                // Wheel (0x71) param-store failures. "Failed to Wri" matches the
-                // write-fail line even when the firmware splits it across frames
-                // ("…Failed to Wri" + "te").
+                // Wheel (0x71) param-store failures. The write-fail line is split
+                // across two frames at a point that moves with the digit count
+                // ("…Failed to Wri" + "te", "…Failed to Wr" + "ite"), so match its
+                // "Table Id N, ParamAddr M:" prefix — read-fail and "Written" lines
+                // never carry "ParamAddr".
                 if (rawDeviceId == 0x71 && text != null)
                 {
-                    bool w = text.Contains("Failed to Wri");
+                    bool w = text.Contains("ParamAddr");
                     bool r = !w && text.Contains("Failed to Read Parameter");
                     if (w || r)
                     {

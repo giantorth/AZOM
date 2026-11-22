@@ -314,6 +314,17 @@ namespace MozaPlugin
         public volatile int WheelIdleSpeed;
         public volatile int WheelPaddlesMode;
         public volatile int WheelClutchPoint;
+        // Wheel's paddle-calibration verdict (3f 71 08 xx): 0x03 saved, 0x04 rejected.
+        // Seq bumps on each verdict so the UI can tell a new one from a stale one.
+        private int _paddleCalibResult;
+        private int _paddleCalibResultSeq;
+        public int PaddleCalibResult => System.Threading.Volatile.Read(ref _paddleCalibResult);
+        public int PaddleCalibResultSeq => System.Threading.Volatile.Read(ref _paddleCalibResultSeq);
+        public void NotePaddleCalibResult(byte code)
+        {
+            System.Threading.Volatile.Write(ref _paddleCalibResult, code);
+            System.Threading.Interlocked.Increment(ref _paddleCalibResultSeq);
+        }
         public volatile int WheelKnobMode;
         // True once the wheel has answered a wheel-knob-mode read. WheelKnobMode is a
         // plain int defaulting to 0, so "answered 0 (Buttons)" and "never answered" are

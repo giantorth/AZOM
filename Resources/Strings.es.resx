@@ -963,4 +963,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Mueva el joystick hasta el tope en todas las direcciones, girando despacio en sentido horario y luego antihorario, y pulse LISTO.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Gire el joystick por completo a la izquierda y a la derecha varias veces y pulse LISTO.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Mueva el mini joystick hasta el tope en todas las direcciones varias veces y pulse LISTO.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Guardando la calibración de levas…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>El volante no confirmó la calibración de levas.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>La calibración de levas ha fallado.</value></data>
 </root>

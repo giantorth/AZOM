@@ -958,4 +958,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Đưa cần điều khiển hết cỡ theo mọi hướng, xoay chậm theo chiều kim đồng hồ rồi ngược chiều, rồi nhấn XONG.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Xoay cần điều khiển hết cỡ sang trái và sang phải vài lần, rồi nhấn XONG.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Đưa cần ngón cái hết cỡ theo mọi hướng vài lần, rồi nhấn XONG.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Đang lưu hiệu chỉnh lẫy…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Vô-lăng không xác nhận hiệu chỉnh lẫy.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Hiệu chỉnh lẫy thất bại.</value></data>
 </root>

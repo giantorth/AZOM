@@ -1023,5 +1023,8 @@ namespace MozaPlugin.Resources
         public static string Hint_FcsCalJoystickXy => Get("Hint_FcsCalJoystickXy");
         public static string Hint_FcsCalTwist => Get("Hint_FcsCalTwist");
         public static string Hint_FcsCalThumbstick => Get("Hint_FcsCalThumbstick");
+        public static string Hint_PaddleCalibrateSaving => Get("Hint_PaddleCalibrateSaving");
+        public static string Hint_PaddleCalibrateUnconfirmed => Get("Hint_PaddleCalibrateUnconfirmed");
+        public static string Hint_PaddleCalibrateFailed => Get("Hint_PaddleCalibrateFailed");
     }
 }

@@ -957,4 +957,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>조이스틱을 모든 방향의 끝까지 움직이며 시계 방향으로, 그다음 반시계 방향으로 천천히 원을 그린 후 완료를 누르세요.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>조이스틱을 왼쪽과 오른쪽 끝까지 몇 번 비튼 다음 완료를 누르세요.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>썸스틱을 모든 방향의 끝까지 몇 번 움직인 다음 완료를 누르세요.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>패들 보정 저장 중…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>휠이 패들 보정을 확인하지 않았습니다.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>패들 보정에 실패했습니다.</value></data>
 </root>

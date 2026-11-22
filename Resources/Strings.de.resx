@@ -958,4 +958,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Bewegen Sie den Joystick in jede Richtung bis zum Anschlag, kreisen Sie langsam im und dann gegen den Uhrzeigersinn und drücken Sie dann FERTIG.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Drehen Sie den Joystick einige Male ganz nach links und ganz nach rechts und drücken Sie dann FERTIG.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Bewegen Sie den Daumenstick einige Male in jede Richtung bis zum Anschlag und drücken Sie dann FERTIG.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Schaltwippen-Kalibrierung wird gespeichert…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Das Lenkrad hat die Schaltwippen-Kalibrierung nicht bestätigt.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Schaltwippen-Kalibrierung fehlgeschlagen.</value></data>
 </root>

@@ -963,4 +963,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Beveg styrespaken helt ut i alle retninger, sirkle sakte med klokken og deretter mot klokken, og trykk deretter FERDIG.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Vri styrespaken helt til venstre og helt til høyre noen ganger, og trykk deretter FERDIG.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Beveg tommelspaken helt ut i alle retninger noen ganger, og trykk deretter FERDIG.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Lagrer padelkalibrering…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Rattet bekreftet ikke padelkalibreringen.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Padelkalibreringen mislyktes.</value></data>
 </root>

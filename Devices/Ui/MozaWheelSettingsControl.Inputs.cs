@@ -108,14 +108,18 @@ namespace MozaPlugin.Devices.Ui
 
         private DispatcherTimer? _paddleCalTimer;
         private int _paddleCalRemaining;
-        private const int PaddleCalSeconds = 5;
+        // Pit House capture: ~11 s sweep, verdict 2.5 s after the save.
+        private const int PaddleCalSeconds = 10;
+        private const int PaddleCalConfirmSeconds = 10;
 
-        // Clutch-paddle calibration (no profile state): clicking Start sends
-        // 08 01, instructs the user to sweep + release all paddles with a live
-        // countdown, then auto-sends 08 02 (save) after 5 s. See wheel-0x17.md.
+        // Clutch-paddle calibration (no profile state), Pit House's sequence: 08 01,
+        // sweep countdown, 08 05 + 08 02, then wait for the wheel's 3f 71 08 03 (saved)
+        // or 08 04 (rejected). Without 08 05 the wheel silently keeps its old
+        // calibration. See wheel-0x17.md.
         private void WiPaddleCalStartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_plugin == null) return;
+            var data = _data;
+            if (_plugin == null || data == null) return;
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 1);  // start
 
             WiPaddleCalStartButton.IsEnabled = false;
@@ -124,21 +128,35 @@ namespace MozaPlugin.Devices.Ui
                 global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
             WiPaddleCalStatus.Visibility = Visibility.Visible;
 
+            int resultSeq = 0, waited = 0;
             _paddleCalTimer?.Stop();
             _paddleCalTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _paddleCalTimer.Tick += (s, ev) =>
             {
-                _paddleCalRemaining--;
                 if (_paddleCalRemaining > 0)
                 {
-                    WiPaddleCalStatus.Text = string.Format(
-                        global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
+                    _paddleCalRemaining--;
+                    if (_paddleCalRemaining > 0)
+                    {
+                        WiPaddleCalStatus.Text = string.Format(
+                            global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
+                        return;
+                    }
+                    resultSeq = data.PaddleCalibResultSeq;
+                    _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 5);
+                    _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
+                    WiPaddleCalStatus.Text = global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateSaving;
                     return;
                 }
-                _paddleCalTimer?.Stop();
-                _paddleCalTimer = null;
-                _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
-                WiPaddleCalStatus.Text = global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateDone;
+                bool answered = data.PaddleCalibResultSeq != resultSeq;
+                if (!answered && ++waited < PaddleCalConfirmSeconds) return;
+                ((DispatcherTimer)s!).Stop();
+                if (ReferenceEquals(_paddleCalTimer, s)) _paddleCalTimer = null;
+                WiPaddleCalStatus.Text = !answered
+                    ? global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateUnconfirmed
+                    : data.PaddleCalibResult == 0x03
+                        ? global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateDone
+                        : global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateFailed;
                 WiPaddleCalStartButton.IsEnabled = true;
             };
             _paddleCalTimer.Start();

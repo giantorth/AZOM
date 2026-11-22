@@ -23,6 +23,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Added wheel and wheelbase devices no longer stuck on "detecting";** when SimHub loaded its devices before the plugin, they never linked up and the "add device" banners stayed.
 - **HMA150 port self-test names the failed axis check;** a rejected corner assignment timed out after 40 s and left the controller in self-test mode.
 - **RPM LEDs stay dark between gear shifts;** the wheel's RPM idle effect played whenever SimHub turned every RPM LED off.
+- **Paddle calibration now saves;** the wheel kept its old calibration, and the status now says whether the wheel saved or rejected it.
 
 ## [1.7.4]
 

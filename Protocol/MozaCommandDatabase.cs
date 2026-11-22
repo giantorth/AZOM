@@ -327,7 +327,7 @@ namespace MozaPlugin.Protocol
             AddCommand("wheel-multifn-right",      "wheel", 0xFF, 63, new byte[] { 40, 2, 1 }, 1, "int");
             AddCommand("wheel-paddle-adaptive-mode","wheel",64, 63, new byte[] { 11 },         1, "int");
             AddCommand("wheel-paddle-button-mode", "wheel", 64, 63, new byte[] { 13 },         1, "int");
-            // Clutch-paddle calibration (write-only): 08 01 = start, 08 02 = save.
+            // Clutch-paddle calibration (write-only): 08 01 = start, then 08 05 + 08 02 to save.
             AddCommand("wheel-paddles-calibration","wheel",0xFF,63, new byte[] { 8 },          1, "int");
             AddCommand("wheel-rpm-interval",       "wheel", 64, 63, new byte[] { 22 },         4, "int");
             AddCommand("wheel-rpm-mode",           "wheel", 64, 63, new byte[] { 23 },         1, "int");

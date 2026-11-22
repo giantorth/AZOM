@@ -958,4 +958,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Отведите джойстик до упора во всех направлениях, медленно вращая по часовой стрелке, а затем против, и нажмите ГОТОВО.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Несколько раз поверните джойстик до упора влево и вправо, затем нажмите ГОТОВО.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Несколько раз отведите мини-джойстик до упора во всех направлениях, затем нажмите ГОТОВО.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Сохранение калибровки лепестков…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Руль не подтвердил калибровку лепестков.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Калибровка лепестков не удалась.</value></data>
 </root>

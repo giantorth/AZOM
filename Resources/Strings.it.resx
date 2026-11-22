@@ -961,4 +961,7 @@ Id: {2}</value></data>
   <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Porta il joystick a fine corsa in ogni direzione, ruotando lentamente in senso orario e poi antiorario, poi premi FATTO.</value></data>
   <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Ruota il joystick tutto a sinistra e tutto a destra alcune volte, poi premi FATTO.</value></data>
   <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Porta la levetta a fine corsa in ogni direzione alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Salvataggio calibrazione paddle…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Il volante non ha confermato la calibrazione dei paddle.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Calibrazione paddle non riuscita.</value></data>
 </root>
