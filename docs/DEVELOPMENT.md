@@ -605,10 +605,28 @@ The canonical wire reference is [`docs/protocol/`](protocol/). Load-bearing fact
 - **Interface members** — declare *both* overloads on the implementing class. Implicit interface implementations are bound by the CLR at type-load time by name and signature, so each host picks the overload its own interface declares. The compat overload must be marked `virtual` by hand: only a public **virtual** method can fill an interface slot (ECMA-335 II.12.2), and Roslyn marks only the overload matching the compile-time interface. A non-virtual compat overload compiles and looks right while the old host still throws `TypeLoadException`.
 - **Constructors / concrete methods** — a direct `new` bakes one signature in, so build the call once through reflection and bind arguments to the host's parameters by name (`SimHubLedCompat.CreateState`). Parameters the host doesn't declare are dropped; ones we don't recognise take their own declared default.
 
-Neither the compiler nor a run against a single SimHub version catches a regression here, so verify with [`tools/simhub-compat`](../tools/simhub-compat/) — it compares a built DLL's metadata references, interface implementations (including virtualness) and `MethodImpl` records against each version's DLL set, and exits non-zero on a mismatch:
+Neither the compiler nor a run against a single SimHub version catches a regression here, so run the [SimHub interface tests](#simhub-interface-tests) against an older installation. With only an older version's DLLs at hand, [`tools/simhub-compat`](../tools/simhub-compat/) compares a built DLL's metadata references, interface implementations (including virtualness) and `MethodImpl` records against each version's DLL set:
 
 ```bash
 tools/simhub-compat/simhub-compat bin/x86/Release/MozaPlugin.dll \
     libs/SimHub \
     "/path/to/an/older/SimHub"
 ```
+
+### SimHub interface tests
+
+[`tests/simhub-interface`](../tests/simhub-interface/) loads a built `MozaPlugin.dll` into an AppDomain rooted at a SimHub installation, under `SimHubWPF.exe.config`, so it binds as it does inside SimHub. Nothing runs against live SimHub state; both passes use the real CLR:
+
+- **Binary** — loads every plugin type and JIT-compiles every method: a host interface member we don't implement (`TypeLoadException`), a host member we call that is gone (`MissingMethodException` / `MissingFieldException`), a missing host type or assembly. Run against v1.5.5 (built on 9.11.22), it reports exactly the 9.12 `ILedDeviceManager.Display` break.
+- **Contract** (`--contract`, for a DLL built from this tree) — resolves every SimHub member the plugin reaches by name (ControlMapper bridge, LED driver / connection-manager swaps, the haptics bridge's ShakeIt walk, the recorded track map, AC raw data, `GetAllPropertiesNames`, `LedDeviceState`'s constructor) with the plugin's own binding flags, reusing the plugin's helpers and constants where it has them. An IL scan then reconciles every reflection literal in the DLL against the checks, so a new, renamed or dropped lookup fails until [`Contract.cs`](../tests/simhub-interface/Contract.cs) is updated (literals that target no SimHub type go in its `NotSimHub` list).
+
+A full SimHub installation is required (`libs/SimHub` lacks SimHub's own dependencies). On Linux the wrapper runs it under Wine — any prefix with .NET Framework 4.8, e.g. SimHub's own:
+
+```bash
+WINE=~/linux-simracing-utils/bin/wine WINEPREFIX=~/linux-simracing-utils/pfx \
+tests/simhub-interface/simhub-interface-test --contract \
+    --simhub ~/linux-simracing-utils/pfx/drive_c/Program\ Files\ \(x86\)/SimHub \
+    --plugin bin/x86/Release/MozaPlugin.dll
+```
+
+Exit code 0 pass, 1 failures, 2 setup error; `--report <file.md>` appends a markdown summary (the update PR body is built from these) and `--expect-version` guards against testing the wrong install.

@@ -293,22 +293,29 @@ namespace MozaPlugin.Devices.Haptics
             if (target == null) return null;
             var accessor = MemberCache.GetOrAdd((target.GetType(), name), key =>
             {
-                const BindingFlags flags =
-                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-
-                for (var t = key.Item1; t != null; t = t.BaseType)
-                {
-                    var p = t.GetProperty(key.Item2, flags);
-                    if (p?.GetMethod != null)
-                        return o => p.GetValue(o);
-
-                    var f = t.GetField(key.Item2, flags);
-                    if (f != null)
-                        return o => f.GetValue(o);
-                }
+                var member = FindPublicMember(key.Item1, key.Item2);
+                if (member is PropertyInfo p) return o => p.GetValue(o);
+                if (member is FieldInfo f) return o => f.GetValue(o);
                 return null;
             });
             return accessor?.Invoke(target);
+        }
+
+        /// <summary>The member <see cref="GetProp"/> reads. Also called by tests/simhub-interface.</summary>
+        internal static MemberInfo? FindPublicMember(Type type, string name)
+        {
+            const BindingFlags flags =
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+            for (var t = type; t != null; t = t.BaseType)
+            {
+                var p = t.GetProperty(name, flags);
+                if (p?.GetMethod != null) return p;
+
+                var f = t.GetField(name, flags);
+                if (f != null) return f;
+            }
+            return null;
         }
 
         private static void Install(object? outputManager, object settings)
