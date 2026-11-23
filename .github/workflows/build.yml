@@ -17,7 +17,10 @@ on:
   # `paths:` scopes a push to the commits actually pushed, but scopes a
   # pull_request to the PR's whole diff — the `changed` job below narrows that
   # back to the pushed range. Keep both lists in sync with the `case` in the
-  # `changed` job below.
+  # `changed` job below. The pull_request side alone skips libs/SimHub/**:
+  # simhub-update.yml tests SimHub bumps itself, so neither the bot's chore PR
+  # nor merging it into dev may publish or announce a PR pre-release. A push to
+  # dev still compiles the merged tree.
   push:
     branches: [main, dev]
     paths:
@@ -40,6 +43,7 @@ on:
       - "**.xaml"
       - "**.resx"
       - "libs/**"
+      - "!libs/SimHub/**"
       - "DeviceTemplates/**"
       - "Resources/**"
       - "Data/**"
@@ -124,10 +128,12 @@ jobs:
           printf '%s\n' "${files:-  (none)}" | sed 's/^/  /'
 
           # Mirrors the two `paths:` filters above — all three lists must
-          # stay in sync.
+          # stay in sync. libs/SimHub/ is the pull_request filter's exclusion:
+          # merging a SimHub bump into dev must not re-release the dev→main PR.
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             case "$f" in
+              libs/SimHub/*) ;;
               *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*|Data/*|Themes/*)
                 build "source changed: ${f}" ;;
             esac
