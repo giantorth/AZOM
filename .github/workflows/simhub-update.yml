@@ -1,5 +1,20 @@
 name: SimHub deps update
 
+# Daily check for a SimHub release newer than libs/SimHub/VERSION. When there is one,
+# install it on a Windows runner, rebuild dev against its DLLs, run the SimHub
+# interface tests (tests/simhub-interface) and open chore/simhub/v<ver> into dev —
+# as a draft carrying the failure report when any test fails. Infrastructure
+# failures (download, install, harness setup) fail the run instead, and the next
+# day's run retries.
+#
+#   plugin                           SimHub      checks
+#   dev, built against the new DLLs  new         binary + reflection contract
+#   latest stable release            new         binary: does an installed plugin survive the update?
+#   dev, built against the new DLLs  previous    binary + reflection contract: backward compatibility
+#
+# build.yml's pull_request filters skip libs/SimHub-only changes, so neither this PR
+# nor merging it into dev builds or announces a PR pre-release.
+
 on:
   schedule:
     - cron: "0 0 * * *"
@@ -14,7 +29,8 @@ jobs:
       should_run: ${{ steps.precheck.outputs.should_run }}
       latest_tag: ${{ steps.precheck.outputs.latest_tag }}
       current_tag: ${{ steps.precheck.outputs.current_tag }}
-      download_url: ${{ steps.precheck.outputs.download_url }}
+      dev_sha: ${{ steps.precheck.outputs.dev_sha }}
+      prev_available: ${{ steps.download.outputs.prev_available }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -22,41 +38,61 @@ jobs:
 
       - name: Check for newer SimHub release
         id: precheck
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -Ls "https://api.github.com/repos/SHWotever/SimHub/releases/latest" -o latest_simhub.json
-          LATEST_TAG=$(grep -Po '"tag_name": "\K[^"]*' ./latest_simhub.json)
-          DOWNLOAD_URL=$(grep -Po '"browser_download_url": "\K[^"]*' ./latest_simhub.json)
+          set -euo pipefail
+          LATEST_TAG=$(gh api repos/SHWotever/SimHub/releases/latest --jq .tag_name)
           CURRENT_TAG=$(<./libs/SimHub/VERSION)
 
           echo "Latest build: $LATEST_TAG"
           echo "Last built: $CURRENT_TAG"
-          echo "Download link: $DOWNLOAD_URL"
 
-          if [ "$LATEST_TAG" != "$CURRENT_TAG" ]; then
-            set +e
-            git ls-remote --exit-code --heads origin "refs/heads/chore/simhub/v$LATEST_TAG" >/dev/null
-
-            if [ $? != 0 ]; then
-              echo "should_run=true" >> $GITHUB_OUTPUT
-              echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-              echo "current_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
-              echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-              echo "New version found"
-              exit 0
-            fi
+          if [ "$LATEST_TAG" != "$CURRENT_TAG" ] \
+             && ! git ls-remote --exit-code --heads origin "refs/heads/chore/simhub/v$LATEST_TAG" >/dev/null; then
+            echo "New version found"
+            # Every later job works on this commit, so the PR carries exactly what was tested.
+            {
+              echo "should_run=true"
+              echo "latest_tag=$LATEST_TAG"
+              echo "current_tag=$CURRENT_TAG"
+              echo "dev_sha=$(git rev-parse HEAD)"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "should_run=false" >> $GITHUB_OUTPUT
-          exit 0
-
-      - name: Download binary
-        if: ${{ steps.precheck.outputs.should_run == 'true' }}
+      - name: Download installers
+        id: download
+        if: steps.precheck.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST_TAG: ${{ steps.precheck.outputs.latest_tag }}
+          CURRENT_TAG: ${{ steps.precheck.outputs.current_tag }}
         run: |
-          curl -L "${{ steps.precheck.outputs.download_url }}" -o SimHub.zip
-          unzip -p SimHub.zip > SimHubSetup.exe
+          set -euo pipefail
+          # Each SimHub release carries one zip holding the Inno Setup installer.
+          fetch() {
+            local tag="$1" out="$2" url
+            url=$(gh api "repos/SHWotever/SimHub/releases/tags/$tag" \
+              --jq '[.assets[] | select(.name | endswith(".zip")) | .browser_download_url][0] // empty') || return 1
+            [ -n "$url" ] || return 1
+            curl -fsSL "$url" -o "$out.zip" || return 1
+            unzip -p "$out.zip" > "$out" || return 1
+            rm -f "$out.zip"
+          }
+
+          fetch "$LATEST_TAG" SimHubSetup.exe || { echo "::error::SimHub $LATEST_TAG installer download failed"; exit 1; }
+          mkdir -p prev
+          if fetch "$CURRENT_TAG" prev/SimHubSetup.exe; then
+            echo "prev_available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::SimHub $CURRENT_TAG installer unavailable — skipping the backward-compatibility run"
+            echo "prev_available=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload setup file
-        if: ${{ steps.precheck.outputs.should_run == 'true' }}
+        if: steps.precheck.outputs.should_run == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: simhub-setup
@@ -65,37 +101,44 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  simhub:
+      - name: Upload previous setup file
+        if: steps.download.outputs.prev_available == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: simhub-setup-prev
+          path: prev/SimHubSetup.exe
+          retention-days: 1
+          if-no-files-found: error
+          compression-level: 0
+
+  verify:
     runs-on: windows-latest
-    # Artifacts only — no GITHUB_TOKEN access needed.
-    permissions: {}
-    needs:
-      - fetch-binary
-    if: ${{ needs.fetch-binary.outputs.should_run == 'true' }}
+    needs: fetch-binary
+    if: needs.fetch-binary.outputs.should_run == 'true'
+    permissions:
+      contents: read
+    outputs:
+      passed: ${{ steps.outcome.outputs.passed }}
+      build_ok: ${{ steps.build.outputs.ok }}
+    env:
+      LATEST_TAG: ${{ needs.fetch-binary.outputs.latest_tag }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.fetch-binary.outputs.dev_sha }}
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "8.0.x"
+
       - uses: actions/download-artifact@v8
         with:
           name: simhub-setup
 
-      - name: Install SimHub and extract DLLs
-        run: |
-          New-Item -Path "C:\" -Name "simhub" -ItemType "Directory"
-          ./SimHubSetup.exe /VERYSILENT /Dir="C:\simhub"
-
-          do {
-            Write-Output "Waiting for files..."
-            Start-Sleep -Seconds 5
-          } until (
-            (Test-Path -path "C:\simhub\GameReaderCommon.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\SimHub.Logging.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\SimHub.Plugins.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\SerialDash.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\BA63Driver.dll" -PathType Leaf) -and
-            (Test-Path -path "C:\simhub\SimHub.Plugins.Motion.dll" -PathType Leaf)
-          )
-
-          Start-Sleep -Seconds 3
-          Write-Output "All files found"
+      - name: Install SimHub ${{ env.LATEST_TAG }}
+        shell: pwsh
+        run: ./.github/scripts/install-simhub.ps1 -Installer ./SimHubSetup.exe -Dir C:\simhub
 
       - name: Upload SimHub files
         uses: actions/upload-artifact@v7
@@ -108,45 +151,183 @@ jobs:
             C:/simhub/SerialDash.dll
             C:/simhub/BA63Driver.dll
             C:/simhub/SimHub.Plugins.Motion.dll
+            C:/simhub/HidSharp.dll
           retention-days: 1
           if-no-files-found: error
           compression-level: 0
 
-  build:
+      # A compile break against the new DLLs is a test failure, not an
+      # infrastructure one: it goes in the report and the PR opens as a draft.
+      - name: Build dev against SimHub ${{ env.LATEST_TAG }}
+        id: build
+        shell: pwsh
+        run: |
+          foreach ($f in 'GameReaderCommon.dll', 'SimHub.Logging.dll', 'SimHub.Plugins.dll', 'SerialDash.dll',
+                         'BA63Driver.dll', 'SimHub.Plugins.Motion.dll', 'HidSharp.dll') {
+            Copy-Item "C:\simhub\$f" libs/SimHub/ -Force
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'build.log'
+          dotnet build -c Release -nologo | Tee-Object -FilePath $log
+          $ok = $LASTEXITCODE -eq 0
+          "ok=$($ok.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if (-not $ok) {
+            $errors = @(Select-String -Path $log -Pattern ': error ' | ForEach-Object { $_.Line.Trim() } |
+                        Sort-Object -Unique | Select-Object -First 40)
+            $section = @("#### FAIL — dev does not build against SimHub $env:LATEST_TAG", '', '```') + $errors + @('```', '')
+            Add-Content -Path (Join-Path $env:RUNNER_TEMP 'interface-report-new.md') -Value $section -Encoding utf8
+            New-Item -ItemType File -Force -Path (Join-Path $env:RUNNER_TEMP 'interface-failed') | Out-Null
+          }
+          exit 0
+
+      - name: Build the interface test harness
+        shell: pwsh
+        run: dotnet build tests/simhub-interface/simhub-interface-test.csproj -c Release -nologo
+
+      - name: Test dev on SimHub ${{ env.LATEST_TAG }}
+        if: steps.build.outputs.ok == 'true'
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-interface-test.ps1 -Contract `
+            -Plugin bin/x86/Release/MozaPlugin.dll -SimHub C:\simhub -Version $env:LATEST_TAG `
+            -Label "dev built against $env:LATEST_TAG" `
+            -Report (Join-Path $env:RUNNER_TEMP 'interface-report-new.md')
+
+      - name: Test the latest release on SimHub ${{ env.LATEST_TAG }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $report = Join-Path $env:RUNNER_TEMP 'interface-report-new.md'
+          $tag = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" --jq .tag_name
+          $dir = Join-Path $env:RUNNER_TEMP 'release'
+          if ($LASTEXITCODE -eq 0) {
+            gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern "MozaPlugin_$tag.zip" --dir $dir
+          }
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output "::warning::Could not download the latest release — skipping its test"
+            Add-Content -Path $report -Encoding utf8 -Value @('#### SKIPPED — latest release (download failed)', '')
+            exit 0
+          }
+          Expand-Archive (Join-Path $dir "MozaPlugin_$tag.zip") -DestinationPath $dir
+          ./.github/scripts/run-interface-test.ps1 `
+            -Plugin (Join-Path $dir 'MozaPlugin.dll') -SimHub C:\simhub -Version $env:LATEST_TAG `
+            -Label "release $tag" -Report $report
+
+      - name: Outcome
+        id: outcome
+        shell: pwsh
+        run: |
+          $failed = Test-Path (Join-Path $env:RUNNER_TEMP 'interface-failed')
+          "passed=$((-not $failed).ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Upload report
+        uses: actions/upload-artifact@v7
+        with:
+          name: interface-report-new
+          path: ${{ runner.temp }}/interface-report-new.md
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload dev build
+        if: steps.build.outputs.ok == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-dev
+          path: bin/x86/Release/MozaPlugin.dll
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Upload harness
+        uses: actions/upload-artifact@v7
+        with:
+          name: interface-test-harness
+          path: tests/simhub-interface/bin/Release/
+          retention-days: 1
+          if-no-files-found: error
+
+  # A separate runner: two Inno Setup installs of one app on the same machine would
+  # share its registry state.
+  verify-prev:
     runs-on: windows-latest
+    needs: [fetch-binary, verify]
+    if: >-
+      needs.fetch-binary.outputs.prev_available == 'true' &&
+      needs.verify.outputs.build_ok == 'true'
     permissions:
       contents: read
-    needs:
-      - fetch-binary
-      - simhub
-    if: ${{ needs.fetch-binary.outputs.should_run == 'true' }}
+    outputs:
+      passed: ${{ steps.outcome.outputs.passed }}
+    env:
+      LATEST_TAG: ${{ needs.fetch-binary.outputs.latest_tag }}
+      CURRENT_TAG: ${{ needs.fetch-binary.outputs.current_tag }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: dev
+          ref: ${{ needs.fetch-binary.outputs.dev_sha }}
 
-      - name: Download SimHub files
-        uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8
         with:
-          name: simhub-files
-          path: libs/SimHub
+          name: simhub-setup-prev
 
-      - name: Build
-        run: dotnet build -c Release
+      - uses: actions/download-artifact@v8
+        with:
+          name: plugin-dev
+          path: ${{ runner.temp }}/plugin
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: interface-test-harness
+          path: tests/simhub-interface/bin/Release
+
+      - name: Install SimHub ${{ env.CURRENT_TAG }}
+        shell: pwsh
+        run: ./.github/scripts/install-simhub.ps1 -Installer ./SimHubSetup.exe -Dir C:\simhub
+
+      - name: Test dev on SimHub ${{ env.CURRENT_TAG }}
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-interface-test.ps1 -Contract `
+            -Plugin (Join-Path $env:RUNNER_TEMP 'plugin/MozaPlugin.dll') -SimHub C:\simhub -Version $env:CURRENT_TAG `
+            -Label "dev built against $env:LATEST_TAG, on the previous SimHub" `
+            -Report (Join-Path $env:RUNNER_TEMP 'interface-report-prev.md')
+
+      - name: Outcome
+        id: outcome
+        shell: pwsh
+        run: |
+          $failed = Test-Path (Join-Path $env:RUNNER_TEMP 'interface-failed')
+          "passed=$((-not $failed).ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
+      - name: Upload report
+        uses: actions/upload-artifact@v7
+        with:
+          name: interface-report-prev
+          path: ${{ runner.temp }}/interface-report-prev.md
+          retention-days: 7
+          if-no-files-found: error
 
   create-pr:
     runs-on: ubuntu-latest
-    needs:
-      - fetch-binary
-      - simhub
-      - build
+    needs: [fetch-binary, verify, verify-prev]
+    # verify-prev is skipped when the previous installer is unavailable or dev
+    # didn't build; a failed or cancelled job means an infrastructure problem.
+    if: >-
+      always() &&
+      needs.verify.result == 'success' &&
+      (needs.verify-prev.result == 'success' || needs.verify-prev.result == 'skipped')
     permissions:
       contents: write
       pull-requests: write
+    env:
+      LATEST_TAG: ${{ needs.fetch-binary.outputs.latest_tag }}
+      CURRENT_TAG: ${{ needs.fetch-binary.outputs.current_tag }}
+      NEW_PASSED: ${{ needs.verify.outputs.passed }}
+      PREV_RESULT: ${{ needs.verify-prev.result }}
+      PREV_PASSED: ${{ needs.verify-prev.outputs.passed }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: dev
+          ref: ${{ needs.fetch-binary.outputs.dev_sha }}
 
       - name: Download SimHub files
         uses: actions/download-artifact@v8
@@ -154,28 +335,63 @@ jobs:
           name: simhub-files
           path: libs/SimHub
 
+      # Outside the checkout: `git add .` below must not pick them up.
+      - name: Download test reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: interface-report-*
+          path: ${{ runner.temp }}/reports
+          merge-multiple: true
+
       - name: Create branch and push
         run: |
-          echo "${{ needs.fetch-binary.outputs.latest_tag }}" > ./libs/SimHub/VERSION
+          echo "$LATEST_TAG" > ./libs/SimHub/VERSION
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git checkout -b chore/simhub/v${{ needs.fetch-binary.outputs.latest_tag }}
+          git checkout -b "chore/simhub/v$LATEST_TAG"
           git add .
-          git commit -m "chore(deps): bump SimHub from v${{ needs.fetch-binary.outputs.current_tag }} to v${{ needs.fetch-binary.outputs.latest_tag }}"
-          git push --set-upstream origin chore/simhub/v${{ needs.fetch-binary.outputs.latest_tag }}
+          git commit -m "chore(deps): bump SimHub from v$CURRENT_TAG to v$LATEST_TAG"
+          git push --set-upstream origin "chore/simhub/v$LATEST_TAG"
 
       - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          passed=true
+          [ "$NEW_PASSED" = true ] || passed=false
+          [ "$PREV_RESULT" != success ] || [ "$PREV_PASSED" = true ] || passed=false
+
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "Bump SimHub from v$CURRENT_TAG to v$LATEST_TAG"
+            echo
+            if [ "$passed" = true ]; then
+              echo "**SimHub interface tests passed.**"
+            else
+              echo "**SimHub interface tests failed — draft until the plugin is fixed on this branch.**"
+            fi
+            echo
+            if [ "$PREV_RESULT" != success ]; then
+              echo "_Not tested on the previous SimHub (v$CURRENT_TAG): installer unavailable or dev did not build._"
+              echo
+            fi
+            cat "$RUNNER_TEMP"/reports/*.md
+          } > "$body"
+          # GitHub caps PR bodies at 65536 characters; the reports are bounded well below.
+          head -c 60000 "$body" > "$body.trim"
+
+          draft=()
+          [ "$passed" = true ] || draft=(--draft)
           PR_URL=$(gh pr create \
             -B dev \
-            -H chore/simhub/v${{ needs.fetch-binary.outputs.latest_tag }} \
-            -t "chore(deps): bump SimHub from v${{ needs.fetch-binary.outputs.current_tag }} to v${{ needs.fetch-binary.outputs.latest_tag }}" \
-            -b 'Bump SimHub from v${{ needs.fetch-binary.outputs.current_tag }} to v${{ needs.fetch-binary.outputs.latest_tag }}')
+            -H "chore/simhub/v$LATEST_TAG" \
+            -t "chore(deps): bump SimHub from v$CURRENT_TAG to v$LATEST_TAG" \
+            --body-file "$body.trim" \
+            "${draft[@]}")
           echo "$PR_URL"
 
           # Close previous SimHub update PRs superseded by this one
           gh pr list -H "chore/simhub/" --json number -q '.[].number' \
-            -S "-head:chore/simhub/v${{ needs.fetch-binary.outputs.latest_tag }}" \
+            -S "-head:chore/simhub/v$LATEST_TAG" \
             | xargs -I {} gh pr close -c "Superseded by $PR_URL" -d {}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
