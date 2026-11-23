@@ -162,26 +162,27 @@ namespace MozaPlugin
 
         /// <summary>
         /// Redact a string identifier, leaving only the last
-        /// <see cref="RedactTailChars"/> characters visible. Returns "—" for
-        /// null/empty, all-asterisks if the value is shorter than the tail.
+        /// <see cref="RedactTailChars"/> characters visible (none when
+        /// <paramref name="full"/>). Returns "—" for null/empty, all-asterisks
+        /// if the value is shorter than the tail.
         /// </summary>
-        public static string RedactId(string s)
+        public static string RedactId(string s, bool full = false)
         {
             if (string.IsNullOrEmpty(s)) return "—";
-            if (s.Length <= RedactTailChars) return new string('*', s.Length);
-            return new string('*', s.Length - RedactTailChars) + s.Substring(s.Length - RedactTailChars);
+            int tail = full ? 0 : RedactTailChars;
+            if (s.Length <= tail) return new string('*', s.Length);
+            return new string('*', s.Length - tail) + s.Substring(s.Length - tail);
         }
 
         /// <summary>
-        /// Hex-encode a byte array and redact all but the trailing
-        /// <see cref="RedactTailChars"/> hex characters. Returns "—" for
-        /// null/empty.
+        /// Hex-encode a byte array and redact it as <see cref="RedactId"/> does.
+        /// Returns "—" for null/empty.
         /// </summary>
-        public static string RedactBytesHex(byte[] b)
+        public static string RedactBytesHex(byte[] b, bool full = false)
         {
             if (b == null || b.Length == 0) return "—";
             var hex = BitConverter.ToString(b).Replace("-", "");
-            return RedactId(hex);
+            return RedactId(hex, full);
         }
     }
 }

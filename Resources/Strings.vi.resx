@@ -963,4 +963,5 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Hiệu chỉnh lẫy thất bại.</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Hiệu ứng mặc định AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Khóa bánh xe</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Chế độ streamer</value></data>
 </root>

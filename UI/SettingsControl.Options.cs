@@ -106,6 +106,15 @@ namespace MozaPlugin.UI
             _plugin.SaveSettings();
         }
 
+        private void StreamerModeCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _plugin.Settings.StreamerMode = StreamerModeCheck.IsChecked == true;
+            _plugin.SaveSettings();
+            // The report box is a snapshot; re-render it under the new mode.
+            if (_fullDiagExpanded) RenderFullDiagReport();
+        }
+
         private void Ab9DetectionCheck_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -392,6 +401,7 @@ namespace MozaPlugin.UI
             {
                 AutoApplyProfileCheck.IsChecked = _plugin.Settings.AutoApplyProfileOnLaunch;
                 SyncDefaultTabCombo();
+                StreamerModeCheck.IsChecked = _plugin.Settings.StreamerMode;
                 ShowAllTabsCheck.IsChecked = _plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = _plugin.Settings.Ab9DetectionEnabled;
                 SyncPedalHapticsSourceCombo();

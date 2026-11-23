@@ -69,6 +69,7 @@ namespace MozaPlugin.UI
                 InitDefaultTabCombo();
                 _preferredTab = ResolveDefaultTab();
                 MainTabs.SelectedItem = _preferredTab;
+                StreamerModeCheck.IsChecked = plugin.Settings.StreamerMode;
                 ShowAllTabsCheck.IsChecked = plugin.Settings.ShowAllTabs;
                 Ab9DetectionCheck.IsChecked = plugin.Settings.Ab9DetectionEnabled;
                 SyncPedalHapticsSourceCombo();

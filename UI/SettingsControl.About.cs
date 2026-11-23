@@ -190,11 +190,12 @@ namespace MozaPlugin.UI
 
         private void DiagCopyAll_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            try { System.Windows.Clipboard.SetText(BuildDiagnosticsDump()); }
+            try { System.Windows.Clipboard.SetText(BuildDiagnosticsDump(MozaPlugin.IsStreamerMode)); }
             catch { /* clipboard may be contested under Wine */ }
         }
 
-        private string BuildDiagnosticsDump()
+        // maskIds: Streamer Mode render; the bundle passes false.
+        private string BuildDiagnosticsDump(bool maskIds)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("=== Plugin ===");
@@ -207,34 +208,34 @@ namespace MozaPlugin.UI
             sb.AppendLine(DiagnosticsTextBuilder.BuildControlMapper(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== USB detection ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Standalone peripherals (own USB port) ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStandalonePeripherals(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== mBooster pedals ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== S12 pedal vibration ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildPedalHaptics(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Motion controller ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildMotionController(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildMotionController(_plugin, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Stalks ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStalks(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Wheel LED zones ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelLedZones(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Base identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildBaseIdentity(_plugin, _data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildBaseIdentity(_plugin, _data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Display sub-device identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Standalone dashboard ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStandaloneDashboardState(_plugin));
@@ -261,7 +262,7 @@ namespace MozaPlugin.UI
             sb.AppendLine(DiagnosticsTextBuilder.BuildFirmwareDebug(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Device display log (session FF kind=14) ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildDeviceLog(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDeviceLog(_plugin, maskIds));
             return sb.ToString();
         }
 

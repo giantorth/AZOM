@@ -86,7 +86,18 @@ namespace MozaPlugin.Devices.Ui
         // at <dir>/Resource/MD5/<hex>.<ext> for the multi-file upload bundle.
         // Empty for library/embedded picks.
         private string _uploadPickedSourceDirectory = "";
+        // Last local file picked, shown in UploadPickedFileText.
+        private string _uploadPickedFilePath = "";
         private bool _uploadLibrarySeeded;
+
+        // PitHouse names its per-wheel folder after the 24-hex display MCU UID.
+        private static readonly System.Text.RegularExpressions.Regex s_uidPathSegment =
+            new System.Text.RegularExpressions.Regex(@"(?<=[\\/])[0-9A-Fa-f]{24}(?=[\\/]|$)");
+
+        private static string ScreenPath(string path)
+            => MozaPlugin.IsStreamerMode && !string.IsNullOrEmpty(path)
+                ? s_uidPathSegment.Replace(path, m => MozaPlugin.ScreenId(m.Value))
+                : path;
 
         // MOZA Dashboard Studio (the vendor's standalone editor) state. The exe
         // path is probed once per control instance; the rescan bookkeeping only
@@ -183,8 +194,9 @@ namespace MozaPlugin.Devices.Ui
                 _uploadPickedName = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName) ?? "";
                 _uploadPickedSourceLabel = dlg.FileName;
                 _uploadPickedSourceDirectory = System.IO.Path.GetDirectoryName(dlg.FileName) ?? "";
+                _uploadPickedFilePath = dlg.FileName;
                 if (UploadPickedFileText != null)
-                    UploadPickedFileText.Text = dlg.FileName;
+                    UploadPickedFileText.Text = ScreenPath(dlg.FileName);
                 if (_plugin?.Settings != null)
                 {
                     _plugin.Settings.LastUploadFileDirectory = _uploadPickedSourceDirectory;
@@ -506,13 +518,15 @@ namespace MozaPlugin.Devices.Ui
             if (UploadFolderStudioText == null || _plugin == null) return;
             var s = _plugin.GetDashboardLibrarySources();
             UploadFolderStudioText.Text = s.Studio ?? Strings.Status_DashFolderNotFound;
-            UploadFolderPitHouseText.Text = s.PitHouseWheel
-                ?? (s.DisplayKnown ? Strings.Status_DashFolderNoWheelCopy
-                    : s.WheelConnected ? Strings.Status_DashFolderNoDisplay
-                    : Strings.Status_DashFolderWheelNotConnected);
+            UploadFolderPitHouseText.Text = s.PitHouseWheel != null ? ScreenPath(s.PitHouseWheel)
+                : s.DisplayKnown ? Strings.Status_DashFolderNoWheelCopy
+                : s.WheelConnected ? Strings.Status_DashFolderNoDisplay
+                : Strings.Status_DashFolderWheelNotConnected;
             bool hasCustom = s.Custom.Length > 0;
-            UploadFolderCustomText.Text = hasCustom ? s.Custom : Strings.Status_DashFolderNone;
+            UploadFolderCustomText.Text = hasCustom ? ScreenPath(s.Custom) : Strings.Status_DashFolderNone;
             UploadClearFolderButton.Visibility = hasCustom ? Visibility.Visible : Visibility.Collapsed;
+            if (UploadPickedFileText != null && _uploadPickedFilePath.Length > 0)
+                UploadPickedFileText.Text = ScreenPath(_uploadPickedFilePath);
         }
 
         private void UploadLibraryCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -861,12 +875,13 @@ namespace MozaPlugin.Devices.Ui
                 });
             }
 
-            // A reload, wheel detection, or a display UID with no PitHouse folder
-            // changes the folder rows without changing the name count.
+            // A reload, wheel detection, a display UID with no PitHouse folder, or
+            // Streamer Mode changes the folder rows without changing the name count.
             var det = _plugin.DetectionState;
             string folders = (_plugin.LoadedLibraryFolders ?? "") + "|"
                 + (det.NewWheelDetected || det.OldWheelDetected) + "|"
-                + WheelUiHelpers.UidToHex(_plugin.Data?.DisplayMcuUid ?? Array.Empty<byte>());
+                + WheelUiHelpers.UidToHex(_plugin.Data?.DisplayMcuUid ?? Array.Empty<byte>()) + "|"
+                + MozaPlugin.IsStreamerMode;
             if (folders != _shownLibraryFolders)
             {
                 _shownLibraryFolders = folders;

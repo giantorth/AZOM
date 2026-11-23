@@ -963,4 +963,5 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Калибровка лепестков не удалась.</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Стандартные эффекты AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Блокировка колеса</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Режим стримера</value></data>
 </root>

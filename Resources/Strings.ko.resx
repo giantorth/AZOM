@@ -962,4 +962,5 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>패들 보정에 실패했습니다.</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM 기본 효과</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>휠 잠김</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>스트리머 모드</value></data>
 </root>

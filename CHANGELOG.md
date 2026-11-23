@@ -10,6 +10,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Double-click the dashboard preview to re-render it;** if no preview can be shown, it names the folder the dashboard wasn't found in.
 - **Privacy policy;** linked from the bug-report form and published at giant.orth.cc/privacy.
 - **Default LED effects for new devices;** newly added wheels, dashes and wheelbases start with Pit House's out-of-the-box RPM, limiter, flag and driving-aid effects.
+- **Streamer Mode;** an Options toggle that masks serial numbers and hardware IDs in the plugin and SimHub's device pages.
 
 ## Changed
 

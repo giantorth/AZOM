@@ -960,4 +960,5 @@
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Grr Arf!</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Good Boy Woofs</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Paw lock</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Awoo Mode!</value></data>
 </root>

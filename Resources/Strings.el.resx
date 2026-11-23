@@ -962,4 +962,5 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Η βαθμονόμηση πτερυγίων απέτυχε.</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Προεπιλεγμένα εφέ AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Μπλοκάρισμα τροχού</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Λειτουργία streamer</value></data>
 </root>

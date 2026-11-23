@@ -4203,6 +4203,15 @@
                                         <ComboBox Grid.Column="1" x:Name="DefaultTabCombo" Width="200" HorizontalAlignment="Left" VerticalAlignment="Center"
                                                   SelectionChanged="DefaultTabCombo_Changed"/>
                                     </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_StreamerMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="StreamerModeCheck" VerticalAlignment="Center"
+                                                  Checked="StreamerModeCheck_Changed" Unchecked="StreamerModeCheck_Changed"/>
+                                    </Grid>
                                     <!-- Status line (firmware note) is long and wraps under the selector. -->
                                     <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>

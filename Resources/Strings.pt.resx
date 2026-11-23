@@ -962,4 +962,5 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>A calibração dos paddles falhou.</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Efeitos padrão AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Travamento de roda</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Modo streamer</value></data>
 </root>

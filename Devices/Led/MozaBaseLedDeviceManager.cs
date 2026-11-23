@@ -56,10 +56,7 @@ namespace MozaPlugin.Devices.Led
         // The base has no serial number as such; its MCU UID is the closest real
         // identity and distinguishes two bases.
         public override string GetSerialNumber()
-        {
-            var uid = MozaPlugin.Instance?.Data?.BaseMcuUid;
-            return uid == null || uid.Length == 0 ? "" : BitConverter.ToString(uid).Replace("-", "");
-        }
+            => MozaPlugin.ScreenId(Haptics.MozaBaseConnectionManager.BaseSerialNumber());
 
         // The base's real firmware, as read at group 0x04 — not the driver's version.
         public override string GetFirmwareVersion() => MozaPlugin.Instance?.Data?.BaseFwVersionText ?? "";

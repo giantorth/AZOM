@@ -1028,5 +1028,6 @@ namespace MozaPlugin.Resources
         public static string Hint_PaddleCalibrateFailed => Get("Hint_PaddleCalibrateFailed");
         public static string LedDefaults_ProfileName => Get("LedDefaults_ProfileName");
         public static string LedDefaults_WheelLock => Get("LedDefaults_WheelLock");
+        public static string SliderLabel_StreamerMode => Get("SliderLabel_StreamerMode");
     }
 }

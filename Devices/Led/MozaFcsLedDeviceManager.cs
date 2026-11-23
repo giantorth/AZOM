@@ -37,7 +37,7 @@ namespace MozaPlugin.Devices.Led
         public override string GetSerialNumber()
         {
             var uid = MozaPlugin.Instance?.Data?.Fcs.McuUid;
-            return uid == null || uid.Length == 0 ? "" : BitConverter.ToString(uid).Replace("-", "");
+            return uid == null || uid.Length == 0 ? "" : MozaPlugin.ScreenId(BitConverter.ToString(uid).Replace("-", ""));
         }
 
         public override string GetFirmwareVersion() => MozaPlugin.Instance?.Data?.Fcs.FwVersionText ?? "";

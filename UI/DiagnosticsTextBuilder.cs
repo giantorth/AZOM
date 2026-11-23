@@ -18,8 +18,12 @@ namespace MozaPlugin.UI
         // ── Field formatters ────────────────────────────────────────────
 
         public static string Blank(string s) => string.IsNullOrEmpty(s) ? "—" : s;
-        public static string Redact(string s) => MozaLog.RedactId(s);
-        public static string RedactBytes(byte[] b) => MozaLog.RedactBytesHex(b);
+        // maskIds (builder parameter): mask identifiers completely, for the on-screen
+        // render under Streamer Mode. Bundles keep the tail-visible redaction.
+        public static string Redact(string s, bool full = false) => MozaLog.RedactId(s, full);
+        public static string RedactBytes(byte[] b, bool full = false) => MozaLog.RedactBytesHex(b, full);
+        // Identifiers otherwise printed in full.
+        private static string RawId(string s, bool maskIds) => maskIds ? Redact(s, full: true) : Blank(s);
         public static string Hex(byte[] b) => b == null || b.Length == 0 ? "—" : BitConverter.ToString(b);
 
         private static string TorqueBoostText(MozaData d)
@@ -136,7 +140,7 @@ namespace MozaPlugin.UI
             catch (Exception ex) { return $"(failed: {ex.Message})"; }
         }
 
-        public static string BuildUsbDetection(MozaPlugin plugin)
+        public static string BuildUsbDetection(MozaPlugin plugin, bool maskIds = false)
         {
             var sb = new StringBuilder();
             var ports = MozaPortDiscovery.Instance.Enumerate();
@@ -188,7 +192,7 @@ namespace MozaPlugin.UI
                     if (p.DevicePath.Length > 0 || p.Serial.Length > 0)
                     {
                         string com = Protocol.WineComNameResolver.ResolveComName(p.PortName) ?? "(unresolved)";
-                        sb.AppendLine($"           dev {p.DevicePath}  serial {Redact(p.Serial)}  bus {p.InstanceId}  wine COM {com}");
+                        sb.AppendLine($"           dev {p.DevicePath}  serial {Redact(p.Serial, maskIds)}  bus {p.InstanceId}  wine COM {com}");
                     }
                 }
             }
@@ -344,7 +348,7 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
-        public static string BuildMBoosterDevices(MozaPlugin plugin, MozaData data)
+        public static string BuildMBoosterDevices(MozaPlugin plugin, MozaData data, bool maskIds = false)
         {
             var registry = plugin.MBoosterRegistry;
             if (registry == null || registry.Devices.Count == 0)
@@ -387,11 +391,11 @@ namespace MozaPlugin.UI
                     $"sleep={(s == null || s.SleepMinutes < 0 ? "—" : s.SleepMinutes.ToString())}  id={id}");
                 // Device-reported identity (learned over the Moza wire) — confirms
                 // the serial-interrogation path on real hardware + shows the chain size.
-                string serialStr = string.IsNullOrEmpty(d.Serial) ? "—" : Redact(d.Serial!);
+                string serialStr = string.IsNullOrEmpty(d.Serial) ? "—" : Redact(d.Serial!, maskIds);
                 sb.AppendLine(
                     $"        serial={serialStr}  " +
                     $"model='{(string.IsNullOrEmpty(d.ModelName) ? "—" : d.ModelName)}'  " +
-                    $"subDevs={d.SubDeviceCount}  container={(string.IsNullOrEmpty(d.ContainerId) ? "—" : d.ContainerId)}");
+                    $"subDevs={d.SubDeviceCount}  container={RawId(d.ContainerId, maskIds)}");
                 // Per-axis role resolution for a chained lane — the actual
                 // routing (which HID axis drives throttle/brake/clutch), so a
                 // mis-mapping is visible straight from the bundle.
@@ -414,7 +418,7 @@ namespace MozaPlugin.UI
                     // explain, which is how a role mix-up stays hidden.
                     sb.AppendLine($"        axes={d.AxisCount}  connected={d.ConnectedAxisCount}  roles({(d.DeviceRolesKnown ? "device" : "profile")})=[{string.Join(", ", roleParts)}]");
                 }
-                AppendMBoosterPedalConfig(sb, registry, d, s);
+                AppendMBoosterPedalConfig(sb, registry, d, s, maskIds);
                 AppendMBoosterStatusRegisters(sb, d);
                 // Routed chain: which chained ids announced themselves, and
                 // whether they went on to ANSWER — the pair that decides
@@ -478,7 +482,8 @@ namespace MozaPlugin.UI
         /// this is the only place a bundle records what the user configured.
         /// </summary>
         private static void AppendMBoosterPedalConfig(
-            StringBuilder sb, MozaMBoosterRegistry registry, MBoosterDeviceController d, Devices.MBooster.MBoosterDeviceSettings? s)
+            StringBuilder sb, MozaMBoosterRegistry registry, MBoosterDeviceController d, Devices.MBooster.MBoosterDeviceSettings? s,
+            bool maskIds)
         {
             var types = d.AxisTypes;
             sb.AppendLine(
@@ -490,7 +495,7 @@ namespace MozaPlugin.UI
             var units = new System.Collections.Generic.List<string>();
             foreach (var u in d.ChainUnits())
                 units.Add($"0x{u.dev:x2} {(u.dev == d.HostDeviceId ? "host" : u.answered ? "chained(answers)" : "chained(silent)")}" +
-                          $" serial={(string.IsNullOrEmpty(u.serial) ? "—" : Redact(u.serial!))} model={(string.IsNullOrEmpty(u.model) ? "—" : u.model)}");
+                          $" serial={(string.IsNullOrEmpty(u.serial) ? "—" : Redact(u.serial!, maskIds))} model={(string.IsNullOrEmpty(u.model) ? "—" : u.model)}");
             sb.AppendLine($"        units=[{string.Join(", ", units)}]");
             foreach (int a in d.ConnectedAxisIndices())
             {
@@ -594,7 +599,7 @@ namespace MozaPlugin.UI
             return sb.ToString().TrimEnd();
         }
 
-        public static string BuildWheelIdentity(MozaData d, Devices.DeviceDetectionState? detection = null)
+        public static string BuildWheelIdentity(MozaData d, Devices.DeviceDetectionState? detection = null, bool maskIds = false)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"Model:          {Blank(d.WheelModelName)}");
@@ -602,12 +607,12 @@ namespace MozaPlugin.UI
             sb.AppendLine($"FW (numeric):   {d.WheelFwVersionText}  ({d.WheelFwVersionProbeRetries} re-probe round(s))");
             sb.AppendLine($"HW version:     {Blank(d.WheelHwVersion)}");
             sb.AppendLine($"HW sub:         {Blank(d.WheelHwSubVersion)}");
-            sb.AppendLine($"Serial:         {Redact(d.WheelSerialNumber)}");
+            sb.AppendLine($"Serial:         {Redact(d.WheelSerialNumber, maskIds)}");
             sb.AppendLine($"Sub-devices:    {d.WheelSubDeviceCount}");
             sb.AppendLine($"Device presence:0x{d.WheelDevicePresence:X2}");
             sb.AppendLine($"Device type:    {Hex(d.WheelDeviceType)}");
             sb.AppendLine($"Capabilities:   {Hex(d.WheelCapabilities)}");
-            sb.AppendLine($"MCU UID:        {RedactBytes(d.WheelMcuUid)}");
+            sb.AppendLine($"MCU UID:        {RedactBytes(d.WheelMcuUid, maskIds)}");
             sb.Append    ($"Identity-11:    {Hex(d.WheelIdentity11)}");
             if (detection?.NewWheelActingOldProtocol == true)
             {
@@ -782,7 +787,7 @@ namespace MozaPlugin.UI
         /// what tells a SILENT base apart from a genuinely old one; both read
         /// "LFE: no", and only one of them is a bug.
         /// </summary>
-        public static string BuildBaseIdentity(MozaPlugin plugin, MozaData d)
+        public static string BuildBaseIdentity(MozaPlugin plugin, MozaData d, bool maskIds = false)
         {
             // No base on the bus (standalone CM2 dash, hub-only rig, wheel-only
             // bench). Say so rather than printing a page of blanks — but keep the
@@ -797,7 +802,7 @@ namespace MozaPlugin.UI
             sb.AppendLine($"FW (sw):        {Blank(d.BaseSwVersion)}");
             sb.AppendLine($"HW version:     {Blank(d.BaseHwVersion)}");
             sb.AppendLine($"HW sub:         {Blank(d.BaseHwSubVersion)}");
-            sb.AppendLine($"MCU UID:        {RedactBytes(d.BaseMcuUid)}");
+            sb.AppendLine($"MCU UID:        {RedactBytes(d.BaseMcuUid, maskIds)}");
             sb.AppendLine($"Identity-11:    {Hex(d.BaseIdentity11)}");
             sb.AppendLine($"FW (numeric):   {d.BaseFwVersionText}  via {d.BaseFwVersionSource}");
 
@@ -966,7 +971,7 @@ namespace MozaPlugin.UI
             return sb.ToString();
         }
 
-        public static string BuildDisplayIdentity(MozaData d)
+        public static string BuildDisplayIdentity(MozaData d, bool maskIds = false)
         {
             if (string.IsNullOrEmpty(d.DisplayModelName) && d.DisplayMcuUid.Length == 0)
                 return "(display sub-device not probed or not present)";
@@ -975,12 +980,12 @@ namespace MozaPlugin.UI
             sb.AppendLine($"FW (sw):        {Blank(d.DisplaySwVersion)}");
             sb.AppendLine($"FW (numeric):   {d.DisplayFwVersionText}");
             sb.AppendLine($"HW version:     {Blank(d.DisplayHwVersion)}");
-            sb.AppendLine($"Serial:         {Redact(d.DisplaySerialNumber)}");
+            sb.AppendLine($"Serial:         {Redact(d.DisplaySerialNumber, maskIds)}");
             sb.AppendLine($"Sub-devices:    {d.DisplaySubDeviceCount}");
             sb.AppendLine($"Device presence:0x{d.DisplayDevicePresence:X2}");
             sb.AppendLine($"Device type:    {Hex(d.DisplayDeviceType)}");
             sb.AppendLine($"Capabilities:   {Hex(d.DisplayCapabilities)}");
-            sb.AppendLine($"MCU UID:        {RedactBytes(d.DisplayMcuUid)}");
+            sb.AppendLine($"MCU UID:        {RedactBytes(d.DisplayMcuUid, maskIds)}");
             sb.Append    ($"Identity-11:    {Hex(d.DisplayIdentity11)}");
             return sb.ToString();
         }
@@ -1297,7 +1302,7 @@ namespace MozaPlugin.UI
         /// <see cref="BuildFirmwareDebug"/>, which shows the base/wheel MCU
         /// group-0x0E chatter. Lines carry their own device-side timestamp, so
         /// the host receive time is only shown to order them.</summary>
-        public static string BuildDeviceLog(MozaPlugin plugin)
+        public static string BuildDeviceLog(MozaPlugin plugin, bool maskIds = false)
         {
             var log = plugin.DeviceLogForDiagnostics;
             var entries = log.Snapshot();
@@ -1333,7 +1338,7 @@ namespace MozaPlugin.UI
             {
                 var e = entries[i];
                 string ts = e.ReceivedUtc.ToLocalTime().ToString("HH:mm:ss");
-                sb.AppendLine($"  {ts} [{e.Source,-5}] {Diagnostics.CaptureRedactor.RedactText(e.Text, data)}");
+                sb.AppendLine($"  {ts} [{e.Source,-5}] {Diagnostics.CaptureRedactor.RedactText(e.Text, data, full: maskIds)}");
             }
             return sb.ToString().TrimEnd();
         }
@@ -1412,7 +1417,7 @@ namespace MozaPlugin.UI
         /// MOZA Motion Controller lane (HMA150 platform): lifecycle phase, controller mode
         /// and flags, port map, setup values and the tail of the controller's own log.
         /// </summary>
-        public static string BuildMotionController(MozaPlugin plugin)
+        public static string BuildMotionController(MozaPlugin plugin, bool maskIds = false)
         {
             var lane = plugin.MotionController;
             if (lane == null) return "(motion lane not created)";
@@ -1427,7 +1432,7 @@ namespace MozaPlugin.UI
             sb.AppendLine($"Port:           {s.PortName ?? "-"}  phase={s.Phase}"
                 + (s.FaultReason != null ? $"  fault=\"{s.FaultReason}\"" : ""));
             sb.AppendLine($"Identity:       {s.ModelName}  hw {s.HardwareId} {s.HardwareRevision}  "
-                + $"fw {s.FirmwareVersion}  hwver {s.HardwareVersion}  uid {s.Uid}");
+                + $"fw {s.FirmwareVersion}  hwver {s.HardwareVersion}  uid {RawId(s.Uid, maskIds)}");
             sb.AppendLine($"Mode:           target={s.ModeTarget} current={s.ModeCurrent} flags=0x{s.Flags:X2} "
                 + $"runState={s.RunState} selfCheckPassed={s.SelfCheckPassed}");
             sb.AppendLine($"Actuators:      supported={s.SupportedActuators} ports={s.PortCount} "

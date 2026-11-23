@@ -541,9 +541,9 @@ namespace MozaPlugin.Devices.Led
             var d = MozaPlugin.Instance?.Data;
             if (d == null) return "";
             var serial = d.WheelSerialNumber;
-            if (!string.IsNullOrEmpty(serial)) return serial;
+            if (!string.IsNullOrEmpty(serial)) return MozaPlugin.ScreenId(serial);
             var uid = d.WheelMcuUid;
-            return uid == null || uid.Length == 0 ? "" : BitConverter.ToString(uid).Replace("-", "");
+            return uid == null || uid.Length == 0 ? "" : MozaPlugin.ScreenId(BitConverter.ToString(uid).Replace("-", ""));
         }
 
         // Wheel and display MCUs run separate firmware; SimHub has one field for both.

@@ -537,6 +537,13 @@ namespace MozaPlugin
         internal MozaData Data => _data;
         internal MozaDeviceManager DeviceManager => _deviceManager;
         internal MozaPluginSettings Settings => _settings;
+
+        internal static bool IsStreamerMode => Instance?._settings?.StreamerMode == true;
+
+        /// <summary>A hardware identifier as shown on screen: fully masked while Streamer Mode is on.</summary>
+        internal static string ScreenId(string id)
+            => IsStreamerMode && !string.IsNullOrEmpty(id) ? MozaLog.RedactId(id, full: true) : id;
+
         internal bool IsNewWheelDetected => DetectionState.NewWheelDetected;
         internal bool IsOldWheelDetected => DetectionState.OldWheelDetected;
         internal Devices.WheelModelInfo? WheelModelInfo { get; set; }
