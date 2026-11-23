@@ -57,8 +57,8 @@ namespace MozaPlugin.Telemetry.Frames
         // Null when car positions weren't requested.
         public int[]? RadarSlotCarIds;
 
-        // Track folder name (AC: content/tracks/<name>, e.g. "ks_zandvoort"),
-        // used as the per-track cache key for the map bounds / transform.
+        // AC path under content/tracks ("ks_zandvoort", "ks_nordschleife/nordschleife"),
+        // else SimHub's TrackId; the per-track cache key for the map bounds / transform.
         public string? TrackFolderName;
 
         // Bounding box of SimHub's recorded track map (PersistantTracker), in the
@@ -151,49 +151,47 @@ namespace MozaPlugin.Telemetry.Frames
             }
         }
 
-        // The track's content-folder name. AC's raw Static.track is the
-        // authoritative source (the content/tracks/<folder> id); SimHub's
-        // TrackId is the fallback. Reflection-only (no compile-time game ref).
-        // Member lookups are cached per runtime type — this runs every tick on
-        // the radar path, and uncached GetProperty/GetField per call was
-        // measurable churn. Statics guarded by s_carPosLock, like the slot
-        // maps below.
+        // What GetRawDataObject() returns for AC (SimHub's ACManager /
+        // ACVanillaManager): public FIELDS Graphics and StaticInfo, AC's
+        // shared-memory pages. ACC/ACR/EVO raw types share the field names but not
+        // AC's carId-indexed CarCoordinates, so only this type is read.
+        // tests/simhub-interface checks the shape against each SimHub build.
+        internal const string AcRawDataType = "ACSharedMemory.Reader.ACRawData";
+
+        // The track's path under AC's content/tracks — "<track>", or
+        // "<track>/<layout>" for a multi-layout track, where its map.ini lives.
+        // SimHub's TrackId ("<track>-<layout>") is the fallback. Member lookups are
+        // cached per runtime type (every tick on the radar path). Statics guarded
+        // by s_carPosLock, like the slot maps below.
         private static Type? s_rawType;
-        private static PropertyInfo? s_rawStaticProp;
-        private static Type? s_staticType;
+        private static FieldInfo? s_rawStaticInfoField;
         private static FieldInfo? s_staticTrackField;
-        private static PropertyInfo? s_staticTrackProp;
+        private static FieldInfo? s_staticLayoutField;
 
         private static string? ResolveTrackFolder(StatusDataBase data)
         {
             try
             {
                 object? raw = data.GetRawDataObject();
-                if (raw != null)
+                var rt = raw?.GetType();
+                if (rt != null && rt != s_rawType)
                 {
-                    var rt = raw.GetType();
-                    if (rt != s_rawType)
-                    {
-                        s_rawType = rt;
-                        s_rawStaticProp = rt.GetProperty("Static");
-                    }
-                    object? st = s_rawStaticProp?.GetValue(raw);
-                    if (st != null)
-                    {
-                        var stt = st.GetType();
-                        if (stt != s_staticType)
-                        {
-                            s_staticType = stt;
-                            s_staticTrackField = stt.GetField("track");
-                            s_staticTrackProp = stt.GetProperty("Track");
-                        }
-                        var t = (s_staticTrackField?.GetValue(st) as string)
-                              ?? (s_staticTrackProp?.GetValue(st) as string);
-                        if (!string.IsNullOrEmpty(t)) return t;
-                    }
+                    s_rawType = rt;
+                    s_rawStaticInfoField = rt.FullName == AcRawDataType ? rt.GetField("StaticInfo") : null;
+                    var st = s_rawStaticInfoField?.FieldType;
+                    s_staticTrackField = st?.GetField("Track");
+                    s_staticLayoutField = st?.GetField("TrackConfiguration");
+                }
+                object? info = rt == null ? null : s_rawStaticInfoField?.GetValue(raw);
+                if (info != null)
+                {
+                    var track = s_staticTrackField?.GetValue(info) as string;
+                    var layout = s_staticLayoutField?.GetValue(info) as string;
+                    if (!string.IsNullOrEmpty(track))
+                        return string.IsNullOrEmpty(layout) ? track : track + "/" + layout;
                 }
             }
-            catch { /* not AC, or shape changed — fall back to SimHub's id */ }
+            catch { /* shape changed — fall back to SimHub's id */ }
             try { return data.TrackId; } catch { return null; }
         }
 
@@ -280,7 +278,7 @@ namespace MozaPlugin.Telemetry.Frames
             // widget plots each car's path around the track from absolute world
             // positions (see TelemetryFrameBuilder.WriteLocationPair). Source
             // priority matches what each game exposes:
-            //   1. AC raw struct (DataContainer.Graphics.CarCoordinates, a flat
+            //   1. AC raw struct (ACRawData.Graphics.CarCoordinates, a flat
             //      [x,y,z,…] per slot) — world coords, the only reliable source
             //      for AC where Opponent.Coordinates is ~98.5% empty. Read
             //      reflectively (no compile-time AC reference).
@@ -497,14 +495,13 @@ namespace MozaPlugin.Telemetry.Frames
             return slotOf;
         }
 
-        // Per-car absolute ground coordinates from the raw game struct, when the
-        // game exposes them (AC: DataContainer.Graphics.CarCoordinates, a flat
-        // float[] of x,y,z per slot). Reflection-only so we don't take a
-        // compile-time dependency on any game plugin; any failure returns null
-        // and the caller falls back to SimHub's generic fields.
+        // Per-car absolute ground coordinates from AC's raw struct
+        // (ACRawData.Graphics.CarCoordinates, a flat float[] of x,y,z per carId).
+        // Reflection-only so we don't take a compile-time dependency on any game
+        // plugin; any other game or failure returns null and the caller falls back
+        // to SimHub's generic fields.
         private static Type? s_gfxRawType;
-        private static PropertyInfo? s_rawGraphicsProp;
-        private static Type? s_gfxType;
+        private static FieldInfo? s_rawGraphicsField;
         private static FieldInfo? s_gfxCarCoordsField;
 
         private static float[]? TryReadRawCarCoordinates(StatusDataBase data)
@@ -517,17 +514,11 @@ namespace MozaPlugin.Telemetry.Frames
                 if (rt != s_gfxRawType)
                 {
                     s_gfxRawType = rt;
-                    s_rawGraphicsProp = rt.GetProperty("Graphics");
+                    s_rawGraphicsField = rt.FullName == AcRawDataType ? rt.GetField("Graphics") : null;
+                    s_gfxCarCoordsField = s_rawGraphicsField?.FieldType.GetField("CarCoordinates");
                 }
-                object? gfx = s_rawGraphicsProp?.GetValue(raw);
-                if (gfx == null) return null;
-                var gt = gfx.GetType();
-                if (gt != s_gfxType)
-                {
-                    s_gfxType = gt;
-                    s_gfxCarCoordsField = gt.GetField("CarCoordinates");
-                }
-                return s_gfxCarCoordsField?.GetValue(gfx) as float[];
+                object? gfx = s_rawGraphicsField?.GetValue(raw);
+                return gfx == null ? null : s_gfxCarCoordsField?.GetValue(gfx) as float[];
             }
             catch
             {
