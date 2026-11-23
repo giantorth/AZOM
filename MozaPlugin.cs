@@ -337,42 +337,112 @@ namespace MozaPlugin
         internal DashboardProfileStore DashProfileStore { get; } = new DashboardProfileStore();
         internal DashboardCache DashCache { get; private set; } = null!;
 
-        /// <summary>
-        /// Reload the folder half of the dashboard library from every source
-        /// that can hold a user's dashboards. Single entry point so the Files
-        /// tab, the Refresh button and post-detection load all see the same set.
-        ///
-        /// <para>MOZA Dashboard Studio authors into its own projectRoot while
-        /// PitHouse syncs a per-wheel copy elsewhere, and neither tree is a
-        /// superset of the other — a dashboard just created in Studio would
-        /// otherwise be invisible here. The user's configured folder is scanned
-        /// LAST so it wins on a duplicate name.</para>
-        /// </summary>
-        /// <param name="configuredFolder">
-        /// Override for the configured folder; defaults to
-        /// <see cref="ActiveTelemetryMzdashFolder"/> when null.
-        /// </param>
-        internal void ReloadDashboardLibrary(string? configuredFolder = null)
+        /// <summary>Where the dashboard library comes from.</summary>
+        internal readonly struct DashboardLibrarySources
         {
-            var folder = configuredFolder ?? ActiveTelemetryMzdashFolder;
-            DashCache?.LoadFromFolders(new[]
+            public DashboardLibrarySources(string? studio, string? pitHouseWheel,
+                bool wheelConnected, bool displayKnown, string custom)
             {
-                UI.DashboardStudioLauncher.ResolveProjectRoot(),
-                folder,
-            });
+                Studio = studio;
+                PitHouseWheel = pitHouseWheel;
+                WheelConnected = wheelConnected;
+                DisplayKnown = displayKnown;
+                Custom = custom;
+            }
+
+            /// <summary>Dashboard Studio's projectRoot; null when it doesn't exist.</summary>
+            public string? Studio { get; }
+            /// <summary>PitHouse's synced copy for the connected wheel's display; null
+            /// when the display UID is unknown or PitHouse never synced it.</summary>
+            public string? PitHouseWheel { get; }
+            public bool WheelConnected { get; }
+            public bool DisplayKnown { get; }
+            /// <summary>The user's folder; "" when unset or the same as an automatic source.</summary>
+            public string Custom { get; }
         }
 
-        /// <summary>Every folder <see cref="ReloadDashboardLibrary"/> scans, for
-        /// UI that reports where the library came from.</summary>
+        /// <summary>
+        /// Studio's projectRoot and PitHouse's copy for the connected wheel are
+        /// automatic — neither tree is a superset of the other. The custom folder
+        /// is an optional extra.
+        /// </summary>
+        /// <param name="configuredFolder">Overrides <see cref="ActiveTelemetryMzdashFolder"/>.</param>
+        internal DashboardLibrarySources GetDashboardLibrarySources(string? configuredFolder = null)
+        {
+            string? studio = UI.DashboardStudioLauncher.ResolveProjectRoot();
+            // PitHouse names the folder after the display sub-device's MCU UID
+            // (wrapped 0xC3/0x71 0x86 reply), not the wheel's own.
+            byte[] uid = Data?.DisplayMcuUid ?? Array.Empty<byte>();
+            bool displayKnown = uid.Length == 12;
+            string? wheel = displayKnown
+                ? UI.DashboardStudioLauncher.ResolveWheelSyncFolder(Devices.Ui.WheelUiHelpers.UidToHex(uid))
+                : null;
+            bool wheelConnected = DetectionState.NewWheelDetected || DetectionState.OldWheelDetected;
+            string custom = configuredFolder ?? ActiveTelemetryMzdashFolder ?? "";
+            if (SameFolder(custom, studio) || SameFolder(custom, wheel)) custom = "";
+            return new DashboardLibrarySources(studio, wheel, wheelConnected, displayKnown, custom);
+        }
+
+        /// <summary>True when <paramref name="path"/> is already scanned automatically.</summary>
+        internal bool IsAutomaticLibraryFolder(string? path)
+        {
+            var s = GetDashboardLibrarySources("");
+            return SameFolder(path, s.Studio) || SameFolder(path, s.PitHouseWheel);
+        }
+
+        private static bool SameFolder(string? a, string? b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            static string Norm(string p)
+            {
+                try { p = System.IO.Path.GetFullPath(p); } catch { }
+                return p.TrimEnd('\\', '/');
+            }
+            return string.Equals(Norm(a!), Norm(b!), StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Folder list of the last ReloadDashboardLibrary; null until the first load.
+        private volatile string? _loadedLibraryFolders;
+        internal string? LoadedLibraryFolders => _loadedLibraryFolders;
+
+        /// <summary>
+        /// Reload the folder half of the dashboard library. Single entry point so
+        /// the Files tab, the Refresh button and post-detection load all see the
+        /// same set (<see cref="DashboardLibraryFolders"/>).
+        /// </summary>
+        /// <param name="configuredFolder">Overrides <see cref="ActiveTelemetryMzdashFolder"/>.</param>
+        internal void ReloadDashboardLibrary(string? configuredFolder = null)
+        {
+            var folders = DashboardLibraryFolders(configuredFolder);
+            _loadedLibraryFolders = string.Join("|", folders);
+            DashCache?.LoadFromFolders(folders.ToArray());
+        }
+
+        /// <summary>
+        /// Reload only if a library was already loaded and its folder set has
+        /// changed since — the wheel UID that picks PitHouse's copy can arrive
+        /// after the post-detection load.
+        /// </summary>
+        internal void ReloadDashboardLibraryIfSourcesChanged()
+        {
+            string? loaded = _loadedLibraryFolders;
+            if (loaded == null) return;
+            var folders = DashboardLibraryFolders();
+            if (string.Join("|", folders) == loaded) return;
+            MozaLog.Debug("[AZOM] Dashboard library sources changed, reloading from: " + string.Join(", ", folders));
+            ReloadDashboardLibrary();
+        }
+
+        /// <summary>Every folder <see cref="ReloadDashboardLibrary"/> scans, in scan
+        /// order: later folders win on a duplicate name, so PitHouse's synced copy
+        /// yields to Studio's editable one, and the custom folder wins over both.</summary>
         internal IReadOnlyList<string> DashboardLibraryFolders(string? configuredFolder = null)
         {
-            var result = new List<string>(2);
-            var studio = UI.DashboardStudioLauncher.ResolveProjectRoot();
-            var folder = configuredFolder ?? ActiveTelemetryMzdashFolder;
-            if (!string.IsNullOrEmpty(folder)) result.Add(folder!);
-            if (!string.IsNullOrEmpty(studio)
-                && !result.Any(p => string.Equals(p, studio, StringComparison.OrdinalIgnoreCase)))
-                result.Add(studio!);
+            var s = GetDashboardLibrarySources(configuredFolder);
+            var result = new List<string>(3);
+            foreach (var f in new[] { s.PitHouseWheel, s.Studio, s.Custom })
+                if (!string.IsNullOrEmpty(f) && !result.Any(p => SameFolder(p, f)))
+                    result.Add(f!);
             return result;
         }
 
@@ -467,6 +537,13 @@ namespace MozaPlugin
         internal MozaData Data => _data;
         internal MozaDeviceManager DeviceManager => _deviceManager;
         internal MozaPluginSettings Settings => _settings;
+
+        internal static bool IsStreamerMode => Instance?._settings?.StreamerMode == true;
+
+        /// <summary>A hardware identifier as shown on screen: fully masked while Streamer Mode is on.</summary>
+        internal static string ScreenId(string id)
+            => IsStreamerMode && !string.IsNullOrEmpty(id) ? MozaLog.RedactId(id, full: true) : id;
+
         internal bool IsNewWheelDetected => DetectionState.NewWheelDetected;
         internal bool IsOldWheelDetected => DetectionState.OldWheelDetected;
         internal Devices.WheelModelInfo? WheelModelInfo { get; set; }
@@ -480,25 +557,33 @@ namespace MozaPlugin
         internal bool IsWheelLedGroupPresent(int group) => DetectionState.IsWheelLedGroupPresent(group);
         // Extension registration state is static: device extensions outlive a
         // plugin reload (game switch) without End/Init, so per-instance state
-        // would read "not added" on the new instance.
+        // would read "not added" on the new instance. Setters are static too: SimHub
+        // can Init device extensions before our plugin Init sets Instance.
 
         /// <summary>Device extension owns wheel LED settings; plugin profile-apply skips wheel writes.</summary>
         private static volatile bool s_deviceExtensionActive;
-        internal bool DeviceExtensionActive
+        internal static bool DeviceExtensionActive
         {
             get => s_deviceExtensionActive;
             set => s_deviceExtensionActive = value;
         }
 
         private static volatile bool s_dashDeviceExtensionActive;
-        internal bool DashDeviceExtensionActive
+        internal static bool DashDeviceExtensionActive
         {
             get => s_dashDeviceExtensionActive;
             set => s_dashDeviceExtensionActive = value;
         }
 
+        private static volatile bool s_fcsDeviceExtensionActive;
+        internal static bool FcsDeviceExtensionActive
+        {
+            get => s_fcsDeviceExtensionActive;
+            set => s_fcsDeviceExtensionActive = value;
+        }
+
         private static volatile bool s_baseAmbientDeviceExtensionActive;
-        internal bool BaseAmbientDeviceExtensionActive
+        internal static bool BaseAmbientDeviceExtensionActive
         {
             get => s_baseAmbientDeviceExtensionActive;
             set => s_baseAmbientDeviceExtensionActive = value;
@@ -535,7 +620,7 @@ namespace MozaPlugin
         /// </summary>
         private static volatile HashSet<string> s_activeModelPrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        internal void RegisterActiveModelPrefix(string prefix)
+        internal static void RegisterActiveModelPrefix(string prefix)
         {
             if (!string.IsNullOrEmpty(prefix) && prefix != MozaDeviceConstants.OldProtocolMarker)
             {
@@ -545,7 +630,7 @@ namespace MozaPlugin
             }
         }
 
-        internal void UnregisterActiveModelPrefix(string prefix)
+        internal static void UnregisterActiveModelPrefix(string prefix)
         {
             if (!string.IsNullOrEmpty(prefix))
             {
@@ -583,6 +668,7 @@ namespace MozaPlugin
         internal bool IsHubDetected => DetectionState.HubDetected;
         internal bool IsPedalsOnHub => _connectionCoordinator?.PedalsOnHub == true;
         internal bool IsAb9Detected => DetectionState.Ab9Detected;
+        internal bool IsFcsDetected => DetectionState.FcsDetected;
         internal MozaAb9DeviceManager Ab9Manager => _ab9Manager;
         internal MozaMBoosterRegistry? MBoosterRegistry => _mboosterRegistry;
         internal MozaStandalonePeripheralRegistry? PeripheralRegistry => _peripheralRegistry;

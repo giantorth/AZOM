@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Δεν έχει αναφερθεί ακόμα διαμόρφωση Joystick από το τιμόνι. Συνδέστε το τιμόνι και περιμένετε να ολοκληρωθεί η ανίχνευση.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Τηλεμετρία</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΦΑΚΕΛΟΥ…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Οθόνες οργάνων Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Οθόνες οργάνων συσκευής</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Προσαρμοσμένος</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Δεν βρέθηκε</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Κανένα αντίγραφο για αυτό το τιμόνι</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Το τιμόνι δεν είναι συνδεδεμένο</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Η οθόνη δεν εντοπίστηκε</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Κανένας</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>ΑΦΑΙΡΕΣΗ</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>ΑΥΤΟΜΑΤΗ ΑΝΙΧΝΕΥΣΗ</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Ορισμός φακέλου .mzdash ως βιβλιοθήκη οθονών</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Αυτόματη ανίχνευση φακέλου οθόνης για το συνδεδεμένο τιμόνι</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>ΔΟΚΙΜΗ</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>ΔΙΑΚΟΠΗ</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>ΑΝΤΙΣΤΟΙΧΙΣΕΙΣ ΚΑΝΑΛΙΩΝ</value></data>
@@ -484,7 +492,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Επιλέξτε πρώτα ένα αρχείο .mzdash ή μια καταχώριση βιβλιοθήκης.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(δεν έχει ληφθεί ακόμη κατάσταση configJson)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Δεν είναι δυνατή η ανάκτηση των ακατέργαστων δεδομένων για «{0}» — επιλέξτε ένα τοπικό αρχείο.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Φάκελος: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Η αποστολή σε ουρά — μεταφορά «{0}» στο τιμόνι…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Η αποστολή δεν ξεκίνησε — το τιμόνι δεν είναι συνδεδεμένο ή δεν υπάρχει ακόμη συνεδρία διαχείρισης.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Η αποστολή ολοκληρώθηκε (κατάσταση 0x{0})</value></data>
@@ -495,18 +502,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Επιλέξτε ένα αρχείο .mzdash για αποστολή</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Ταμπλό Moza (*.mzdash)|*.mzdash|Όλα τα αρχεία (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Επιλέξτε φάκελο που περιέχει αρχεία ταμπλό .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Αυτόματος εντοπισμός φακέλου ταμπλό</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Ο φάκελος ταμπλό του MOZA Pit House δεν βρέθηκε στο:
-{0}
-
-Εγκαταστήστε το MOZA Pit House και φορτώστε ένα ταμπλό, ή χρησιμοποιήστε «Ορισμός φακέλου…» για προσαρμοσμένη τοποθεσία.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Δεν υπάρχει φάκελος ταμπλό για το συνδεδεμένο τιμόνι (UID {0}).
-Αναζητήθηκε στο:
-{1}
-
-Ανοίξτε πρώτα ένα ταμπλό στο MOZA Pit House για αυτό το τιμόνι.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Δεν βρέθηκαν φάκελοι ταμπλό ανά τιμόνι κάτω από το _dashes. Ανοίξτε το MOZA Pit House, φορτώστε ένα ταμπλό και δοκιμάστε ξανά.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Βρέθηκαν πολλοί φάκελοι ταμπλό ({0}) και δεν είναι συνδεδεμένο τιμόνι. Συνδέστε το τιμόνι σας και δοκιμάστε ξανά, ή χρησιμοποιήστε «Ορισμός φακέλου…» για χειροκίνητη επιλογή.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Αυτό θα διαγράψει οριστικά όλες τις ρυθμίσεις και τα προφίλ του πρόσθετου.
 
 Είστε σίγουροι;</value></data>
@@ -644,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Περιγράψτε το πρόβλημα: τι κάνατε, τι έκανε το τιμόνι ή το ταμπλό, και πότε ξεκίνησε.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Επικοινωνία (προαιρετικό — email ή Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Με την υποβολή αποστέλλεται ένα πακέτο διαγνωστικών (αρχεία καταγραφής του πρόσθετου και ίχνος σειριακής επικοινωνίας, με τα αναγνωριστικά υλικού αφαιρεμένα) στον προγραμματιστή.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Πολιτική απορρήτου</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Υποβολή αναφοράς σφάλματος</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Αποστολή…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Η αναφορά υποβλήθηκε. Κωδικός: {0}</value></data>
@@ -816,6 +812,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Απτική ανάδραση</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce κουμπιών (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Η προεπισκόπηση δεν είναι διαθέσιμη</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Η οθόνη οργάνων δεν βρέθηκε στο {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Πατημένο</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Ελεύθερο</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Προσαρμοσμένη επιλογή απόχρωσης</value></data>
@@ -938,4 +935,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Μέγιστη απόδοση</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Η μέγιστη απόδοση ακολουθεί τις πλήρεις γωνίες του SimHub χωρίς όριο ταχύτητας. Με τις ρυθμίσεις του SimHub στο μέγιστο ή κοντά σε αυτό, το rig σας είναι πιθανό να αναπηδήσει ή να μετακινηθεί. Χρήση με δική σας ευθύνη.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Σημείο περιστροφής από το κάθισμα: {0:0} mm πίσω, {1:0} mm κάτω</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Αναζήτηση FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ΑΞΟΝΕΣ ΖΩΝΤΑΝΑ</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Μοχλός γκαζιού</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Χειριστήριο X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Χειριστήριο Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Περιστροφή χειριστηρίου</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Μοχλίσκος X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Μοχλίσκος Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Χειριστήριο XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Μοχλίσκος</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>ΛΕΙΤΟΥΡΓΙΕΣ ΧΕΙΡΙΣΤΗΡΙΟΥ</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Δεξιός μοχλός</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Μη συνδεδεμένο</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Ενσωματωμένο χειριστήριο</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Φωτισμός κουμπιών</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Χρώματα LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>ΧΡΩΜΑΤΑ LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Ένα MOZA Farming Control System είναι συνδεδεμένο, αλλά η συσκευή δεν έχει προστεθεί στο SimHub. Ανοίξτε Συσκευές &gt; Προσθήκη συσκευής &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Μετακινήστε τον μοχλό γκαζιού τέρμα μπροστά και τέρμα πίσω μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Μετακινήστε το χειριστήριο μέχρι το άκρο προς κάθε κατεύθυνση, κάνοντας αργούς κύκλους δεξιόστροφα και μετά αριστερόστροφα, και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Περιστρέψτε το χειριστήριο τέρμα αριστερά και τέρμα δεξιά μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Μετακινήστε τον μοχλίσκο μέχρι το άκρο προς κάθε κατεύθυνση μερικές φορές και πατήστε ΤΕΛΟΣ.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Αποθήκευση βαθμονόμησης πτερυγίων…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Το τιμόνι δεν επιβεβαίωσε τη βαθμονόμηση πτερυγίων.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Η βαθμονόμηση πτερυγίων απέτυχε.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Προεπιλεγμένα εφέ AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Μπλοκάρισμα τροχού</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Λειτουργία streamer</value></data>
 </root>

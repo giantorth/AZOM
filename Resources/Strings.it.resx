@@ -334,9 +334,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Nessuna configurazione joystick riportata dal volante. Connetti il volante e attendi il completamento del probe di identità.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetria</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>IMPOSTA CARTELLA…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Dashboard di Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Dashboard del dispositivo</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Personalizzata</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Non trovata</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Nessuna copia per questo volante</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Volante non connesso</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display non rilevato</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Nessuna</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>RIMUOVI</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>RILEVAMENTO AUTOMATICO</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Imposta una cartella di file .mzdash come libreria dashboard</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Rileva automaticamente la cartella dashboard per il volante connesso</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>PROVA</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>FERMA</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>MAPPATURE CANALI</value></data>
@@ -488,7 +496,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Seleziona prima un file .mzdash o una voce della libreria.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(nessuno stato configJson ancora ricevuto)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Impossibile risolvere i byte grezzi per «{0}» — scegli invece un file locale.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Cartella: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Caricamento in coda — invio di «{0}» al volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Caricamento non avviato — volante non connesso o nessuna sessione di gestione.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Caricamento completato (stato 0x{0})</value></data>
@@ -499,18 +506,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Seleziona un file .mzdash da caricare</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Cruscotto Moza (*.mzdash)|*.mzdash|Tutti i file (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Seleziona la cartella con i file dashboard .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Rileva automaticamente la cartella dei cruscotti</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Cartella dei cruscotti di MOZA Pit House non trovata in:
-{0}
-
-Installa MOZA Pit House e carica un cruscotto, oppure usa «Imposta cartella…» per indicare un percorso personalizzato.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Nessuna cartella dei cruscotti per il volante connesso (UID {0}).
-Cercato in:
-{1}
-
-Apri prima un cruscotto in MOZA Pit House per questo volante.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Nessuna cartella dei cruscotti specifica per il volante trovata in _dashes. Apri MOZA Pit House, carica un cruscotto e riprova.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Trovate più cartelle dei cruscotti ({0}) e nessun volante connesso. Collega il volante e riprova, oppure usa «Imposta cartella…» per scegliere manualmente.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Questa operazione eliminerà definitivamente tutte le impostazioni e i profili del plugin.
 
 Sei sicuro?</value></data>
@@ -648,6 +643,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descrivi il problema: cosa hai fatto, cosa ha fatto il volante o il display, e quando è iniziato.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contatto (opzionale — email o Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>L'invio carica un pacchetto diagnostico (log del plugin e una traccia seriale, con gli identificativi hardware oscurati) allo sviluppatore del plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Informativa sulla privacy</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Invia segnalazione</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Caricamento…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Segnalazione inviata. Riferimento: {0}</value></data>
@@ -820,6 +816,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Feedback tattile</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce pulsanti (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Anteprima non disponibile</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard non trovata in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Premuto</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Rilasciato</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Selettore di tonalità personalizzato</value></data>
@@ -942,4 +939,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Prestazioni massime</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Le prestazioni massime seguono gli angoli completi di SimHub senza limite di velocità. Con le impostazioni di SimHub al massimo o vicine al massimo, è probabile che il tuo rig salti o si sposti. Usalo a tuo rischio.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Perno dal sedile: {0:0} mm indietro, {1:0} mm in basso</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Ricerca FCS in corso...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ASSI IN TEMPO REALE</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Leva acceleratore</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Rotazione joystick</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Levetta X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Levetta Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Levetta</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>MODALITÀ JOYSTICK</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Impugnatura destra</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Non collegato</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Joystick integrato</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Illuminazione pulsanti</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Colori LED</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>COLORI LED</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Un MOZA Farming Control System è collegato, ma il dispositivo non è stato aggiunto in SimHub. Apri Dispositivi &gt; Aggiungi dispositivo &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Sposta la leva dell'acceleratore tutta avanti e tutta indietro alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Porta il joystick a fine corsa in ogni direzione, ruotando lentamente in senso orario e poi antiorario, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Ruota il joystick tutto a sinistra e tutto a destra alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Porta la levetta a fine corsa in ogni direzione alcune volte, poi premi FATTO.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Salvataggio calibrazione paddle…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Il volante non ha confermato la calibrazione dei paddle.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Calibrazione paddle non riuscita.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effetti predefiniti AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Bloccaggio ruota</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Modalità streamer</value></data>
 </root>

@@ -35,12 +35,14 @@ namespace MozaPlugin.UI
         private const string AboutDiscordUrl = "https://discord.gg/J4enw43e62";
         private const string AboutSponsorUrl = "https://github.com/sponsors/giantorth";
         private const string AboutKofiUrl    = "https://ko-fi.com/giantorth";
+        private const string PrivacyPolicyUrl = "https://giant.orth.cc/privacy/";
 
-        private void AboutGuidesIndexButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutGuidesUrl);
-        private void AboutGitHubButton_Click(object sender, System.Windows.RoutedEventArgs e)  => OpenExternalUrl(AboutGitHubUrl);
-        private void AboutDiscordButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutDiscordUrl);
-        private void AboutSponsorButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutSponsorUrl);
-        private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => OpenExternalUrl(AboutKofiUrl);
+        private void AboutGuidesIndexButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutGuidesUrl);
+        private void AboutGitHubButton_Click(object sender, System.Windows.RoutedEventArgs e)  => UiHelpers.OpenExternalUrl(AboutGitHubUrl);
+        private void AboutDiscordButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutDiscordUrl);
+        private void AboutSponsorButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutSponsorUrl);
+        private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => UiHelpers.OpenExternalUrl(AboutKofiUrl);
+        private void BugReportPrivacyLink_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(PrivacyPolicyUrl);
 
         // Guide list published by the site at build time, in site order. Fetched
         // once per AppDomain; the built-in list below shows until it arrives and
@@ -167,7 +169,7 @@ namespace MozaPlugin.UI
             {
                 string url = guides[i].Url;
                 var link = new Hyperlink(new Run(guides[i].Title)) { ToolTip = url };
-                link.Click += (s, e) => OpenExternalUrl(url);
+                link.Click += (s, e) => UiHelpers.OpenExternalUrl(url);
                 if (TryFindResource("CyanBrush") is Brush brush)
                     link.Foreground = brush;
                 var text = new TextBlock(link)
@@ -182,37 +184,18 @@ namespace MozaPlugin.UI
             }
         }
 
-        // Open a URL via the OS shell. On Windows this hits the default
-        // browser; under Wine/Proton it routes through winebrowser which
-        // forwards to the host's xdg-open.
-        private static void OpenExternalUrl(string url)
-        {
-            try
-            {
-                // The returned Process (when any) is an unmanaged handle — dispose it.
-                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true,
-                })) { }
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Warn($"[About] failed to open {url}: {ex.Message}");
-            }
-        }
-
         // Live state TextBlocks were removed (the FULL DIAGNOSTIC REPORT expander
         // shows the same content); BuildDiagnosticsDump now sources every line
         // straight from DiagnosticsTextBuilder.
 
         private void DiagCopyAll_Click(object sender, System.Windows.RoutedEventArgs e)
         {
-            try { System.Windows.Clipboard.SetText(BuildDiagnosticsDump()); }
+            try { System.Windows.Clipboard.SetText(BuildDiagnosticsDump(MozaPlugin.IsStreamerMode)); }
             catch { /* clipboard may be contested under Wine */ }
         }
 
-        private string BuildDiagnosticsDump()
+        // maskIds: Streamer Mode render; the bundle passes false.
+        private string BuildDiagnosticsDump(bool maskIds)
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine("=== Plugin ===");
@@ -225,34 +208,34 @@ namespace MozaPlugin.UI
             sb.AppendLine(DiagnosticsTextBuilder.BuildControlMapper(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== USB detection ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildUsbDetection(_plugin, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Standalone peripherals (own USB port) ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStandalonePeripherals(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== mBooster pedals ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildMBoosterDevices(_plugin, _data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== S12 pedal vibration ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildPedalHaptics(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Motion controller ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildMotionController(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildMotionController(_plugin, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Stalks ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStalks(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Wheel identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildWheelIdentity(_data, _plugin.DetectionState, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Wheel LED zones ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildWheelLedZones(_plugin, _data));
             sb.AppendLine();
             sb.AppendLine("=== Base identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildBaseIdentity(_plugin, _data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildBaseIdentity(_plugin, _data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Display sub-device identity ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDisplayIdentity(_data, maskIds));
             sb.AppendLine();
             sb.AppendLine("=== Standalone dashboard ===");
             sb.AppendLine(DiagnosticsTextBuilder.BuildStandaloneDashboardState(_plugin));
@@ -279,7 +262,7 @@ namespace MozaPlugin.UI
             sb.AppendLine(DiagnosticsTextBuilder.BuildFirmwareDebug(_plugin));
             sb.AppendLine();
             sb.AppendLine("=== Device display log (session FF kind=14) ===");
-            sb.AppendLine(DiagnosticsTextBuilder.BuildDeviceLog(_plugin));
+            sb.AppendLine(DiagnosticsTextBuilder.BuildDeviceLog(_plugin, maskIds));
             return sb.ToString();
         }
 

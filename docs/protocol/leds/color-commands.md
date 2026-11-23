@@ -242,6 +242,16 @@ against 285 RPM bitmasks, so the wheel keeps colours across bitmask-only
 updates. Whether a cleared active bit alone darkens a *button* is uncaptured,
 so buttons still get an explicit black.
 
+The exception is an all-dark RPM frame. On a KS with its RPM idle effect set to
+Breathing (bug report D6XPZWVK), the idle effect played in every gap between
+shifts, each of which the plugin had sent as `active=0` with the feed never
+lapsing. So once SimHub has lit the strip, a dark frame goes out as black
+colours with every slot's bit set for as long as the keepalive holds the strip
+(see [below](#live-ownership-and-the-keepalive)), and the plugin sends `active=0`
+when the hold ends. That black with the bits set renders dark is carried over
+from the knob ring, not captured on the RPM bar. The bare "CS" and ES rims
+still send `active=0`.
+
 Ordering: within a zone every colour write precedes the bitmask that lights
 it, and a dark LED whose new colour has not landed is held out of the bitmask
 until it has. Across zones the highest priority with work goes next (RPM,
@@ -303,7 +313,8 @@ Plugin behaviour (`Devices/Led/MozaLedDeviceManager.cs`, `TickKeepalive`):
   so a stalled SimHub LED pipeline does not stall the feed.
 - Holds a section while a game is active, while it is lit, or for `WheelKeepaliveTimeoutSec`
   (default 45 s) since it last changed. Knobs key the hold on SimHub still driving the
-  encoder channel. Past that, a steadily dark section is released to the wheel.
+  encoder channel. Past that, a steadily dark section is released to the wheel; an RPM
+  strip held black gets an explicit `active=0`.
 - During catalog negotiation it re-feeds the bitmask alone. That the bitmask by itself holds
   ownership is inferred from the rule above, not separately captured.
 - An out-of-band static write (`0x1F`, `0x27`) repaints the frame buffer. The plugin marks the

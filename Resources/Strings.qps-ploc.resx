@@ -358,9 +358,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Yip Boof Wan Grrowl Grrowl Yap!</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Awoo!</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>BORK…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Kennel Dashes!</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Paw Dashes!</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Howl!</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Sniff… nothing!</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>No bone for this paw!</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Paw not leashed!</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>No shiny screen sniffed!</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Yip!</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>DIG!</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>ARF!!</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Yip Wuff Wan!</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Boof Grr Yap!</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>BARK!!</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>AWOO!!</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>GRRR!!</value></data>
@@ -511,7 +519,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Wroof Ruff Grrowl!</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>Yowff Awoo!</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Wroof Woof Howl Barff {0} Barff Grrowl Ruff Howl!</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Wan {0}!</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Boof Yap {0} Yap Arf…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Yowl Howl Bark Snarf!</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Bork Yip Wuff (Yowl 0x{0})</value></data>
@@ -522,11 +529,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Grrowl Wroof!</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Boof Barff!</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Yip Ruff!</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Yap!</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Grrowl Grrowl Yip Wuff Snarf Snarf {0} Wan Yowl Wroof Arf Bork Howl!</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Boof Bark Rrrf Rrrf Bork Woof {0} Yap Bark Boof Grr Yap Ruff {1} Woof Yip Grrowl Bark Yap Ruff!</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Woof Wan Woof Ruff Woof Wan!</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Grrowl Yip Wroof Awoo Yip Grr {0} Wroof Ruff Awoo Ruff Yowl Woof!</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Ruff Grrowl Ruff Woof?</value></data>
   <data name="Dialog_ClearAllSettings_Caption" xml:space="preserve"><value>Barff!</value></data>
   <data name="Dialog_RedeployDefinitions_Caption" xml:space="preserve"><value>Bark!</value></data>
@@ -635,6 +637,7 @@
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Snarf Bork Grrowl Wan Awoo!</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Yowl Yowl!</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Rrrf Arf Arf Wuff Boof Yip!</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Arf Woof!</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Wroof!</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Snarf…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Wan {0}!</value></data>
@@ -807,6 +810,7 @@
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Boop Woof</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Yip!</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Whimper…</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Sniff sniff… no bone in {0}!</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Paw down!</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Paw up!</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Sniff out a hue!</value></data>
@@ -929,4 +933,32 @@
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Woof bark</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Woof bark grr arf woof bark grr arf woof bark grr arf. Woof bark grr arf woof bark grr arf woof bark grr arf woof bark. Woof bark grr arf woof.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Woof bark: {0:0} mm yip, {1:0} mm arf</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Sniff sniff… FCS?</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>WOOF WOOF!!</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Yowff!</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Arf X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Arf Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Arf twirl!</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Paw X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Paw Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Arf XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Paw!</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>ARF ARF!!</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Right paw!</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Whimper…</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Good boy!</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Snarf!</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Rrrf!</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>WROOF!!</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Moo? Wroof Snarf Wan Woof Grrowl Yip {0} Rrrf Grr Boof!</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Yowff! Paw forward, paw back, Woof DONE!</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Arf arf! Chase tail one way, chase tail other way, Woof DONE!</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Arf twirl! Twirl twirl, Woof DONE!</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Paw paw paw paw! Woof DONE!</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Yip Boof Woof…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Grr Woof Rrrf Boof Arf.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Grr Arf!</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Good Boy Woofs</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Paw lock</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Awoo Mode!</value></data>
 </root>

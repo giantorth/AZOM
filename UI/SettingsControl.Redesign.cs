@@ -652,19 +652,7 @@ namespace MozaPlugin.UI
             _fullDiagExpanded = !_fullDiagExpanded;
             if (_fullDiagExpanded)
             {
-                try
-                {
-                    var report = BuildDiagnosticsDump();
-                    FullDiagReportBox.Text = report;
-                    int lineCount = report.Split('\n').Length;
-                    FullDiagSummaryText.Text = string.Format(
-                        CultureInfo.CurrentCulture, Strings.Hint_FullDiagRendered, lineCount);
-                }
-                catch (Exception ex)
-                {
-                    FullDiagReportBox.Text = $"[error rendering diagnostic report]\n{ex}";
-                    FullDiagSummaryText.Text = Strings.Hint_FullDiagRenderFailed;
-                }
+                RenderFullDiagReport();
                 FullDiagReportBox.Visibility = Visibility.Visible;
                 FullDiagToggleButton.Content = Strings.Button_Collapse;
             }
@@ -672,6 +660,23 @@ namespace MozaPlugin.UI
             {
                 FullDiagReportBox.Visibility = Visibility.Collapsed;
                 FullDiagToggleButton.Content = Strings.Button_Expand;
+            }
+        }
+
+        private void RenderFullDiagReport()
+        {
+            try
+            {
+                var report = BuildDiagnosticsDump(MozaPlugin.IsStreamerMode);
+                FullDiagReportBox.Text = report;
+                int lineCount = report.Split('\n').Length;
+                FullDiagSummaryText.Text = string.Format(
+                    CultureInfo.CurrentCulture, Strings.Hint_FullDiagRendered, lineCount);
+            }
+            catch (Exception ex)
+            {
+                FullDiagReportBox.Text = $"[error rendering diagnostic report]\n{ex}";
+                FullDiagSummaryText.Text = Strings.Hint_FullDiagRenderFailed;
             }
         }
 

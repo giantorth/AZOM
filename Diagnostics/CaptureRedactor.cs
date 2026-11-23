@@ -47,17 +47,18 @@ namespace MozaPlugin.Diagnostics
         /// human-readable rather than hex). Only the ASCII-printable identity
         /// sequences apply — MCU UIDs are binary and can't appear verbatim in a
         /// log line. Matched runs keep their last <see cref="TailBytesVisible"/>
-        /// characters, mirroring the hex path.
+        /// characters, mirroring the hex path, or none when <paramref name="full"/>.
         /// </summary>
-        public static string RedactText(string text, MozaData? data)
+        public static string RedactText(string text, MozaData? data, bool full = false)
         {
             if (string.IsNullOrEmpty(text)) return text;
             var sequences = data?.GetIdentityByteSequences();
             if (sequences == null || sequences.Count == 0) return text;
 
+            int tail = full ? 0 : TailBytesVisible;
             foreach (var seq in sequences)
             {
-                if (seq == null || seq.Length <= TailBytesVisible) continue;
+                if (seq == null || seq.Length <= tail) continue;
                 bool printable = true;
                 foreach (var b in seq)
                 {
@@ -67,8 +68,8 @@ namespace MozaPlugin.Diagnostics
 
                 string needle = Encoding.ASCII.GetString(seq);
                 if (text.IndexOf(needle, StringComparison.Ordinal) < 0) continue;
-                string replacement = new string('.', needle.Length - TailBytesVisible)
-                    + needle.Substring(needle.Length - TailBytesVisible);
+                string replacement = new string('.', needle.Length - tail)
+                    + needle.Substring(needle.Length - tail);
                 text = text.Replace(needle, replacement);
             }
             return text;

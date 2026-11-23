@@ -100,7 +100,7 @@ Full serial number = serial-a + serial-b (32 ASCII chars total).
 | rpm-brightness | `1B 00 FF` | 1 | int | |
 | buttons-brightness | `1B 01 FF` | 1 | int | |
 | flags-brightness | `1B 02 FF` | 1 | int | |
-| paddles-calibration | `08` | 1 | int | Write-only, two commands: `08 01` = start, `08 02` = save. (PitHouse, dev `0x17`, write group `0x3F`.) |
+| paddles-calibration | `08` | 1 | int | Write-only, three commands. Pit House sequence (`usb-capture/soft-restart.calibrate-paddles…pcapng`, W17): `08 01` start (acked `bf 71 08 01`) → user sweeps the paddles (~11 s) → `08 05` (acked `bf 71 08 05`) → `08 02` 31 ms later (no ack) → ~2.5 s later the wheel sends an **unsolicited** `3f 71 08 03` (raw group `0x3F`, no reply bit) and logs `paddle.c:723 Paddle Calib Success` + `paddle.c:724 Paddle Calib Write in flash`. What `05` means on its own is unknown, but **without it the save does nothing**: bug report FJJK8BX7 (CS) sent only `08 01` → `08 02`, got no `08 03` or success line, and every later heartbeat still showed the old range. The once-a-minute heartbeat reports the stored range per paddle sensor as `CalibN[Max:… Min:…]` (raw ADC; CS has `Calib0`/`Calib1`, W17 `Calib0`–`Calib5`). `Max:3000 Min:2000` is the firmware default, and on a CS it leaves the paddles stuck pressed (see the legacy-CS section). **Rejection** (1TYJZ6T7, W17, plugin-driven): the same 2.5 s after `08 02` the wheel sent `3f 71 08 04` and logged `[ERRO]paddle.c:693 Paddle N Delta Error Value V` for all six sensors (V = 10–18; the stored ranges are 477–642 wide), then `error_code 51 occurs`. It re-reported error 51 as `0e 71 03 00 33 00 01` once a second for as long as the capture ran (33 s), and the old range stayed. The user pressed every paddle during the plugin's 5.5 s `08 01`→`08 05` window, so the wheel did not register travel it should have. **Cause unknown.** During its sweep Pit House sent only reads (`40 17 1f/1e/27/28/2a…`), presence probes and session traffic (`43 17 7c 00/27`, `fc 00`); in the same window the plugin was also streaming dash telemetry (`43 17 7d 23`, ~35 Hz) and button-LED writes (`3f 17 19 01` / `1a 01`, ~1.3 Hz). Plugin: `wheel-paddles-calibration` (Inputs tab) sends the Pit House sequence after a 10 s sweep countdown, then shows saved on `08 03` (or the success line), failed on `08 04`, and unconfirmed after 10 s with neither (`MozaData.PaddleCalibResult`). |
 
 ### Group `0x3F` (63) — Live Telemetry (write-only)
 
@@ -235,7 +235,7 @@ off:  0    1    2    3  4   5  6   7  8   9 10  11 12  13 14  15  16  17
 
 The healthy 60-minute session **sent the same eight `0x3F` idle-family writes** (`1c`, `1d`×2, `20`, `21`, `22`, `24`) — but the values matched what the wheel already held, so the **firmware deduped them**: no `Param … Written` line, no flash write, no sweep, no failures. It also took **18 Table-7 Param-6 writes** (dashboard selects) in that same hour with no ill effect, so the dashboard-index param is safe to write. The crash sessions differ only in that a Table-2 value genuinely *changed* (e.g. sleep timeout 15 → 3 min, sleep colour light-blue → amber), producing real flash writes ~3 minutes before the sweep began. PitHouse never writes this family at all (writes = 0 across four captures; it only reads it and writes on explicit user action), which is exactly why the wheel never wedges under PitHouse. Gating rule: never emit an idle/sleep-light write from a connect / profile-apply path on this wheel — see `HardwareApplier.ApplyWheelToHardware`.
 
-**Param-store wedge (failure mode, 2026-08-06 crash bundles).** The wheel's parameter subsystem can wedge: every param read fails (`Table N: Failed to Read Parameter M` sweeps across Tables 2/3/7) and a pending Table 7 Param 6 write retries ~1 Hz forever (`Table Id 7, ParamAddr 6: Failed to Write`, often split across two `0x0E` frames). The comm MCU keeps answering (polls, logs, identity) but the **display goes dark and stays dark until the wheel is power-cycled** — host reconnects don't help. No host command sustains the loop (zero `g32` traffic during the wedge); the retry is firmware-internal. The plugin detects the signature from the `0x0E` log and surfaces a PARAM-STORE FAULT line in diagnostics.
+**Param-store wedge (failure mode, 2026-08-06 crash bundles).** The wheel's parameter subsystem can wedge: every param read fails (`Table N: Failed to Read Parameter M` sweeps across Tables 2/3/7) and a pending Table 7 Param 6 write retries ~1 Hz forever (`Table Id 7, ParamAddr 6: Failed to Write`, often split across two `0x0E` frames; the split point moves with the digit count — `…Failed to Wri` + `te` here, `…Failed to Wr` + `ite` for `ParamAddr 11` in bundle 1RHCD7NJ — so `FirmwareDebugLog` keys write failures on `ParamAddr`, which read-fail and `Written` lines never contain). The comm MCU keeps answering (polls, logs, identity) but the **display goes dark and stays dark until the wheel is power-cycled** — host reconnects don't help. No host command sustains the loop (zero `g32` traffic during the wedge); the retry is firmware-internal. The plugin detects the signature from the `0x0E` log and surfaces a PARAM-STORE FAULT line in diagnostics.
 
 **Read-only variant + the flash-write budget (2026-08-11 bundles, FSR1 on R12).** A second wedge instance refines the picture. Signature was **0 failed writes / ~1,750 failed reads** — no stuck `Table 7 Param 6` write at all, so the wedge can present read-only. Each of Tables 2/3/7 sweeps params **0..127** on its own cursor (588/588/584 failures ≈ 4.6 sweeps), all three failing from the same instant.
 
@@ -468,6 +468,40 @@ plugin read/write the wheel can't service. (The benign `[ERRO]diag_svr_event.c
 error_code 40/41/42` lines seen once at startup appear under Pit House too and
 are **not** the fault signal.)
 
+**But a sweep alone doesn't prove a plugin trigger (bug reports FJJK8BX7 /
+1RHCD7NJ, same CS on an R9, 2026-11-22).**
+
+- FJJK8BX7: after the base re-enumerated, the first sweep line the plugin saw on
+  the new connection was already `Failed to Read Parameter 36`. It then ran to 127
+  at the usual four params per ~320 ms (10:26:00–10:26:07) and stopped. At that
+  rate it began ~3 s earlier, before the port was open. The plugin had sent the
+  wheel only `40 17 1c`, `40 17 18` and one `07 01`, 0.9 s before the first line.
+- 1RHCD7NJ: a continuous loop (starting at param 92, five full 0–127 passes,
+  10:39:09 to the end of the bundle) began 28 s after the plugin's connect-time
+  RPM-colour writes landed (`Table 8, Param 33/36/39 Written`). That has the same
+  shape as the FSR1 trigger above, a real main-table flash write followed by a
+  sweep about 30 s later. But FJJK8BX7 persisted Params 34–42 the same way at
+  10:26:14, and no loop followed through 10:31. Unresolved.
+
+**CS Table 8 layout.** On this firmware Table 8 plays the role Table 2 has on
+newer rims. From the param-write echoes in those two bundles:
+
+| Param | Meaning | Evidence |
+|---|---|---|
+| 5 | `paddles-mode` | `3f 17 03 0N` → `Table 8, Param 5 Written` (W17: Table 2 Param 5). The echo printed `Written: 1` for wire values 3, 2 and 1 alike. |
+| 11–14 | probably the four paddle-calibration values (`Calib0`/`Calib1` Max/Min) | Right after a Pit House paddle calibration (1RHCD7NJ, already in progress before the plugin's first wheel frame): `Table Id 8, ParamAddr 11: Failed to Write` ×17 at ~18 ms, `[ERRO]param_manage.c:321 Table 8 Param 11 overrewrite`, `[ERRO]diag_svr_event.c:86 error_code 30 occurs`, then one failure each for ParamAddr 12/13/14. Error 30 was then re-reported as `0e 71 03 00 1e 00 01` (0x1E = 30) once a second for 46 s until the base re-enumerated. The new calibration still survived the next wheel reboot (`Calib0[Max:3632 Min:3071]` at the 10:39:36 heartbeat). |
+| 33–42 | RPM LED colours 0–9 | `3f 17 1f 00 ff 0N rr gg bb` → `Table 8, Param 33+N Written: <rgb>` |
+
+**Default calibration = paddles stuck pressed (FJJK8BX7).** The heartbeat showed
+`Calib0/1[Max:3000 Min:2000]`, the firmware default. After recalibration the same
+rim reads ~3070 released / ~3650 pressed (1RHCD7NJ), so with the default range a
+released paddle is above Max, i.e. 100%. In Buttons mode (`PaddleMode:1`) both
+clutch paddles therefore report permanently pressed. The user saw this as buttons
+12/13 held in AZOM and unbindable in game, surviving base power cycles, rim
+re-plugs and SimHub restarts. The range was already at default before the user
+touched AZOM. The bundles don't show when or why it reverted. A working
+calibration fixes it (see `paddles-calibration`).
+
 **Gating rule (do not regress).**
 
 - Never push sleep-light params (`wheel-idle-mode`/`-timeout`/`-speed`/`-color`)
@@ -486,8 +520,8 @@ are **not** the fault signal.)
   `param_manage.c` channel that emits this storm — see
   [`../periodic/group-0x0E-param-reader.md`](../periodic/group-0x0E-param-reader.md).
 
-**Runtime self-protection (implemented 2026-08-10).** `FirmwareDebugLog.ParamStormActive` counts `Failed to Read/Write
-Parameter` lines in a trailing 10 s window; ≥ 3 marks a storm (and logs a
+**Runtime self-protection (implemented 2026-08-10).** `FirmwareDebugLog.ParamStormActive` counts param failures
+(`Failed to Read Parameter` lines, plus write failures matched on `ParamAddr`) in a trailing 10 s window; ≥ 3 marks a storm (and logs a
 one-time SimHub warning so it's on record even if the user never opens the pane).
 While a storm is active the plugin skips the heavy LED-capability read batch on
 re-detect (so it stops feeding the dogging loop) and the AZOM pane raises a header

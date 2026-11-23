@@ -81,9 +81,7 @@ namespace MozaPlugin.Devices.Extensions
             _modelPrefix = MozaDeviceConstants.GetBaseModelPrefix(
                 LinkedDevice.DeviceDescriptor?.DeviceTypeID ?? "") ?? "";
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-                plugin.BaseAmbientDeviceExtensionActive = true;
+            MozaPlugin.BaseAmbientDeviceExtensionActive = true;
 
             TryEarlyProviderInstall();
             RemoveConnectionSubDevice();
@@ -501,12 +499,8 @@ namespace MozaPlugin.Devices.Extensions
                 LinkedDevice.DeviceDescriptor.Name + "_MozaBaseAmbientActive",
                 this.GetType());
 
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null)
-            {
-                plugin.BaseAmbientDeviceExtensionActive = false;
-                MozaLog.Debug("[AZOM] Base ambient device extension ended");
-            }
+            MozaPlugin.BaseAmbientDeviceExtensionActive = false;
+            MozaLog.Debug("[AZOM] Base ambient device extension ended");
 
             // Restore SimHub's original driver and drop ours so neither
             // outlives the extension.

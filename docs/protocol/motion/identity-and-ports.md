@@ -84,7 +84,15 @@ Connection"). The assignment is stored in the controller.
 | read | `1F 12 02 [port] 00 00 00` → `9F 21 02 [port] 00 [role] 00` | current role of port; the host reads all 8 at connect |
 
 Observed stored map (both rigs): ports 1,2(or 3),7,8 → role 0 (unassigned); the four actuators
-carry roles **5, 7, 1, 3**. Firmware echoes each write as `serial_reply_app.c:333 port:N axis:R`.
+carry roles **5, 7, 1, 3**. Firmware echoes each write as `serial_reply_app.c:333 port:N axis:R`
+(preceded by `controller_model.c:227 e2p port: (N), axis: (R)` in `ports and self test` and bundle
+`AX787D2P`), and the `0x1F/02` readback returns the new role at once.
+
+The map is committed only by a passing port self-test, as Table 2 parameters:
+`Param (8 + role) = port` for roles 1/3/5/7 (`Selftest`: `9 = 5, 11 = 6, 13 = 3, 15 = 4` for ports
+3/4/5/6 ← 5/7/1/3; `ports and self test`: `13 = 2` with port 2 ← 5) and `Param 27 = 4`. A failed
+self-test writes 0 to Params 9–16 and 27 (bundle `AX787D2P`). The role reads after a failed test
+have not been captured.
 
 | Role code | Corner (inferred) | Evidence |
 |-----------|-------------------|----------|

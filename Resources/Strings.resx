@@ -360,9 +360,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>No joystick configuration reported by the wheel yet. Connect the wheel and wait for the identity probe to complete.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetry</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>SET FOLDER…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio Dashes</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Device Dashes</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Custom</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Not found</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>No copy for this wheel</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Wheel not connected</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display not detected</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>None</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>CLEAR</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-DETECT</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Set a folder of .mzdash files as a dashboard library</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Auto-detect the dashboard folder for the connected wheel</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>STOP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>CHANNEL MAPPINGS</value></data>
@@ -514,7 +522,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Pick a .mzdash file or library entry first.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(no configJson state received yet)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Cannot resolve raw bytes for "{0}" — pick a local file instead.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Folder: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload queued — pushing "{0}" to the wheel…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload not started — wheel not connected or no management session yet.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Upload complete (status 0x{0})</value></data>
@@ -525,18 +532,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Pick a .mzdash file to upload</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza dashboard (*.mzdash)|*.mzdash|All files (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Select folder containing .mzdash dashboard files</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Auto-detect dashboard folder</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House dashboard folder not found at:
-{0}
-
-Install MOZA Pit House and load a dashboard, or use Set Folder… to point at a custom location.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>No dashboard folder for the connected wheel (UID {0}).
-Looked under:
-{1}
-
-Open a dashboard in MOZA Pit House for this wheel first.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>No wheel-specific dashboard folders found under _dashes. Open MOZA Pit House and load a dashboard, then try again.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Multiple dashboard folders found ({0}) and no wheel is connected. Connect your wheel and try again, or use Set Folder… to choose manually.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>This will permanently delete all plugin settings and profiles.
 
 Are you sure?</value></data>
@@ -653,6 +648,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Describe the problem: what you did, what the wheel or dash did, and when it started.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contact (optional — email or Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Submitting uploads a diagnostic bundle (plugin logs and a serial trace, with hardware identifiers redacted) to the plugin developer.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Submit bug report</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Uploading…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Report submitted. Reference: {0}</value></data>
@@ -824,6 +820,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Tactile feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Button debounce (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Preview not available</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard not found in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Pressed</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Released</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Custom hue picker</value></data>
@@ -946,4 +943,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Max performance</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Max performance follows SimHub's full angles with no limit on speed. Your rig is likely to hop or shift with SimHub's settings at or close to maximum. Use at your own risk.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Pivot from the seat: {0:0} mm behind, {1:0} mm down</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Searching for FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>LIVE AXES</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Throttle lever</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Joystick twist</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Thumbstick X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Thumbstick Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Thumbstick</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>JOYSTICK MODES</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Right rod</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Built-in joystick</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Button light mode</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED colors</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED COLORS</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>A MOZA Farming Control System is connected, but the device hasn't been added in SimHub. Open Devices &gt; Add device &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Move the throttle lever all the way forward and all the way back a few times, then press DONE.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Move the joystick to its edge in every direction, circling slowly clockwise and then counter-clockwise, then press DONE.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Twist the joystick fully left and fully right a few times, then press DONE.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Move the thumbstick to its edge in every direction a few times, then press DONE.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Saving paddle calibration…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>The wheel did not confirm the paddle calibration.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Paddle calibration failed.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Default Effects</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Wheel lock</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Streamer Mode</value></data>
 </root>

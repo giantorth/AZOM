@@ -309,6 +309,10 @@ namespace MozaPlugin.Settings
         // absent hardware shows empty/idle values rather than live ones.
         public bool ShowAllTabs { get; set; } = false;
 
+        // Masks serial numbers and hardware IDs wherever the UI shows them
+        // (MozaPlugin.ScreenId). Bug-report bundles keep their own redaction.
+        public bool StreamerMode { get; set; } = false;
+
         // When true, automatically put the wheelbase into Work Mode standby
         // (main-set-work-mode=1) after the idle timeout elapses with no game
         // running and no recent activity, and wake it (=0) the moment a game

@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>方向盘尚未上报摇杆配置。请连接方向盘并等待身份探测完成。</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>遥测</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>设置文件夹…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio 仪表盘</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>设备仪表盘</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>自定义</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>未找到</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>此方向盘无副本</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>方向盘未连接</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>未检测到显示屏</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>无</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>清除</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>自动检测</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>将一个包含 .mzdash 文件的文件夹设为仪表盘库</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>自动检测已连接方向盘的仪表盘文件夹</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>测试</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>停止</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>通道映射</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>请先选择一个 .mzdash 文件或库条目。</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>（尚未收到 configJson 状态）</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>无法解析 “{0}” 的原始字节——请改为选择本地文件。</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>文件夹：{0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>上传已排队——正在将 “{0}” 推送到方向盘…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>未开始上传——方向盘未连接或尚无管理会话。</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>上传完成（状态 0x{0}）</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>选择要上传的 .mzdash 文件</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza 仪表盘 (*.mzdash)|*.mzdash|所有文件 (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>选择包含 .mzdash 仪表盘文件的文件夹</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>自动检测仪表盘文件夹</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>未在以下位置找到 MOZA Pit House 仪表盘文件夹：
-{0}
-
-请安装 MOZA Pit House 并加载一个仪表盘，或使用“设置文件夹…”指向自定义位置。</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>找不到已连接方向盘（UID {0}）的仪表盘文件夹。
-已查找：
-{1}
-
-请先在 MOZA Pit House 中为此方向盘打开一个仪表盘。</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>在 _dashes 下未找到特定方向盘的仪表盘文件夹。请打开 MOZA Pit House 加载一个仪表盘后重试。</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>找到多个仪表盘文件夹（{0}）且未连接方向盘。请连接方向盘后重试，或使用“设置文件夹…”手动选择。</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>这将永久删除所有插件设置和配置文件。
 
 确定吗？</value></data>
@@ -645,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>描述问题：你做了什么，方向盘或仪表盘有什么反应，以及从何时开始。</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>联系方式（可选 — 电子邮件或 Discord）</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>提交将向插件开发者上传一个诊断包（插件日志和串口跟踪，硬件标识已脱敏）。</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>隐私政策</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>提交错误报告</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>正在上传…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>报告已提交。编号：{0}</value></data>
@@ -817,6 +813,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>触觉反馈</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>按键去抖 (毫秒)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>预览不可用</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>在 {0} 中未找到仪表盘</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>已按下</value></data>
   <data name="Status_Released" xml:space="preserve"><value>已松开</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>自定义色调选择器</value></data>
@@ -939,4 +936,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>最大性能</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>最大性能会跟随 SimHub 的完整角度，且不限制速度。当 SimHub 的设置处于或接近最大值时，您的设备很可能会跳动或移位。使用风险自负。</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>旋转中心相对座椅：向后 {0:0} mm，向下 {1:0} mm</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>正在搜索 FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>实时轴</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>油门杆</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>摇杆 X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>摇杆 Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>摇杆扭转</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>拇指摇杆 X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>拇指摇杆 Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>摇杆 XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>拇指摇杆</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>摇杆模式</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>右侧摇杆</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>内置摇杆</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>按键灯光模式</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED 颜色</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED 颜色</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>已连接 MOZA Farming Control System，但该设备尚未在 SimHub 中添加。请打开 设备 &gt; 添加设备 &gt; {0}。</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>将油门杆推到最前并拉到最后几次，然后按完成。</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>将摇杆推到各个方向的尽头，先顺时针再逆时针缓慢画圈，然后按完成。</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>将摇杆向左和向右扭转到底几次，然后按完成。</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>将拇指摇杆向各个方向推到尽头几次，然后按完成。</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>正在保存拨片校准…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>方向盘未确认拨片校准。</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>拨片校准失败。</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM 默认效果</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>车轮抱死</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>主播模式</value></data>
 </root>

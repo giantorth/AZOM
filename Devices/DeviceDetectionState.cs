@@ -35,6 +35,8 @@ namespace MozaPlugin.Devices
         // (SGP: LED read; HGP: device-type identity probe) — never a timeout.
         public volatile bool HgpDetected;
         public volatile bool SgpDetected;
+        // MOZA FCS on its own USB port (always a dedicated pipe).
+        public volatile bool FcsDetected;
 
         // Which MozaDeviceManager owns each routable peripheral — i.e. the pipe
         // it was detected on. Null = no opinion → callers fall back to the
@@ -48,6 +50,7 @@ namespace MozaPlugin.Devices
         public volatile MozaDeviceManager? HandbrakeOwner;
         public volatile MozaDeviceManager? HgpOwner;
         public volatile MozaDeviceManager? SgpOwner;
+        public volatile MozaDeviceManager? FcsOwner;
 
         /// <summary>Which shifter model was detected on the given pipe, so relayed
         /// shifter replies (shared <c>shifter-*</c> command names) route to the right
@@ -165,6 +168,7 @@ namespace MozaPlugin.Devices
             Ab9Detected = false;
             HgpDetected = false;
             SgpDetected = false;
+            FcsDetected = false;
             ClearOwners();
         }
 
@@ -180,6 +184,7 @@ namespace MozaPlugin.Devices
             HandbrakeOwner = null;
             HgpOwner = null;
             SgpOwner = null;
+            FcsOwner = null;
             BaseOwner = null;
         }
 
@@ -213,6 +218,11 @@ namespace MozaPlugin.Devices
             {
                 SgpDetected = false;
                 SgpOwner = null;
+            }
+            if (ReferenceEquals(FcsOwner, dm))
+            {
+                FcsDetected = false;
+                FcsOwner = null;
             }
         }
 

@@ -65,7 +65,7 @@ namespace MozaPlugin.UI
 
             return new UI.DiagnosticsBundleWriter.BundleContent
             {
-                DiagnosticsDumpText = BuildDiagnosticsDump(),
+                DiagnosticsDumpText = BuildDiagnosticsDump(maskIds: false),
                 StartupSnapshot = startup,
                 RollingSnapshot = rolling,
                 StartupCaptureText = CaptureRedactor.FormatRedacted(startup, _data),

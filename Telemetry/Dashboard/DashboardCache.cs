@@ -37,7 +37,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
 
         public int WheelCacheCount { get { lock (_lock) return _byHash.Count; } }
-        public int FolderProfileCount { get { lock (_lock) return _folderProfiles.Count; } }
+        public int FolderProfileCount { get { lock (_lock) return _folderFilePaths.Count; } }
 
         /// <summary>
         /// O(1) change signal for <see cref="CachedNames"/>. Not the deduped
@@ -47,7 +47,7 @@ namespace MozaPlugin.Telemetry.Dashboard
         /// </summary>
         public int CachedNameCount
         {
-            get { lock (_lock) return _nameToHash.Count + _folderProfiles.Count; }
+            get { lock (_lock) return _nameToHash.Count + _folderFilePaths.Count; }
         }
 
         // --- User folder library (wins over the wheel cache on a shared name) ---
@@ -281,7 +281,7 @@ namespace MozaPlugin.Telemetry.Dashboard
                     var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var name in _nameToHash.Keys)
                         if (seen.Add(name)) result.Add(name);
-                    foreach (var name in _folderProfiles.Keys)
+                    foreach (var name in _folderFilePaths.Keys)
                         if (seen.Add(name)) result.Add(name);
                     return result;
                 }
@@ -353,12 +353,16 @@ namespace MozaPlugin.Telemetry.Dashboard
                     using (var reader = new StreamReader(new MemoryStream(rawBytes), Encoding.UTF8,
                                detectEncodingFromByteOrderMarks: true))
                         content = reader.ReadToEnd();
-                    var profile = _store.ParseMzdashContent(Path.GetFileNameWithoutExtension(file), content);
-                    if (profile == null) continue;
-
-                    profiles[profile.Name] = profile;
-                    rawContent[profile.Name] = rawBytes;
-                    filePaths[profile.Name] = file;
+                    string name = Path.GetFileNameWithoutExtension(file);
+                    // Null for a dashboard with no telemetry bindings (static
+                    // pages): still a library entry for preview/upload/edit.
+                    // Removing keeps a later no-telemetry copy from inheriting
+                    // an earlier folder's profile.
+                    var profile = _store.ParseMzdashContent(name, content);
+                    if (profile != null) profiles[name] = profile;
+                    else profiles.Remove(name);
+                    rawContent[name] = rawBytes;
+                    filePaths[name] = file;
                 }
                 catch (Exception ex)
                 {
@@ -367,7 +371,7 @@ namespace MozaPlugin.Telemetry.Dashboard
             }
 
             // Count is cumulative across every folder scanned this pass.
-            MozaLog.Debug($"[AZOM] DashboardCache: {profiles.Count} folder profiles after scanning '{folderPath}'");
+            MozaLog.Debug($"[AZOM] DashboardCache: {filePaths.Count} folder dashboards after scanning '{folderPath}'");
         }
 
         /// <summary>

@@ -133,7 +133,7 @@ Spanish language with English dub and subtitles available.
 ## Community & Support
 
 - **[Discord](https://discord.gg/J4enw43e62)** — discuss features and development.
-- **[Report a problem](https://giant.orth.cc/guides/diagnostics-and-bug-reports/)** — the plugin's Help tab submits a redacted diagnostic bundle in one click.
+- **[Report a problem](https://giant.orth.cc/guides/diagnostics-and-bug-reports/)** — the plugin's Help tab submits a redacted diagnostic bundle in one click. See the **[privacy policy](https://giant.orth.cc/privacy/)** for what is sent and how long it is kept.
 - **[Sponsor](https://github.com/sponsors/giantorth)** / **[Ko-fi](https://ko-fi.com/giantorth)** — the money just buys more MOZA hardware to support.
 
 ## Building from Source

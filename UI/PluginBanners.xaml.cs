@@ -217,7 +217,7 @@ namespace MozaPlugin.UI
             string url = MozaPlugin.Instance?.Settings?.LastSeenReleaseUrl ?? "";
             if (string.IsNullOrEmpty(url))
                 url = "https://github.com/giantorth/AZOM/releases";
-            OpenExternalUrl(url);
+            UiHelpers.OpenExternalUrl(url);
         }
 
         // ----- install progress / completion (from the coordinator, on UI thread) -----
@@ -318,24 +318,6 @@ namespace MozaPlugin.UI
                 try { plugin!.PersistSettings(); } catch { /* best-effort */ }
             }
             RefreshLegacyLfeBanner();
-        }
-
-        // Open a URL via the OS shell (browser on Windows; winebrowser → xdg-open
-        // under Wine/Proton).
-        private static void OpenExternalUrl(string url)
-        {
-            try
-            {
-                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true,
-                })) { }
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Warn($"[PluginBanners] failed to open {url}: {ex.Message}");
-            }
         }
     }
 }

@@ -58,28 +58,10 @@ namespace MozaPlugin
             // request/response protocol — capture for diagnostics visibility,
             // then short-circuit so MozaResponseParser doesn't waste cycles
             // trying to match them against the command database.
-            if (data.Length >= 4
-                && data[0] == MozaProtocol.FirmwareDebugGroup
-                && data[2] == 0x05)
+            var text = _firmwareDebugLog.RecordFrame(data);
+            if (text != null)
             {
                 byte rawDeviceId = data[1];
-                string text;
-                try
-                {
-                    // Body is ASCII text starting at data[3]. Trim trailing
-                    // newline / null padding so the ring buffer entries are
-                    // compact and don't contain control chars that mess up
-                    // the diagnostics text layout. Non-printable bytes
-                    // become '?' under the ASCII decode's error replacement.
-                    text = System.Text.Encoding.ASCII
-                        .GetString(data, 3, data.Length - 3)
-                        .TrimEnd('\n', '\r', '\0');
-                }
-                catch
-                {
-                    text = $"<{data.Length - 3} bytes>";
-                }
-                _firmwareDebugLog.Record(rawDeviceId, text);
                 // The wheel streams these 0x0E logs (dev 0x71) continuously whenever it
                 // is physically connected — they only stop on a real rim/link drop. So
                 // they are positive "wheel is alive" evidence: count them against the
@@ -103,6 +85,9 @@ namespace MozaPlugin
                 // Wheel heartbeat reports the multi-mode dial word (Table 2 Param 62).
                 if (rawDeviceId == 0x71)
                     TryFollowMultiDialHeartbeat(text);
+                // Logged alongside the 3f 71 08 03 calibration result handled below.
+                if (rawDeviceId == 0x71 && text.Contains("Paddle Calib Success"))
+                    _data?.NotePaddleCalibResult(0x03);
                 // A CM1 base-bridged dash reports its current page via the byte-identical
                 // "Table 7, Param 6 Written: N" log on dev 0x41 (0x14 swapped). Follow it.
                 if (rawDeviceId == 0x41 && DashIsCm1)
@@ -191,6 +176,18 @@ namespace MozaPlugin
                         TryFollowMultiDialRightRead(data[4], data[5]);
                 }
                 _deviceManager.MarkWheelResponse(MozaProtocol.SwapNibbles(data[1]));
+                return;
+            }
+
+            // Unsolicited paddle-calibration result: raw group 0x3F (no reply bit), sent
+            // ~2.5 s after the host's 08 05 + 08 02: 08 03 = saved, 08 04 = rejected.
+            if (data.Length >= 4 && data[0] == 0x3F
+                && data[1] == MozaProtocol.WheelDeviceIdSwapped && data[2] == 0x08)
+            {
+                MozaLog.Info($"[AZOM] Wheel paddle-calibration result: 0x{data[3]:X2}");
+                if (data[3] == 0x03 || data[3] == 0x04)
+                    _data?.NotePaddleCalibResult(data[3]);
+                _deviceManager.MarkWheelResponse(MozaProtocol.DeviceWheel);
                 return;
             }
 
@@ -476,6 +473,8 @@ namespace MozaPlugin
             // through the switch untouched, so this stays a no-op for the ten
             // stored-setting reads the connect burst already issues.
             _data?.UpdateFromCommand(r.Name, r.IntValue);
+            if (r.ArrayValue != null)
+                _data?.UpdateFromArray(r.Name, r.ArrayValue);
 
             MozaLog.Debug($"[AZOM/AB9] {r.Name} = {r.IntValue}");
         }

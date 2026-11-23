@@ -42,6 +42,11 @@ namespace MozaPlugin.Devices.Extensions
             {
                 yield return typeof(MozaBaseDeviceExtension);
             }
+
+            if (MozaDeviceConstants.IsFcsDevice(typeId))
+            {
+                yield return typeof(MozaFcsDeviceExtension);
+            }
         }
     }
 }

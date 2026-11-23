@@ -131,7 +131,8 @@ namespace MozaPlugin.Devices.Led
         /// registered driver matches the attached wheel. Ages are seconds; -1 = never.
         /// </summary>
         internal static (int HoldSec, double SrcQuietSec, double RpmFedSec, double BtnFedSec,
-                         double KnobFedSec, int Skips, int KnobActiveMask, bool HostClosed)? LiveKeepaliveSnapshot()
+                         double KnobFedSec, int Skips, int KnobActiveMask, bool RpmOwned,
+                         bool HostClosed)? LiveKeepaliveSnapshot()
         {
             MozaLedDeviceManager[] snapshot;
             lock (s_instancesLock)
@@ -143,15 +144,14 @@ namespace MozaPlugin.Devices.Led
             {
                 if (!inst.IsConnected()) continue;
                 long now = DateTime.UtcNow.Ticks;
-                int hold = MozaPlugin.Instance?.Settings?.WheelKeepaliveTimeoutSec
-                           ?? (int)KeepaliveHoldSeconds;
-                return (hold,
+                return (HoldSeconds(MozaPlugin.Instance),
                         AgeSeconds(now, Interlocked.Read(ref inst._lastDisplayUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._rpmFedUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._btnFedUtcTicks)),
                         AgeSeconds(now, Interlocked.Read(ref inst._knobFedUtcTicks)),
                         Volatile.Read(ref inst._keepaliveSkips),
                         Volatile.Read(ref inst._lastKnobBitmask),
+                        Volatile.Read(ref inst._rpmOwned),
                         inst._hostClosed);
             }
             return null;
@@ -260,6 +260,10 @@ namespace MozaPlugin.Devices.Led
         private int _lastButtonBitmask = -1;
         private int _lastKnobBitmask = -1;
 
+        // The RPM strip has lit since it was last handed back, so a dark frame is held
+        // black rather than sent as active=0 (see RpmWireActive). Under _emitLock.
+        private bool _rpmOwned;
+
         // Set by InvalidateLiveCache when an out-of-band write repainted a section: the
         // next Display() frame for it goes out even if unchanged. The cached frame is
         // kept, so the keepalive can repaint meanwhile. 0/1 via Volatile/Interlocked.
@@ -284,7 +288,8 @@ namespace MozaPlugin.Devices.Led
         //   • RPM / buttons — SimHub keeps sending them (black) after a halt, so "channel
         //     present" can't detect a halt. Engaged = currently lit, OR within the hold
         //     window since the content last CHANGED (_rpm/_btnChangedUtc). A steadily-
-        //     black section ages out and reverts; their "off" is just dark, no hold needed.
+        //     black section ages out and reverts. Until then an RPM strip that has lit
+        //     renders its "off" as held black (_rpmOwned).
         //   • Knobs — only knobs lit during the current stream are in the mask (their "off"
         //     renders dark), the rest show stored colours. SimHub STOPS the encoder channel
         //     when the knob effect halts, so engaged = the channel is still arriving
@@ -451,6 +456,7 @@ namespace MozaPlugin.Devices.Led
             _lastRpmBitmask = -1;
             _lastButtonBitmask = -1;
             _lastKnobBitmask = -1;
+            _rpmOwned = false;
             _lastKnobRawColors = null;
             Interlocked.Exchange(ref _lastKnobColorChangeUtcTicks, 0L);
             _knobStaticHoldReleased = false;
@@ -535,9 +541,9 @@ namespace MozaPlugin.Devices.Led
             var d = MozaPlugin.Instance?.Data;
             if (d == null) return "";
             var serial = d.WheelSerialNumber;
-            if (!string.IsNullOrEmpty(serial)) return serial;
+            if (!string.IsNullOrEmpty(serial)) return MozaPlugin.ScreenId(serial);
             var uid = d.WheelMcuUid;
-            return uid == null || uid.Length == 0 ? "" : BitConverter.ToString(uid).Replace("-", "");
+            return uid == null || uid.Length == 0 ? "" : MozaPlugin.ScreenId(BitConverter.ToString(uid).Replace("-", ""));
         }
 
         // Wheel and display MCUs run separate firmware; SimHub has one field for both.
@@ -649,6 +655,7 @@ namespace MozaPlugin.Devices.Led
             {
                 if (_lastLeds != null) _lastLeds = new Color[_lastLeds.Length];
                 if (_lastRpmBitmask >= 0) _lastRpmBitmask = 0;
+                _rpmOwned = false;
                 if (_lastButtons != null) _lastButtons = new Color[_lastButtons.Length];
                 if (_lastButtonBitmask >= 0) _lastButtonBitmask = 0;
                 _lastKnobs = null;
@@ -996,13 +1003,17 @@ namespace MozaPlugin.Devices.Led
                     // also gets the old-protocol 0x41 FD DE bitmask PitHouse streams to it.
                     if (isNewWheel)
                     {
-                        var layout = RpmLayout(plugin, count, modelInfo?.UsesLegacyRpmTelemetry == true);
+                        bool legacy = modelInfo?.UsesLegacyRpmTelemetry == true;
+                        var layout = RpmLayout(plugin, count, legacy);
                         if (layout != null)
                         {
+                            // Ownership follows SimHub's content, not the negotiation pulse.
+                            int active = RpmWireActive(plugin, bitmask,
+                                LitMask(rpmColors, 0, count) != 0, count, legacy);
                             plugin.DeviceManager.Leds.Publish(LedZone.WheelRpm, layout,
-                                ToRgb(wire, count), bitmask, (1 << rpmN) - 1,
+                                ToRgb(wire, count), active, (1 << rpmN) - 1,
                                 forceColors: rpmResend || indicatorEnded, forceMask: rpmResend);
-                            _lastRpmBitmask = bitmask;
+                            _lastRpmBitmask = active;
                         }
                         anySent = true;
                     }
@@ -1360,10 +1371,10 @@ namespace MozaPlugin.Devices.Led
         /// feeding and the group reverts to its stored/idle render. So re-feed each
         /// section's last frame (colour + bitmask) at ~1 Hz while it's CURRENTLY LIT
         /// (hold the lit frame indefinitely) OR within the hold window since it last
-        /// CHANGED (render an "off" — owned knobs stay in active so they go dark — for
-        /// the hold, then let it revert). Keying on content (lit / recent change) rather
-        /// than "SimHub is sending the channel" is what lets a steadily-black section
-        /// time out: after an effect halt SimHub keeps sending black RPM/buttons but
+        /// CHANGED (render an "off" — owned knobs and a held RPM strip stay in active so
+        /// they go dark — for the hold, then let it revert). Keying on content (lit /
+        /// recent change) rather than "SimHub is sending the channel" is what lets a
+        /// steadily-black section time out: after an effect halt SimHub keeps sending black RPM/buttons but
         /// stops the knob channel, and a channel-presence key held the RPM/buttons off
         /// forever while knobs reverted. 0 = no hold. *FedUtcTicks paces each section
         /// independently.</para>
@@ -1419,16 +1430,19 @@ namespace MozaPlugin.Devices.Led
             int knobLedMode = plugin.Data.WheelKnobLedMode;
 
             long kaNow = DateTime.UtcNow.Ticks;
-            int holdSec = plugin.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
+            int holdSec = HoldSeconds(plugin);
             // While a game is actively feeding telemetry, NEVER pause the keepalive —
             // the wheel must stay live for the whole session (incl. menus/pauses) and
             // only sleep once the game is closed. The lit/hold gate (which lets a
             // steadily-black section time out) applies only when no game is active.
             bool gameActive = plugin.IsGameActive;
 
-            bool rpmDue = leds != null
-                && (gameActive || AnyLit(leds) || WithinHold(kaNow, Interlocked.Read(ref _rpmChangedUtcTicks), holdSec))
+            bool rpmLit = leds != null && AnyLit(leds);
+            bool rpmHeld = RpmHeld(gameActive, kaNow, holdSec);
+            bool rpmDue = leds != null && (rpmHeld || rpmLit)
                 && DueAfter(kaNow, Interlocked.Read(ref _rpmFedUtcTicks), KeepaliveIntervalSeconds);
+            // A strip held black (RpmWireActive) is handed back once its hold ends.
+            bool rpmRelease = leds != null && !rpmLit && !rpmHeld && Volatile.Read(ref _rpmOwned);
             // Mode predicate here too: a group in Off/Static renders its stored palette
             // and discards live frames, so re-feeding them is pure wire traffic.
             bool btnDue = isNewWheel && buttons != null && GroupRendersLiveFrames(btnLedMode)
@@ -1447,7 +1461,7 @@ namespace MozaPlugin.Devices.Led
             bool knobRelease = knobLive && !gameActive && knobDriven != 0 && kaNow - knobDriven >= knobReleaseTicks;
             bool knobDue = knobLive && !knobRelease
                 && DueAfter(kaNow, Interlocked.Read(ref _knobFedUtcTicks), KeepaliveIntervalSeconds);
-            if (!rpmDue && !btnDue && !knobDue && !knobRelease) return;
+            if (!rpmDue && !rpmRelease && !btnDue && !knobDue && !knobRelease) return;
 
             // TryEnter, never Enter: if Display() is mid-frame it is already feeding the
             // wire, so a skipped re-feed is redundant rather than lost. Blocking here
@@ -1466,7 +1480,11 @@ namespace MozaPlugin.Devices.Led
                 buttons = _lastButtons;
                 knobs = _lastKnobs;
 
-                if (rpmDue && leds != null)
+                if (rpmRelease)
+                {
+                    ReleaseRpmHold(plugin);
+                }
+                else if (rpmDue && leds != null)
                 {
                     // Read before the stamp below: an ES rim whose feed lapsed needs the
                     // wake pulse again (see the old-wheel branch in Display()).
@@ -1558,7 +1576,8 @@ namespace MozaPlugin.Devices.Led
                 var layout = RpmLayout(plugin, rpmN, modelInfo!.UsesLegacyRpmTelemetry);
                 if (layout == null) return;
                 var wire = WithIndicator(plugin, _lastLeds ?? Array.Empty<Color>(), rpmN, want);
-                int mask = LitMask(wire, 0, rpmN);
+                int mask = RpmWireActive(plugin, LitMask(wire, 0, rpmN), false, rpmN,
+                    modelInfo.UsesLegacyRpmTelemetry);
                 // Full colour rewrite on the engage and release edges only.
                 bool edge = _indicatorShown < 0 || want < 0;
                 plugin.DeviceManager.Leds.Publish(LedZone.WheelRpm, layout, ToRgb(wire, rpmN),
@@ -1581,6 +1600,54 @@ namespace MozaPlugin.Devices.Led
         private static bool WithinHold(long nowTicks, long changedTicks, int holdSec)
             => holdSec > 0 && changedTicks != 0
                && (nowTicks - changedTicks) < holdSec * TimeSpan.TicksPerSecond;
+
+        // Per-section keepalive hold in seconds: the Options slider, else the default.
+        private static int HoldSeconds(MozaPlugin? plugin)
+            => plugin?.Settings?.WheelKeepaliveTimeoutSec ?? (int)KeepaliveHoldSeconds;
+
+        // The RPM strip stays live for the whole game, else for the hold since its last change.
+        private bool RpmHeld(bool gameActive, long nowTicks, int holdSec)
+            => gameActive || WithinHold(nowTicks, Interlocked.Read(ref _rpmChangedUtcTicks), holdSec);
+
+        /// <summary>
+        /// RPM active mask as sent. Once SimHub has lit the strip, an all-dark frame goes
+        /// out as black with every slot's bit set while the strip is held: on <c>active=0</c>
+        /// the wheel played its RPM idle effect in every gap between shifts (bug report
+        /// D6XPZWVK, idle effect Breathing). Outside the hold dark stays <c>active=0</c> and
+        /// the strip is handed back. The bare "CS" is left alone: its old-protocol bitmask
+        /// would carry the held bits too. Caller holds <see cref="_emitLock"/>.
+        /// </summary>
+        private int RpmWireActive(MozaPlugin plugin, int wireMask, bool contentLit, int slots, bool legacy)
+        {
+            if (legacy) return wireMask;
+            if (contentLit) _rpmOwned = true;
+            if (wireMask != 0) return wireMask;
+            if (_rpmOwned && slots > 0
+                && RpmHeld(plugin.IsGameActive, DateTime.UtcNow.Ticks, HoldSeconds(plugin)))
+                return (1 << slots) - 1;
+            _rpmOwned = false;
+            return 0;
+        }
+
+        /// <summary>The hold on a dark RPM strip ended: hand it back with <c>active=0</c>.
+        /// Re-checked under <see cref="_emitLock"/>, since a lit frame may have landed
+        /// meanwhile; a running negotiation pulse hands it back on its own end edge.</summary>
+        private void ReleaseRpmHold(MozaPlugin plugin)
+        {
+            var leds = _lastLeds;
+            if (!_rpmOwned || _indicatorShown >= 0 || AnyLit(leds)) return;
+            if (leds != null && RpmHeld(plugin.IsGameActive, DateTime.UtcNow.Ticks, HoldSeconds(plugin)))
+                return;
+            _rpmOwned = false;
+            var modelInfo = plugin.WheelModelInfo;
+            if (leds == null || modelInfo == null || _lastRpmBitmask <= 0) return;
+            int rpmN = modelInfo.RpmLedCount;
+            // Same slot count as Display() and the keepalive, so the lane keeps its state.
+            var layout = RpmLayout(plugin, Math.Min(leds.Length, rpmN), modelInfo.UsesLegacyRpmTelemetry);
+            if (layout != null)
+                plugin.DeviceManager.Leds.PublishMaskOnly(LedZone.WheelRpm, layout, 0, (1 << rpmN) - 1);
+            _lastRpmBitmask = 0;
+        }
 
         // True once `seconds` have elapsed since a stamp. Never-fed (0 ticks) is due.
         private static bool DueAfter(long nowTicks, long lastTicks, double seconds)
@@ -1965,8 +2032,8 @@ namespace MozaPlugin.Devices.Led
 
         /// <summary>RPM zone. A dark LED rides the bitmask alone and only changed colours
         /// are written — how PitHouse drives this group (KS Pro capture: 36 colour frames
-        /// against 285 bitmasks). The bare "CS" keeps full-set colour writes plus the
-        /// old-protocol bitmask.</summary>
+        /// against 285 bitmasks), except a held all-dark frame (<see cref="RpmWireActive"/>).
+        /// The bare "CS" keeps full-set colour writes plus the old-protocol bitmask.</summary>
         internal static LedZoneLayout? RpmLayout(MozaPlugin plugin, int count, bool legacy)
             => legacy
                 ? plugin.DeviceManager.BuildLedLayout("wheel-telemetry-rpm-colors", IdentityIndex(count),

@@ -40,6 +40,8 @@ namespace MozaPlugin.Devices
         // mBooster pedals ShakeIt device, one channel per pedal role. Permanent once
         // shipped: changing it orphans the user's ShakeIt profile.
         public const string MBoosterShakeItGuid = "5badc96c-de60-4fdf-8070-bba8088ff3dc";
+        // FCS farming panel: six button LEDs. Also the FCS device-profile page GUID.
+        public const string FcsGuid = "ef182ec0-0a1b-4435-a533-e4eadd7b323d";
 
         /// <summary>
         /// Registry key namespace for wheelbase models. Base tokens ("R16") and
@@ -88,6 +90,11 @@ namespace MozaPlugin.Devices
         private static readonly Guid WheelGuidNamespace =
             new Guid("a1b2c3d4-e5f6-4789-abcd-ef0123456789");
 
+        // UUID v5 namespace for default LED profile ids (stable, so defaults.json
+        // only changes when its content does).
+        private static readonly Guid LedDefaultsNamespace =
+            new Guid("3f6c2a8e-9d41-4b7a-8e25-6a1d0c7f4b93");
+
         /// <summary>
         /// Runtime registry mapping GUID → model prefix. Populated at startup from
         /// backward-compat map + UUID v5 generation for all known models + persistent file.
@@ -101,7 +108,7 @@ namespace MozaPlugin.Devices
         private static readonly Dictionary<string, string> PrefixToGuid =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        private static bool _registryInitialized;
+        private static volatile bool _registryInitialized;
         private static readonly object _registryLock = new object();
         private static string? _registryPath;
 
@@ -115,8 +122,9 @@ namespace MozaPlugin.Devices
         private static Dictionary<string, string>? _pendingSaveSnapshot;
 
         /// <summary>
-        /// Initialize the GUID registry. Call once from plugin Init.
-        /// Populates the lookup tables from backward-compat GUIDs,
+        /// Initialize the GUID registry. Idempotent; every lookup below calls it, because
+        /// SimHub can start its Devices plugin (extension filter + extension Init) before
+        /// ours. Populates the lookup tables from backward-compat GUIDs,
         /// UUID v5 generation for all WheelModelInfo.KnownModels,
         /// and any previously saved dynamic mappings from disk.
         /// </summary>
@@ -162,6 +170,7 @@ namespace MozaPlugin.Devices
         /// </summary>
         public static string ResolveWheelGuid(string modelPrefix)
         {
+            EnsureRegistry();
             string guid;
             Dictionary<string, string> snapshot;
             lock (_registryLock)
@@ -235,6 +244,8 @@ namespace MozaPlugin.Devices
             if (Matches(deviceTypeId, WheelOldProtoGuid))
                 return OldProtocolMarker;
 
+            EnsureRegistry();
+
             // Dynamic registry lookup (covers backward-compat + UUID v5 + unknown
             // models). Locked because ResolveWheelGuid can mutate GuidToPrefix
             // from another thread; _registryLock is reentrant-safe here.
@@ -271,6 +282,8 @@ namespace MozaPlugin.Devices
 
             if (Matches(deviceTypeId, BaseAmbientGuid))
                 return "";
+
+            EnsureRegistry();
 
             lock (_registryLock)
             {
@@ -336,10 +349,25 @@ namespace MozaPlugin.Devices
         public static bool IsMBoosterShakeItDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, MBoosterShakeItGuid);
 
+        public static bool IsFcsDevice(string deviceTypeId) =>
+            !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, FcsGuid);
+
+        /// <summary>Deterministic id of the default LED profile shipped for a device definition.</summary>
+        public static Guid LedDefaultsProfileId(string descriptorId) =>
+            new Guid(GenerateUuidV5(LedDefaultsNamespace, descriptorId.Trim().ToLowerInvariant()));
+
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>
             deviceTypeId.Equals(id, StringComparison.OrdinalIgnoreCase)
             || deviceTypeId.StartsWith(id + "_", StringComparison.OrdinalIgnoreCase);
+
+        // Lookups read the dicts under _registryLock, which InitializeRegistry holds while
+        // populating, so a reader that sees the flag early still waits for the fill.
+        private static void EnsureRegistry()
+        {
+            if (!_registryInitialized)
+                InitializeRegistry();
+        }
 
         private static void Register(string prefix, string guid)
         {
@@ -350,13 +378,16 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Generate a deterministic UUID v5 from a model prefix string.
         /// </summary>
-        private static string GenerateUuidV5(string modelPrefix)
+        private static string GenerateUuidV5(string modelPrefix) =>
+            GenerateUuidV5(WheelGuidNamespace, modelPrefix);
+
+        private static string GenerateUuidV5(Guid ns, string name)
         {
-            byte[] namespaceBytes = WheelGuidNamespace.ToByteArray();
+            byte[] namespaceBytes = ns.ToByteArray();
             // Convert .NET GUID (mixed-endian) to big-endian for RFC 4122 hashing
             SwapGuidEndian(namespaceBytes);
 
-            byte[] nameBytes = Encoding.UTF8.GetBytes(modelPrefix);
+            byte[] nameBytes = Encoding.UTF8.GetBytes(name);
 
             byte[] hash;
             using (var sha1 = SHA1.Create())

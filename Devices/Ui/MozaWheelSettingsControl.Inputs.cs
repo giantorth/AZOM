@@ -29,7 +29,6 @@ namespace MozaPlugin.Devices.Ui
         // 500ms RefreshWheel tick, separate from it so HID input feels live
         // even when no telemetry is streaming.
         private DispatcherTimer? _inputsLiveTimer;
-        private readonly DateTime[] _wiButtonLastPressed = new DateTime[MozaData.MaxButtons];
 
         // Run the live timer only while the Inputs tab is showing (the ES wheel's
         // headerless single page is the Inputs tab too).
@@ -61,83 +60,25 @@ namespace MozaPlugin.Devices.Ui
 
         // ── Live paddle bars + active buttons ──────────────────────────
 
-        // Signature of the last rendered button list ("3,7*," — star = pressed) so
-        // the Inlines are only rebuilt when the visible content changes.
-        private string _wiActiveButtonsSig = "";
+        private ActiveButtonsRenderer? _wiActiveButtons;
 
         private void RefreshInputsLive()
         {
             if (_data == null || WiLeftPaddleBar == null) return;
+            _wiActiveButtons ??= new ActiveButtonsRenderer(WiActiveButtonsText, MozaData.MaxButtons);
             bool connected = _plugin?.HidReader != null && _data.IsHidConnected;
             if (!connected)
             {
                 WiLeftPaddleBar.Value = 0;
                 WiRightPaddleBar.Value = 0;
                 WiCombinedPaddleBar.Value = 0;
-                if (_wiActiveButtonsSig != "none")
-                {
-                    _wiActiveButtonsSig = "none";
-                    WiActiveButtonsText.Inlines.Clear();
-                    WiActiveButtonsText.Inlines.Add(new Run("None"));
-                }
+                _wiActiveButtons.ShowNone();
                 return;
             }
             WiLeftPaddleBar.Value     = _data.LeftPaddlePosition;
             WiRightPaddleBar.Value    = _data.RightPaddlePosition;
             WiCombinedPaddleBar.Value = _data.CombinedPaddlePosition;
-            RefreshActiveButtons();
-        }
-
-        private void RefreshActiveButtons()
-        {
-            if (_data == null || _data.ButtonCount == 0)
-            {
-                if (_wiActiveButtonsSig != "none")
-                {
-                    _wiActiveButtonsSig = "none";
-                    WiActiveButtonsText.Inlines.Clear();
-                    WiActiveButtonsText.Inlines.Add(new Run("None"));
-                }
-                return;
-            }
-            var now = DateTime.UtcNow;
-            int count = _data.ButtonCount;
-            var sig = new System.Text.StringBuilder(count * 3);
-            for (int i = 0; i < count; i++)
-            {
-                bool pressed = _data.ButtonStates[i];
-                if (pressed) _wiButtonLastPressed[i] = now;
-                if ((now - _wiButtonLastPressed[i]).TotalSeconds < 1.0)
-                {
-                    sig.Append(i + 1);
-                    if (pressed) sig.Append('*');
-                    sig.Append(',');
-                }
-            }
-            string signature = sig.Length == 0 ? "none" : sig.ToString();
-            if (signature == _wiActiveButtonsSig) return;   // 30 Hz caller; only rebuild on change
-            _wiActiveButtonsSig = signature;
-
-            WiActiveButtonsText.Inlines.Clear();
-            if (signature == "none")
-            {
-                WiActiveButtonsText.Inlines.Add(new Run("None"));
-                return;
-            }
-            bool first = true;
-            for (int i = 0; i < count; i++)
-            {
-                if ((now - _wiButtonLastPressed[i]).TotalSeconds >= 1.0) continue;
-                if (!first) WiActiveButtonsText.Inlines.Add(new Run(", "));
-                first = false;
-                var run = new Run((i + 1).ToString());
-                if (_data.ButtonStates[i])
-                {
-                    run.FontWeight = FontWeights.Bold;
-                    run.Foreground = Brushes.White;
-                }
-                WiActiveButtonsText.Inlines.Add(run);
-            }
+            _wiActiveButtons.Refresh(_data.ButtonStates, _data.ButtonCount);
         }
 
         // 0=Buttons → no live bars visible
@@ -167,14 +108,18 @@ namespace MozaPlugin.Devices.Ui
 
         private DispatcherTimer? _paddleCalTimer;
         private int _paddleCalRemaining;
-        private const int PaddleCalSeconds = 5;
+        // Pit House capture: ~11 s sweep, verdict 2.5 s after the save.
+        private const int PaddleCalSeconds = 10;
+        private const int PaddleCalConfirmSeconds = 10;
 
-        // Clutch-paddle calibration (no profile state): clicking Start sends
-        // 08 01, instructs the user to sweep + release all paddles with a live
-        // countdown, then auto-sends 08 02 (save) after 5 s. See wheel-0x17.md.
+        // Clutch-paddle calibration (no profile state), Pit House's sequence: 08 01,
+        // sweep countdown, 08 05 + 08 02, then wait for the wheel's 3f 71 08 03 (saved)
+        // or 08 04 (rejected). Without 08 05 the wheel silently keeps its old
+        // calibration. See wheel-0x17.md.
         private void WiPaddleCalStartButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_plugin == null) return;
+            var data = _data;
+            if (_plugin == null || data == null) return;
             _plugin.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 1);  // start
 
             WiPaddleCalStartButton.IsEnabled = false;
@@ -183,21 +128,35 @@ namespace MozaPlugin.Devices.Ui
                 global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
             WiPaddleCalStatus.Visibility = Visibility.Visible;
 
+            int resultSeq = 0, waited = 0;
             _paddleCalTimer?.Stop();
             _paddleCalTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             _paddleCalTimer.Tick += (s, ev) =>
             {
-                _paddleCalRemaining--;
                 if (_paddleCalRemaining > 0)
                 {
-                    WiPaddleCalStatus.Text = string.Format(
-                        global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
+                    _paddleCalRemaining--;
+                    if (_paddleCalRemaining > 0)
+                    {
+                        WiPaddleCalStatus.Text = string.Format(
+                            global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrate, _paddleCalRemaining);
+                        return;
+                    }
+                    resultSeq = data.PaddleCalibResultSeq;
+                    _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 5);
+                    _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
+                    WiPaddleCalStatus.Text = global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateSaving;
                     return;
                 }
-                _paddleCalTimer?.Stop();
-                _paddleCalTimer = null;
-                _plugin?.HardwareApplier.WriteIfWheelDetected("wheel-paddles-calibration", 2);  // save
-                WiPaddleCalStatus.Text = global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateDone;
+                bool answered = data.PaddleCalibResultSeq != resultSeq;
+                if (!answered && ++waited < PaddleCalConfirmSeconds) return;
+                ((DispatcherTimer)s!).Stop();
+                if (ReferenceEquals(_paddleCalTimer, s)) _paddleCalTimer = null;
+                WiPaddleCalStatus.Text = !answered
+                    ? global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateUnconfirmed
+                    : data.PaddleCalibResult == 0x03
+                        ? global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateDone
+                        : global::MozaPlugin.Resources.Strings.Hint_PaddleCalibrateFailed;
                 WiPaddleCalStartButton.IsEnabled = true;
             };
             _paddleCalTimer.Start();

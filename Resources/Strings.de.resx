@@ -331,9 +331,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>Das Lenkrad hat noch keine Joystick-Konfiguration gemeldet. Lenkrad anschließen und auf den Abschluss der Identity-Probe warten.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetrie</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>ORDNER WÄHLEN…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Studio-Dashboards</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Geräte-Dashboards</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Eigener</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Nicht gefunden</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Keine Kopie für dieses Lenkrad</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Lenkrad nicht verbunden</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Display nicht erkannt</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Keiner</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>ENTFERNEN</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTO-ERKENNUNG</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Einen Ordner mit .mzdash-Dateien als Dashboard-Bibliothek festlegen</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Den Dashboard-Ordner für das verbundene Lenkrad automatisch erkennen</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TEST</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>STOPP</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>KANAL-ZUORDNUNGEN</value></data>
@@ -485,7 +493,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Wählen Sie zuerst eine .mzdash-Datei oder einen Bibliothekseintrag.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(noch kein configJson-Status empfangen)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Rohdaten für „{0}“ können nicht aufgelöst werden – wählen Sie stattdessen eine lokale Datei.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Ordner: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Upload in Warteschlange – „{0}“ wird an das Lenkrad gesendet…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Upload nicht gestartet – Lenkrad nicht verbunden oder noch keine Verwaltungssitzung.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Upload abgeschlossen (Status 0x{0})</value></data>
@@ -496,18 +503,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Wählen Sie eine .mzdash-Datei zum Hochladen</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Moza-Dashboard (*.mzdash)|*.mzdash|Alle Dateien (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Ordner mit .mzdash-Dashboard-Dateien auswählen</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Dashboard-Ordner automatisch erkennen</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>MOZA Pit House-Dashboard-Ordner nicht gefunden unter:
-{0}
-
-Installieren Sie MOZA Pit House und laden Sie ein Dashboard, oder verwenden Sie „Ordner festlegen…“, um einen eigenen Speicherort anzugeben.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Kein Dashboard-Ordner für das verbundene Lenkrad (UID {0}).
-Gesucht unter:
-{1}
-
-Öffnen Sie zuerst ein Dashboard in MOZA Pit House für dieses Lenkrad.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Keine lenkradspezifischen Dashboard-Ordner unter _dashes gefunden. Öffnen Sie MOZA Pit House, laden Sie ein Dashboard und versuchen Sie es erneut.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Mehrere Dashboard-Ordner gefunden ({0}) und kein Lenkrad verbunden. Verbinden Sie Ihr Lenkrad und versuchen Sie es erneut, oder verwenden Sie „Ordner festlegen…“, um manuell zu wählen.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Dadurch werden alle Plugin-Einstellungen und Profile dauerhaft gelöscht.
 
 Sind Sie sicher?</value></data>
@@ -645,6 +640,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Beschreiben Sie das Problem: was Sie getan haben, was das Lenkrad oder Dashboard getan hat und wann es begann.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Kontakt (optional — E-Mail oder Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Beim Senden wird ein Diagnosepaket (Plugin-Protokolle und ein seriellen Mitschnitt, Hardware-Kennungen entfernt) an den Plugin-Entwickler übertragen.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Datenschutzerklärung</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Fehlerbericht senden</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Wird gesendet…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Bericht gesendet. Referenz: {0}</value></data>
@@ -817,6 +813,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Taktiles Feedback</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Tasten-Entprellung (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Vorschau nicht verfügbar</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Dashboard nicht gefunden in {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Gedrückt</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Losgelassen</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Eigene Farbtonauswahl</value></data>
@@ -939,4 +936,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Maximale Leistung</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>Maximale Leistung folgt den vollen Winkeln von SimHub ohne Geschwindigkeitsbegrenzung. Bei SimHub-Einstellungen am oder nahe am Maximum wird Ihr Rig wahrscheinlich hüpfen oder verrutschen. Benutzung auf eigene Gefahr.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Drehpunkt vom Sitz aus: {0:0} mm nach hinten, {1:0} mm nach unten</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Suche nach FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>ACHSEN LIVE</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Gashebel</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Joystick-Drehung</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Daumenstick X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Daumenstick Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Daumenstick</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>JOYSTICK-MODI</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Rechter Griff</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Nicht verbunden</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Eingebauter Joystick</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Tastenbeleuchtung</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>LED-Farben</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>LED-FARBEN</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Ein MOZA Farming Control System ist verbunden, aber das Gerät wurde in SimHub nicht hinzugefügt. Öffnen Sie Geräte &gt; Gerät hinzufügen &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Bewegen Sie den Gashebel einige Male ganz nach vorne und ganz nach hinten und drücken Sie dann FERTIG.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Bewegen Sie den Joystick in jede Richtung bis zum Anschlag, kreisen Sie langsam im und dann gegen den Uhrzeigersinn und drücken Sie dann FERTIG.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Drehen Sie den Joystick einige Male ganz nach links und ganz nach rechts und drücken Sie dann FERTIG.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Bewegen Sie den Daumenstick einige Male in jede Richtung bis zum Anschlag und drücken Sie dann FERTIG.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Schaltwippen-Kalibrierung wird gespeichert…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Das Lenkrad hat die Schaltwippen-Kalibrierung nicht bestätigt.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Schaltwippen-Kalibrierung fehlgeschlagen.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Standardeffekte</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Radblockade</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Streamer-Modus</value></data>
 </root>

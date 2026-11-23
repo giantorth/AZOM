@@ -36,6 +36,8 @@ namespace MozaPlugin.Devices.Motion
         private const int GameEntryTimeoutMs = 15_000;
         private const int ModeLossToleranceMs = 1_500;
         private const int PortSelfTestTimeoutMs = 40_000;
+        // Motion Manager sends run state stop 1.7–3.5 s after each identify-port (`ports and self test`).
+        private const int IdentifyStopMs = 2_000;
         private const int LogRingSize = 200;
         private const int EnrolReadSpacingMs = 15;
         private const int EnrolRetryMs = 500;
@@ -84,6 +86,10 @@ namespace MozaPlugin.Devices.Motion
         private volatile int _portCount;
         private volatile bool _selfCheckPassed;
         private volatile bool _selfCheckSeen;
+        // Port self-test outcome from the controller log: failed axes ("front", "back"), and the
+        // mapped-actuator count it stores last (Table 2 Param 27; -1 until written).
+        private volatile string? _portTestFailedAxes;
+        private volatile int _portMapCount = -1;
         private volatile bool _countsSeen;
         private int _portRolesSeen;           // bitmask of ports whose role read was answered
         private readonly int[] _portPresent = new int[MozaMotionProtocol.PortCount + 1];   // -1 unknown, 0, 1
@@ -125,6 +131,7 @@ namespace MozaPlugin.Devices.Motion
         private bool _wasConnected;
         private bool _released;
         private long _lastConnectAttemptMs = -ConnectRetryMs;
+        private long _identifyStopAtMs = -1;
         private IReadOnlyList<MotionConfigIssue> _lastIssues = Array.Empty<MotionConfigIssue>();
         // Manual mode (controller mode 2) while SimHub's Manual control or Hop-in position is the
         // motion source: wanted = the output's request, driven = the lane has left game mode for it.
@@ -156,6 +163,8 @@ namespace MozaPlugin.Devices.Motion
 
         private static readonly Regex ErrorOccurs = new Regex(@"error_code (\d+) occurs", RegexOptions.Compiled);
         private static readonly Regex ErrorClear = new Regex(@"error_code (\d+) clear", RegexOptions.Compiled);
+        private static readonly Regex AxisFailed = new Regex(@"([A-Za-z]+)_Axis Failed", RegexOptions.Compiled);
+        private static readonly Regex PortMapWritten = new Regex(@"Table 2, Param 27 Written: (\d+)", RegexOptions.Compiled);
 
         public MozaMotionController(Func<bool>? isShuttingDown)
         {
@@ -340,8 +349,24 @@ namespace MozaPlugin.Devices.Motion
 
         // ------------------------------------------------------------ setup API (settings panel)
 
+        /// <summary>The actuator on <paramref name="port"/> signals; run state stop follows after <see cref="IdentifyStopMs"/>.</summary>
         public void IdentifyPort(int port)
-            => _requests.Enqueue(() => Send(MozaMotionProtocol.BuildIdentifyPort(port)));
+            => _requests.Enqueue(() =>
+            {
+                FlushIdentifyStop();
+                Send(MozaMotionProtocol.BuildIdentifyPort(port));
+                Send(MozaMotionProtocol.BuildRunStateRead());
+                _identifyStopAtMs = _clock.ElapsedMilliseconds + IdentifyStopMs;
+            });
+
+        /// <summary>Send the stop owed to an identify-port now; false if none is pending.</summary>
+        private bool FlushIdentifyStop()
+        {
+            if (_identifyStopAtMs < 0) return false;
+            _identifyStopAtMs = -1;
+            SendRunState(MotionRunState.Stop);
+            return true;
+        }
 
         /// <summary>
         /// Motion Manager's "Configure to Self-Test": armed mode, a role per populated port,
@@ -659,6 +684,7 @@ namespace MozaPlugin.Devices.Motion
                 try { request(); }
                 catch (Exception ex) { MozaLog.Debug($"[AZOM/Motion] Request: {ex.Message}"); }
             }
+            if (_identifyStopAtMs >= 0 && now >= _identifyStopAtMs) FlushIdentifyStop();
 
             // The controller drops requests that arrive faster than ~13 ms apart.
             if (now >= _nextPacedMs && _paced.TryDequeue(out var paced))
@@ -774,7 +800,8 @@ namespace MozaPlugin.Devices.Motion
         private void StartSequence(IEnumerator<int> sequence)
         {
             _sequence = sequence;
-            _sequenceWakeMs = 0;
+            // An identify is stopped before anything else runs, as Motion Manager does.
+            _sequenceWakeMs = FlushIdentifyStop() ? _clock.ElapsedMilliseconds + EnrolReadSpacingMs : 0;
         }
 
         private void StreamTick(long now)
@@ -1066,6 +1093,7 @@ namespace MozaPlugin.Devices.Motion
             _logPartial.Clear();
             _modeLostSinceMs = -1;
             _manualDriven = false;
+            _identifyStopAtMs = -1;
         }
 
         private void ResetEffects()
@@ -1110,6 +1138,29 @@ namespace MozaPlugin.Devices.Motion
                 reads.Add((MozaMotionProtocol.BuildPortRoleRead(port), () => (Volatile.Read(ref _portRolesSeen) & bit) != 0));
             }
 
+            var enrol = ReadUntilAnswered(reads, "Enrol");
+            while (enrol.MoveNext()) yield return enrol.Current;
+
+            // MM ends its connect push with run-state stop and device type 1.
+            SendRunState(MotionRunState.Stop);
+            Send(MozaMotionProtocol.BuildDeviceType());
+            _lastIssues = CurrentIssues();
+            // Zero intensity on every slot: the controller moves nothing.
+            _seedDefaultEffects = MotionSlotsBlank();
+            _phase = MotionLanePhase.Ready;
+            MozaLog.Info($"[AZOM/Motion] Enrolled {_model} fw {_fw}, mode {_modeCurrent}, "
+                + $"{CountPresent()} actuators");
+            if (_seedDefaultEffects)
+                MozaLog.Info("[AZOM/Motion] Controller holds no motion effects; defaults apply where the profile sets none");
+            PushDesiredEffects();
+        }
+
+        /// <summary>
+        /// Send each read spaced, re-send the unanswered every <see cref="EnrolRetryMs"/> until all are
+        /// answered or <see cref="EnrolTimeoutMs"/>; a null check means the read is sent once.
+        /// </summary>
+        private IEnumerator<int> ReadUntilAnswered(List<(byte[] Frame, Func<bool>? Answered)> reads, string label)
+        {
             long deadline = _clock.ElapsedMilliseconds + EnrolTimeoutMs;
             for (bool first = true; ; first = false)
             {
@@ -1129,21 +1180,8 @@ namespace MozaPlugin.Devices.Motion
                 var missing = new List<string>();
                 foreach (var (frame, answered) in reads)
                     if (answered != null && !answered()) missing.Add(BitConverter.ToString(frame).Replace("-", ""));
-                MozaLog.Debug($"[AZOM/Motion] Enrol reads unanswered: {string.Join(" ", missing)}");
+                MozaLog.Debug($"[AZOM/Motion] {label} reads unanswered: {string.Join(" ", missing)}");
             }
-
-            // MM ends its connect push with run-state stop and device type 1.
-            SendRunState(MotionRunState.Stop);
-            Send(MozaMotionProtocol.BuildDeviceType());
-            _lastIssues = CurrentIssues();
-            // Zero intensity on every slot: the controller moves nothing.
-            _seedDefaultEffects = MotionSlotsBlank();
-            _phase = MotionLanePhase.Ready;
-            MozaLog.Info($"[AZOM/Motion] Enrolled {_model} fw {_fw}, mode {_modeCurrent}, "
-                + $"{CountPresent()} actuators");
-            if (_seedDefaultEffects)
-                MozaLog.Info("[AZOM/Motion] Controller holds no motion effects; defaults apply where the profile sets none");
-            PushDesiredEffects();
         }
 
         private static bool AllAnswered(List<(byte[] Frame, Func<bool>? Answered)> reads)
@@ -1415,25 +1453,46 @@ namespace MozaPlugin.Devices.Motion
                 Send(MozaMotionProtocol.BuildPortRoleRead(kv.Key));
                 yield return 1000;
             }
+            _portTestFailedAxes = null;
+            _portMapCount = -1;
             Send(MozaMotionProtocol.BuildSetMode(MotionMode.PortSelfTest));
 
-            // Each actuator moves in turn; the controller sets flag 0x20 while it runs and
-            // clears it when done (~14 s in the captures). MM then returns to idle.
+            // Each actuator moves in turn (~14 s). A map that checks out is stored and flag 0x20
+            // clears. One that doesn't logs "<Front|Back>_Axis Failed", the controller stores an
+            // empty map (Param 27 written last) and stays in mode 8 with the flag set.
             long deadline = _clock.ElapsedMilliseconds + PortSelfTestTimeoutMs;
             bool pendingSeen = false;
+            string? failure = null;
             while (true)
             {
-                if (_clock.ElapsedMilliseconds > deadline) { Fault("port self-test did not finish"); yield break; }
                 bool pending = (_flags & MozaMotionProtocol.FlagPortConfigPending) != 0;
                 if (_modeCurrent == (int)MotionMode.PortSelfTest && pending) pendingSeen = true;
                 if (pendingSeen && !pending) break;
+                string? failedAxes = _portTestFailedAxes;
+                bool timedOut = _clock.ElapsedMilliseconds > deadline;
+                if (failedAxes != null && (_portMapCount >= 0 || timedOut))
+                {
+                    failure = $"port self-test: {failedAxes} axis check failed";
+                    break;
+                }
+                if (timedOut) { failure = "port self-test did not finish"; break; }
                 yield return 50;
             }
+            // MM returns to idle after the test; a failed one otherwise leaves the controller in mode 8.
             Send(MozaMotionProtocol.BuildSetMode(MotionMode.Idle));
             yield return 100;
+            // Fresh role reads: a failed test leaves the controller's map empty.
+            Interlocked.Exchange(ref _portRolesSeen, 0);
+            var reads = new List<(byte[] Frame, Func<bool>? Answered)>();
             for (int p = 1; p <= MozaMotionProtocol.PortCount; p++)
-                Send(MozaMotionProtocol.BuildPortRoleRead(p));
-            Send(MozaMotionProtocol.BuildRigDimensionsRead());
+            {
+                int bit = 1 << p;
+                reads.Add((MozaMotionProtocol.BuildPortRoleRead(p), () => (Volatile.Read(ref _portRolesSeen) & bit) != 0));
+            }
+            reads.Add((MozaMotionProtocol.BuildRigDimensionsRead(), null));
+            var reread = ReadUntilAnswered(reads, "Port self-test");
+            while (reread.MoveNext()) yield return reread.Current;
+            if (failure != null) { Fault(failure); yield break; }
             _phase = MotionLanePhase.Ready;
             MozaLog.Info("[AZOM/Motion] Port self-test finished");
         }
@@ -1565,6 +1624,15 @@ namespace MozaPlugin.Devices.Motion
                 if (m.Success) _activeErrors[int.Parse(m.Groups[1].Value)] = 0;
                 m = ErrorClear.Match(line);
                 if (m.Success) _activeErrors.TryRemove(int.Parse(m.Groups[1].Value), out _);
+                m = AxisFailed.Match(line);
+                if (m.Success)
+                {
+                    string axis = m.Groups[1].Value.ToLowerInvariant();
+                    string? prev = _portTestFailedAxes;
+                    _portTestFailedAxes = prev == null ? axis : prev + ", " + axis;
+                }
+                m = PortMapWritten.Match(line);
+                if (m.Success) _portMapCount = int.Parse(m.Groups[1].Value);
             }
             // The fault dump is 200 numeric lines; keep it out of the ring.
             if (line.Length == 0 || line.StartsWith("[") && char.IsDigit(line.Length > 1 ? line[1] : 'x')) return;

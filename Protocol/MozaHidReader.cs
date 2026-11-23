@@ -43,6 +43,12 @@ namespace MozaPlugin.Protocol
         /// button array. Its axes are idle and not consumed.
         /// </summary>
         Ab9 = 4,
+        /// <summary>
+        /// MOZA FCS farming panel (PID 0x0030): six axes and 128 buttons routed to
+        /// <c>MozaData.Fcs</c> only — never the steering, paddle, pedal or wheel
+        /// button fields. Games bind the joystick directly.
+        /// </summary>
+        Fcs = 5,
     }
 
     /// <summary>Reads physical input positions from Moza HID devices (VID 0x346E).</summary>
@@ -168,6 +174,7 @@ namespace MozaPlugin.Protocol
             _thread = null;
             _data.IsHidConnected = false;
             _data.IsAb9HidConnected = false;
+            _data.Fcs.IsHidConnected = false;
         }
 
         /// <summary>
@@ -218,6 +225,7 @@ namespace MozaPlugin.Protocol
                 var devices = FindMozaDevices(ignoredPaths);
                 _data.IsStalksConnected = devices.Any(d => d.Item3 == MozaHidClass.Stalks);
                 _data.IsAb9HidConnected = false;
+                _data.Fcs.IsHidConnected = false;
                 if (devices.Count == 0)
                 {
                     _data.IsHidConnected = false;
@@ -253,6 +261,7 @@ namespace MozaPlugin.Protocol
                         openPaths.Add(path);
                         if (deviceClass == MozaHidClass.Stalks) _data.IsStalksConnected = true;
                         if (deviceClass == MozaHidClass.Ab9) _data.IsAb9HidConnected = true;
+                        if (deviceClass == MozaHidClass.Fcs) _data.Fcs.IsHidConnected = true;
 
                         bool isHandbrake = MozaUsbIds.IsHandbrakePid((ushort)device.ProductID);
                         string idCapture = identity;
@@ -351,6 +360,7 @@ namespace MozaPlugin.Protocol
 
                 _data.IsHidConnected = false;
                 _data.IsAb9HidConnected = false;
+                _data.Fcs.IsHidConnected = false;
                 SleepInterruptible(1000);
             }
         }
@@ -409,6 +419,7 @@ namespace MozaPlugin.Protocol
                 case MozaDeviceCategory.Hub:
                 case MozaDeviceCategory.Stalks:
                 case MozaDeviceCategory.MBooster:
+                case MozaDeviceCategory.Fcs:
                 case MozaDeviceCategory.Unknown:
                     return true;
                 default:
@@ -487,6 +498,7 @@ namespace MozaPlugin.Protocol
                                    || category == MozaDeviceCategory.PedalHaptics ? MozaHidClass.Pedals
                                  : category == MozaDeviceCategory.Stalks ? MozaHidClass.Stalks
                                  : isAb9 ? MozaHidClass.Ab9
+                                 : category == MozaDeviceCategory.Fcs ? MozaHidClass.Fcs
                                  : MozaHidClass.Standard;
                         string identity = isMBooster ? ExtractUsbParentInstance(dev) : "";
                         if (isMBooster)
@@ -602,7 +614,7 @@ namespace MozaPlugin.Protocol
                     }
 
                     // Cache steering axis range if this device has it
-                    if (usages.ContainsKey(UsageX))
+                    if (kind == MozaHidClass.Standard && usages.ContainsKey(UsageX))
                     {
                         _data.SteeringAngleRawMin = usages[UsageX].min;
                         _data.SteeringAngleRawMax = usages[UsageX].max;
@@ -665,6 +677,25 @@ namespace MozaPlugin.Protocol
                         }
 
                         if (usage == 0 || !usages.TryGetValue(usage, out var range)) return;
+
+                        if (kind == MozaHidClass.Fcs)
+                        {
+                            var fcs = _data.Fcs;
+                            if ((usage >> 16) == 0x0009)
+                            {
+                                int bi = (int)(usage & 0xFFFF) - 1;
+                                if (bi >= 0 && bi < MozaData.FcsState.MaxButtons)
+                                {
+                                    fcs.ButtonStates[bi] = logical != 0;
+                                    if (bi >= fcs.ButtonCount) fcs.ButtonCount = bi + 1;
+                                }
+                                return;
+                            }
+                            int ai = FcsAxisIndex(usage);
+                            if (ai >= 0 && range.max > range.min)
+                                fcs.AxisPct[ai] = NormalizePct(logical, range.min, range.max);
+                            return;
+                        }
 
                         if (usage == UsageX)
                         {
@@ -912,6 +943,22 @@ namespace MozaPlugin.Protocol
                     changed(Usages[i], _now[i]);
                 }
                 _seen = true;
+            }
+        }
+
+        // FCS report order X, Y, Rx, Ry, Rz, Z = joystick X/Y, thumbstick X/Y,
+        // throttle lever, twist (docs/protocol/devices/fcs.md § HID report).
+        private static int FcsAxisIndex(uint usage)
+        {
+            switch (usage)
+            {
+                case UsageX:  return 0;
+                case UsageY:  return 1;
+                case UsageRx: return 2;
+                case UsageRy: return 3;
+                case UsageRz: return 4;
+                case UsageZ:  return 5;
+                default:      return -1;
             }
         }
 

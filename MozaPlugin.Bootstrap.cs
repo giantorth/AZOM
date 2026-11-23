@@ -833,10 +833,10 @@ namespace MozaPlugin
                     }
                 }
 
-                // Top up artwork on already-deployed wheel definitions. The
-                // per-model deploy only reaches the attached wheel, so other
-                // wheels the user owns would never get a picture.
-                DeviceDefinitionDeployer.RefreshDeployedThumbnails();
+                // Top up artwork and default LED effects on already-deployed
+                // definitions. The per-model deploy only reaches the attached
+                // wheel, so other wheels the user owns would never get them.
+                DeviceDefinitionDeployer.RefreshDeployedSidecars();
                 Devices.Haptics.MozaLfeEffectDefaults.Deploy();
 
                 // Now safe to initialize the profile system — ApplyProfile (called

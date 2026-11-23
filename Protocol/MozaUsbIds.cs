@@ -27,6 +27,9 @@ namespace MozaPlugin.Protocol
         // MOZA Motion Controller (HMA150 platform, PID 0x2000) — its own bus,
         // dev 0x12 + actuator ports 0x14..0x1B. Never probed by the wheel lanes.
         Motion,
+        // MOZA Farming Control System (PID 0x0030) — own CDC port (dev 0x12,
+        // group 0x4E) + HID joystick. Claimed by the standalone peripheral lane.
+        Fcs,
     }
 
     /// <summary>
@@ -66,6 +69,7 @@ namespace MozaPlugin.Protocol
                 [0x0024] = new InventoryEntry(MozaDeviceCategory.Stalks,    "MOZA Stalks"),
                 [0x0025] = new InventoryEntry(MozaDeviceCategory.Dashboard, "CM2 Racing Dash"),
                 [0x002F] = new InventoryEntry(MozaDeviceCategory.PedalHaptics, "S12 Pedal Vibration"),
+                [0x0030] = new InventoryEntry(MozaDeviceCategory.Fcs,       "Farming Control System"),
                 [0x1000] = new InventoryEntry(MozaDeviceCategory.Ab9,       "AB9 active shifter"),
                 // AB6: AB9's sibling, same lane. Must stay in category Ab9, NOT
                 // Shifter — Shifter is the passive HGP/SGP family claimed by
@@ -139,6 +143,8 @@ namespace MozaPlugin.Protocol
         public static bool IsPedalHapticsPid(ushort pid)  => Categorize(pid) == MozaDeviceCategory.PedalHaptics;
         public static bool IsMotionPid(string? pid)    => Categorize(pid) == MozaDeviceCategory.Motion;
         public static bool IsMotionPid(ushort pid)     => Categorize(pid) == MozaDeviceCategory.Motion;
+        public static bool IsFcsPid(string? pid)       => Categorize(pid) == MozaDeviceCategory.Fcs;
+        public static bool IsFcsPid(ushort pid)        => Categorize(pid) == MozaDeviceCategory.Fcs;
 
         /// <summary>Short display name for the active-shifter lane, which the AB9
         /// and AB6 share. Returns the family label for an unknown/null PID —

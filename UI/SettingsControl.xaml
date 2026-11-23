@@ -4203,6 +4203,15 @@
                                         <ComboBox Grid.Column="1" x:Name="DefaultTabCombo" Width="200" HorizontalAlignment="Left" VerticalAlignment="Center"
                                                   SelectionChanged="DefaultTabCombo_Changed"/>
                                     </Grid>
+                                    <Grid Margin="0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" SharedSizeGroup="OptLabelL"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_StreamerMode}" Style="{StaticResource SliderLabel}"/>
+                                        <ctrl:OffOnToggle Grid.Column="1" x:Name="StreamerModeCheck" VerticalAlignment="Center"
+                                                  Checked="StreamerModeCheck_Changed" Unchecked="StreamerModeCheck_Changed"/>
+                                    </Grid>
                                     <!-- Status line (firmware note) is long and wraps under the selector. -->
                                     <Grid x:Name="WheelbaseLfeSourceRow" Margin="0,4" Visibility="Collapsed">
                                         <Grid.ColumnDefinitions>
@@ -4674,8 +4683,11 @@
                                 <TextBlock Text="{x:Static res:Strings.Label_BugReportContact}"
                                            Foreground="{StaticResource TextBrush}" Margin="0,10,0,4"/>
                                 <TextBox x:Name="BugReportContactBox" Style="{StaticResource LfeNameBox}" MaxLength="200"/>
-                                <TextBlock Text="{x:Static res:Strings.Hint_BugReportConsent}"
-                                           Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <TextBlock Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,10,0,0">
+                                    <Run Text="{x:Static res:Strings.Hint_BugReportConsent}"/>
+                                    <Hyperlink Click="BugReportPrivacyLink_Click" Foreground="{StaticResource TextBrush}"
+                                               ToolTip="giant.orth.cc/privacy"><Run Text="{x:Static res:Strings.Link_PrivacyPolicy}"/></Hyperlink>
+                                </TextBlock>
                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                     <Button x:Name="SubmitBugReportButton" Content="{x:Static res:Strings.Button_SubmitBugReport}"
                                             Style="{StaticResource MozaButtonPrimary}" Click="SubmitBugReport_Click"/>

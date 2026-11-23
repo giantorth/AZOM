@@ -389,7 +389,7 @@ namespace MozaPlugin.Devices.Haptics
             // injected driver does. Nothing to do.
         }
 
-        public string GetSerialNumber() => BaseSerialNumber();
+        public string GetSerialNumber() => MozaPlugin.ScreenId(BaseSerialNumber());
         public string GetFirmwareVersion() => MozaPlugin.Instance?.Data?.BaseFwVersionText ?? "";
         public object GetDriverInstance() => _motors;
         public void Close() => _motors.Clear();
@@ -420,7 +420,7 @@ namespace MozaPlugin.Devices.Haptics
         // needs firmware >= 1.2.10.10.
         public bool IsConnected => MozaPlugin.Instance?.IsBaseLfeHapticsReady == true;
 
-        public string SerialNumber => MozaBaseConnectionManager.BaseSerialNumber();
+        public string SerialNumber => MozaPlugin.ScreenId(MozaBaseConnectionManager.BaseSerialNumber());
         public string FirmwareVersion => MozaPlugin.Instance?.Data?.BaseFwVersionText ?? "";
 
         public bool SendMotors(MotorStates states, bool forceRefresh)

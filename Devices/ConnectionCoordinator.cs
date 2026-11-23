@@ -279,12 +279,13 @@ namespace MozaPlugin.Devices
                     _ab9Manager.Disconnect();
                     return;
                 }
+                // Cleared before any read goes out so a swapped device can't
+                // inherit the previous one's readings.
+                _data.ResetAb9Probe();
                 _ab9Manager.SendIdentityProbe();
                 _ab9Manager.RequestAllStoredSettings();
                 // Once per connect so a diagnostics bundle carries the answer even
-                // if the user never opens the AB9 tab's status card. Cleared first
-                // so a swapped device can't inherit the previous one's readings.
-                _data.ResetAb9Probe();
+                // if the user never opens the AB9 tab's status card.
                 _ab9Manager.RequestStatusProbe();
 
                 // Persist successful port for next launch

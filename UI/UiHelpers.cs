@@ -68,6 +68,27 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
+        /// Open a URL via the OS shell: the default browser on Windows; under
+        /// Wine/Proton winebrowser forwards it to the host's xdg-open.
+        /// </summary>
+        public static void OpenExternalUrl(string url)
+        {
+            try
+            {
+                // The returned Process (when any) is an unmanaged handle — dispose it.
+                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = url,
+                    UseShellExecute = true,
+                })) { }
+            }
+            catch (System.Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] failed to open {url}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Case-insensitive comparer that orders embedded digit runs by VALUE,
         /// so "Rally V2" sorts before "Rally V10" instead of after it. Dashboard
         /// names are overwhelmingly "&lt;car or series&gt; &lt;number&gt;", which

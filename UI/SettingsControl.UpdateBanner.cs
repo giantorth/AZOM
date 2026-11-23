@@ -356,7 +356,7 @@ namespace MozaPlugin.UI
 
         private void ReleaseNotesLink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {
-            OpenExternalUrl(e.Uri?.ToString() ?? "");
+            UiHelpers.OpenExternalUrl(e.Uri?.ToString() ?? "");
             e.Handled = true;
         }
 

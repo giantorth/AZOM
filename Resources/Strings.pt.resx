@@ -352,9 +352,17 @@
   <data name="Hint_NoJoystickConfig" xml:space="preserve"><value>O volante ainda não informou a configuração do joystick. Conecte o volante e aguarde a sonda de identidade concluir.</value></data>
   <data name="Label_EnableDashboardTelemetry" xml:space="preserve"><value>Telemetria</value></data>
   <data name="Button_SetFolder" xml:space="preserve"><value>DEFINIR PASTA…</value></data>
+  <data name="Label_DashFolderStudio" xml:space="preserve"><value>Painéis do Studio</value></data>
+  <data name="Label_DashFolderPitHouse" xml:space="preserve"><value>Painéis do dispositivo</value></data>
+  <data name="Label_DashFolderCustom" xml:space="preserve"><value>Personalizada</value></data>
+  <data name="Status_DashFolderNotFound" xml:space="preserve"><value>Não encontrada</value></data>
+  <data name="Status_DashFolderNoWheelCopy" xml:space="preserve"><value>Sem cópia para este volante</value></data>
+  <data name="Status_DashFolderWheelNotConnected" xml:space="preserve"><value>Volante desconectado</value></data>
+  <data name="Status_DashFolderNoDisplay" xml:space="preserve"><value>Tela não detectada</value></data>
+  <data name="Status_DashFolderNone" xml:space="preserve"><value>Nenhuma</value></data>
+  <data name="Button_ClearFolder" xml:space="preserve"><value>REMOVER</value></data>
   <data name="Button_AutoDetect" xml:space="preserve"><value>AUTODETECTAR</value></data>
   <data name="Tooltip_SetFolder" xml:space="preserve"><value>Define uma pasta de arquivos .mzdash como biblioteca de painéis</value></data>
-  <data name="Tooltip_AutoDetect" xml:space="preserve"><value>Autodetecta a pasta de painéis do volante conectado</value></data>
   <data name="Button_SendTestPattern" xml:space="preserve"><value>TESTE</value></data>
   <data name="Button_StopTest" xml:space="preserve"><value>PARAR</value></data>
   <data name="Section_ChannelMappings" xml:space="preserve"><value>MAPEAMENTOS DE CANAL</value></data>
@@ -505,7 +513,6 @@
   <data name="Status_PickMzdashFirst" xml:space="preserve"><value>Escolha primeiro um arquivo .mzdash ou item da biblioteca.</value></data>
   <data name="Status_NoConfigJsonState" xml:space="preserve"><value>(nenhum estado de configJson recebido ainda)</value></data>
   <data name="Upload_CannotResolveBytes" xml:space="preserve"><value>Não foi possível obter os bytes brutos de "{0}" — escolha um arquivo local.</value></data>
-  <data name="Upload_FolderPrefix" xml:space="preserve"><value>Pasta: {0}</value></data>
   <data name="Upload_Queued" xml:space="preserve"><value>Envio na fila — enviando "{0}" para o volante…</value></data>
   <data name="Upload_NotStarted" xml:space="preserve"><value>Envio não iniciado — volante desconectado ou sem sessão de gerenciamento ainda.</value></data>
   <data name="Upload_Complete" xml:space="preserve"><value>Envio concluído (estado 0x{0})</value></data>
@@ -516,18 +523,6 @@
   <data name="Upload_FileDialog_Title" xml:space="preserve"><value>Escolha um arquivo .mzdash para enviar</value></data>
   <data name="Upload_FileDialog_Filter" xml:space="preserve"><value>Painel Moza (*.mzdash)|*.mzdash|Todos os arquivos (*.*)|*.*</value></data>
   <data name="Upload_FolderDialog_Description" xml:space="preserve"><value>Selecione a pasta com arquivos de painel .mzdash</value></data>
-  <data name="Upload_AutoDetect_Caption" xml:space="preserve"><value>Autodetectar pasta de painéis</value></data>
-  <data name="Upload_AutoDetect_NotFound" xml:space="preserve"><value>Pasta de painéis do MOZA Pit House não encontrada em:
-{0}
-
-Instale o MOZA Pit House e carregue um painel, ou use Definir pasta… para apontar para um local personalizado.</value></data>
-  <data name="Upload_AutoDetect_NoFolderForWheel" xml:space="preserve"><value>Nenhuma pasta de painéis para o volante conectado (UID {0}).
-Procurado em:
-{1}
-
-Abra um painel no MOZA Pit House para este volante primeiro.</value></data>
-  <data name="Upload_AutoDetect_NoFolders" xml:space="preserve"><value>Nenhuma pasta de painéis específica de volante encontrada em _dashes. Abra o MOZA Pit House e carregue um painel, depois tente novamente.</value></data>
-  <data name="Upload_AutoDetect_Multiple" xml:space="preserve"><value>Várias pastas de painéis encontradas ({0}) e nenhum volante conectado. Conecte o volante e tente novamente, ou use Definir pasta… para escolher manualmente.</value></data>
   <data name="Dialog_ClearAllSettings_Body" xml:space="preserve"><value>Isto excluirá permanentemente todas as configurações e perfis do plugin.
 
 Tem certeza?</value></data>
@@ -644,6 +639,7 @@ Id: {2}</value></data>
   <data name="Placeholder_BugReportDescription" xml:space="preserve"><value>Descreva o problema: o que você fez, o que o volante ou o painel fez e quando começou.</value></data>
   <data name="Label_BugReportContact" xml:space="preserve"><value>Contato (opcional — e-mail ou Discord)</value></data>
   <data name="Hint_BugReportConsent" xml:space="preserve"><value>Ao enviar, um pacote de diagnóstico (logs do plugin e um trace serial, com identificadores de hardware anonimizados) é enviado ao desenvolvedor do plugin.</value></data>
+  <data name="Link_PrivacyPolicy" xml:space="preserve"><value>Política de privacidade</value></data>
   <data name="Button_SubmitBugReport" xml:space="preserve"><value>Enviar relatório de erro</value></data>
   <data name="Status_BugReportUploading" xml:space="preserve"><value>Enviando…</value></data>
   <data name="Status_BugReportSubmitted" xml:space="preserve"><value>Relatório enviado. Referência: {0}</value></data>
@@ -816,6 +812,7 @@ Id: {2}</value></data>
   <data name="Motion_Effect_TactileFeedback" xml:space="preserve"><value>Feedback tátil</value></data>
   <data name="SliderLabel_StalkDebounce" xml:space="preserve"><value>Debounce dos botões (ms)</value></data>
   <data name="Status_PreviewUnavailable" xml:space="preserve"><value>Pré-visualização indisponível</value></data>
+  <data name="Status_PreviewDashboardNotFoundFmt" xml:space="preserve"><value>Painel não encontrado em {0}</value></data>
   <data name="Status_Pressed" xml:space="preserve"><value>Pressionado</value></data>
   <data name="Status_Released" xml:space="preserve"><value>Solto</value></data>
   <data name="Tooltip_CustomHuePicker" xml:space="preserve"><value>Seletor de tom personalizado</value></data>
@@ -938,4 +935,32 @@ Id: {2}</value></data>
   <data name="Motion_Panel_MaxPerformance" xml:space="preserve"><value>Desempenho máximo</value></data>
   <data name="Motion_Panel_MaxPerformanceWarning" xml:space="preserve"><value>O desempenho máximo segue os ângulos completos do SimHub sem limite de velocidade. Com as definições do SimHub no máximo ou perto dele, é provável que o seu rig salte ou se desloque. Use por sua conta e risco.</value></data>
   <data name="Motion_Panel_VrMcPivotBehindFmt" xml:space="preserve"><value>Pivô a partir do banco: {0:0} mm para trás, {1:0} mm para baixo</value></data>
+  <data name="Status_SearchingForFcs" xml:space="preserve"><value>Procurando FCS...</value></data>
+  <data name="Section_LiveAxes" xml:space="preserve"><value>EIXOS AO VIVO</value></data>
+  <data name="Label_FcsThrottleLever" xml:space="preserve"><value>Alavanca do acelerador</value></data>
+  <data name="Label_FcsJoystickX" xml:space="preserve"><value>Joystick X</value></data>
+  <data name="Label_FcsJoystickY" xml:space="preserve"><value>Joystick Y</value></data>
+  <data name="Label_FcsJoystickTwist" xml:space="preserve"><value>Giro do joystick</value></data>
+  <data name="Label_FcsThumbstickX" xml:space="preserve"><value>Mini joystick X</value></data>
+  <data name="Label_FcsThumbstickY" xml:space="preserve"><value>Mini joystick Y</value></data>
+  <data name="Label_FcsJoystickXy" xml:space="preserve"><value>Joystick XY</value></data>
+  <data name="Label_FcsThumbstick" xml:space="preserve"><value>Mini joystick</value></data>
+  <data name="Section_JoystickModes" xml:space="preserve"><value>MODOS DO JOYSTICK</value></data>
+  <data name="Label_RightRod" xml:space="preserve"><value>Alavanca direita</value></data>
+  <data name="Option_RodNotConnected" xml:space="preserve"><value>Não conectado</value></data>
+  <data name="Option_RodBuiltIn" xml:space="preserve"><value>Joystick integrado</value></data>
+  <data name="SliderLabel_ButtonLightMode" xml:space="preserve"><value>Iluminação dos botões</value></data>
+  <data name="Label_LedColors" xml:space="preserve"><value>Cores dos LEDs</value></data>
+  <data name="Section_LedColors" xml:space="preserve"><value>CORES DOS LEDS</value></data>
+  <data name="Banner_ProfileNotAddedFcs_Body" xml:space="preserve"><value>Um MOZA Farming Control System está conectado, mas o dispositivo não foi adicionado no SimHub. Abra Dispositivos &gt; Adicionar dispositivo &gt; {0}.</value></data>
+  <data name="Hint_FcsCalThrottle" xml:space="preserve"><value>Mova a alavanca do acelerador totalmente para a frente e para trás algumas vezes e pressione CONCLUÍDO.</value></data>
+  <data name="Hint_FcsCalJoystickXy" xml:space="preserve"><value>Mova o joystick até o limite em todas as direções, girando devagar no sentido horário e depois anti-horário, e pressione CONCLUÍDO.</value></data>
+  <data name="Hint_FcsCalTwist" xml:space="preserve"><value>Gire o joystick totalmente para a esquerda e para a direita algumas vezes e pressione CONCLUÍDO.</value></data>
+  <data name="Hint_FcsCalThumbstick" xml:space="preserve"><value>Mova o mini joystick até o limite em todas as direções algumas vezes e pressione CONCLUÍDO.</value></data>
+  <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Salvando a calibração dos paddles…</value></data>
+  <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>O volante não confirmou a calibração dos paddles.</value></data>
+  <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>A calibração dos paddles falhou.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Efeitos padrão AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Travamento de roda</value></data>
+  <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Modo streamer</value></data>
 </root>
