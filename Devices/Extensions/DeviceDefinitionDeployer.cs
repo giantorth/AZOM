@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using MozaPlugin.Devices.Led;
 using MozaPlugin.Protocol;
 using MozaPlugin.Resources;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Devices.Extensions
@@ -54,7 +56,7 @@ namespace MozaPlugin.Devices.Extensions
         private const string DashCm1ThumbnailKey = "CM1";
 
         // Device name → thumbnail key for the template-based definitions that ship
-        // art. Drives RefreshDeployedThumbnails' startup top-up; the per-detection
+        // art. Drives RefreshDeployedSidecars' startup top-up; the per-detection
         // DeployFromResource callers pass the key directly.
         private static readonly (string DeviceName, string ThumbnailKey)[] TemplateThumbnails =
         {
@@ -145,7 +147,7 @@ namespace MozaPlugin.Devices.Extensions
         /// dashes and the three S12 pedal-haptics devices. Unlike the lazy per-detection paths this
         /// ignores the staleness checks — the user asked for a redeploy, so an
         /// existing file that merely parses is still replaced (that is the repair
-        /// case). Complements <see cref="RefreshDeployedThumbnails"/>, which tops up
+        /// case). Complements <see cref="RefreshDeployedSidecars"/>, which tops up
         /// art but only for definitions already on disk.
         ///
         /// Every definition is stamped with <paramref name="wheelbasePid"/>: a
@@ -516,8 +518,9 @@ namespace MozaPlugin.Devices.Extensions
                 if (fileExists && !force && !IsBaseDefinitionStale(
                         deviceJsonPath, deviceName, guid, ledCount, wantHaptics, pid))
                 {
-                    // Current, but the artwork may still be missing.
+                    // Current, but the artwork or default LED effects may still be missing.
                     EnsureThumbnail(deviceDir, thumbnailKey);
+                    EnsureLedDefaults(deviceDir);
                     return false;
                 }
 
@@ -525,6 +528,7 @@ namespace MozaPlugin.Devices.Extensions
                 AtomicFile.WriteAllText(deviceJsonPath,
                     GenerateBaseDeviceJson(guid, BaseModelInfo.GetFriendlyName(prefix), ledCount, wantHaptics, pid));
                 EnsureThumbnail(deviceDir, thumbnailKey);
+                EnsureLedDefaults(deviceDir);
 
                 MozaLog.Info(
                     $"[AZOM] {(fileExists ? "Refreshed" : "Deployed")} base device definition: {deviceName} " +
@@ -825,9 +829,11 @@ namespace MozaPlugin.Devices.Extensions
 
                     if (!stale)
                     {
-                        // Definition is current, but the artwork may still be
-                        // missing (added by a plugin update, or user-deleted).
+                        // Definition is current, but the artwork or default LED
+                        // effects may still be missing (added by a plugin update,
+                        // or user-deleted).
                         EnsureThumbnail(deviceDir, modelPrefix);
+                        EnsureLedDefaults(deviceDir);
                         return RemoveShadowingWheelDefinitions(deviceName, guid);
                     }
                 }
@@ -837,6 +843,7 @@ namespace MozaPlugin.Devices.Extensions
                 var json = GenerateWheelDeviceJson(guid, productName, rpmCount, hasFlagLeds, buttonCount, knobCount, browSegmentSize, pid);
                 AtomicFile.WriteAllText(deviceJsonPath, json);
                 EnsureThumbnail(deviceDir, modelPrefix);
+                EnsureLedDefaults(deviceDir);
 
                 string action = fileExists ? "Refreshed" : "Deployed";
                 MozaLog.Debug(
@@ -928,18 +935,18 @@ namespace MozaPlugin.Devices.Extensions
         }
 
         /// <summary>
-        /// Top up artwork for wheel definitions that are already on disk.
-        /// <see cref="DeployForModel"/> only ever reaches the wheel that is
-        /// currently attached, so definitions left behind by other wheels the
-        /// user has owned would stay picture-less until that wheel is plugged
-        /// back in. Called once at Init.
+        /// Top up the sidecars (artwork, default LED effects) of definitions that
+        /// are already on disk. <see cref="DeployForModel"/> only ever reaches the
+        /// wheel that is currently attached, so definitions left behind by other
+        /// wheels the user has owned would stay without them until that wheel is
+        /// plugged back in. Called once at Init.
         ///
         /// Only writes into directories that already exist — it never creates a
         /// definition for a wheel the user has not actually had connected, and
-        /// never rewrites device.json. Cosmetic, so it reports nothing and never
-        /// asks for a SimHub restart.
+        /// never rewrites device.json. Neither sidecar needs a restart (SimHub reads
+        /// both lazily), so it reports nothing.
         /// </summary>
-        public static void RefreshDeployedThumbnails()
+        public static void RefreshDeployedSidecars()
         {
             try
             {
@@ -947,6 +954,10 @@ namespace MozaPlugin.Devices.Extensions
                     AppDomain.CurrentDomain.BaseDirectory, "DevicesDefinitions", "User");
                 if (!Directory.Exists(userDefsDir))
                     return;
+
+                // EnsureLedDefaults ignores folders that aren't a MOZA LED definition.
+                foreach (var deviceDir in Directory.GetDirectories(userDefsDir))
+                    EnsureLedDefaults(deviceDir);
 
                 foreach (var (prefix, friendlyName, _) in WheelModelInfo.KnownModels)
                 {
@@ -973,7 +984,54 @@ namespace MozaPlugin.Devices.Extensions
             }
             catch (Exception ex)
             {
-                MozaLog.Warn($"[AZOM] Could not refresh deployed device thumbnails: {ex.Message}");
+                MozaLog.Warn($"[AZOM] Could not refresh deployed device sidecars: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Write the default LED profile (<see cref="LedDefaultProfiles"/>) as
+        /// <c>defaults.json</c> beside device.json, generated from that device.json's
+        /// own telemetry layout. SimHub's Device Builder loader reads it live, and
+        /// only when the user adds the device (DevicesPluginSettings.AddNewDevice);
+        /// existing devices never see it. Idempotent, never needs a restart. A MOZA
+        /// definition with no telemetry LEDs (haptics-only base) loses a stale file;
+        /// any other folder is left alone.
+        /// </summary>
+        private static void EnsureLedDefaults(string deviceDir)
+        {
+            try
+            {
+                var deviceJsonPath = Path.Combine(deviceDir, "device.json");
+                if (!File.Exists(deviceJsonPath))
+                    return;
+
+                var deviceJson = JObject.Parse(File.ReadAllText(deviceJsonPath));
+                var id = deviceJson.SelectToken("DescriptorUniqueId")?.Value<string>() ?? "";
+                if (LedDefaultProfiles.KindFor(id) == null)
+                    return;
+
+                var defaultsPath = Path.Combine(deviceDir, LedDefaultProfiles.DefaultsFileName);
+                var profile = LedDefaultProfiles.BuildProfile(deviceJson);
+                if (profile == null)
+                {
+                    if (File.Exists(defaultsPath))
+                    {
+                        File.Delete(defaultsPath);
+                        MozaLog.Debug($"[AZOM] Removed default LED effects (no telemetry LEDs): {defaultsPath}");
+                    }
+                    return;
+                }
+
+                var json = LedDefaultProfiles.BuildDefaults(profile).ToString(Formatting.Indented);
+                if (File.Exists(defaultsPath) && string.Equals(File.ReadAllText(defaultsPath), json, StringComparison.Ordinal))
+                    return;
+
+                AtomicFile.WriteAllText(defaultsPath, json);
+                MozaLog.Debug($"[AZOM] Wrote default LED effects: {defaultsPath}");
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Warn($"[AZOM] Could not write default LED effects in '{deviceDir}': {ex.Message}");
             }
         }
 
@@ -1353,10 +1411,12 @@ namespace MozaPlugin.Devices.Extensions
 
                     if (!stale)
                     {
-                        // Definition is current; the artwork may still be missing
-                        // (added by a plugin update, or user-deleted).
+                        // Definition is current; the artwork or default LED
+                        // effects may still be missing (added by a plugin update,
+                        // or user-deleted).
                         if (thumbnailKey != null)
                             EnsureThumbnail(deviceDir, thumbnailKey);
+                        EnsureLedDefaults(deviceDir);
                         return false;
                     }
                 }
@@ -1395,6 +1455,7 @@ namespace MozaPlugin.Devices.Extensions
 
                 if (thumbnailKey != null)
                     EnsureThumbnail(deviceDir, thumbnailKey);
+                EnsureLedDefaults(deviceDir);
 
                 string action = fileExists ? "Refreshed" : "Deployed";
                 MozaLog.Info($"[AZOM] {action} device definition: {deviceName} (restart SimHub to add it)");

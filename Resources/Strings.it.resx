@@ -964,4 +964,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Salvataggio calibrazione paddle…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Il volante non ha confermato la calibrazione dei paddle.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Calibrazione paddle non riuscita.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effetti predefiniti AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Bloccaggio ruota</value></data>
 </root>

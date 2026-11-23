@@ -966,4 +966,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Guardando la calibración de levas…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>El volante no confirmó la calibración de levas.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>La calibración de levas ha fallado.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Efectos predeterminados de AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Bloqueo de rueda</value></data>
 </root>

@@ -961,4 +961,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Schaltwippen-Kalibrierung wird gespeichert…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Das Lenkrad hat die Schaltwippen-Kalibrierung nicht bestätigt.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Schaltwippen-Kalibrierung fehlgeschlagen.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Standardeffekte</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Radblockade</value></data>
 </root>

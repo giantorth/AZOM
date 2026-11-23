@@ -966,4 +966,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Lagrer padelkalibrering…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Rattet bekreftet ikke padelkalibreringen.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Padelkalibreringen mislyktes.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM standardeffekter</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Hjullåsing</value></data>
 </root>

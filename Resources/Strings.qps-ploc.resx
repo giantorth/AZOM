@@ -958,4 +958,6 @@
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Yip Boof Woof…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Grr Woof Rrrf Boof Arf.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Grr Arf!</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Good Boy Woofs</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Paw lock</value></data>
 </root>

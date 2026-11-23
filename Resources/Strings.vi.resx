@@ -961,4 +961,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Đang lưu hiệu chỉnh lẫy…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Vô-lăng không xác nhận hiệu chỉnh lẫy.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Hiệu chỉnh lẫy thất bại.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Hiệu ứng mặc định AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Khóa bánh xe</value></data>
 </root>

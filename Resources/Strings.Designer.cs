@@ -1026,5 +1026,7 @@ namespace MozaPlugin.Resources
         public static string Hint_PaddleCalibrateSaving => Get("Hint_PaddleCalibrateSaving");
         public static string Hint_PaddleCalibrateUnconfirmed => Get("Hint_PaddleCalibrateUnconfirmed");
         public static string Hint_PaddleCalibrateFailed => Get("Hint_PaddleCalibrateFailed");
+        public static string LedDefaults_ProfileName => Get("LedDefaults_ProfileName");
+        public static string LedDefaults_WheelLock => Get("LedDefaults_WheelLock");
     }
 }

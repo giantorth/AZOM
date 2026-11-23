@@ -968,4 +968,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Saving paddle calibration…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>The wheel did not confirm the paddle calibration.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Paddle calibration failed.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Default Effects</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Wheel lock</value></data>
 </root>

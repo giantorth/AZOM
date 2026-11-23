@@ -960,4 +960,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Salvando a calibração dos paddles…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>O volante não confirmou a calibração dos paddles.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>A calibração dos paddles falhou.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Efeitos padrão AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Travamento de roda</value></data>
 </root>

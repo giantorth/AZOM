@@ -90,6 +90,11 @@ namespace MozaPlugin.Devices
         private static readonly Guid WheelGuidNamespace =
             new Guid("a1b2c3d4-e5f6-4789-abcd-ef0123456789");
 
+        // UUID v5 namespace for default LED profile ids (stable, so defaults.json
+        // only changes when its content does).
+        private static readonly Guid LedDefaultsNamespace =
+            new Guid("3f6c2a8e-9d41-4b7a-8e25-6a1d0c7f4b93");
+
         /// <summary>
         /// Runtime registry mapping GUID → model prefix. Populated at startup from
         /// backward-compat map + UUID v5 generation for all known models + persistent file.
@@ -347,6 +352,10 @@ namespace MozaPlugin.Devices
         public static bool IsFcsDevice(string deviceTypeId) =>
             !string.IsNullOrEmpty(deviceTypeId) && Matches(deviceTypeId, FcsGuid);
 
+        /// <summary>Deterministic id of the default LED profile shipped for a device definition.</summary>
+        public static Guid LedDefaultsProfileId(string descriptorId) =>
+            new Guid(GenerateUuidV5(LedDefaultsNamespace, descriptorId.Trim().ToLowerInvariant()));
+
         /// <summary>Check if deviceTypeId matches an id exactly or as a prefix (for _UserProject/_Embedded suffixes).</summary>
         private static bool Matches(string deviceTypeId, string id) =>
             deviceTypeId.Equals(id, StringComparison.OrdinalIgnoreCase)
@@ -369,13 +378,16 @@ namespace MozaPlugin.Devices
         /// <summary>
         /// Generate a deterministic UUID v5 from a model prefix string.
         /// </summary>
-        private static string GenerateUuidV5(string modelPrefix)
+        private static string GenerateUuidV5(string modelPrefix) =>
+            GenerateUuidV5(WheelGuidNamespace, modelPrefix);
+
+        private static string GenerateUuidV5(Guid ns, string name)
         {
-            byte[] namespaceBytes = WheelGuidNamespace.ToByteArray();
+            byte[] namespaceBytes = ns.ToByteArray();
             // Convert .NET GUID (mixed-endian) to big-endian for RFC 4122 hashing
             SwapGuidEndian(namespaceBytes);
 
-            byte[] nameBytes = Encoding.UTF8.GetBytes(modelPrefix);
+            byte[] nameBytes = Encoding.UTF8.GetBytes(name);
 
             byte[] hash;
             using (var sha1 = SHA1.Create())

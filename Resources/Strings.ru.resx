@@ -961,4 +961,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Сохранение калибровки лепестков…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Руль не подтвердил калибровку лепестков.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>Калибровка лепестков не удалась.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Стандартные эффекты AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Блокировка колеса</value></data>
 </root>

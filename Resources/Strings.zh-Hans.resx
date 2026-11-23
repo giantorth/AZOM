@@ -961,4 +961,6 @@ Id: {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>正在保存拨片校准…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>方向盘未确认拨片校准。</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>拨片校准失败。</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM 默认效果</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>车轮抱死</value></data>
 </root>

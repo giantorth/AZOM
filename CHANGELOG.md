@@ -9,6 +9,7 @@ All notable changes to the AZOM plugin are documented here.
 - **MOZA Farming Control System (FCS) support;** SimHub device with its six button LEDs, live inputs, calibration, joystick modes, and per-game light mode, colours and standby effect.
 - **Double-click the dashboard preview to re-render it;** if no preview can be shown, it names the folder the dashboard wasn't found in.
 - **Privacy policy;** linked from the bug-report form and published at giant.orth.cc/privacy.
+- **Default LED effects for new devices;** newly added wheels, dashes and wheelbases start with Pit House's out-of-the-box RPM, limiter, flag and driving-aid effects.
 
 ## Changed
 

@@ -192,20 +192,26 @@ SimHub has a built-in per-game profile system. Plugins provide a profile data cl
 
 | Member | Description |
 |--------|-------------|
-| `List<TProfile> Profiles` | All profiles |
-| `TProfile CurrentProfile { get; set; }` | Active profile |
-| `ObservableCollection<TProfile> SortedProfiles` | Sorted/observable, used by UI bindings |
+| `ObservableCollection<TProfile> Profiles` | The user's (custom) profiles — the saved list |
+| `ObservableCollection<TProfile> BuiltInProfiles` | Read-only profiles loaded from `SetBuiltInProfilesPath`; `[JsonIgnore]`, re-read from disk on every init |
+| `ObservableCollection<TProfile> AvailableProfiles` | `BuiltInProfiles` when `UseBuiltInProfilesEx` is on, otherwise `Profiles` — never both |
+| `TProfile CurrentProfile { get; set; }` | Active profile, resolved from the saved `activeProfileId` within `AvailableProfiles` (falls back to entry 0). The setter ignores a profile not in `AvailableProfiles`. |
+| `IEnumerable<TProfile> SortedProfiles` | `AvailableProfiles` sorted for the UI combobox |
+| `bool UseBuiltInProfilesEx` | `HasBuiltInProfiles && UseBuiltInProfiles` (the saved, private-setter bool); the LEDs tab's "Built in profiles / Use custom profiles" radio |
 | `ProfileSwitchingMode ProfileSwitchingMode` | How profiles switch on game change |
 | `string FileFilter` | File dialog filter for import/export (e.g. `"My profile (*.myprofile)\|*.myprofile"`) |
 | `void Init()` | Call during plugin init. Reads `PluginManager.Instance.GameName` and selects the matching profile. |
-| `void AddProfile(TProfile p)` | Add a new profile |
+| `void AddProfile(TProfile p, bool builtIn = false)` | Add to `AvailableProfiles` (duplicate `ProfileId`s get a new GUID). In built-in mode that is the unsaved built-in list, so turn `UseBuiltInProfilesEx` off first, as SimHub's own UI does. `builtIn: true` writes `<ProfileId>.<ext>` into the built-in folder. |
+| `TProfile FindProfile(Guid id, bool builtin)` / `void RemoveProfile(TProfile p)` | Lookup / removal (removing the current profile selects another) |
 | `event EventHandler CurrentProfileChanged` | Fires when the active profile changes (game switch or manual) |
 | `void InitProfile(TProfile p)` | Override to run setup on deserialized profiles |
 
-**`ProfileSwitchingMode`** — Enum controlling auto-switch behavior:
-- `Disabled` — Manual only
-- `LastUsedPerGame` — Remember last profile per game
-- `BestMatch` — SimHub picks the closest match
+Profile collections are WPF-bound: mutate them on the dispatcher (SimHub's own `GameLoaded` uses `Dispatcher.Invoke`).
+
+**`ProfileSwitchingMode`** — Enum controlling auto-switch behavior on game load:
+- `LastPerGame` — the profile last used for this game (`LastGameProfiles`), then one whose `GameCode` matches, then the first
+- `Last` — no switch; stays on the current profile (the `LedsSettings` default)
+- `BestMatch` — game + car match, then game only, then a profile with no game, then the first
 
 **`IProfileSettings` / `IProfileSettings<TProfile>`** — Interfaces implemented by `ProfileSettingsBase`. Required by the UI controls.
 
@@ -429,7 +435,7 @@ SimHub caches template metadata in `PluginsData/DevicesDesccriptorCache.json`. D
 
 SimHub 9.11+ includes a Device Builder that produces a newer format, distinct from `.shdevicetemplate`. The editable file is `.shdd`; the distributable (end-user installable) export is `.shdp`. Both are ZIP files containing a single `DeviceName/device.json`.
 
-This format **does not use `InheritedFrom`** or `defaults.json` — it directly declares features, avoiding the `LedModuleDevice.SetSettings()` registry issue entirely.
+This format **does not use `InheritedFrom`** — it directly declares features, avoiding the `LedModuleDevice.SetSettings()` registry issue entirely. It does read an optional `defaults.json` sidecar (see [Default and built-in LED profiles](#default-and-built-in-led-profiles-device-builder)).
 
 **`device.json` schema:**
 ```json
@@ -513,6 +519,54 @@ Thumbnail = new PictureWrapper(descriptor, "thumbnail.png", 512);   // filename,
 
 This plugin ships per-wheel art through this mechanism — see
 [DEVELOPMENT.md](DEVELOPMENT.md#device-extensions-devices).
+
+#### Default and built-in LED profiles (Device Builder)
+
+A freshly added device's LED module starts with one empty `"Default Profile"` per driver (`RGBLedsDriver.InitSettings` adds it when `Profiles` is empty), so nothing lights until the user adds effects. Two descriptor-folder sidecars change that. Decoded from `SimHub.Plugins.dll` 9.13.7 (`놈.녍`, the obfuscated Device Builder descriptor) and checked against the stock `DevicesDefinitions/Embedded/` folders.
+
+**`defaults.json`** — `녍.GetDefaultSettings()` reads `<descriptor dir>/defaults.json` as a `DeviceSaveSettings`, **live, at add time**: `DevicesPluginSettings.AddNewDevice` calls `instance.SetSettings(defaults.Settings, isDefault: true)` (or `LoadDefaultSettings()` when absent), then `LoadExtensionsSettings(defaults.ExtensionSettings, isDefault: true)`. It is never applied to an already-saved device (those load with `isDefault: false`), and needs no restart. `DeviceTypeID` / `InstanceId` in the file are ignored on this path.
+
+- `Settings` is keyed by `CompositeCode` (the LED sub-device is `"LEDS"`). `CompositeDeviceInstance.SetSettings` calls `LoadDefaultSettings()` on every child the dictionary omits, so a file carrying only `LEDS` leaves e.g. a `Haptics` child exactly as a file-less add would.
+- `LEDS` must contain `ledModuleSettings` — `LedModuleDevice.SetSettings` indexes it unconditionally — but it is `JsonExtensions.Populate`d into the existing object, so `{}` is enough. Each driver block (`leds`, `buttons`, `encoders`, `matrix`, `raw`) builds that driver from the block when it has values, else the driver's default.
+- An `ExtensionSettings` key absent for an extension means `LoadDefaultSettings()` for it — the same as no file.
+
+Minimal file that ships one active custom profile in the telemetry driver:
+
+```jsonc
+{ "Settings": { "LEDS": {
+    "ledModuleSettings": {},
+    "leds": { "Profiles": [ { /* a .ledsprofile body */ } ], "activeProfileId": "<its ProfileId>" } } } }
+```
+
+**`BuiltInLedsProfiles/<key>/*.ledsprofile`** — the descriptor sets `DefaultSettingsRootDirectory = <descriptor dir>/BuiltInLedsProfiles`, and each driver loads its built-ins from a sub-folder: `S2` telemetry, `S1` buttons, `S3` encoders/extra, `Raw` individual LEDs, `Matrix`. Non-recursive, any filename (SimHub names them `<ProfileId>.ledsprofile`). Built-ins are `[JsonIgnore]` and re-read on every driver init, so editing the file reaches every user; they appear only when the LEDs tab's "Built in profiles" radio is selected (`UseBuiltInProfilesEx`) and are **never auto-selected** for a device whose custom profile is empty. `defaults.json` can select one (`"UseBuiltInProfiles": true` + `activeProfileId` — the stock `CPSFormulaV2` pattern). `"IsLocked": true` hides the "make built-in" / "make current settings default" UI but does not stop loading.
+
+Built-in mode has a trap: `AddProfile` adds to `AvailableProfiles`, i.e. the unsaved built-in list, so a tool that adds a profile without switching to custom mode loses it. This plugin therefore ships its default effects as a **custom** profile inside `defaults.json` (the stock `PuexSimSignal` / `OpvekKonaX` pattern) — see [DEVELOPMENT.md](DEVELOPMENT.md#device-extensions-devices).
+
+**`.ledsprofile` / container JSON** — a serialized `Profile` (`Name`, `ProfileId`, `GameCode`, `CarChoices`, `UseProfileBrightness`, `GlobalBrightnessPreset`, `LedContainers[]`, …). `LedsContainerBase` carries `[JsonConverter(LedContainerJsonConverter)]`, which resolves `"ContainerType"` by class name, full name, or the full name minus `SimHub.Plugins.DataPlugins.RGBDriver.LedsContainers.` and `Container` (`"RPM"`, `"Status.SpeedLimiterAnimation"`, `"Flags.BlueFlag"`, `"Base.Group"`), then `Populate`s a ctor-built instance; unknown types round-trip as `UnknownContainer`. Groups nest children as `"LedContainers": [...]`. Containers render in list order, each merged over the previous (`IContainerGroupExtensions.GetGroupResult` → `LedResult.Merge`), so later entries win; a non-opaque pixel alpha-blends instead, and a fully transparent one keeps what is beneath, which is what an inactive status effect draws (`StaticColorContainerBase` fills its `IdleColor`, default `Transparent`). `StartPosition` is 1-based into the telemetry strip, whose Device Builder side segments split it as `[side…, centre, side…reversed]` with contiguous indices (`TelemetryLedSection.LedSplit`). `Color` values are written by `ColorConverter`: a name (`"Lime"`) or `"r, g, b"`.
+
+- `RPMContainer` (`"RPM"`) is a gradient; `RPMSegmentsContainer` (`"RPMSegments"`) lights each segment once the value passes its `StartValue`, and `Segments` serialize as `"<ledCount>;<startValue>;<html colour>;<useBlinkColour 0|1>;<blink colour>"` (`LedSegmentJsonConverter`; keep `SegmentsCount` equal to the list). Both light only while a game runs. `RpmMode` `0` (Percent) reads `CarSettings_CurrentDisplayedRPMPercent`, `1` RPM-to-redline %, `2` raw RPM; blinking follows `CarSettings_RPMRedLineReached` (the car's redline) and is skipped in top gear unless `BlinkOnLastGear`.
+- Status effects (`"Status.AbsActive"`, `"Status.TCActive"`, `"Status.DrsAvailable"` = available and not open, `"Status.DrsOn"`, `"Status.SpeedLimiter"`, `"Flags.*"`) fill `LedCount` with `Color`; with `BlinkEnabled` they alternate `Color` / `BlinkingColor` every `BlinkDelay` ms.
+- `"CustomStatus"` takes `"EnabledFormula": {"Expression": "…"}` (NCalc). A formula that evaluates to null counts as **on** (`ParseValueOrDefault(…, 1.0)`), so guard a plugin property with `isnull([…], 0)` or the effect sticks lit whenever the plugin isn't loaded.
+
+#### Default LED effects
+
+The profile this plugin ships in `defaults.json` ("AZOM Default Effects", `Devices/Led/LedDefaultProfiles.cs`) copies what Pit House enables out of the box. Pit House's official presets live in `Documents/MOZA Pit House/Presets/<Steering Wheel|Meter|Motor>/<uuid>.mzpreset`: a ZIP holding `preset.json`, whose `deviceParams.indicatorLedEffects[]` is the telemetry-LED effect list. Per effect: `telemetryType` (`v1/gameData/<signal>`), `type` (`value_single_color` RPM bar, `whether_single_color` on/off, `whether_blink_color` two-colour blink), 1-based `startPos` + `count`, `priority`, and an 18-entry `colors` / `percentages` array indexed by **absolute** LED position (the right brow's colours sit at indices 15–17 on an 18-LED KS Pro). Read from the presets an installed Pit House carried in 2026-11:
+
+| Layout (presets) | Effects, highest priority first |
+|---|---|
+| 3-LED flag segments each side — CS Pro, KS Pro, FSR V2, Mustang GTD, W23, CM2 dash | ABS active `#FFFF00`, TC active `#F856CE` (KS Pro: yellow), wheel lock `#FF0000`, DRS available, DRS open (green) — each on both segments; pit limiter, whole strip, blue/red every 500 ms; RPM over the centre band; green / yellow / blue / white flag on both segments |
+| No flag segments — CS, CS V2, ES, ESX, FSR, GS, GS V2, KS, RS family, TSW, Vision GS, SCV12 (1/8/1) | RPM over all 10 LEDs only (ES Pro and KS V2 add the limiter) |
+| Ultra wheelbase strip — R16 / R21 / R25 Ultra | ABS, TC, wheel lock, pit limiter, each over the whole strip; no RPM. The R12 Pro preset ships everything disabled. |
+
+RPM per LED (percent of `CarSettings_CurrentDisplayedRPMPercent`; G/R/M = `#00FF00` / `#FF0000` / `#FF00FF`): 10 LEDs `75 79 82 85 87 88 89 90 92 94` GGGRRRRMMM, 12 LEDs (KS Pro) `75 77 79 81 83 85 87 88 91 93 94 95` GGGGRRRRMMMM, blinking red at 125 ms past 94–95 %. Presets for 6/9/11/15 LEDs (MotoGP, ES Pro, W23, KS V2) are in `RpmPresets`.
+
+Mapping, and where it differs:
+
+- RPM → `RPMSegments`, one single-LED segment per LED, `RpmMode` 0. Blinking follows the car's redline instead of Pit House's fixed percentage, and runs in top gear too (`BlinkOnLastGear`).
+- ABS / TC / DRS / flags / limiter → the matching SimHub status effect. Wheel lock has no SimHub effect, so a `CustomStatus` reads `isnull([MozaPlugin.AZOM.WheelLockup], 0)`.
+- Lower `priority` is taken to win (ABS over flags, limiter over RPM), so the list is written in reverse.
+- `whether_single_color` effects carry a `blinkInterval` (50/100 ms, 0 on some), but nothing marks them as blinking, unlike `whether_blink_color`; they are shipped solid. The base limiter's `blinkMode` 3 (wheels: 1) is undecoded and shipped as the same blue/red blink.
+- TC uses the majority pink. CM1 has no preset and gets CM2's (same 16-LED bar); its device.json declares no segments, so the dash kind assumes 3-LED flag segments.
 
 ### IDeviceExtensionFilter
 

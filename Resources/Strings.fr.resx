@@ -961,4 +961,6 @@ Id : {2}</value></data>
   <data name="Hint_PaddleCalibrateSaving" xml:space="preserve"><value>Enregistrement de l'étalonnage des palettes…</value></data>
   <data name="Hint_PaddleCalibrateUnconfirmed" xml:space="preserve"><value>Le volant n'a pas confirmé l'étalonnage des palettes.</value></data>
   <data name="Hint_PaddleCalibrateFailed" xml:space="preserve"><value>L'étalonnage des palettes a échoué.</value></data>
+  <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effets par défaut AZOM</value></data>
+  <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Blocage de roue</value></data>
 </root>

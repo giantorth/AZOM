@@ -37,12 +37,12 @@ namespace MozaPlugin.UI
         private const string AboutKofiUrl    = "https://ko-fi.com/giantorth";
         private const string PrivacyPolicyUrl = "https://giant.orth.cc/privacy/";
 
-        private void AboutGuidesIndexButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutGuidesUrl);
-        private void AboutGitHubButton_Click(object sender, System.Windows.RoutedEventArgs e)  => OpenExternalUrl(AboutGitHubUrl);
-        private void AboutDiscordButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutDiscordUrl);
-        private void AboutSponsorButton_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(AboutSponsorUrl);
-        private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => OpenExternalUrl(AboutKofiUrl);
-        private void BugReportPrivacyLink_Click(object sender, System.Windows.RoutedEventArgs e) => OpenExternalUrl(PrivacyPolicyUrl);
+        private void AboutGuidesIndexButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutGuidesUrl);
+        private void AboutGitHubButton_Click(object sender, System.Windows.RoutedEventArgs e)  => UiHelpers.OpenExternalUrl(AboutGitHubUrl);
+        private void AboutDiscordButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutDiscordUrl);
+        private void AboutSponsorButton_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(AboutSponsorUrl);
+        private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => UiHelpers.OpenExternalUrl(AboutKofiUrl);
+        private void BugReportPrivacyLink_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(PrivacyPolicyUrl);
 
         // Guide list published by the site at build time, in site order. Fetched
         // once per AppDomain; the built-in list below shows until it arrives and
@@ -169,7 +169,7 @@ namespace MozaPlugin.UI
             {
                 string url = guides[i].Url;
                 var link = new Hyperlink(new Run(guides[i].Title)) { ToolTip = url };
-                link.Click += (s, e) => OpenExternalUrl(url);
+                link.Click += (s, e) => UiHelpers.OpenExternalUrl(url);
                 if (TryFindResource("CyanBrush") is Brush brush)
                     link.Foreground = brush;
                 var text = new TextBlock(link)
@@ -181,26 +181,6 @@ namespace MozaPlugin.UI
                 if (TryFindResource("FontUi") is FontFamily font)
                     text.FontFamily = font;
                 (i < leftCount ? GuidesLeftColumn : GuidesRightColumn).Children.Add(text);
-            }
-        }
-
-        // Open a URL via the OS shell. On Windows this hits the default
-        // browser; under Wine/Proton it routes through winebrowser which
-        // forwards to the host's xdg-open.
-        private static void OpenExternalUrl(string url)
-        {
-            try
-            {
-                // The returned Process (when any) is an unmanaged handle — dispose it.
-                using (System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true,
-                })) { }
-            }
-            catch (Exception ex)
-            {
-                MozaLog.Warn($"[About] failed to open {url}: {ex.Message}");
             }
         }
 
