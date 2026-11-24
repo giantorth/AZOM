@@ -699,8 +699,6 @@ namespace MozaPlugin.UI.Import
                         {
                             double pct = span > 0 ? (forces[i] - lo) / span * 100.0 : 0;
                             y[i] = (float)Math.Round(Clamp(pct, 0, 100));
-                            // Nodes can't cross (the editor clamps Y to neighbours).
-                            if (i > 0 && y[i] < y[i - 1]) y[i] = y[i - 1];
                         }
                         Add("Pedal feel curve (Y, % of deadzone→max force)", Nodes(_read.InputCurveY), Nodes(y),
                             Differs(_read.InputCurveY, y), c => c.InputCurveY = (float[])y.Clone());

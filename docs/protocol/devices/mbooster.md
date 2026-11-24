@@ -2083,6 +2083,12 @@ top one grabbable when `AnchorEndDraggableInY` is set), and keeps a 1-unit
 X gap between the last draggable node and the `(100,100)` point — the same
 gap every other neighbouring node pair keeps.
 
+Node Y is **not** ordered: each interior node takes any 0–100% of the span
+regardless of its neighbours, so non-monotonic ("A"-shaped) curves are
+valid — the pedal handles them (user report, 2026-11-24). Only X is kept
+in order. The PitHouse preset importer keeps `forces_curve` nodes as-is
+for the same reason.
+
 ### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
 
 **REVISED**: the `{8.049, 19.495, 44.245, 72.433, 90.040, 97.910}%` default

@@ -2485,8 +2485,7 @@
                                                                   AllowHorizontalDrag="True" AnchorAtTopRight="True"
                                                                   ShowAnchorPoints="True" AnchorEndDraggableInY="True"
                                                                   SpanLow="{Binding Value, ElementName=MBoosterDeadzoneSlider, Mode=OneWay}"
-                                                                  SpanHigh="{Binding Value, ElementName=MBoosterMaxForceSlider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                                  ClampYToAdjacentNodes="True"/>
+                                                                  SpanHigh="{Binding Value, ElementName=MBoosterMaxForceSlider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                             <!-- Vertical Max Force slider (Brake 24-200kg, role-scoped),
                                                  mirrored to the curve editor's right. Two-way with the curve's
                                                  top-right point: drag either. -->

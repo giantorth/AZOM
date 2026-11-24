@@ -138,19 +138,6 @@ namespace MozaControls
         public bool IsDragging => _dragNode >= 0 || _dragEndAnchor;
         public event EventHandler? DragCompleted;
 
-        // When true, a node's Y is ALSO clamped between its immediate
-        // neighbours' current Y (index-adjacent, same convention as the
-        // existing X neighbour-clamp below) — the first/last node clamp
-        // against YMin/YMax instead. Used by the Pedal Feel curve, where
-        // both axes are freely draggable so nothing else stops a node from
-        // being dragged past its neighbour's Y. Off by default so every other
-        // curve keeps its existing unconstrained Y-drag behaviour.
-        public static readonly DependencyProperty ClampYToAdjacentNodesProperty =
-            DependencyProperty.Register(nameof(ClampYToAdjacentNodes), typeof(bool), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
-                    (d, e) => ((MozaCurveEditor)d).Recompute()));
-        public bool ClampYToAdjacentNodes { get => (bool)GetValue(ClampYToAdjacentNodesProperty); set => SetValue(ClampYToAdjacentNodesProperty, value); }
-
         // Per-node Y cap for the LAST node only (NaN = disabled) — the 10-band
         // EQ's 100 Hz band stays 0-100% while every other band runs to YMax=500.
         public static readonly DependencyProperty LastNodeYMaxProperty =
@@ -820,15 +807,6 @@ namespace MozaControls
                 v = Math.Max(storedMin, Math.Min(storedMax, v));
                 if (!double.IsNaN(LastNodeYMax) && _dragNode == lastNode)
                     v = Math.Min(v, LastNodeYMax);
-                // Clamp to the neighbours' Y too — same crossing-prevention
-                // reasoning as the X neighbour-clamp below, just per-axis.
-                if (ClampYToAdjacentNodes)
-                {
-                    double loY = _dragNode == 0 ? storedMin : GetY(_dragNode - 1);
-                    double hiY = _dragNode == lastNode ? storedMax : GetY(_dragNode + 1);
-                    if (hiY < loY) hiY = loY;
-                    v = Math.Max(loY, Math.Min(hiY, v));
-                }
                 SetY(_dragNode, v);
             }
 
@@ -914,24 +892,6 @@ namespace MozaControls
                 case 7: Y8 = v; break;
                 case 8: Y9 = v; break;
                 case 9: Y10 = v; break;
-            }
-        }
-
-        private double GetY(int i)
-        {
-            switch (i)
-            {
-                case 0: return Y1;
-                case 1: return Y2;
-                case 2: return Y3;
-                case 3: return Y4;
-                case 4: return Y5;
-                case 5: return Y6;
-                case 6: return Y7;
-                case 7: return Y8;
-                case 8: return Y9;
-                case 9: return Y10;
-                default: return 0;
             }
         }
 

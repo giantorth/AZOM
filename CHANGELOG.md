@@ -2,6 +2,12 @@
 
 All notable changes to the AZOM plugin are documented here.
 
+## [1.7.6]
+
+## Fixed
+
+- **mBooster Pedal Feel curve allows "A"-shaped curves;** a point could not go below the one before it, in the editor or on PitHouse preset import.
+
 ## [1.7.5]
 
 ## Added
