@@ -348,7 +348,7 @@ namespace MozaPlugin.UI
                 var fxLog = PeekMBoosterEffectTarget();
                 string Fmt(float[]? a) => a == null ? "null" : "[" + string.Join(",", a) + "]";
                 MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
-                    + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
+                    + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)} InputCurveEndY={fxLog?.InputCurveEndY}");
             }
             // The seed below shows every Test toggle off (custom-effect rows
             // are rebuilt off too), so nothing may keep running behind them —
@@ -841,6 +841,8 @@ namespace MozaPlugin.UI
             MBoosterInputX4Slider.Value = inputCurveX[3];
             MBoosterInputX5Slider.Value = inputCurveX[4];
             MBoosterInputX6Slider.Value = inputCurveX[5];
+            float endY = fx?.InputCurveEndY ?? -1;
+            MBoosterInputEndYSlider.Value = endY >= 0 ? endY : 100;
             float mf = fx?.MaxForceKg ?? -1;
             MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));

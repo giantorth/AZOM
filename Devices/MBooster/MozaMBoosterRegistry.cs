@@ -970,6 +970,14 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
+        /// The Pedal Feel graph's last point in kg (selector 0x0E) —
+        /// <paramref name="endPct"/> of the Deadzone-Max Force span, Max
+        /// Force itself when unset (&lt; 0).
+        /// </summary>
+        internal static double ComputeFeelCurveEndY(double deadzoneKg, double maxForceKg, float endPct)
+            => endPct >= 0 ? deadzoneKg + endPct / 100.0 * (maxForceKg - deadzoneKg) : maxForceKg;
+
+        /// <summary>
         /// The 6 X points of the Pedal Feel curve, in kg, ready to write to
         /// <c>mbooster-brake-feelcurve-x-1..6</c>. UNLIKE the Y nodes above,
         /// X is NOT relative to the pedal's own Deadzone-Max Force span —

@@ -159,11 +159,11 @@ namespace MozaPlugin.UI
         private void MBoosterCurvePreset_Exponential(object s, RoutedEventArgs e) => ApplyMBoosterCurvePreset(PedalCurvePresets[2]);
         private void MBoosterCurvePreset_Parabolic(object s, RoutedEventArgs e)   => ApplyMBoosterCurvePreset(PedalCurvePresets[3]);
 
-        // Pedal Feel curve presets — the 6 DRAGGABLE nodes only. The graph
-        // is 8 points: fixed (0,0) (Deadzone) and fixed (100,100) (Max
-        // Force) with these 6 evenly spaced between them, so each preset is
-        // the 5-point PedalCurvePresets shape (which spans that same 0-100
-        // square) resampled at k/7 for k=1..6 — see
+        // Pedal Feel curve presets — the 6 interior nodes. The graph is 8
+        // points: (0,0) (Deadzone), these 6 evenly spaced, and the last point
+        // at X=100, which every preset puts back at 100% (Max Force). Each
+        // preset is the 5-point PedalCurvePresets shape (which spans that
+        // same 0-100 square) resampled at k/7 for k=1..6 — see
         // MozaMBoosterRegistry.FeelCurveFractions.
         private static readonly int[][] MBoosterInputCurvePresets =
         {
@@ -187,7 +187,7 @@ namespace MozaPlugin.UI
         // MBoosterDeviceController.PushFeelCurveResync): its 6 nodes (0-100%
         // of the Deadzone-Max Force span) populate mbooster-brake-
         // feelcurve-1..6 directly. Every edit here calls PushMBoosterFeelCurve.
-        private void SetMBoosterInputCurveY(int index, int v)
+        private void SetMBoosterInputCurveY(int index, float v)
         {
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
@@ -198,12 +198,12 @@ namespace MozaPlugin.UI
             PushMBoosterFeelCurve(s);
         }
 
-        private void MBoosterInputY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(0, v));
-        private void MBoosterInputY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(1, v));
-        private void MBoosterInputY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(2, v));
-        private void MBoosterInputY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(3, v));
-        private void MBoosterInputY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(4, v));
-        private void MBoosterInputY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveY(5, v));
+        private void MBoosterInputY1Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(0, (float)v));
+        private void MBoosterInputY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(1, (float)v));
+        private void MBoosterInputY3Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(2, (float)v));
+        private void MBoosterInputY4Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(3, (float)v));
+        private void MBoosterInputY5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(4, (float)v));
+        private void MBoosterInputY6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v => SetMBoosterInputCurveY(5, (float)v));
 
         // Pedal Feel node X position (0-100% of the Deadzone-Max Force span)
         // — CONFIRMED real hardware calibration alongside InputCurveY (see
@@ -228,6 +228,16 @@ namespace MozaPlugin.UI
         private void MBoosterInputX5Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(4, v));
         private void MBoosterInputX6Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, v => SetMBoosterInputCurveX(5, v));
 
+        // The graph's last point (see MBoosterDeviceSettings.InputCurveEndY) —
+        // moves on its own; only the Max Force slider rescales the graph.
+        private void MBoosterInputEndYSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v =>
+        {
+            var cfg = CurrentMBoosterEffectTarget();
+            if (cfg == null) return;
+            cfg.InputCurveEndY = (float)v;
+            PushMBoosterFeelCurve(cfg);
+        });
+
         private void ApplyMBoosterInputCurvePreset(int[] curve)
         {
             var s = CurrentMBoosterEffectTarget();
@@ -238,8 +248,10 @@ namespace MozaPlugin.UI
             // positions back to the fixed breakpoints too (same convention
             // as ApplyMBoosterCurvePreset for Sim Input Mapping).
             s.InputCurveX = null;
+            s.InputCurveEndY = -1;
             using (_suppressor.Begin())
             {
+                MBoosterInputEndYSlider.Value = 100;
                 MBoosterInputY1Slider.Value = curve[0];
                 MBoosterInputY2Slider.Value = curve[1];
                 MBoosterInputY3Slider.Value = curve[2];
@@ -370,8 +382,9 @@ namespace MozaPlugin.UI
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
             float[]? curveY = s.InputCurveY;
             float[]? curveX = s.InputCurveX;
+            float curveEnd = s.InputCurveEndY;
             controller.QueueCalibWrite($"{dev:x2}:feel-curve", () =>
-                controller.PushFeelCurveResync(dz, mf, curveY, curveX, dev));
+                controller.PushFeelCurveResync(dz, mf, curveY, curveX, curveEnd, dev));
         }
 
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
@@ -402,10 +415,12 @@ namespace MozaPlugin.UI
             }
             bool feelSet = s.DeadzoneKg >= 0 || s.MaxForceKg >= 0
                 || (s.InputCurveY != null && s.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                || (s.InputCurveX != null && s.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount);
+                || (s.InputCurveX != null && s.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
+                || s.InputCurveEndY >= 0;
             double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
             double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
             float[]? curveY = s.InputCurveY, curveX = s.InputCurveX;
+            float curveEnd = s.InputCurveEndY;
             controller.QueueCalibWrite($"{dev:x2}:travel", () =>
             {
                 (bool Start, bool End) dirty;
@@ -422,7 +437,7 @@ namespace MozaPlugin.UI
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(endMm), dev);
                 // Never push default feel values over the unit's own.
                 if (feelSet)
-                    controller.PushFeelCurveResync(dz, mf, curveY, curveX, dev, allX: true);
+                    controller.PushFeelCurveResync(dz, mf, curveY, curveX, curveEnd, dev, allX: true);
             });
         }
 
@@ -439,8 +454,6 @@ namespace MozaPlugin.UI
         // like the other mBooster sliders).
         private void MBoosterDeadzoneSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            // View-only, so it also follows suppressed seeds.
-            UpdateMBoosterFeelAxis();
             if (_suppressEvents) return;
             double v = Math.Round(e.NewValue, 1);
             SetValueText(MBoosterDeadzoneValue, v.ToString("F1"));
@@ -452,9 +465,9 @@ namespace MozaPlugin.UI
         }
 
         // Max Force (0..200kg on an active pedal) — the force at which the
-        // pedal's raw HID axis reaches 100% travel. Also the Pedal Feel curve's own top-right
-        // point, which is bound two-way to this slider — dragging that point
-        // vertically lands here (see MozaCurveEditor.AnchorEndDraggableInY).
+        // pedal's raw HID axis reaches 100% travel, and the Pedal Feel curve's
+        // 100% level: it rescales every point, the last one included. The
+        // last point's own drag does not move it (see InputCurveEndY).
         // CONFIRMED real hardware calibration
         // (mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
         // engineered from max-force-24-75-128-166-200.pcapng (bug bundle
@@ -463,7 +476,6 @@ namespace MozaPlugin.UI
         // PushMBoosterFeelCurve.
         private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            UpdateMBoosterFeelAxis();
             OnIntSliderChanged(e.NewValue, MBoosterMaxForceValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();

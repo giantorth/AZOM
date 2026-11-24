@@ -244,12 +244,13 @@ namespace MozaPlugin.Hardware
                 bool curveCustomized = (cfg.InputCurveY != null
                     && cfg.InputCurveY.Length == global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount)
                     || (cfg.InputCurveX != null
-                    && cfg.InputCurveX.Length == global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount);
+                    && cfg.InputCurveX.Length == global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount)
+                    || cfg.InputCurveEndY >= 0;
                 if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0 || curveCustomized))
                 {
                     double dz = cfg.DeadzoneKg >= 0 ? cfg.DeadzoneKg : 0;
                     double mf = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200;
-                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, cfg.InputCurveX, dev);
+                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, cfg.InputCurveX, cfg.InputCurveEndY, dev);
                 }
             }
 

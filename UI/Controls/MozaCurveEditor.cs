@@ -131,13 +131,6 @@ namespace MozaControls
                 new FrameworkPropertyMetadata(10.0));
         public double MinEndpointGap { get => (double)GetValue(MinEndpointGapProperty); set => SetValue(MinEndpointGapProperty, value); }
 
-        // True while a node or the end anchor is being dragged. Owners that
-        // rescale the axis from a value the drag itself writes (Pedal Feel:
-        // YMax from Max Force) wait for DragCompleted, else the axis moves
-        // under the pointer mid-gesture.
-        public bool IsDragging => _dragNode >= 0 || _dragEndAnchor;
-        public event EventHandler? DragCompleted;
-
         // Per-node Y cap for the LAST node only (NaN = disabled) — the 10-band
         // EQ's 100 Hz band stays 0-100% while every other band runs to YMax=500.
         public static readonly DependencyProperty LastNodeYMaxProperty =
@@ -192,15 +185,14 @@ namespace MozaControls
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool AnchorAtOrigin { get => (bool)GetValue(AnchorAtOriginProperty); set => SetValue(AnchorAtOriginProperty, value); }
 
-        // When true, the spline is ALSO anchored at the plot's upper-right
-        // corner (data-space 100,100) as a real drawn point, symmetric to
-        // AnchorAtOrigin's lower-left corner — so the visible line reaches
-        // (100,100) even when the last draggable node doesn't sit exactly
-        // there. Used by the Pedal Feel curve (MBoosterInputCurveEditor,
-        // both axes now draggable): its domain is 0-100% of the Deadzone→Max
-        // Force span on BOTH axes, so the curve should visually span that
-        // whole square. Off by default — every other curve already ends at
-        // its own last node/point with no separate corner anchor.
+        // When true, the spline is ALSO anchored at data X=100 as a real
+        // drawn point, at EndY (default: the top, data 100,100), symmetric to
+        // AnchorAtOrigin's lower-left corner — so the visible line runs to
+        // full-scale input even when the last draggable node doesn't sit
+        // there. Used by the Pedal Feel curve (MBoosterInputCurveEditor),
+        // whose last point is pinned at full-scale input. Off by default —
+        // every other curve already ends at its own last node/point with no
+        // separate end anchor.
         public static readonly DependencyProperty AnchorAtTopRightProperty =
             DependencyProperty.Register(nameof(AnchorAtTopRight), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -211,8 +203,8 @@ namespace MozaControls
         // DRAWN as node-styled circles — dimmed and hit-test-transparent, so
         // they read as real points that can't be dragged. Used by the Pedal
         // Feel curve, whose graph is 8 points: (0,0) set by the Deadzone
-        // slider, 6 draggable nodes, and a (100,100) node set by Max Force
-        // (selectors 0x07 / 0x08-0x0D / 0x0E — see
+        // slider, 6 draggable nodes, and a last point at X=100 (selectors
+        // 0x07 / 0x08-0x0D / 0x0E — see
         // docs/protocol/devices/mbooster.md "Pedal Feel"). Off by default:
         // AnchorAtOrigin is on for every output curve in the app, and none of
         // those show a point at the origin.
@@ -223,40 +215,43 @@ namespace MozaControls
         public bool ShowAnchorPoints { get => (bool)GetValue(ShowAnchorPointsProperty); set => SetValue(ShowAnchorPointsProperty, value); }
 
         // When true (with ShowAnchorPoints + AnchorAtTopRight), the top-right
-        // anchor point is draggable VERTICALLY — it writes SpanHigh, so bind
-        // that to whatever value the point represents (Pedal Feel: the Max
-        // Force slider) and the drag drives it. Never draggable in X: it is
-        // the curve's fixed end, at full-scale input. Pit House behaves the
-        // same way for this point.
+        // anchor point is draggable VERTICALLY — it writes EndY. Never
+        // draggable in X: it is the curve's fixed end, at full-scale input.
+        // Pit House behaves the same way for this point.
         public static readonly DependencyProperty AnchorEndDraggableInYProperty =
             DependencyProperty.Register(nameof(AnchorEndDraggableInY), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false));
         public bool AnchorEndDraggableInY { get => (bool)GetValue(AnchorEndDraggableInYProperty); set => SetValue(AnchorEndDraggableInYProperty, value); }
 
+        // Y of the top-right anchor point, in the same units as Y1..Y10 (so a
+        // percentage of the span in span mode). NaN = the top: SpanHigh, or
+        // YMax without a span. Free of the nodes — it may sit below them.
+        public static readonly DependencyProperty EndYProperty =
+            DependencyProperty.Register(nameof(EndY), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(double.NaN,
+                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public double EndY { get => (double)GetValue(EndYProperty); set => SetValue(EndYProperty, value); }
+
         // Y sub-range the node values are a PERCENTAGE of, in axis units
         // (NaN on either = off, the default: node Y values are plain axis
         // values, as every other curve in this app uses them).
         //
-        // The Pedal Feel curve needs this because its 6 stored nodes are
-        // percentages of the Deadzone→Max Force span while the plot itself
-        // has to be in absolute kg: the two ends of that span are themselves
-        // graph points (selectors 0x07 and 0x0E), and the top one is
-        // user-draggable, which a span-normalized axis cannot express — 100%
-        // *is* Max Force there, so the point could never move. With the
-        // absolute axis, dragging Max Force down rescales every node's kg
-        // while its stored percentage stays put, which is exactly what the
-        // wire does (see docs/protocol/devices/mbooster.md "Pedal Feel").
+        // The Pedal Feel curve's points are stored as percentages of the
+        // Deadzone→Max Force span, but plotted in absolute kg so the two
+        // sliders visibly move the curve: Deadzone lifts its start, and Max
+        // Force rescales every point while its stored percentage stays put,
+        // which is exactly what the wire does (see
+        // docs/protocol/devices/mbooster.md "Pedal Feel").
         public static readonly DependencyProperty SpanLowProperty =
             DependencyProperty.Register(nameof(SpanLow), typeof(double), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(double.NaN,
-                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public double SpanLow { get => (double)GetValue(SpanLowProperty); set => SetValue(SpanLowProperty, value); }
 
         public static readonly DependencyProperty SpanHighProperty =
             DependencyProperty.Register(nameof(SpanHigh), typeof(double), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(double.NaN,
-                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public double SpanHigh { get => (double)GetValue(SpanHighProperty); set => SetValue(SpanHighProperty, value); }
 
@@ -264,7 +259,7 @@ namespace MozaControls
         // plain axis values.
         private bool SpanMode => !double.IsNaN(SpanLow) && !double.IsNaN(SpanHigh);
 
-        // Axis-unit width of that span. Zero (Max Force dragged down onto
+        // Axis-unit width of that span. Zero (Max Force set down onto
         // Deadzone) flattens the curve onto SpanLow rather than dividing by
         // zero; the inverse conversion refuses to run at all.
         private double SpanRange => Math.Max(0, SpanHigh - SpanLow);
@@ -709,13 +704,11 @@ namespace MozaControls
         }
 
         // Every path out of a drag lands here (mouse-up, lost capture, button
-        // released outside the canvas); raises DragCompleted once per gesture.
+        // released outside the canvas).
         private void EndDrag()
         {
-            bool was = IsDragging;
             _dragNode = -1;
             _dragEndAnchor = false;
-            if (was) DragCompleted?.Invoke(this, EventArgs.Empty);
         }
 
         private int FindClosestNode(Point p)
@@ -766,45 +759,48 @@ namespace MozaControls
             return YMin + y01 * Math.Max(1, YMax - YMin);
         }
 
+        // Pointer Y → a stored point value: whole axis units, or an unrounded
+        // percentage of SpanLow..SpanHigh when that's in use (the owner keeps
+        // its own precision — whole percents can't hold every axis value, so
+        // Shift's snap missed), clamped in that same space. Snap acts on the
+        // axis value shown in the point. False on a collapsed span (Max Force
+        // set down onto Deadzone), which has no Y to place a point at.
+        private bool TryPointerToStoredY(Point p, bool snap, out double v)
+        {
+            v = 0;
+            bool span = SpanMode;
+            double spanRange = span ? SpanRange : 0;
+            if (span && spanRange <= 0) return false;
+            double axisValue = PointerToAxisValue(p);
+            if (snap) axisValue = Snap(axisValue);
+            double storedMin = span ? 0.0 : YMin;
+            double storedMax = span ? 100.0 : YMax;
+            v = span
+                ? (axisValue - SpanLow) / spanRange * 100.0
+                : Math.Round(axisValue);
+            v = Math.Max(storedMin, Math.Min(storedMax, v));
+            return true;
+        }
+
         private void ApplyDrag(Point p)
         {
             bool snap = SnapModifier;
 
-            // Top-right anchor: vertical only, and it moves SpanHigh rather
-            // than any node (see AnchorEndDraggableInY). Never below SpanLow,
-            // the curve's own start point.
+            // Top-right anchor: vertical only, writes EndY (see
+            // AnchorEndDraggableInY).
             if (_dragEndAnchor)
             {
-                double lo = double.IsNaN(SpanLow) ? YMin : SpanLow;
-                double a = PointerToAxisValue(p);
-                if (snap) a = Snap(a);
-                SpanHigh = Math.Round(Math.Max(lo, Math.Min(YMax, a)));
+                if (TryPointerToStoredY(p, snap, out double end)) EndY = end;
                 return;
             }
 
             int lastNode = ClampedNodeCount() - 1;
             bool isEndpoint = _dragNode == 0 || _dragNode == lastNode;
 
-            // Vertical drag. A collapsed span (Max Force dragged down onto
-            // Deadzone) has no Y to place a node at, so it skips the vertical
-            // half and leaves horizontal drag working.
-            bool span = SpanMode;
-            double spanRange = span ? SpanRange : 0;
-            bool canDragY = (!span || spanRange > 0) && !(EndpointRangeMode && _dragNode == 0);
-            if (canDragY)
+            // Vertical drag; a collapsed span skips it and leaves horizontal
+            // drag working.
+            if (!(EndpointRangeMode && _dragNode == 0) && TryPointerToStoredY(p, snap, out double v))
             {
-                // Node values are stored in axis units, or as a percentage of
-                // SpanLow..SpanHigh when that's in use — convert the pointer
-                // back into whichever, then clamp in that same space.
-                // Snap acts on the axis value shown in the node.
-                double axisValue = PointerToAxisValue(p);
-                if (snap) axisValue = Snap(axisValue);
-                double storedMin = span ? 0.0 : YMin;
-                double storedMax = span ? 100.0 : YMax;
-                double v = span
-                    ? Math.Round((axisValue - SpanLow) / spanRange * 100.0)
-                    : Math.Round(axisValue);
-                v = Math.Max(storedMin, Math.Min(storedMax, v));
                 if (!double.IsNaN(LastNodeYMax) && _dragNode == lastNode)
                     v = Math.Min(v, LastNodeYMax);
                 SetY(_dragNode, v);
@@ -1038,11 +1034,18 @@ namespace MozaControls
             int realCount = nodeCount + (anchorStart ? 1 : 0) + (anchorEnd ? 1 : 0);
             var real = new Point[realCount];
             int wi = 0;
-            // In span mode the two anchors are the span's own ends (Pedal
-            // Feel: Deadzone and Max Force), so they ride up and down with
-            // those values instead of being pinned to the plot's corners.
+            // In span mode the start anchor is the span's low end (Pedal Feel:
+            // Deadzone) and the end anchor sits at EndY percent of the span
+            // (unset = its top, Max Force), so both ride with those values
+            // instead of being pinned to the plot's corners.
+            // Unclamped span here, as the wire computes it (see
+            // MozaMBoosterRegistry.ComputeFeelCurveEndY).
+            double endY = EndY;
+            double endRaw = spanMode
+                ? (double.IsNaN(endY) ? SpanHigh : spanLow + (endY / 100.0) * (SpanHigh - spanLow))
+                : (double.IsNaN(endY) ? YMax : endY);
             double startValue = spanMode ? Math.Max(YMin, Math.Min(YMax, spanLow)) : YMin;
-            double endValue = spanMode ? Math.Max(YMin, Math.Min(YMax, SpanHigh)) : YMax;
+            double endValue = Math.Max(YMin, Math.Min(YMax, endRaw));
             double startPixY = PadTop + (1 - (startValue - YMin) / range) * plotH;
             double endPixY = PadTop + (1 - (endValue - YMin) / range) * plotH;
             if (anchorStart) real[wi++] = new Point(PadLeft, startPixY);

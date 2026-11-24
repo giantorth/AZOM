@@ -2667,11 +2667,13 @@ namespace MozaPlugin.Devices.MBooster
         /// 0-200kg full scale (the two axes are NOT interchangeable — see
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveY"/> and
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveX"/>).
+        /// <paramref name="inputCurveEndY"/> is the last point's Y, same span
+        /// (-1 = 100%); it, not Max Force itself, is what 0x0E carries.
         /// </summary>
         /// <param name="allX">Send every X regardless — Pit House's Travel
         /// start/end bursts carry all six.</param>
-        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device,
-            bool allX = false)
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX,
+            float inputCurveEndY, byte device, bool allX = false)
         {
 
             var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
@@ -2700,7 +2702,8 @@ namespace MozaPlugin.Devices.MBooster
                     SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", rawX[i], device);
                 SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
             }
-            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
+            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(
+                MozaMBoosterRegistry.ComputeFeelCurveEndY(deadzoneKg, maxForceKg, inputCurveEndY)), device);
         }
 
         // Feel-curve X raw values (then the Deadzone) last written, per device id (see

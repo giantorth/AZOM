@@ -2476,19 +2476,18 @@
                                             <!-- Y axis is absolute force: 0 to this role's Max Force ceiling
                                                  (set in UpdateMBoosterConfigVisibilityForRole, since the ceiling
                                                  is 200kg for a Brake but 20kg for a Throttle/Clutch). The 6
-                                                 stored nodes stay percentages of the Deadzone-Max Force span —
-                                                 SpanLow/SpanHigh convert them — so the (0,0) Deadzone point and
-                                                 the (100,100) Max Force point are both plotted where their
-                                                 sliders put them, and dragging the Max Force point vertically
-                                                 writes the slider back. -->
+                                                 nodes and the last point (EndY) are percentages of the
+                                                 Deadzone-Max Force span — SpanLow/SpanHigh convert them — so
+                                                 the Deadzone slider moves the start and the Max Force slider
+                                                 rescales every point. Dragging the last point moves only it. -->
                                             <ctrl:MozaCurveEditor Grid.Row="1" Grid.Column="1" x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"
                                                                   AllowHorizontalDrag="True" AnchorAtTopRight="True"
                                                                   ShowAnchorPoints="True" AnchorEndDraggableInY="True"
                                                                   SpanLow="{Binding Value, ElementName=MBoosterDeadzoneSlider, Mode=OneWay}"
-                                                                  SpanHigh="{Binding Value, ElementName=MBoosterMaxForceSlider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                  SpanHigh="{Binding Value, ElementName=MBoosterMaxForceSlider, Mode=OneWay}"
+                                                                  EndY="{Binding Value, ElementName=MBoosterInputEndYSlider, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                             <!-- Vertical Max Force slider (Brake 24-200kg, role-scoped),
-                                                 mirrored to the curve editor's right. Two-way with the curve's
-                                                 top-right point: drag either. -->
+                                                 to the curve editor's right: the top of the graph. -->
                                             <StackPanel Grid.Row="1" Grid.Column="2" Margin="6,0,0,0" HorizontalAlignment="Center">
                                                 <Slider x:Name="MBoosterMaxForceSlider" Style="{StaticResource MozaSliderVertical}" Height="220"
                                                         TickFrequency="1" ValueChanged="MBoosterMaxForceSlider_ValueChanged"/>
@@ -2578,6 +2577,7 @@
                                             <Slider x:Name="MBoosterInputX4Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX4Slider_ValueChanged"/>
                                             <Slider x:Name="MBoosterInputX5Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX5Slider_ValueChanged"/>
                                             <Slider x:Name="MBoosterInputX6Slider" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterInputX6Slider_ValueChanged"/>
+                                            <Slider x:Name="MBoosterInputEndYSlider" Minimum="0" Maximum="100" Value="100" TickFrequency="1" ValueChanged="MBoosterInputEndYSlider_ValueChanged"/>
                                         </StackPanel>
                                     </StackPanel>
 

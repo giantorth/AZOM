@@ -2043,7 +2043,7 @@ Pit House draws this curve as **8 points**, one per Y selector in the
 |---|---|---|
 | `(0,0)` — start | `0x07` Deadzone | no — set by the Deadzone slider |
 | 6 interior nodes | `0x08`-`0x0D` | yes, both axes (`InputCurveY`/`InputCurveX`) |
-| `(100,100)` — terminates the line | `0x0E` Max Force | vertically only — X is pinned at full-scale input |
+| last point, X=100 — terminates the line | `0x0E` | vertically only (`InputCurveEndY`) — X is pinned at full-scale input |
 
 So "evenly spaced" for the interior nodes means **sevenths** — 7 equal
 gaps across the 8 points — which is exactly the `k/7` spacing the sweep
@@ -2053,41 +2053,55 @@ at. Source for the layout and the drag affordances is the user's own
 reading of Pit House's UI, not a capture; the selector mapping beside it
 is capture-confirmed.
 
-**The vertical drag on that last point forces the plot's Y axis to be
-absolute force.** Its Y *is* Max Force (`0x0E`) — there is no other
-selector left for it to be — so on a Y axis normalized to the
-Deadzone→Max Force span, that point is 100% by definition and could never
-move. AZOM therefore plots this curve in kg: `YMax` follows the current
-Max Force (or Deadzone, if higher) × 1.25, rounded up to 4 × {1,2,5,10,20,25,50}
-so the kg axis labels stay whole, capped at the role's Max Force ceiling
-(`SettingsControl.UpdateMBoosterFeelAxis`). It is held while the curve is
-being dragged (the top-point drag writes Max Force) and re-fit on
-`MozaCurveEditor.DragCompleted`. A fixed ceiling axis (200kg) squashed a
-40kg curve into the bottom fifth of the plot (bug report 6SWSMJX0). The `(0,0)` point sits at
-`DeadzoneKg` and the `(100,100)` point at `MaxForceKg`, both bound to
-their sliders (`MozaCurveEditor.SpanLow`/`SpanHigh`, the latter two-way so
-the drag writes the slider). The 6 interior nodes are **still stored** as
-percentages of the span — `SpanLow`/`SpanHigh` convert for display and
-drag only, so nothing about `InputCurveY`'s wire contract changes.
+**The Max Force slider is the top of the graph, not the last point**
+(user's reading of Pit House, 2026-11-24): it sets the force at 100% of
+the Deadzone→Max Force span and rescales every point, the last one
+included. Dragging the last point moves only that point and can put it
+below the nodes; it never moves the slider. AZOM stores it as
+`InputCurveEndY`, a percentage of the span like `InputCurveY` (unset =
+100%), and writes `0x0E` as `deadzone + endPct/100 × (maxForce − deadzone)`
+(`MozaMBoosterRegistry.ComputeFeelCurveEndY`). At the default 100% that is
+Max Force itself, which is all the captures below cover — that `0x0E`
+carries the lowered point is **inferred** from the graph having one point
+per selector and from PitHouse presets keeping `forces_curve[6]`
+separately from `forcelimit_max`, not captured.
+
+AZOM plots this curve in absolute kg on a fixed axis: `YMax` = the
+pedal's Max Force ceiling, 200kg active / 20kg spring
+(`SettingsControl.UpdateMBoosterFeelAxis`), so moving Max Force or
+Deadzone visibly moves the curve and never rescales the graph — the
+user's choice (2026-11-24), accepting that a light setting sits low on a
+200kg axis (the bug report 6SWSMJX0 trade-off). Both Max-Force-fitted
+axes tried before were rejected: × 1.25 headroom rounded up to
+4 × {1,2,5,10,20,25,50} jumped the whole curve each time Max Force crossed
+a step (6.4, 16, 32, 64, 80 kg), and a top of exactly Max Force left the
+curve motionless with only the labels changing. The start
+point sits at `DeadzoneKg`; every other point is stored as a percentage
+of the span and converted for display and drag only
+(`MozaCurveEditor.SpanLow`/`SpanHigh`, both one-way from their sliders,
+plus `EndY` for the last point). Those percentages are kept to two
+decimals (`MBoosterUiConstants.PedalFeelYDecimals`): whole percents are
+2kg steps on a 200kg span, so Shift's 5kg snap landed on 136/144 instead
+of 135/145.
 
 A consequence, and it matches the wire exactly: dragging Max Force down
-rescales every interior node's kg while its stored percentage stays put,
-which is precisely the `(value − deadzone) / (maxForce − deadzone)`
-invariance the four sweep captures measured. Deadzone likewise lifts where
-the curve starts — neither slider had any visible effect on the old
-span-normalized plot.
+rescales every point's kg while its stored percentage stays put, which is
+precisely the `(value − deadzone) / (maxForce − deadzone)` invariance the
+four sweep captures measured. Deadzone likewise lifts where the curve
+starts — neither slider had any visible effect on the old span-normalized
+plot.
 
 AZOM draws the two end points via `MozaCurveEditor.ShowAnchorPoints`
 (dimmed node circles on the `AnchorAtOrigin`/`AnchorAtTopRight` ends, the
-top one grabbable when `AnchorEndDraggableInY` is set), and keeps a 1-unit
-X gap between the last draggable node and the `(100,100)` point — the same
-gap every other neighbouring node pair keeps.
+last one grabbable when `AnchorEndDraggableInY` is set), and keeps a
+1-unit X gap between the last draggable node and the last point — the
+same gap every other neighbouring node pair keeps.
 
-Node Y is **not** ordered: each interior node takes any 0–100% of the span
-regardless of its neighbours, so non-monotonic ("A"-shaped) curves are
-valid — the pedal handles them (user report, 2026-11-24). Only X is kept
-in order. The PitHouse preset importer keeps `forces_curve` nodes as-is
-for the same reason.
+Point Y is **not** ordered: each interior node and the last point take
+any 0–100% of the span regardless of their neighbours, so non-monotonic
+("A"-shaped) curves are valid — the pedal handles them (user report,
+2026-11-24). Only X is kept in order. The PitHouse preset importer keeps
+`forces_curve` values as-is for the same reason.
 
 ### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
 
@@ -2908,7 +2922,7 @@ rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 | `<p>_softlimit_hardness_press` / `_release`      | `EndstopFrontStiffness` / `EndstopEndStiffness`         | **inferred**, see below                                                                |
 | `brake_press_combine`                            | `SensorOutputRatioPct`                                  | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
 | `<p>_forcelimit_min` / `_max` (`_v128` first)    | `DeadzoneKg` / `MaxForceKg`                             | kg; see "Pedal Feel keys" below                                                        |
-| `<p>_forces_curve[0..5]` (or `_forces_curve_cache_v128`) | `InputCurveY` (% of Deadzone→Max Force)         | 7 kg values; `[6]` is the Max Force point                                              |
+| `<p>_forces_curve[0..6]` (or `_forces_curve_cache_v128`) | `InputCurveY` + `InputCurveEndY` (% of Deadzone→Max Force) | 7 kg values; `[6]` is the last point                                                   |
 | `<p>_stroke_curve[0..5]` (or `_stroke_curve_cache_v128`) | `InputCurveX` (% of travel)                     | mm inside `machinelimit_min..max`                                                      |
 | `<p>_damping_press` / `_release` (+ `_switch`)   | `DampingPressPct` / `DampingReleasePct`                 | **inferred**; switched off → 0%                                                        |
 | `<p>_damping_[release_]segment{1,2}_position`    | `SegmentedDamping.Divider{1,2}{Pressed,Released}`       | **inferred**; un-prefixed-direction pair = Pressed                                     |
@@ -2929,9 +2943,11 @@ The sample Brake preset holds `brake_forcelimit_min: 11`,
 `[36.40 … 43.57]`, exactly `k/7` of its `machinelimit` range
 (34.97–45.0 mm) for k = 1..6. The same k/7 is the Pedal Feel wire default
 on both axes (see [Pedal Feel default curve shape](#pedal-feel-default-curve-shape-and-node-x-domain--revised-mbooster-deadzone-slider-does-nothing-report)),
-so these are Deadzone, Max Force and the 6 node Y (kg) / X (mm) positions.
-The Y nodes are converted to % of the preset's own Deadzone→Max Force span,
-X to % of its own travel range — the fractions the wire carries.
+so these are Deadzone, Max Force and the 6 node Y (kg) / X (mm) positions,
+with `forces_curve[6]` the last point (equal to `forcelimit_max` here, i.e.
+100%). The Y values are converted to % of the preset's own Deadzone→Max
+Force span (`[6]` into `InputCurveEndY`), X to % of its own travel range —
+the fractions the wire carries.
 
 Values are clamped to the plugin's own slider bounds (`MBoosterUiConstants`)
 on import, and the travel pair additionally honours `TravelMinGapMm` so an

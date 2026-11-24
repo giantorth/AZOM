@@ -534,7 +534,8 @@ namespace MozaPlugin.UI
                     $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
                     $"damping={FmtPct(cfg.DampingPressPct)}/{FmtPct(cfg.DampingReleasePct)} " +
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
-                    $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")}");
+                    $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")} " +
+                    $"inCurveEnd={FmtPct(cfg.InputCurveEndY)}");
             }
         }
 
