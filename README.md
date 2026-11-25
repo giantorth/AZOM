@@ -136,6 +136,17 @@ Spanish language with English dub and subtitles available.
 - **[Report a problem](https://giant.orth.cc/guides/diagnostics-and-bug-reports/)** — the plugin's Help tab submits a redacted diagnostic bundle in one click. See the **[privacy policy](https://giant.orth.cc/privacy/)** for what is sent and how long it is kept.
 - **[Sponsor](https://github.com/sponsors/giantorth)** / **[Ko-fi](https://ko-fi.com/giantorth)** — the money just buys more MOZA hardware to support.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+`MozaPlugin.dll` in stable releases and PR pre-releases is built and signed by this repository's GitHub Actions. Every build signed with the SignPath Foundation certificate is approved manually.
+
+- **Committers and reviewers:** [giantorth](https://github.com/giantorth)
+- **Approvers:** [giantorth](https://github.com/giantorth)
+
+**Privacy:** what the plugin sends, and when, is described in the [privacy policy](https://giant.orth.cc/privacy/).
+
 ## Building from Source
 
 See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for build instructions (Windows & Linux cross-compilation), CI/CD pipeline details, and full architecture reference.

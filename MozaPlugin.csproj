@@ -12,13 +12,16 @@
     <Version>0.0.0</Version>
     <AssemblyTitle>MozaPlugin</AssemblyTitle>
     <Description>SimHub plugin for MOZA Racing hardware</Description>
-    <Product>MozaPlugin</Product>
+    <!-- Must equal the SignPath project name: SignPath Foundation requires
+         ProductName to match it, enforced by product-name in
+         .github/actions/sign-plugin/artifact-configuration.xml. -->
+    <Product>AZOM</Product>
     <Copyright>Copyright 2026</Copyright>
     <UseWPF>true</UseWPF>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <!-- dotnet SDK 10.x + WPF emits duplicate AssemblyAttribute (CS0579) in
          the markup-compile temp project. Turn off SDK auto-generation and
-         re-emit the version attributes ourselves in WriteVersionInfo below.
+         re-emit the assembly attributes ourselves in WriteAssemblyInfo below.
          See dotnet/wpf#93 and dotnet/sdk#7207. -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -227,13 +230,14 @@
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(SIMHUB_PATH)" />
   </Target>
 
-  <!-- Re-emit version attributes since GenerateAssemblyInfo is off. CI
-       passes /p:Version=...; without this target the value never reaches
-       the DLL and DiagnosticsTextBuilder.GetPluginVersion falls back to
-       1.0.0.0. AssemblyVersion / AssemblyFileVersion require 4-part
-       numeric form, so we strip any SemVer suffix and pad. The full
-       $(Version) goes into AssemblyInformationalVersion. -->
-  <Target Name="WriteVersionInfo" BeforeTargets="CoreCompile">
+  <!-- Re-emit the assembly attributes since GenerateAssemblyInfo is off;
+       without this target none of the properties above reach the DLL's
+       version resource. CI passes /p:Version=...; DiagnosticsTextBuilder.
+       GetPluginVersion and the SignPath product-version restriction both
+       read it as AssemblyInformationalVersion (the full $(Version), shown as
+       ProductVersion). AssemblyVersion / AssemblyFileVersion require 4-part
+       numeric form, so we strip any SemVer suffix and pad. -->
+  <Target Name="WriteAssemblyInfo" BeforeTargets="CoreCompile">
     <PropertyGroup>
       <_VersionNumeric>$(Version)</_VersionNumeric>
       <_VersionNumeric Condition="$(_VersionNumeric.Contains('-'))">$(_VersionNumeric.Substring(0, $(_VersionNumeric.IndexOf('-'))))</_VersionNumeric>
@@ -244,21 +248,33 @@
       <_VersionNumeric Condition="'$(_VersionDotCount)' == '2'">$(_VersionNumeric).0</_VersionNumeric>
     </PropertyGroup>
     <ItemGroup>
-      <_PluginVersionAttr Include="System.Reflection.AssemblyVersionAttribute">
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyVersionAttribute">
         <_Parameter1>$(_VersionNumeric)</_Parameter1>
-      </_PluginVersionAttr>
-      <_PluginVersionAttr Include="System.Reflection.AssemblyFileVersionAttribute">
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyFileVersionAttribute">
         <_Parameter1>$(_VersionNumeric)</_Parameter1>
-      </_PluginVersionAttr>
-      <_PluginVersionAttr Include="System.Reflection.AssemblyInformationalVersionAttribute">
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyInformationalVersionAttribute">
         <_Parameter1>$(Version)</_Parameter1>
-      </_PluginVersionAttr>
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyProductAttribute">
+        <_Parameter1>$(Product)</_Parameter1>
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyTitleAttribute">
+        <_Parameter1>$(AssemblyTitle)</_Parameter1>
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyDescriptionAttribute">
+        <_Parameter1>$(Description)</_Parameter1>
+      </_PluginAssemblyAttr>
+      <_PluginAssemblyAttr Include="System.Reflection.AssemblyCopyrightAttribute">
+        <_Parameter1>$(Copyright)</_Parameter1>
+      </_PluginAssemblyAttr>
     </ItemGroup>
     <WriteCodeFragment
-        AssemblyAttributes="@(_PluginVersionAttr)"
+        AssemblyAttributes="@(_PluginAssemblyAttr)"
         Language="C#"
         OutputDirectory="$(IntermediateOutputPath)"
-        OutputFile="VersionInfo.cs">
+        OutputFile="AssemblyAttributes.cs">
       <Output TaskParameter="OutputFile" ItemName="Compile" />
       <Output TaskParameter="OutputFile" ItemName="FileWrites" />
     </WriteCodeFragment>

@@ -13,6 +13,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      unsigned_artifact_id: ${{ steps.upload-unsigned.outputs.artifact-id }}
 
     steps:
       - name: Checkout
@@ -34,29 +37,55 @@ jobs:
       - name: Build plugin DLL
         run: dotnet build -c Release --no-restore /p:Version=${{ steps.version.outputs.version }}
 
-      - name: Stage release files
-        shell: pwsh
-        run: |
-          $staging = "staging"
-          New-Item -ItemType Directory -Path $staging -Force | Out-Null
-          Copy-Item ./bin/x86/Release/MozaPlugin.dll $staging/
-          # All localized resources are embedded inside MozaPlugin.dll (see the
-          # i18n resource group in MozaPlugin.csproj), so the single DLL is the
-          # full deployment — no per-culture satellite folders to stage.
+      # SignPath signs MozaPlugin.dll inside the zip this step makes — see
+      # .github/actions/sign-plugin/artifact-configuration.xml.
+      - name: Upload unsigned DLL
+        id: upload-unsigned
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-dll
+          path: ./bin/x86/Release/MozaPlugin.dll
+          retention-days: 1
+          if-no-files-found: error
 
-      - name: Zip release files
-        run: Compress-Archive -Path ./staging/* -DestinationPath ./${{ env.ReleaseFileName }}
+  # Never runs the build: holds the SignPath token and only handles the
+  # artifact `build` uploaded.
+  sign:
+    runs-on: windows-latest
+    needs: build
+    timeout-minutes: 330
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout signing action
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/sign-plugin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Sign and zip
+        uses: ./.github/actions/sign-plugin
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          unsigned-artifact-id: ${{ needs.build.outputs.unsigned_artifact_id }}
+          version: ${{ needs.build.outputs.version }}
+          zip-name: ${{ env.ReleaseFileName }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: build-file
           path: ${{ env.ReleaseFileName }}
+          if-no-files-found: error
 
   create-release:
     runs-on: ubuntu-latest
     needs:
-      - build
+      - sign
     permissions:
       contents: write
     steps:
@@ -80,7 +109,9 @@ jobs:
 
       # GitHub and Discord render every newline as a break, so the
       # hard-wrapped CHANGELOG text pasted as the body shows ragged.
-      - name: Unwrap release body
+      # SignPath Foundation requires "Code signing policy" on every download
+      # page, so the body also gets the link when it lacks one.
+      - name: Finalize release body
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -90,14 +121,18 @@ jobs:
           set -euo pipefail
           id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.id')
           gh api "repos/${GITHUB_REPOSITORY}/releases/${id}" --jq '.body // ""' > body.md
-          python3 src/tools/unwrap_markdown.py < body.md > body.unwrapped.md
-          if cmp -s body.md body.unwrapped.md; then
-            echo "Release body already unwrapped."
+          python3 src/tools/unwrap_markdown.py < body.md > body.final.md
+          if ! grep -q 'Code signing policy' body.final.md; then
+            printf '\n\n[Code signing policy](https://github.com/%s#code-signing-policy)\n' \
+              "$GITHUB_REPOSITORY" >> body.final.md
+          fi
+          if cmp -s body.md body.final.md; then
+            echo "Release body already final."
             exit 0
           fi
-          jq -n --rawfile body body.unwrapped.md '{body: $body}' \
+          jq -n --rawfile body body.final.md '{body: $body}' \
             | gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${id}" --input - > /dev/null
-          echo "Release body unwrapped."
+          echo "Release body updated."
 
       - name: Repoint dev-latest shepherd release
         continue-on-error: true
@@ -116,7 +151,9 @@ jobs:
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "dev-latest (${GITHUB_REF_NAME#v})" \
-            --notes "The development channel has been replaced by per-PR builds (update your plugin and pick a PR in the release-channel dropdown). This release mirrors stable ${GITHUB_REF_NAME} so plugins still on the dev channel can update."
+            --notes "The development channel has been replaced by per-PR builds (update your plugin and pick a PR in the release-channel dropdown). This release mirrors stable ${GITHUB_REF_NAME} so plugins still on the dev channel can update.
+
+          [Code signing policy](https://github.com/${GITHUB_REPOSITORY}#code-signing-policy)"
 
       - name: Notify Discord
         if: success()

@@ -1,0 +1,89 @@
+name: Sign plugin DLL
+description: >-
+  Signs MozaPlugin.dll through SignPath, verifies the signature and metadata,
+  and zips the signed DLL as the release asset. Shared by build.yml (PR
+  pre-releases) and release.yml (stable). Needs a Windows runner and a job with
+  `actions: read` + `contents: read`.
+
+inputs:
+  api-token:
+    description: SignPath API token of a submitter (secrets.SIGNPATH_API_TOKEN).
+    required: true
+  organization-id:
+    description: SignPath organization ID (vars.SIGNPATH_ORGANIZATION_ID).
+    required: true
+  project-slug:
+    description: SignPath project slug (vars.SIGNPATH_PROJECT_SLUG).
+    required: true
+  unsigned-artifact-id:
+    description: artifact-id output of the upload-artifact step that uploaded the unsigned MozaPlugin.dll.
+    required: true
+  version:
+    description: The $(Version) the DLL was built with; must equal its ProductVersion.
+    required: true
+  zip-name:
+    description: File name of the release ZIP to create in the workspace root.
+    required: true
+  # Only test-signing is granted so far; switch the default to release-signing
+  # once SignPath Foundation grants it. The callers don't pass this.
+  signing-policy-slug:
+    description: SignPath signing policy. test-signing accepts a signature whose chain Windows doesn't trust.
+    default: test-signing
+
+runs:
+  using: composite
+  steps:
+    # A signing policy can require a manual approval in SignPath, so this
+    # waits for it: 5 h, inside the sign jobs' 330-minute timeout.
+    - name: Submit signing request
+      uses: signpath/github-action-submit-signing-request@v3
+      with:
+        api-token: ${{ inputs.api-token }}
+        organization-id: ${{ inputs.organization-id }}
+        project-slug: ${{ inputs.project-slug }}
+        signing-policy-slug: ${{ inputs.signing-policy-slug }}
+        artifact-configuration-slug: mozaplugin-dll
+        github-artifact-id: ${{ inputs.unsigned-artifact-id }}
+        wait-for-completion: true
+        wait-for-completion-timeout-in-seconds: 18000
+        output-artifact-directory: signed
+        parameters: |
+          version: ${{ toJSON(inputs.version) }}
+
+    - name: Verify signature and metadata
+      shell: pwsh
+      env:
+        EXPECTED_VERSION: ${{ inputs.version }}
+        SIGNING_POLICY: ${{ inputs.signing-policy-slug }}
+      run: |
+        $dll = 'signed/MozaPlugin.dll'
+        if (-not (Test-Path $dll)) {
+          Write-Output "::error::SignPath returned no MozaPlugin.dll"
+          Get-ChildItem -Recurse signed | ForEach-Object { $_.FullName }
+          exit 1
+        }
+        $sig = Get-AuthenticodeSignature -FilePath $dll
+        Write-Output "Status:     $($sig.Status) — $($sig.StatusMessage)"
+        Write-Output "Signer:     $($sig.SignerCertificate.Subject)"
+        Write-Output "Issuer:     $($sig.SignerCertificate.Issuer)"
+        Write-Output "Timestamp:  $($sig.TimeStamperCertificate.Subject)"
+        # The test certificate's root isn't trusted: WinVerifyTrust reports that
+        # as UnknownError (or NotTrusted) once the hash has checked out, while a
+        # missing or broken signature is NotSigned / HashMismatch.
+        $accepted = if ($env:SIGNING_POLICY -eq 'test-signing') { 'Valid', 'UnknownError', 'NotTrusted' } else { @('Valid') }
+        if ($null -eq $sig.SignerCertificate -or $accepted -notcontains "$($sig.Status)") {
+          Write-Output "::error::MozaPlugin.dll signature is $($sig.Status) under $env:SIGNING_POLICY (accepted: $($accepted -join ', '))"
+          exit 1
+        }
+        $vi = (Get-Item $dll).VersionInfo
+        if ($vi.ProductName -ne 'AZOM' -or $vi.ProductVersion -ne $env:EXPECTED_VERSION) {
+          Write-Output "::error::Signed DLL is ProductName='$($vi.ProductName)' ProductVersion='$($vi.ProductVersion)', expected 'AZOM' / '$env:EXPECTED_VERSION'"
+          exit 1
+        }
+
+    # The DLL is the whole deployment — localized resources are embedded.
+    - name: Zip signed DLL
+      shell: pwsh
+      env:
+        ZIP_NAME: ${{ inputs.zip-name }}
+      run: Compress-Archive -Path signed/MozaPlugin.dll -DestinationPath "./$env:ZIP_NAME"
