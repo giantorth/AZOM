@@ -231,9 +231,6 @@ namespace MozaPlugin.Settings
         public Dictionary<string, MBoosterBitePointCalibration> MBoosterClutchBitePointCalibrations { get; set; }
             = new Dictionary<string, MBoosterBitePointCalibration>(StringComparer.OrdinalIgnoreCase);
 
-        // Learn and refine the bite point from every clean standing start.
-        public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
-
         // Clutch position the Bite Point trigger and calibration read.
         public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.Game;
 

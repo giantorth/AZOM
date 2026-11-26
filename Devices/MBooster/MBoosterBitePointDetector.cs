@@ -1,20 +1,37 @@
 using System;
 using System.Diagnostics;
-using System.Threading;
 
 namespace MozaPlugin.Devices.MBooster
 {
+    /// <summary>Automatic bite point calibration's readiness to measure a standing start.</summary>
     public enum BitePointCalState
     {
-        Idle,
-        // Started; needs the car stopped, in gear, with the clutch pressed in.
+        // No game, clutch reading or gear, or paused.
+        NotReady,
+        // Driving; needs the car stopped, in gear, with the clutch pressed in.
         Waiting,
-        // Conditions met; the next release past ClutchInLevel starts the run.
+        // Conditions met; the next release past ClutchInLevel is measured.
         Armed,
         // Clutch coming up with the car still stopped.
         Releasing,
-        Captured,
-        Cancelled,
+        // The last release was too fast to count; held a few seconds.
+        TooFast,
+    }
+
+    /// <summary>What a standing start needs, as met on the last data tick.</summary>
+    [Flags]
+    public enum BitePointConditions
+    {
+        None = 0,
+        // Game running and not paused.
+        InGame = 1,
+        // The clutch source reports a position.
+        HasClutch = 2,
+        InGear = 4,
+        // Below MBoosterBitePointDetector.StandstillKmh.
+        Stopped = 8,
+        // Pressed past MBoosterBitePointDetector.ClutchInLevel.
+        ClutchIn = 16,
     }
 
     /// <summary>One standing-start observation.</summary>
@@ -261,86 +278,5 @@ namespace MozaPlugin.Devices.MBooster
             }
             return 0;
         }
-    }
-
-    /// <summary>
-    /// A user-started calibration run. Commands arrive from any thread;
-    /// <see cref="Update"/> runs on the SimHub data thread and owns every state change.
-    /// </summary>
-    internal sealed class MBoosterBitePointCalibrator
-    {
-        private const int RequestNone = 0, RequestToggle = 1, RequestStop = 2;
-
-        private readonly MBoosterBitePointDetector _detector = new MBoosterBitePointDetector();
-        private int _request;
-        private int _state;
-        private string? _game;
-
-        public BitePointCalState State => (BitePointCalState)Volatile.Read(ref _state);
-
-        public bool IsActive
-        {
-            get
-            {
-                var s = State;
-                return s == BitePointCalState.Waiting || s == BitePointCalState.Armed || s == BitePointCalState.Releasing;
-            }
-        }
-
-        /// <summary>Start a run, or cancel the one in progress.</summary>
-        public void Toggle() => Interlocked.Exchange(ref _request, RequestToggle);
-
-        /// <summary>Drop any run and return to Idle.</summary>
-        public void Stop() => Interlocked.Exchange(ref _request, RequestStop);
-
-        /// <param name="game">SimHub game code.</param>
-        /// <param name="ready">Driving, in gear, with a clutch pedal reporting.</param>
-        /// <param name="capturedGame">Game the capture belongs to.</param>
-        /// <returns>True on the frame a bite point is captured.</returns>
-        public bool Update(string? game, bool ready, double speedKmh, double pedal01,
-            out string capturedGame, out BitePointSample sample)
-        {
-            capturedGame = "";
-            sample = default;
-
-            switch (Interlocked.Exchange(ref _request, RequestNone))
-            {
-                case RequestToggle:
-                    if (IsActive || string.IsNullOrEmpty(game)) SetState(BitePointCalState.Cancelled);
-                    else
-                    {
-                        _game = game;
-                        _detector.Reset();
-                        SetState(BitePointCalState.Waiting);
-                    }
-                    break;
-                case RequestStop:
-                    SetState(BitePointCalState.Idle);
-                    break;
-            }
-
-            if (!IsActive) return false;
-            if (!string.Equals(game, _game, StringComparison.OrdinalIgnoreCase))
-            {
-                SetState(BitePointCalState.Cancelled);
-                return false;
-            }
-
-            if (_detector.Update(ready, speedKmh, pedal01, out sample))
-            {
-                capturedGame = _game!;
-                SetState(BitePointCalState.Captured);
-                return true;
-            }
-            SetState(_detector.Current switch
-            {
-                MBoosterBitePointDetector.Phase.Armed => BitePointCalState.Armed,
-                MBoosterBitePointDetector.Phase.Releasing => BitePointCalState.Releasing,
-                _ => BitePointCalState.Waiting,
-            });
-            return false;
-        }
-
-        private void SetState(BitePointCalState s) => Volatile.Write(ref _state, (int)s);
     }
 }

@@ -865,13 +865,6 @@ Id : {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibré</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manuel</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>RÉINITIALISER</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Inactif</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>En attente</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Armé</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Relâchement</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Annulé</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibration automatique</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} échantillons</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Source d'embrayage</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pédale mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Point de patinage de l'embrayage</value></data>
@@ -883,7 +876,6 @@ Id : {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Appui</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Relâchement</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Les deux</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Valeur du jeu</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Axe HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Périphérique</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>DÉFINIR LA PLAGE</value></data>
@@ -976,4 +968,20 @@ Id : {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Tableau de bord</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Commandes</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Mesure en cours</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Voiture calibrée ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Jeu calibré ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Non calibré</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Trop rapide</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Point de patinage de l'embrayage MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Affiche la calibration du point de patinage de l'embrayage pendant la conduite.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Pas prêt</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>En attente</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>En jeu</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Signal d'embrayage</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Rapport engagé</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>À l'arrêt</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embrayage enfoncé</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Dernier départ {0}% · {1}%/s</value></data>
 </root>

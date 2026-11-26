@@ -865,13 +865,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibriert</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manuell</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ZURÜCKSETZEN</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Wartet</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Bereit</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Loslassen</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Abgebrochen</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisch kalibrieren</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} Messungen</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Kupplungsquelle</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-Pedal</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Kupplungs-Schleifpunkt</value></data>
@@ -883,7 +876,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Drücken</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Loslassen</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Beides</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Spielwert</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID-Achse</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Gerät</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>BEREICH SETZEN</value></data>
@@ -976,4 +968,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Bedienelemente</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Bereit</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Messung läuft</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Fahrzeug kalibriert ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Spiel kalibriert ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Nicht kalibriert</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Zu schnell</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA Kupplungs-Schleifpunkt</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Zeigt die Kalibrierung des Kupplungs-Schleifpunkts während der Fahrt.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Nicht bereit</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Wartet</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>Im Spiel</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Kupplungssignal</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Gang eingelegt</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Stillstand</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Kupplung getreten</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Letzter Start {0}% · {1}%/s</value></data>
 </root>

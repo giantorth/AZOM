@@ -868,13 +868,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrato</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manuale</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>RIPRISTINA</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Inattivo</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>In attesa</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Pronto</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Rilascio</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Annullato</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibrazione automatica</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} campioni</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Sorgente frizione</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pedale mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Punto di attacco della frizione</value></data>
@@ -886,7 +879,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Pressione</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Rilascio</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Entrambi</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Valore del gioco</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Asse HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>IMPOSTA INTERVALLO</value></data>
@@ -979,4 +971,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Comandi</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Misurazione</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Auto calibrata ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Gioco calibrato ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Non calibrato</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Troppo veloce</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Punto di attacco della frizione MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Mostra la calibrazione del punto di attacco della frizione durante la guida.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Non pronto</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>In attesa</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>In gioco</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Segnale frizione</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Marcia inserita</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Fermo</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Frizione premuta</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Ultima partenza {0}% · {1}%/s</value></data>
 </root>

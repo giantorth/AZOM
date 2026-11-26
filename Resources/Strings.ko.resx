@@ -864,13 +864,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>보정값</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>수동</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>초기화</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>비활성</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>대기 중</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>준비됨</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>해제 중</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>취소됨</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>자동 보정</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>샘플 {0}개</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>클러치 소스</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 페달</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>클러치 물림 지점</value></data>
@@ -882,7 +875,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>밟을 때</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>뗄 때</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>둘 다</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>게임 값</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 축</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>장치</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>범위 설정</value></data>
@@ -975,4 +967,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>대시보드</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>컨트롤</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>플러그인</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>준비됨</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>측정 중</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>차량 보정됨 ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>게임 보정됨 ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>보정 안 됨</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>너무 빠름</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA 클러치 물림 지점</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>주행 중 클러치 물림 지점 보정 상태를 표시합니다.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>준비 안 됨</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>대기 중</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>게임 중</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>클러치 신호</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>기어 체결</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>정지</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>클러치 밟음</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>마지막 출발 {0}% · {1}%/s</value></data>
 </root>

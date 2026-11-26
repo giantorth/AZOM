@@ -1,6 +1,7 @@
 using System;
 using SimHub.Plugins;
 using MozaPlugin.Devices;
+using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Telemetry;
 using MozaPlugin.Telemetry.Display;
 using MozaPlugin.Settings;
@@ -120,10 +121,24 @@ namespace MozaPlugin.Integration
             // Clutch split point (issue #125) — the wheel overlay is the source
             // of truth; newer KS-family firmware drops the cmd-9 read-back.
             _plugin.AttachDelegate("AZOM.ClutchSplitPoint", () => CurrentClutchSplitPoint());
-            // mBooster clutch bite point for the current game (0..100, -1 when
-            // uncalibrated) and the calibration run's state name.
+            // Clutch bite point for the current game and car (0..100, -1 when
+            // uncalibrated), its calibration (BitePointCalState name; Car/Game/""
+            // scope and sample count), the clutch it reads (0..100, -1 = none),
+            // what a standing start still needs, and the last launch measured.
             _plugin.AttachDelegate("AZOM.ClutchBitePoint", () => _plugin.CurrentClutchBitePointPct);
             _plugin.AttachDelegate("AZOM.ClutchBitePointCalibration", () => _plugin.BitePointCalibrationState.ToString());
+            _plugin.AttachDelegate("AZOM.ClutchBitePointScope", () => _plugin.ClutchBitePointInfo().Scope);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointSamples", () => _plugin.ClutchBitePointInfo().SampleCount);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointClutch",
+                () => _plugin.TryGetBitePointClutchPosition(out double clutch01) ? Math.Round(clutch01 * 100, 1) : -1.0);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointInGame", () => _plugin.BitePointConditionsMet(BitePointConditions.InGame));
+            _plugin.AttachDelegate("AZOM.ClutchBitePointHasClutch", () => _plugin.BitePointConditionsMet(BitePointConditions.HasClutch));
+            _plugin.AttachDelegate("AZOM.ClutchBitePointInGear", () => _plugin.BitePointConditionsMet(BitePointConditions.InGear));
+            _plugin.AttachDelegate("AZOM.ClutchBitePointStopped", () => _plugin.BitePointConditionsMet(BitePointConditions.Stopped));
+            _plugin.AttachDelegate("AZOM.ClutchBitePointClutchIn", () => _plugin.BitePointConditionsMet(BitePointConditions.ClutchIn));
+            _plugin.AttachDelegate("AZOM.ClutchBitePointLastSample", () => _plugin.BitePointLastLaunch?.Pct ?? -1);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointLastRate", () => _plugin.BitePointLastLaunch?.ReleaseRatePct ?? -1);
+            _plugin.AttachDelegate("AZOM.ClutchBitePointLastSkipped", () => _plugin.BitePointLastLaunch?.Skipped ?? false);
             // Telemetry pipeline health, so users can show a degraded/parked state on
             // an overlay. TelemetryState = the PipelinePhase name (Idle/SilenceWait/
             // Starting/Active/HotSwitchBurst/Recovery/Parked). DashboardBound is a
@@ -238,9 +253,7 @@ namespace MozaPlugin.Integration
                 _plugin.AddAction("AZOM.Ab9Layout" + layout.Suffix, (a, b) => SetAb9Layout(target));
             }
 
-            // mBooster clutch bite point for the current game: start/cancel a
-            // standing-start calibration, or clear the stored value.
-            _plugin.AddAction("AZOM.ClutchBitePointCalibrate", (a, b) => _plugin.ToggleBitePointCalibration());
+            // Clear the mBooster clutch bite point for the current game or car.
             _plugin.AddAction("AZOM.ClutchBitePointReset", (a, b) => _plugin.ResetClutchBitePoint());
 
             // Cycle the wheel's displayed dashboard (wraparound).

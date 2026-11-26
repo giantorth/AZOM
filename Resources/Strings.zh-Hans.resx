@@ -865,13 +865,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>已校准</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>手动</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>重置</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>空闲</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>等待中</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>就绪</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>松开中</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>已取消</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>自动校准</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} 个样本</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>离合来源</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 踏板</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>离合器结合点</value></data>
@@ -883,7 +876,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>踩下</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>松开</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>两者</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>游戏值</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 轴</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>设备</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>设置范围</value></data>
@@ -976,4 +968,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>仪表盘</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>控制</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>插件</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>就绪</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>测量中</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>车辆已校准 ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>游戏已校准 ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>未校准</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>太快</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA 离合器结合点</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>驾驶时显示离合器结合点校准状态。</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>未就绪</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>等待中</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>游戏中</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>离合器信号</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>已挂挡</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>已停车</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>离合器已踩下</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>上次起步 {0}% · {1}%/s</value></data>
 </root>

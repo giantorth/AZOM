@@ -116,7 +116,24 @@ Web dash (phone/tablet): `Web/controls.js` `renderButtonItem` sends `pressed`/`r
 
 - **FFB Equalizer:** a vertical `LinearGaugeItem` (`GaugeOrientation` 1, `GaugeAlignment` 0 = fill from the bottom) per band with ▲▲ ▲ / ▼ ▼▼, in frequency order. Two layers: 10-band (scale 500 %) and 6-band (400 %), switched on `AZOM.Equalizer7 >= 0`.
 - **FFB Output Curve:** a plot of (0,0) → points 1–4 → (100, Y5), drawn as rectangles whose `Left`/`Top` are bound to the point properties (no line item exists), plus one card per point: ◄ ► = input (X), ▼ ▲ = output (Y). Point 5 is output-only. X steps are clamped 1 unit inside the neighbouring points, as the curve editor's drag is.
-- Roboto has no ▲►▼◄; arrow glyphs use Cousine, which is also in `DashFonts` (the web dash serves `DashFonts` through `/FontFaces.css`). `ControlDashInstaller` writes it to `DashTemplates` at Init when the bytes change; the SHA-256 of the last write is kept in `<Name>.djson.azom`, and a `.djson` that no longer matches it (edited in Dash Studio) is left alone.
+- Roboto has no ▲►▼◄; arrow glyphs use Cousine, which is also in `DashFonts` (the web dash serves `DashFonts` through `/FontFaces.css`).
+
+### MOZA clutch bite point overlay
+
+`Integration/ControlDash/BitePointDashBuilder.cs` generates "MOZA Clutch Bite Point", a 520×208 display-only overlay (`IsOverlay` and `EnableClickThroughOverlay` true; black dashboard background, transparent screen, as the stock overlays). It reads the `AZOM.ClutchBitePoint*` properties:
+
+| Property | Value |
+|---|---|
+| `ClutchBitePoint` | bite point in use, 0–100; -1 uncalibrated |
+| `ClutchBitePointCalibration` | `BitePointCalState`: `NotReady`, `Waiting`, `Armed`, `Releasing`, `TooFast` (5 s after a skipped launch) |
+| `ClutchBitePointScope` / `ClutchBitePointSamples` | `Car`, `Game` or `""`; samples behind the value |
+| `ClutchBitePointClutch` | clutch the calibration reads, 0–100; -1 none |
+| `ClutchBitePointInGame` / `HasClutch` / `InGear` / `Stopped` / `ClutchIn` | standing-start conditions on the last data tick; all true = `Armed` |
+| `ClutchBitePointLastSample` / `LastRate` / `LastSkipped` | last launch for the current game and car: bite %, release %/s, too fast to count; -1 / false when none |
+
+### Install
+
+`DashTemplateInstaller` writes both dashboards to `DashTemplates` at Init when the bytes change; the SHA-256 of the last write is kept in `<Name>.djson.azom`, and a `.djson` that no longer matches it (edited in Dash Studio) is left alone. The primitives both builders use (items, bindings, envelope, palette) are in `DashItems`.
 
 ## Logging
 

@@ -2,15 +2,14 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using MozaPlugin.Devices.MBooster;
-using MozaPlugin.Resources;
 using static MozaPlugin.UI.UiHelpers;
 
 namespace MozaPlugin.UI
 {
     /// <summary>
     /// Clutch bite point calibration section of the mBooster Clutch Bite Point card
-    /// (per game; see MozaPlugin.MBoosterBitePoint.cs). No clutch source picker:
-    /// the card's effect reads the mBooster clutch (MozaPlugin.BitePointSource).
+    /// (per game and car, learned from standing starts; see MozaPlugin.MBoosterBitePoint.cs).
+    /// No clutch source picker: the card's effect reads the mBooster clutch (MozaPlugin.BitePointSource).
     /// Trigger Input Level shows the calibrated value while the calibration is in
     /// use, else the fallback.
     /// </summary>
@@ -21,11 +20,9 @@ namespace MozaPlugin.UI
         private void RefreshMBoosterBiteCal()
         {
             var info = _plugin.ClutchBitePointInfo();
-            bool running = _plugin.IsBitePointCalibrationRunning;
-            MBoosterBiteCalState.Text = _plugin.BitePointStatusText(info);
-            MBoosterBiteCalButton.Content = running ? Strings.Button_Cancel : Strings.Button_Calibrate;
-            MBoosterBiteCalResetButton.IsEnabled = (info.IsCalibrated && !info.Inherited) || running;
-            MBoosterBiteCalAuto.IsChecked = _plugin.BitePointAutoCalibrate;
+            MBoosterBiteCalState.Text = MozaPlugin.BitePointValueText(info);
+            MBoosterBiteCalIndicator.Show(info, _plugin.BitePointCalibrationState);
+            MBoosterBiteCalResetButton.IsEnabled = info.IsCalibrated && !info.Inherited;
 
             var vis = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;
             if (MBoosterBiteCalValuePanel.Visibility != vis) MBoosterBiteCalValuePanel.Visibility = vis;
@@ -54,21 +51,10 @@ namespace MozaPlugin.UI
                    && _plugin.ClutchBitePointInfo().IsCalibrated;
         }
 
-        private void MBoosterBiteCal_Click(object sender, RoutedEventArgs e)
-        {
-            _plugin.ToggleBitePointCalibration();
-        }
-
         private void MBoosterBiteCalReset_Click(object sender, RoutedEventArgs e)
         {
             _plugin.ResetClutchBitePoint();
             using (_suppressor.Begin()) RefreshMBoosterBiteCal();
-        }
-
-        private void MBoosterBiteCalAuto_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_suppressEvents) return;
-            _plugin.BitePointAutoCalibrate = MBoosterBiteCalAuto.IsChecked == true;
         }
 
         private void MBoosterBitePointSource_Changed(object sender, SelectionChangedEventArgs e)

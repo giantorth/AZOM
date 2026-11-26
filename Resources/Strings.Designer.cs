@@ -930,13 +930,6 @@ namespace MozaPlugin.Resources
         public static string Option_BitePointCalibrated => Get("Option_BitePointCalibrated");
         public static string Option_BitePointManual => Get("Option_BitePointManual");
         public static string Button_ResetCalibration => Get("Button_ResetCalibration");
-        public static string BiteCal_Idle => Get("BiteCal_Idle");
-        public static string BiteCal_Waiting => Get("BiteCal_Waiting");
-        public static string BiteCal_Armed => Get("BiteCal_Armed");
-        public static string BiteCal_Releasing => Get("BiteCal_Releasing");
-        public static string BiteCal_Cancelled => Get("BiteCal_Cancelled");
-        public static string Label_AutoCalibrate => Get("Label_AutoCalibrate");
-        public static string BiteCal_Samples => Get("BiteCal_Samples");
         public static string Label_ClutchSource => Get("Label_ClutchSource");
         public static string Option_ClutchSourceMBooster => Get("Option_ClutchSourceMBooster");
         public static string Section_ClutchBitePoint => Get("Section_ClutchBitePoint");
@@ -948,7 +941,6 @@ namespace MozaPlugin.Resources
         public static string Option_BiteTriggerPress => Get("Option_BiteTriggerPress");
         public static string Option_BiteTriggerRelease => Get("Option_BiteTriggerRelease");
         public static string Option_BiteTriggerBoth => Get("Option_BiteTriggerBoth");
-        public static string BiteCal_GameValue => Get("BiteCal_GameValue");
         public static string Option_ClutchSourceHid => Get("Option_ClutchSourceHid");
         public static string Label_HidDevice => Get("Label_HidDevice");
         public static string Button_SetRange => Get("Button_SetRange");
@@ -1041,5 +1033,21 @@ namespace MozaPlugin.Resources
         public static string GuideCategory_Dashboard => Get("GuideCategory_Dashboard");
         public static string GuideCategory_Controls => Get("GuideCategory_Controls");
         public static string GuideCategory_Plugin => Get("GuideCategory_Plugin");
+        public static string BiteCal_Ready => Get("BiteCal_Ready");
+        public static string BiteCal_Measuring => Get("BiteCal_Measuring");
+        public static string BiteCal_CarCalibrated => Get("BiteCal_CarCalibrated");
+        public static string BiteCal_GameCalibrated => Get("BiteCal_GameCalibrated");
+        public static string BiteCal_NotCalibrated => Get("BiteCal_NotCalibrated");
+        public static string BiteCal_TooFast => Get("BiteCal_TooFast");
+        public static string BiteDash_Title => Get("BiteDash_Title");
+        public static string BiteDash_Description => Get("BiteDash_Description");
+        public static string BiteCal_NotReady => Get("BiteCal_NotReady");
+        public static string BiteCal_Waiting => Get("BiteCal_Waiting");
+        public static string BiteDash_InGame => Get("BiteDash_InGame");
+        public static string BiteDash_ClutchSignal => Get("BiteDash_ClutchSignal");
+        public static string BiteDash_InGear => Get("BiteDash_InGear");
+        public static string BiteDash_Stopped => Get("BiteDash_Stopped");
+        public static string BiteDash_ClutchPressed => Get("BiteDash_ClutchPressed");
+        public static string BiteDash_LastLaunch => Get("BiteDash_LastLaunch");
     }
 }

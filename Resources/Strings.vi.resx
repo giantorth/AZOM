@@ -865,13 +865,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Đã hiệu chuẩn</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Thủ công</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ĐẶT LẠI</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Nhàn rỗi</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Đang chờ</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Sẵn sàng</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Đang nhả</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Đã hủy</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Tự động hiệu chuẩn</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} mẫu</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Nguồn côn</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Bàn đạp mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Điểm bắt côn ly hợp</value></data>
@@ -883,7 +876,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Đạp</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Nhả</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Cả hai</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Giá trị trò chơi</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Trục HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Thiết bị</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ĐẶT PHẠM VI</value></data>
@@ -976,4 +968,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Bảng điều khiển</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Điều khiển</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Sẵn sàng</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Đang đo</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Xe đã hiệu chuẩn ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Trò chơi đã hiệu chuẩn ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Chưa hiệu chuẩn</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Quá nhanh</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Điểm bắt côn ly hợp MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Hiển thị hiệu chuẩn điểm bắt côn ly hợp khi bạn lái xe.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Chưa sẵn sàng</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Đang chờ</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>Đang trong trò chơi</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Tín hiệu côn</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Đã vào số</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Đã dừng</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Đã đạp côn</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Lần xuất phát cuối {0}% · {1}%/s</value></data>
 </root>

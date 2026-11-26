@@ -34,7 +34,7 @@ namespace MozaPlugin.Integration
     }
 
     /// <summary>
-    /// Clutch and Bite Point sections (clutch source, calibration, Calibrated/Manual
+    /// Clutch and Bite Point sections (clutch source, calibration status, Calibrated/Manual
     /// picker and Trigger Input Level) for the ShakeIt clutch effect editors — the same plugin state the
     /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). The source picker is
     /// locked to the mBooster pedal while the plugin tab drives an mBooster clutch. Trigger Input
@@ -46,14 +46,13 @@ namespace MozaPlugin.Integration
         private readonly Model _model = new Model();
         private readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         private readonly TextBlock _status = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
-        private readonly Button _calibrate = new Button { Padding = new Thickness(10, 2, 10, 2) };
+        private readonly MozaControls.BitePointCalIndicator _indicator = new MozaControls.BitePointCalIndicator();
         private readonly Button _reset = new Button
         {
             Content = Strings.Button_ResetCalibration,
             Padding = new Thickness(10, 2, 10, 2),
             Margin = new Thickness(8, 0, 0, 0),
         };
-        private readonly CheckBox _auto = new CheckBox { Content = Strings.Label_AutoCalibrate, Margin = new Thickness(0, 6, 0, 6) };
         private readonly ComboBox _source = new ComboBox { MinWidth = 140, Margin = new Thickness(8, 0, 0, 0) };
         private readonly Button _sourceFormula = new Button
         {
@@ -79,14 +78,14 @@ namespace MozaPlugin.Integration
         public MozaClutchBitePointCalibrationView(IClutchBitePointSettings effect)
         {
             _effect = effect;
-            var header = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+            var header = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetColumn(_calibrate, 1);
+            Grid.SetColumn(_indicator, 1);
             Grid.SetColumn(_reset, 2);
             header.Children.Add(_status);
-            header.Children.Add(_calibrate);
+            header.Children.Add(_indicator);
             header.Children.Add(_reset);
 
             _useCalibrated.Items.Add(Strings.Option_BitePointCalibrated);
@@ -119,10 +118,9 @@ namespace MozaPlugin.Integration
             root.Children.Add(EditorSections.Section(Strings.Section_ShakeItClutch,
                 sourceRow, _sourceFormulaText, _hidPicker));
             root.Children.Add(EditorSections.Section(Strings.Section_BitePoint,
-                header, _auto, _useCalibratedRow, _trigger));
+                header, _useCalibratedRow, _trigger));
             Content = root;
 
-            _calibrate.Click += (s, e) => MozaPlugin.Instance?.ToggleBitePointCalibration();
             _reset.Click += (s, e) =>
             {
                 MozaPlugin.Instance?.ResetClutchBitePoint();
@@ -138,8 +136,6 @@ namespace MozaPlugin.Integration
                     EditFormula();
             };
             _sourceFormula.Click += (s, e) => EditFormula();
-            _auto.Checked += (s, e) => SetAuto(true);
-            _auto.Unchecked += (s, e) => SetAuto(false);
             _useCalibrated.SelectionChanged += (s, e) =>
             {
                 if (_refreshing || _useCalibrated.SelectedIndex < 0) return;
@@ -173,18 +169,11 @@ namespace MozaPlugin.Integration
         private bool UsesCalibration(MozaPlugin plugin, in MozaPlugin.BitePointInfo info) =>
             _effect.UseCalibratedBitePoint && info.IsCalibrated && !string.IsNullOrEmpty(plugin.CurrentGameName);
 
-        private void SetAuto(bool on)
-        {
-            var plugin = MozaPlugin.Instance;
-            if (plugin != null && !_refreshing) plugin.BitePointAutoCalibrate = on;
-        }
-
         private void Refresh()
         {
             var plugin = MozaPlugin.Instance;
             if (plugin == null) return;
             var info = plugin.ClutchBitePointInfo();
-            bool running = plugin.IsBitePointCalibrationRunning;
             _refreshing = true;
             try
             {
@@ -200,10 +189,9 @@ namespace MozaPlugin.Integration
                 _sourceValue.Text = plugin.TryGetBitePointClutchPosition(out double clutch01)
                     ? Math.Round(clutch01 * 100) + "%" : "—";
 
-                _status.Text = plugin.BitePointStatusText(info);
-                _calibrate.Content = running ? Strings.Button_Cancel : Strings.Button_Calibrate;
-                _reset.IsEnabled = (info.IsCalibrated && !info.Inherited) || running;
-                _auto.IsChecked = plugin.BitePointAutoCalibrate;
+                _status.Text = MozaPlugin.BitePointValueText(info);
+                _indicator.Show(info, plugin.BitePointCalibrationState);
+                _reset.IsEnabled = info.IsCalibrated && !info.Inherited;
                 _useCalibratedRow.Visibility = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;
                 _useCalibrated.SelectedIndex = _effect.UseCalibratedBitePoint ? 0 : 1;
                 bool showsCalibration = UsesCalibration(plugin, info);

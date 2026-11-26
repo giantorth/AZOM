@@ -865,13 +865,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Калиброванная</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Вручную</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>СБРОС</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Неактивно</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Ожидание</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Готово</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Отпускание</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Отменено</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Автокалибровка</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>Замеров: {0}</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Источник сцепления</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Педаль mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Точка схватывания сцепления</value></data>
@@ -883,7 +876,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Нажатие</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Отпускание</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Оба</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Значение игры</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Ось HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Устройство</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ЗАДАТЬ ДИАПАЗОН</value></data>
@@ -976,4 +968,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Табло</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Органы управления</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Плагин</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Готово</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Измерение</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Автомобиль откалиброван ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Игра откалибрована ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Не откалибровано</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Слишком быстро</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Точка схватывания сцепления MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Показывает калибровку точки схватывания сцепления во время езды.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Не готово</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Ожидание</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>В игре</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Сигнал сцепления</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Передача включена</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Остановлен</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Сцепление выжато</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Последний старт {0}% · {1}%/s</value></data>
 </root>

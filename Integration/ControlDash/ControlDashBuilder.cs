@@ -4,8 +4,8 @@ using System.Globalization;
 using System.Linq;
 using MozaPlugin.Resources;
 using MozaPlugin.Settings;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using static MozaPlugin.Integration.ControlDash.DashItems;
 
 namespace MozaPlugin.Integration.ControlDash
 {
@@ -44,27 +44,10 @@ namespace MozaPlugin.Integration.ControlDash
         private const int BtnW = 52, BtnGap = 4, ValueW = 104, ToggleW = 120;
         private const int CtlW = 4 * BtnW + ValueW + 4 * BtnGap;
 
-        private const string Font = "Roboto";
         // Roboto has no geometric arrows; Cousine (also in DashFonts, also
         // served to the web dash) has ▲►▼◄.
         private const string ArrowFont = "Cousine";
         private const string ArrowLeft = "◄", ArrowRight = "►", ArrowUp = "▲", ArrowDown = "▼";
-
-        private const string BgColor = "#FF14171C";
-        private const string BarColor = "#FF1C2027";
-        private const string RowColor = "#FF1B1F26";
-        private const string BtnColor = "#FF2B313B";
-        private const string GridColor = "#FF2A303A";
-        private const string GuideColor = "#FF4A5260";
-        private const string AccentColor = "#FF3FA9F5";
-        private const string OnColor = "#FF2E8B57";
-        private const string OffColor = "#FF3A3F48";
-        private const string TextColor = "#FFFFFFFF";
-        private const string LabelColor = "#FFB8C0CC";
-        private const string Transparent = "#00FFFFFF";
-
-        private const string ItemNs = "SimHub.Plugins.OutputPlugins.GraphicalDash.Models.";
-        private const string Asm = ", SimHub.Plugins";
 
         // ── Layout model ────────────────────────────────────────────────────
 
@@ -200,63 +183,15 @@ namespace MozaPlugin.Integration.ControlDash
 
         // ── Output ──────────────────────────────────────────────────────────
 
-        internal sealed class Output
-        {
-            public string Djson = "";
-            public string Metadata = "";
-        }
-
         /// <summary>Build the dashboard and its metadata sidecar for the current UI culture.</summary>
-        internal static Output Build(bool fahrenheit)
+        internal static DashOutput Build(bool fahrenheit)
         {
             var pages = Pages();
             var screens = new JArray();
             for (int i = 0; i < pages.Count; i++)
                 screens.Add(Screen(pages, i, fahrenheit));
-
-            var meta = Metadata(pages.Count);
-            var dash = new JObject
-            {
-                ["Version"] = 2,
-                ["Id"] = DashboardId,
-                ["BaseHeight"] = H,
-                ["BaseWidth"] = W,
-                ["BackgroundColor"] = BgColor,
-                ["Screens"] = screens,
-                ["Images"] = new JArray(),
-                ["Metadata"] = meta,
-                ["ShowOnScreenControls"] = false,
-                ["IsOverlay"] = false,
-                ["EnableClickThroughOverlay"] = false,
-                ["EnableOnDashboardMessaging"] = false,
-            };
-
-            return new Output
-            {
-                Djson = dash.ToString(Formatting.Indented),
-                Metadata = meta.ToString(Formatting.Indented),
-            };
-        }
-
-        private static JObject Metadata(int screenCount)
-        {
-            var all = new JArray(Enumerable.Range(0, screenCount));
-            return new JObject
-            {
-                ["Title"] = Strings.ControlDash_Title,
-                ["Description"] = Strings.ControlDash_Description,
-                ["Author"] = "AZOM",
-                ["ScreenCount"] = (double)screenCount,
-                ["InGameScreensIndexs"] = all,
-                ["IdleScreensIndexs"] = new JArray(all),
-                ["PitScreensIndexs"] = new JArray(),
-                ["MainPreviewIndex"] = 0,
-                ["IsOverlay"] = false,
-                ["Width"] = (double)W,
-                ["Height"] = (double)H,
-                ["MetadataVersion"] = 2.0,
-                ["EnableOnDashboardMessaging"] = false,
-            };
+            return Dashboard(DashboardId, W, H, BgColor, screens,
+                Strings.ControlDash_Title, Strings.ControlDash_Description, overlay: false);
         }
 
         private static JObject Screen(List<Page> pages, int index, bool fahrenheit)
@@ -670,166 +605,5 @@ namespace MozaPlugin.Integration.ControlDash
             }
             return Layer("Nav", 0, NavTop, W, NavH, children);
         }
-
-        // ── Item primitives ─────────────────────────────────────────────────
-
-        private static JObject Text(string name, int x, int y, int w, int h, string text, int size,
-                                    string color, bool bold = false, int align = 0, string font = Font)
-        {
-            var o = new JObject
-            {
-                ["$type"] = ItemNs + "TextItem" + Asm,
-                ["IsTextItem"] = true,
-                ["Font"] = font,
-                ["FontSize"] = (double)size,
-                ["Text"] = text,
-                ["TextColor"] = color,
-                ["HorizontalAlignment"] = align,   // 0 left, 1 center, 2 right
-                ["VerticalAlignment"] = 1,         // center
-                ["BackgroundColor"] = Transparent,
-            };
-            if (bold) o["FontWeight"] = "Bold";
-            Geometry(o, name, x, y, w, h);
-            return o;
-        }
-
-        private static JObject Rect(string name, int x, int y, int w, int h, string color, int radius = 10)
-        {
-            var o = new JObject
-            {
-                ["$type"] = ItemNs + "RectangleItem" + Asm,
-                ["IsRectangleItem"] = true,
-                ["BackgroundColor"] = color,
-                ["BorderStyle"] = Border(radius),
-            };
-            Geometry(o, name, x, y, w, h);
-            return o;
-        }
-
-        /// <summary>Vertical bar gauge filling from the bottom.</summary>
-        private static JObject LinearGauge(string name, int x, int y, int w, int h, int max)
-        {
-            var o = new JObject
-            {
-                ["$type"] = ItemNs + "LinearGaugeItem" + Asm,
-                ["AutoSize"] = false,
-                ["AutoSizeScale"] = 1.0,
-                ["GaugeColor"] = AccentColor,
-                ["Minimum"] = 0.0,
-                ["Maximum"] = (double)max,
-                ["Value"] = 0.0,
-                ["Steps"] = 0.0,
-                ["GaugeOrientation"] = 1,   // Vertical
-                ["GaugeAlignment"] = 0,     // LeftOrBottom
-                ["BackgroundColor"] = BtnColor,
-            };
-            Geometry(o, name, x, y, w, h);
-            return o;
-        }
-
-        /// <summary>
-        /// Visible button: background rectangle and label, then a transparent
-        /// <c>ButtonItem</c> on top as the hit area (later items draw above earlier
-        /// ones). Children nested in a ButtonItem don't render, hence the overlay —
-        /// the same pattern the stock dashboards use. The ctor defaults
-        /// SimulateKey=true / TriggerSimHubInputName="MyButton" are cleared. With
-        /// <paramref name="enabledWhen"/> (NCalc boolean), the button is disabled
-        /// and its visuals dimmed while the expression is false.
-        /// </summary>
-        private static JObject[] Button(string name, int x, int y, int w, int h, string color, JObject label,
-                                        string? azomAction, string? enabledWhen)
-        {
-            var bg = Rect(name + ".Background", x, y, w, h, color);
-            var hit = new JObject
-            {
-                ["$type"] = ItemNs + "ButtonItem" + Asm,
-                ["SimulatedKey"] = 0,
-                ["SimulatedKeyV2"] = new JObject { ["Win"] = false, ["Ctrl"] = false, ["Alt"] = false, ["Shift"] = false },
-                ["SimulateKey"] = false,
-                ["TriggerAction"] = azomAction == null ? "" : SimHubRegistrar.FullName(azomAction),
-                ["TriggerSimHubInputName"] = "",
-                ["AutoSize"] = false,
-                ["IsEnabled"] = true,
-                ["BackgroundColor"] = Transparent,
-            };
-            Geometry(hit, name, x, y, w, h);
-
-            if (enabledWhen != null)
-            {
-                hit["Bindings"] = new JObject { ["IsEnabled"] = NCalc("IsEnabled", enabledWhen) };
-                foreach (var visual in new[] { bg, label })
-                {
-                    var b = visual["Bindings"] as JObject ?? new JObject();
-                    b["Opacity"] = NCalc("Opacity", "if(" + enabledWhen + ", 100, 30)");
-                    visual["Bindings"] = b;
-                }
-            }
-            return new[] { bg, label, hit };
-        }
-
-        private static void AddAll(JArray target, IEnumerable<JObject> items)
-        {
-            foreach (var i in items) target.Add(i);
-        }
-
-        private static JObject Layer(string name, int x, int y, int w, int h, JArray children)
-        {
-            var o = new JObject
-            {
-                ["$type"] = ItemNs + "Layer" + Asm,
-                ["Group"] = true,
-                ["BackgroundColor"] = Transparent,
-            };
-            Geometry(o, name, x, y, w, h);
-            o["Childrens"] = children;
-            return o;
-        }
-
-        private static void Geometry(JObject o, string name, int x, int y, int w, int h)
-        {
-            o["Left"] = (double)x;
-            o["Top"] = (double)y;
-            o["Width"] = (double)w;
-            o["Height"] = (double)h;
-            o["Visible"] = true;
-            o["Name"] = name;
-        }
-
-        private static JObject Border(int radius) => new JObject
-        {
-            ["RadiusTopLeft"] = radius,
-            ["RadiusTopRight"] = radius,
-            ["RadiusBottomLeft"] = radius,
-            ["RadiusBottomRight"] = radius,
-        };
-
-        // ── Bindings ────────────────────────────────────────────────────────
-
-        private static JObject NCalc(string target, string expr) => new JObject
-        {
-            ["Formula"] = new JObject { ["Expression"] = expr },
-            ["Mode"] = 2,
-            ["TargetPropertyName"] = target,
-        };
-
-        private static JObject Js(string target, string expr) => new JObject
-        {
-            ["Formula"] = new JObject { ["Interpreter"] = 1, ["Expression"] = expr },
-            ["Mode"] = 2,
-            ["TargetPropertyName"] = target,
-        };
-
-        /// <summary>NCalc property reference.</summary>
-        private static string Ref(string azomName) => "[" + SimHubRegistrar.FullName(azomName) + "]";
-
-        /// <summary>JavaScript property read.</summary>
-        private static string Prop(string azomName) => "$prop('" + SimHubRegistrar.FullName(azomName) + "')";
-
-        /// <summary>JavaScript string literal (JSON quoting is valid JS).</summary>
-        private static string JsStr(string s) => JsonConvert.ToString(s);
-
-        // Formulas must not pick up the UI culture's decimal comma.
-        private static string Int(int v) => v.ToString(CultureInfo.InvariantCulture);
-        private static string Dbl(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);
     }
 }

@@ -864,13 +864,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Βαθμονομημένο</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Χειροκίνητο</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Αδράνεια</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Έτοιμο</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Απελευθέρωση</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Ακυρώθηκε</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Αυτόματη βαθμονόμηση</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} δείγματα</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Πηγή συμπλέκτη</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Πεντάλ mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Σημείο εμπλοκής συμπλέκτη</value></data>
@@ -882,7 +875,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Πάτημα</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Απελευθέρωση</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Και τα δύο</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Τιμή παιχνιδιού</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Άξονας HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Συσκευή</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΕΥΡΟΥΣ</value></data>
@@ -975,4 +967,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Πίνακας οργάνων</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Χειριστήρια</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Έτοιμο</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Μέτρηση</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Αυτοκίνητο βαθμονομημένο ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Παιχνίδι βαθμονομημένο ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Μη βαθμονομημένο</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Πολύ γρήγορα</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA Σημείο εμπλοκής συμπλέκτη</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Εμφανίζει τη βαθμονόμηση του σημείου εμπλοκής του συμπλέκτη ενώ οδηγείτε.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Μη έτοιμο</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>Σε παιχνίδι</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Σήμα συμπλέκτη</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Με ταχύτητα</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Σταματημένο</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Συμπλέκτης πατημένος</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Τελευταία εκκίνηση {0}% · {1}%/s</value></data>
 </root>

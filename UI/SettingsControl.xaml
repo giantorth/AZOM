@@ -3143,10 +3143,10 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" x:Name="MBoosterBiteCalState" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" x:Name="MBoosterBiteCalButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="MBoosterBiteCal_Click"/>
+                                        <ctrl:BitePointCalIndicator Grid.Column="1" x:Name="MBoosterBiteCalIndicator"
+                                                                    Background="{StaticResource BgCardBrush}" BorderBrush="{StaticResource BorderBrush}"/>
                                         <Button Grid.Column="2" x:Name="MBoosterBiteCalResetButton" Content="{x:Static res:Strings.Button_ResetCalibration}" Padding="10,2" Margin="8,0,0,0" Click="MBoosterBiteCalReset_Click"/>
                                     </Grid>
-                                    <ctrl:OffOnToggle x:Name="MBoosterBiteCalAuto" Content="{x:Static res:Strings.Label_AutoCalibrate}" HorizontalAlignment="Left" Margin="0,4" Checked="MBoosterBiteCalAuto_Changed" Unchecked="MBoosterBiteCalAuto_Changed"/>
                                     <!-- Shown when the current game has a calibrated bite point. -->
                                     <StackPanel x:Name="MBoosterBiteCalValuePanel" Visibility="Collapsed">
                                         <Grid Margin="0,4">

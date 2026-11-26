@@ -864,13 +864,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrado</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manual</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>REDEFINIR</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Ocioso</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Aguardando</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Pronto</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Soltando</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Cancelado</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibração automática</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} amostras</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Fonte da embreagem</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pedal mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Ponto de acoplamento da embreagem</value></data>
@@ -882,7 +875,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Pisar</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Soltar</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Ambos</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Valor do jogo</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Eixo HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Dispositivo</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>DEFINIR FAIXA</value></data>
@@ -975,4 +967,20 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Painel</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Controles</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Medindo</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Carro calibrado ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Jogo calibrado ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Não calibrado</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Rápido demais</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Ponto de acoplamento da embreagem MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Mostra a calibração do ponto de acoplamento da embreagem enquanto você dirige.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Não pronto</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Aguardando</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>No jogo</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Sinal da embreagem</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Marcha engatada</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Parado</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embreagem pressionada</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Última largada {0}% · {1}%/s</value></data>
 </root>
