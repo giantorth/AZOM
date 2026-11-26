@@ -482,6 +482,7 @@ namespace MozaPlugin
             _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
 
             bool hasClutch = TryGetBitePointClutchPosition(out double clutch01);
+            UpdateAutoBiteFeel(gameKey, data.GameRunning && !data.GamePaused, hasClutch ? clutch01 : double.NaN);
             string? gear = nd?.Gear;
             bool inGear = !string.IsNullOrEmpty(gear) && gear != "N" && gear != "0";
             bool ready = data.GameRunning && !data.GamePaused && nd != null && hasClutch && inGear;

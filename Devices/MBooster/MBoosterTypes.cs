@@ -141,6 +141,15 @@ namespace MozaPlugin.Devices.MBooster
         public const int BitePointPulseRateMaxHz = 25;
         public const int BitePointPulseRateDefaultHz = 10;
 
+        // Automatic bite point (MBoosterAutoBiteCurve): the peak's half-width
+        // in pedal travel (%), and the force before and after it (% of the
+        // Deadzone→Max Force span).
+        public const int AutoBiteWidthMinPct = 2;
+        public const int AutoBiteWidthMaxPct = 25;
+        public const int AutoBiteWidthDefaultPct = 8;
+        public const int AutoBiteBeforeDefaultPct = 50;
+        public const int AutoBiteAfterDefaultPct = 40;
+
         /// <summary>
         /// The ripple rate a Bite Point with no Pulse rate set plays: before the
         /// setting existed the ripple ran at the tone frequency but was only
@@ -651,6 +660,8 @@ namespace MozaPlugin.Devices.MBooster
         float DampingPressPct { get; set; }
         float DampingReleasePct { get; set; }
         MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
+        // Automatic bite point Pedal Feel; null = never set.
+        MBoosterAutoBiteFeel? AutoBiteFeel { get; set; }
     }
 
     /// <summary>
@@ -699,6 +710,8 @@ namespace MozaPlugin.Devices.MBooster
         public float DampingPressPct { get; set; } = -1;
         public float DampingReleasePct { get; set; } = -1;
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
+        // See MBoosterDeviceSettings.AutoBiteFeel.
+        public MBoosterAutoBiteFeel? AutoBiteFeel { get; set; } = null;
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
         public MBoosterEffectSettings Abs { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
@@ -740,6 +753,7 @@ namespace MozaPlugin.Devices.MBooster
                 DampingPressPct = DampingPressPct,
                 DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
+                AutoBiteFeel = AutoBiteFeel?.Clone(),
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
@@ -1064,6 +1078,11 @@ namespace MozaPlugin.Devices.MBooster
         // docs/protocol/devices/mbooster.md "Segmented Damping".
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
+        // Automatic bite point: while on, a clutch pedal's Pedal Feel curve is
+        // MBoosterAutoBiteCurve's template peaking at the calibrated bite point
+        // instead of InputCurveY/X/EndY, which stay as they are. Null = never set.
+        public MBoosterAutoBiteFeel? AutoBiteFeel { get; set; } = null;
+
         // Auto-sleep timeout in minutes (0 = off, 1..300), register 0xB4 on
         // the host unit. -1 = no override.
         public int SleepMinutes { get; set; } = -1;
@@ -1111,6 +1130,7 @@ namespace MozaPlugin.Devices.MBooster
                 DampingPressPct = DampingPressPct,
                 DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
+                AutoBiteFeel = AutoBiteFeel?.Clone(),
                 SleepMinutes = SleepMinutes,
             };
         }

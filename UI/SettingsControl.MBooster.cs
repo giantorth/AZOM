@@ -336,7 +336,11 @@ namespace MozaPlugin.UI
                 if (s.SleepMinutes < 0) SeedMBoosterSleep(s, selected);
                 // So can the Pedal Feel read-backs.
                 using (_suppressor.Begin())
+                {
                     SeedMBoosterPedalFeelRegisters(PeekMBoosterEffectTarget(), unsetOnly: true);
+                    // The bite point moves with the game, vehicle and calibration.
+                    ApplyMBoosterAutoBiteState(PeekMBoosterEffectTarget(), showCurve: false);
+                }
                 return;
             }
             // Diagnostic trail for the "curve values wrong until profile
@@ -824,25 +828,9 @@ namespace MozaPlugin.UI
             float thr = fx?.MaxThresholdKg ?? -1;
             MBoosterMaxThresholdSlider.Value = thr >= 0 ? thr : 100;
             SetValueText(MBoosterMaxThresholdValue, MBoosterMaxThresholdSlider.Value.ToString("F0"));
-            // Pedal Feel
-            var inputCurve = (fx?.InputCurveY != null && fx.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                ? fx.InputCurveY : MBoosterInputCurveDefault;
-            MBoosterInputY1Slider.Value = inputCurve[0];
-            MBoosterInputY2Slider.Value = inputCurve[1];
-            MBoosterInputY3Slider.Value = inputCurve[2];
-            MBoosterInputY4Slider.Value = inputCurve[3];
-            MBoosterInputY5Slider.Value = inputCurve[4];
-            MBoosterInputY6Slider.Value = inputCurve[5];
-            var inputCurveX = (fx?.InputCurveX != null && fx.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                ? fx.InputCurveX : MBoosterInputCurveDefault;
-            MBoosterInputX1Slider.Value = inputCurveX[0];
-            MBoosterInputX2Slider.Value = inputCurveX[1];
-            MBoosterInputX3Slider.Value = inputCurveX[2];
-            MBoosterInputX4Slider.Value = inputCurveX[3];
-            MBoosterInputX5Slider.Value = inputCurveX[4];
-            MBoosterInputX6Slider.Value = inputCurveX[5];
-            float endY = fx?.InputCurveEndY ?? -1;
-            MBoosterInputEndYSlider.Value = endY >= 0 ? endY : 100;
+            // Pedal Feel — the curve the pedal gets, the automatic bite point
+            // one included.
+            SeedMBoosterAutoBite(fx);
             float mf = fx?.MaxForceKg ?? -1;
             MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));

@@ -275,6 +275,9 @@ namespace MozaPlugin.UI
             // active pedal's.
             bool ownsLoadCell = CurrentMBoosterController()?.OwnsSingletonRegisters(_mboosterEffectPedalIndex) ?? false;
             MBoosterLoadCellPanel.Visibility = ownsLoadCell ? Visibility.Visible : Visibility.Collapsed;
+            // Same gate as MozaPlugin.TryAutoBiteFeelCurve.
+            bool clutchFeel = isClutch && (CurrentMBoosterController()?.IsAxisMotorized(_mboosterEffectPedalIndex) ?? false);
+            MBoosterAutoBitePanel.Visibility = clutchFeel ? Visibility.Visible : Visibility.Collapsed;
 
             // Max Force/Deadzone slider bounds are role-scoped: Throttle and
             // Clutch are both much lighter springs than a brake's load cell,
@@ -349,6 +352,7 @@ namespace MozaPlugin.UI
             MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
             MBoosterLoadCellPanel.Visibility = Visibility.Visible;
+            MBoosterAutoBitePanel.Visibility = Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = Visibility.Visible;
             MBoosterDeadzoneMaxForcePanel.Visibility = Visibility.Visible;
             MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;

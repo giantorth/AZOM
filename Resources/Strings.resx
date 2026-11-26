@@ -971,4 +971,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Default Effects</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Wheel lock</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Streamer Mode</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatic bite point</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Before bite (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>After bite (%)</value></data>
 </root>

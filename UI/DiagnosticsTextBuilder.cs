@@ -373,6 +373,10 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"Merged pos:     T={data.ThrottlePosition} B={data.BrakePosition} C={data.ClutchPosition}" +
                 $"  (max seen this session: T={maxT} B={maxB} C={maxC})");
+            int bitePedal = plugin.ClutchBitePedalPct;
+            sb.AppendLine(
+                $"Bite point:     {(plugin.CurrentClutchBitePointPct < 0 ? "—" : plugin.CurrentClutchBitePointPct + "%")} " +
+                $"({plugin.BitePointSource}) = {(bitePedal < 0 ? "—" : bitePedal + "%")} clutch pedal travel");
             for (int i = 0; i < devs.Count; i++)
             {
                 var d = devs[i];
@@ -535,7 +539,8 @@ namespace MozaPlugin.UI
                     $"damping={FmtPct(cfg.DampingPressPct)}/{FmtPct(cfg.DampingReleasePct)} " +
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
                     $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")} " +
-                    $"inCurveEnd={FmtPct(cfg.InputCurveEndY)}");
+                    $"inCurveEnd={FmtPct(cfg.InputCurveEndY)} " +
+                    $"autoBite={(cfg.AutoBiteFeel is { } ab ? $"{(ab.Enabled ? "on" : "off")}(w{ab.WidthPct}/b{ab.BeforePct}/a{ab.AfterPct})" : "—")}");
             }
         }
 

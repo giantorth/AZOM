@@ -2103,6 +2103,69 @@ any 0–100% of the span regardless of their neighbours, so non-monotonic
 2026-11-24). Only X is kept in order. The PitHouse preset importer keeps
 `forces_curve` values as-is for the same reason.
 
+### Automatic bite point — the curve drawn from the calibrated bite point
+
+Plugin-side only: it writes the same `0xAB` family as a hand-drawn curve,
+through `PushFeelCurveResync`. Shown for an active pedal with the Clutch role
+(`MBoosterAutoBitePanel`); stored per pedal as `AutoBiteFeel` (null = never
+set). Pit House has no equivalent.
+
+**Shape** (`MBoosterAutoBiteCurve`, Y in % of the Deadzone→Max Force span):
+a ramp from the Deadzone start point up to *Before* at `bite − Width`, 100 %
+(Max Force, so the slider sets the peak height) at the bite point, *After*
+at `bite + Width`, flat after that to the last point. Defaults: Width ±8 %
+of travel, Before 50 %, After 40 %. Three nodes take `bite − Width`,
+`bite`, `bite + Width` (clamped to 1..99 so the editor's 1-unit gaps to
+the end points hold; the bite point is held to 2..98). The other three
+split between the two sides in proportion to each side's length, evenly
+spaced, X whole. Bite 35 → X `14 27 35 43 62 81`, Y `25.93 50 100 40 40 40`,
+last point 40. The peak is a node, so it lands at the bite point whether the
+unit interpolates between nodes linearly or by spline (which it does is
+not known).
+
+**Units.** The calibration (`MBoosterClutchBitePointCalibrations`) is in the
+clutch source's units; the curve's X is the pedal's own travel. AZOM places
+the bite point the way the graph's live dot reads the pedal:
+`LastAxisRawPercentPreThreshold` (raw HID, before the host-side Max
+Threshold gain). Whether the unit's X axis is that reading, or travel before
+its own output curve and Min/Max, is **unverified**; with a linear output
+curve over 0–100 the two coincide. Check on hardware: hold the clutch at the
+bite point and the dot should sit on the peak, where the force peaks.
+
+- *mBooster pedal* source: the bite point is the shaped position; dividing
+  by `MaxThresholdGain` gives the raw reading (USB lanes only; a routed
+  lane's position carries no gain).
+- *Game / Formula / HID axis*: `MBoosterBitePointPedalMap`, one per game key
+  (`MBoosterBitePointPedalMaps`, no vehicle keys — input processing is per
+  game): source % (101 bins) → pedal travel, learned on the data thread
+  while the game runs, unpaused, whenever both positions stay within 2 %
+  over 0.2 s (10 %/s, so telemetry lag costs well under 1 %). Each steady
+  sample moves its bin 10 % toward the reading. A lookup takes the bite
+  point's own bin, else interpolates between the nearest seen bins on both
+  sides within 5 %; otherwise there is no bite point in travel. One slow
+  press of the clutch fills it; launches add samples around the bite point.
+  Recording the pedal at the fitted bite moment instead would carry the
+  game's speed-telemetry lag × release rate (the detector's own fit is
+  self-consistent in the game's units, the HID reading is ahead of it).
+
+**Writes.** `MozaPlugin.ResolveMBoosterFeelCurve` picks the automatic curve
+when it applies (on, active Clutch, bite point known in travel), else the
+stored `InputCurveY/X/EndY`, which are never overwritten. Every feel push
+goes through it: the UI's coalesced push, the Travel push, the connect and
+profile apply, and the data thread. The data thread checks every 250 ms and
+pushes when the resolved curve differs from the last one sent to that unit
+(`IsFeelCurvePushed`) — game, vehicle, calibration or source changes — only
+while the clutch is under 5 % travel, re-checked when the coalesced write
+runs; at most once per 2 s. With no bite point it puts the stored curve back,
+and writes defaults only over a curve already sent this connection, never
+over the unit's own values (`MBoosterFeelPushGuard`). Turning the option off
+pushes the stored curve from the UI under the same rule.
+
+**Sensor Output Ratio** is held at angle only (0) while it applies
+(`EffectiveSensorRatioPct`; set and written when it's turned on, the slider
+locked): with load cell in the blend, output would dip after the force peak,
+and the bite point placed by that output would move with the curve it drives.
+
 ### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
 
 **REVISED**: the `{8.049, 19.495, 44.245, 72.433, 90.040, 97.910}%` default
@@ -3095,6 +3158,7 @@ equivalent of `ImportPlan.TouchedMBoosters`.
 - 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
 - Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
 - Calibration routines — [`Devices/MBooster/MBoosterCalibrationRunner.cs`](../../../Devices/MBooster/MBoosterCalibrationRunner.cs), UI in [`UI/SettingsControl.MBoosterCal.cs`](../../../UI/SettingsControl.MBoosterCal.cs)
+- Automatic bite point — [`MozaPlugin.MBoosterAutoBiteFeel.cs`](../../../MozaPlugin.MBoosterAutoBiteFeel.cs), template and settings in [`Devices/MBooster/MBoosterAutoBiteFeel.cs`](../../../Devices/MBooster/MBoosterAutoBiteFeel.cs), map in [`Devices/MBooster/MBoosterBitePointPedalMap.cs`](../../../Devices/MBooster/MBoosterBitePointPedalMap.cs), UI in [`UI/SettingsControl.MBoosterAutoBite.cs`](../../../UI/SettingsControl.MBoosterAutoBite.cs)
 - Byte-exact frame expectations — [`tools/cmd-frame-mbooster-cal.txt`](../../../tools/cmd-frame-mbooster-cal.txt), checked with [`tools/cmd-frame`](../../../tools/cmd-frame) (`tools/cmd-frame --check tools/cmd-frame-mbooster-cal.txt`)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
 - Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)

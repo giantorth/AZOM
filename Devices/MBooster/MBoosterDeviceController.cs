@@ -1851,7 +1851,7 @@ namespace MozaPlugin.Devices.MBooster
             // next apply skip a write the reconnected unit needs.
             lock (_statusLock) { _outputRegs.Clear(); _outputFloatRegs.Clear(); }
             // The next connect-time apply resends every feel-curve X.
-            lock (_lastFeelX) _lastFeelX.Clear();
+            lock (_lastFeel) _lastFeel.Clear();
             lock (_lastSegDamp) { _lastSegDamp.Clear(); _plainDampingLatest.Clear(); }
         }
 
@@ -2675,40 +2675,83 @@ namespace MozaPlugin.Devices.MBooster
         public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX,
             float inputCurveEndY, byte device, bool allX = false)
         {
-
-            var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
-            var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+            var raw = new FeelCurveRaw(deadzoneKg, maxForceKg, inputCurveY, inputCurveX, inputCurveEndY);
             // Pit House's bursts (moza-simulator bridge, 2026-09-29): a
             // Deadzone change is 0x07 + 0x08-0x0D + 0x0E, a Max Force change
             // 0x08-0x0D + 0x0E, a node drag adds that node's X. So Deadzone
             // and X go only where they changed since the last push to this
             // unit (everything after a reconnect); the Y nodes and Max Force
             // always.
-            int rawDz = MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg);
-            var rawX = new int[midX.Length + 1];
-            for (int i = 0; i < midX.Length; i++) rawX[i] = MozaMBoosterProtocol.EncodeThresholdKg(midX[i]);
-            rawX[midX.Length] = rawDz;
-            int[]? lastX;
-            lock (_lastFeelX)
+            FeelCurveRaw? last;
+            lock (_lastFeel)
             {
-                _lastFeelX.TryGetValue(device, out lastX);
-                _lastFeelX[device] = rawX;
+                _lastFeel.TryGetValue(device, out last);
+                _lastFeel[device] = raw;
             }
-            if (lastX == null || lastX.Length != rawX.Length || lastX[midX.Length] != rawDz)
-                SendIntWrite("mbooster-brake-deadzone", rawDz, device);
-            for (int i = 0; i < midY.Length; i++)
+            if (last == null || last.Deadzone != raw.Deadzone)
+                SendIntWrite("mbooster-brake-deadzone", raw.Deadzone, device);
+            for (int i = 0; i < raw.Y.Length; i++)
             {
-                if (allX || lastX == null || lastX.Length != rawX.Length || lastX[i] != rawX[i])
-                    SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", rawX[i], device);
-                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
+                if (allX || last == null || last.X[i] != raw.X[i])
+                    SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", raw.X[i], device);
+                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", raw.Y[i], device);
             }
-            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(
-                MozaMBoosterRegistry.ComputeFeelCurveEndY(deadzoneKg, maxForceKg, inputCurveEndY)), device);
+            SendIntWrite("mbooster-brake-maxforce", raw.End, device);
         }
 
-        // Feel-curve X raw values (then the Deadzone) last written, per device id (see
-        // PushFeelCurveResync). Cleared on disconnect.
-        private readonly Dictionary<byte, int[]> _lastFeelX = new Dictionary<byte, int[]>();
+        /// <summary>Whether the last feel curve pushed to <paramref name="device"/>
+        /// since connect encodes the same as this one; false when none was.</summary>
+        public bool IsFeelCurvePushed(byte device, double deadzoneKg, double maxForceKg,
+            float[]? inputCurveY, float[]? inputCurveX, float inputCurveEndY)
+        {
+            FeelCurveRaw? last;
+            lock (_lastFeel) _lastFeel.TryGetValue(device, out last);
+            return last != null && last.SameAs(new FeelCurveRaw(deadzoneKg, maxForceKg, inputCurveY, inputCurveX, inputCurveEndY));
+        }
+
+        /// <summary>A feel curve has been pushed to <paramref name="device"/>
+        /// since connect, so it no longer holds its own.</summary>
+        public bool AnyFeelCurvePushed(byte device)
+        {
+            lock (_lastFeel) return _lastFeel.ContainsKey(device);
+        }
+
+        // The 0xAB family as written: X/Y nodes, last point (0x0E), Deadzone.
+        private sealed class FeelCurveRaw
+        {
+            public readonly int[] X;
+            public readonly int[] Y;
+            public readonly int End;
+            public readonly int Deadzone;
+
+            public FeelCurveRaw(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, float inputCurveEndY)
+            {
+                var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
+                var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+                X = new int[midX.Length];
+                Y = new int[midY.Length];
+                for (int i = 0; i < midX.Length; i++) X[i] = MozaMBoosterProtocol.EncodeThresholdKg(midX[i]);
+                for (int i = 0; i < midY.Length; i++) Y[i] = MozaMBoosterProtocol.EncodeThresholdKg(midY[i]);
+                End = MozaMBoosterProtocol.EncodeThresholdKg(
+                    MozaMBoosterRegistry.ComputeFeelCurveEndY(deadzoneKg, maxForceKg, inputCurveEndY));
+                Deadzone = MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg);
+            }
+
+            public bool SameAs(FeelCurveRaw o) =>
+                End == o.End && Deadzone == o.Deadzone && Same(X, o.X) && Same(Y, o.Y);
+
+            private static bool Same(int[] a, int[] b)
+            {
+                if (a.Length != b.Length) return false;
+                for (int i = 0; i < a.Length; i++)
+                    if (a[i] != b[i]) return false;
+                return true;
+            }
+        }
+
+        // Feel curve last written, per device id (see PushFeelCurveResync).
+        // Cleared on disconnect.
+        private readonly Dictionary<byte, FeelCurveRaw> _lastFeel = new Dictionary<byte, FeelCurveRaw>();
 
         // ── Coalescing gate for UI-driven calibration writes ──
         // A slider raises ValueChanged per tick, and every one of these

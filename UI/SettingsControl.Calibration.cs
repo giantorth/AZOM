@@ -122,13 +122,20 @@ namespace MozaPlugin.UI
         /// currently-selected config pedal, or null if it has no game role.</summary>
         private string? MBoosterSelectedPedalRolePrefix()
         {
-            var s = CurrentMBoosterSettings();
-            var c = CurrentMBoosterController();
-            if (s == null || c == null) return null;
-            var role = c.AxisRole(_mboosterEffectPedalIndex, s);
+            var role = MBoosterSelectedPedalRole();
             return role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Throttle ? "throttle"
                  : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake ? "brake"
                  : role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Clutch ? "clutch" : null;
+        }
+
+        /// <summary>The currently-selected config pedal's role; Disabled when no
+        /// device is selected.</summary>
+        private global::MozaPlugin.Devices.MBooster.MBoosterRole MBoosterSelectedPedalRole()
+        {
+            var s = CurrentMBoosterSettings();
+            var c = CurrentMBoosterController();
+            if (s == null || c == null) return global::MozaPlugin.Devices.MBooster.MBoosterRole.Disabled;
+            return c.AxisRole(_mboosterEffectPedalIndex, s);
         }
 
         private void MBoosterY2Slider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnIntSliderChanged(e.NewValue, _ => SetMBoosterCurveY());
@@ -190,7 +197,7 @@ namespace MozaPlugin.UI
         private void SetMBoosterInputCurveY(int index, float v)
         {
             var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
+            if (s == null || MBoosterAutoBiteActive(s)) return;
             int n = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount;
             if (s.InputCurveY == null || s.InputCurveY.Length != n)
                 s.InputCurveY = Array.ConvertAll(MBoosterInputCurvePresets[0], x => (float)x);
@@ -213,7 +220,7 @@ namespace MozaPlugin.UI
         private void SetMBoosterInputCurveX(int index, int v)
         {
             var s = CurrentMBoosterEffectTarget();
-            if (s == null) return;
+            if (s == null || MBoosterAutoBiteActive(s)) return;
             int n = global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount;
             if (s.InputCurveX == null || s.InputCurveX.Length != n)
                 s.InputCurveX = Array.ConvertAll(MBoosterInputCurvePresets[0], x => (float)x);
@@ -233,7 +240,7 @@ namespace MozaPlugin.UI
         private void MBoosterInputEndYSlider_ValueChanged(object s, RoutedPropertyChangedEventArgs<double> e) => OnDataSliderChanged(e.NewValue, MBoosterUiConstants.PedalFeelYDecimals, v =>
         {
             var cfg = CurrentMBoosterEffectTarget();
-            if (cfg == null) return;
+            if (cfg == null || MBoosterAutoBiteActive(cfg)) return;
             cfg.InputCurveEndY = (float)v;
             PushMBoosterFeelCurve(cfg);
         });
@@ -358,11 +365,12 @@ namespace MozaPlugin.UI
         /// form for this 8-value family — see
         /// MBoosterDeviceController.PushFeelCurveResync.
         /// </summary>
-        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s)
+        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s,
+            global::MozaPlugin.Devices.MBooster.MBoosterFeelPushGuard guard = global::MozaPlugin.Devices.MBooster.MBoosterFeelPushGuard.None)
         {
             var controller = CurrentMBoosterController();
             if (controller == null) return;
-            PushMBoosterFeelCurve(s, controller, _mboosterEffectPedalIndex);
+            PushMBoosterFeelCurve(s, controller, _mboosterEffectPedalIndex, guard);
         }
 
         /// <summary>
@@ -373,18 +381,17 @@ namespace MozaPlugin.UI
         /// zero-arg overload above delegates here using the currently
         /// selected controller/axis.
         /// </summary>
-        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s, global::MozaPlugin.Devices.MBooster.MBoosterDeviceController controller, int axisIndex)
+        private void PushMBoosterFeelCurve(IMBoosterPedalConfig s, global::MozaPlugin.Devices.MBooster.MBoosterDeviceController controller, int axisIndex,
+            global::MozaPlugin.Devices.MBooster.MBoosterFeelPushGuard guard = global::MozaPlugin.Devices.MBooster.MBoosterFeelPushGuard.None)
         {
             // Singleton Pedal Feel hardware — see QueueMBoosterPedalFeelPush.
             if (!controller.IsAxisMotorized(axisIndex)) return;
             if (!TryMBoosterCalibDevice(controller, axisIndex, out byte dev)) return;
-            double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
-            double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
-            float[]? curveY = s.InputCurveY;
-            float[]? curveX = s.InputCurveX;
-            float curveEnd = s.InputCurveEndY;
+            // Resolved when the coalesced write runs: the automatic bite point
+            // curve when it applies, else the stored one.
+            var plugin = _plugin;
             controller.QueueCalibWrite($"{dev:x2}:feel-curve", () =>
-                controller.PushFeelCurveResync(dz, mf, curveY, curveX, curveEnd, dev));
+                plugin.PushResolvedFeelCurve(s, controller, axisIndex, dev, guard: guard));
         }
 
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
@@ -413,14 +420,8 @@ namespace MozaPlugin.UI
                 _mboosterTravelDirty.TryGetValue(dev, out var d);
                 _mboosterTravelDirty[dev] = (d.Start || startChanged, d.End || endChanged);
             }
-            bool feelSet = s.DeadzoneKg >= 0 || s.MaxForceKg >= 0
-                || (s.InputCurveY != null && s.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                || (s.InputCurveX != null && s.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                || s.InputCurveEndY >= 0;
-            double dz = s.DeadzoneKg >= 0 ? s.DeadzoneKg : 0;
-            double mf = s.MaxForceKg >= 0 ? s.MaxForceKg : 200;
-            float[]? curveY = s.InputCurveY, curveX = s.InputCurveX;
-            float curveEnd = s.InputCurveEndY;
+            var plugin = _plugin;
+            int axis = _mboosterEffectPedalIndex;
             controller.QueueCalibWrite($"{dev:x2}:travel", () =>
             {
                 (bool Start, bool End) dirty;
@@ -436,8 +437,8 @@ namespace MozaPlugin.UI
                     controller.SendIntWrite("mbooster-brake-travel-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeTravelMm(endMm), dev);
                 // Never push default feel values over the unit's own.
-                if (feelSet)
-                    controller.PushFeelCurveResync(dz, mf, curveY, curveX, curveEnd, dev, allX: true);
+                plugin.PushResolvedFeelCurve(s, controller, axis, dev, allX: true,
+                    guard: global::MozaPlugin.Devices.MBooster.MBoosterFeelPushGuard.IfSet);
             });
         }
 

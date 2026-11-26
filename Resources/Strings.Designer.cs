@@ -1029,5 +1029,8 @@ namespace MozaPlugin.Resources
         public static string LedDefaults_ProfileName => Get("LedDefaults_ProfileName");
         public static string LedDefaults_WheelLock => Get("LedDefaults_WheelLock");
         public static string SliderLabel_StreamerMode => Get("SliderLabel_StreamerMode");
+        public static string Label_AutoBitePoint => Get("Label_AutoBitePoint");
+        public static string SliderLabel_AutoBiteBefore => Get("SliderLabel_AutoBiteBefore");
+        public static string SliderLabel_AutoBiteAfter => Get("SliderLabel_AutoBiteAfter");
     }
 }

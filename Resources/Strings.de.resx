@@ -964,4 +964,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Standardeffekte</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Radblockade</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Streamer-Modus</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatischer Schleifpunkt</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Vor dem Schleifpunkt (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Nach dem Schleifpunkt (%)</value></data>
 </root>

@@ -246,6 +246,12 @@ namespace MozaPlugin.Settings
         // Clutch travel times Prediction learns (MBoosterBitePointTravel); null = none yet.
         public Devices.MBooster.MBoosterBitePointTravelTimes? MBoosterBitePointTravelTimes { get; set; }
 
+        // Clutch source position → clutch mBooster pedal travel, per game key as
+        // in MBoosterClutchBitePointCalibrations (no vehicle keys). Places the
+        // bite point on the Automatic bite point curve. Copy-on-write.
+        public Dictionary<string, MBoosterBitePointPedalMap> MBoosterBitePointPedalMaps { get; set; }
+            = new Dictionary<string, MBoosterBitePointPedalMap>(StringComparer.OrdinalIgnoreCase);
+
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
         // HardwareApplier.SuppressPedalsWrite to block the pedals-* command set —

@@ -4,6 +4,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.6]
 
+## Added
+
+- **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point, following the game and car.
+
 ## Fixed
 
 - **Truck-sim stalk keys reach ETS2/ATS on Linux;** for a game in another Wine prefix or native, with an LSU Wine that forwards SendInput.

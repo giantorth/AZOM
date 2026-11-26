@@ -964,4 +964,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Hiệu ứng mặc định AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Khóa bánh xe</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Chế độ streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Điểm bám tự động</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Trước điểm bám (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Sau điểm bám (%)</value></data>
 </root>

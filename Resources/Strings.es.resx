@@ -969,4 +969,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Efectos predeterminados de AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Bloqueo de rueda</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Modo streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Punto de mordida automático</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Antes del punto de mordida (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Después del punto de mordida (%)</value></data>
 </root>

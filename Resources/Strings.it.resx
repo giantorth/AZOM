@@ -967,4 +967,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effetti predefiniti AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Bloccaggio ruota</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Modalità streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Punto di stacco automatico</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Prima del punto di stacco (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Dopo il punto di stacco (%)</value></data>
 </root>

@@ -964,4 +964,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Стандартные эффекты AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Блокировка колеса</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Режим стримера</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Автоматическая точка схватывания</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>До точки схватывания (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>После точки схватывания (%)</value></data>
 </root>

@@ -208,6 +208,7 @@ namespace MozaPlugin
                 && c.EndstopFrontStiffness < 0 && c.EndstopEndStiffness < 0
                 && c.NaturalFrictionPct < 0
                 && c.DampingPressPct < 0 && c.DampingReleasePct < 0
+                && c.AutoBiteFeel == null
                 && c.SegmentedDamping.Divider1Pressed < 0 && c.SegmentedDamping.Divider2Pressed < 0
                 && c.SegmentedDamping.Seg1Pressed < 0 && c.SegmentedDamping.Seg2Pressed < 0 && c.SegmentedDamping.Seg3Pressed < 0
                 && c.SegmentedDamping.Divider1Released < 0 && c.SegmentedDamping.Divider2Released < 0
@@ -313,6 +314,12 @@ namespace MozaPlugin
             Flt("NaturalFrictionPct", () => into.NaturalFrictionPct, v => into.NaturalFrictionPct = v, from.NaturalFrictionPct);
             Flt("DampingPressPct", () => into.DampingPressPct, v => into.DampingPressPct = v, from.DampingPressPct);
             Flt("DampingReleasePct", () => into.DampingReleasePct, v => into.DampingReleasePct = v, from.DampingReleasePct);
+
+            if (into.AutoBiteFeel == null) into.AutoBiteFeel = from.AutoBiteFeel?.Clone();
+            else if (from.AutoBiteFeel is { } fa && (fa.Enabled != into.AutoBiteFeel.Enabled
+                     || fa.WidthPct != into.AutoBiteFeel.WidthPct || fa.BeforePct != into.AutoBiteFeel.BeforePct
+                     || fa.AfterPct != into.AutoBiteFeel.AfterPct))
+                conflicts.Add(label + "AutoBiteFeel");
 
             // MBoosterSegmentedDampingSettings is a sealed class, so these are
             // references — mutating sd edits into.SegmentedDamping in place.

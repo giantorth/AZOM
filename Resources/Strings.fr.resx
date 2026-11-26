@@ -964,4 +964,7 @@ Id : {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effets par défaut AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Blocage de roue</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Mode streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Point de patinage automatique</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Avant le point de patinage (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Après le point de patinage (%)</value></data>
 </root>

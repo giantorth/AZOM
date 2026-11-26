@@ -969,4 +969,7 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM standardeffekter</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Hjullåsing</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Strømmemodus</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatisk bitepunkt</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Før bitepunktet (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Etter bitepunktet (%)</value></data>
 </root>
