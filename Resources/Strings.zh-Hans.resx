@@ -968,4 +968,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>接合点前 (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>接合点后 (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>行程终点 (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>安装与设置</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>方向盘基座</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>踏板</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>换挡器与拨杆</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED 灯光</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>仪表盘</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>控制</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>插件</value></data>
 </root>

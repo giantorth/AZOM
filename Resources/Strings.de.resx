@@ -968,4 +968,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Vor dem Schleifpunkt (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Nach dem Schleifpunkt (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Ende des Pedalwegs (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Einrichtung</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Lenkradbasis</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pedale</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Schalthebel &amp; Multifunktionshebel</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LEDs</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Bedienelemente</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
 </root>

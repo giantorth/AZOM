@@ -56,7 +56,7 @@ IDENTICAL_TRANSLATIONS = {
     "SESSION", "SOURCE", "Torque", "version —", "Cycle", "Full", "Stable",
     "CALIBRATION", "DISPLAY", "JOYSTICK", "MOZA DASHBOARD", "PROTECTION",
     "Cyan", "Orange", "Color", "Formula", "Interpolation", "Name", "Trigger",
-    "Base", "Options", "Hub",
+    "Base", "Options", "Hub", "Plugin",
     "5+R Layout 1", "5+R Layout 2", "6+R Layout 1", "6+R Layout 2",
     "7+R Layout 1", "7+R Layout 2",
     "R+5 Layout", "R+6 Layout", "R+8 Layout",

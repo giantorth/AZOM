@@ -973,4 +973,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Før bitepunktet (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Etter bitepunktet (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Slutt på bevegelse (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Oppsett</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Rattbase</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Girspaker og rattspaker</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED-er</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Kontroller</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
 </root>

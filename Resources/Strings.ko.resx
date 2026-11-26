@@ -967,4 +967,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>물림점 이전 (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>물림점 이후 (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>이동 종료 (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>설치 및 설정</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>휠베이스</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>시프터 및 스토크</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>대시보드</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>컨트롤</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>플러그인</value></data>
 </root>

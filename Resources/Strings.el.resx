@@ -967,4 +967,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Πριν το σημείο εμπλοκής (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Μετά το σημείο εμπλοκής (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Τέλος διαδρομής (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Εγκατάσταση</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Βάση τιμονιού</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Λεβιέδες &amp; διακόπτες</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Πίνακας οργάνων</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Χειριστήρια</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
 </root>

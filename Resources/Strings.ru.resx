@@ -968,4 +968,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>До точки схватывания (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>После точки схватывания (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Конец хода (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Установка и настройка</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>База руля</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Шифтеры и подрулевые переключатели</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>Светодиоды</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Табло</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Органы управления</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Плагин</value></data>
 </root>

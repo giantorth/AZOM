@@ -973,4 +973,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Antes del punto de mordida (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Después del punto de mordida (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Fin del recorrido (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Puesta en marcha</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Base del volante</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pedales</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Cambios y palancas</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LEDs</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Tablero</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Controles</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
 </root>

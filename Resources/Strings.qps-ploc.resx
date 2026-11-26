@@ -965,4 +965,12 @@
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Pre-chomp! (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Post-chomp! (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Last chomp! (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Woof Sniff!</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Grrowl Arf!</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Yip Yap!</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Bork Bork Grr!</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>AWOO Yip!</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Ruff Woof Arf!</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Grr Bark!</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Snuffle Woof!</value></data>
 </root>

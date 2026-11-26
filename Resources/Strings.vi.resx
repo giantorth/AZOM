@@ -968,4 +968,12 @@ Id: {2}</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Trước điểm bám (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Sau điểm bám (%)</value></data>
   <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Kết thúc hành trình (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Thiết lập</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Đế vô lăng</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Bàn đạp</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Cần số &amp; cần gạt</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>Đèn LED</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Bảng điều khiển</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Điều khiển</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
 </root>

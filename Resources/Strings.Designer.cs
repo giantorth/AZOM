@@ -1033,5 +1033,13 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_AutoBiteBefore => Get("SliderLabel_AutoBiteBefore");
         public static string SliderLabel_AutoBiteAfter => Get("SliderLabel_AutoBiteAfter");
         public static string SliderLabel_AutoBiteEnd => Get("SliderLabel_AutoBiteEnd");
+        public static string GuideCategory_Setup => Get("GuideCategory_Setup");
+        public static string GuideCategory_Wheelbase => Get("GuideCategory_Wheelbase");
+        public static string GuideCategory_Pedals => Get("GuideCategory_Pedals");
+        public static string GuideCategory_ShiftersStalks => Get("GuideCategory_ShiftersStalks");
+        public static string GuideCategory_Leds => Get("GuideCategory_Leds");
+        public static string GuideCategory_Dashboard => Get("GuideCategory_Dashboard");
+        public static string GuideCategory_Controls => Get("GuideCategory_Controls");
+        public static string GuideCategory_Plugin => Get("GuideCategory_Plugin");
     }
 }
