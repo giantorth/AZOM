@@ -455,6 +455,8 @@ namespace MozaPlugin.UI
         // like the other mBooster sliders).
         private void MBoosterDeadzoneSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            // View-only, so it also follows suppressed seeds.
+            UpdateMBoosterFeelAxis();
             if (_suppressEvents) return;
             double v = Math.Round(e.NewValue, 1);
             SetValueText(MBoosterDeadzoneValue, v.ToString("F1"));
@@ -477,6 +479,7 @@ namespace MozaPlugin.UI
         // PushMBoosterFeelCurve.
         private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            UpdateMBoosterFeelAxis();
             OnIntSliderChanged(e.NewValue, MBoosterMaxForceValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();

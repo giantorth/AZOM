@@ -2066,16 +2066,16 @@ carries the lowered point is **inferred** from the graph having one point
 per selector and from PitHouse presets keeping `forces_curve[6]`
 separately from `forcelimit_max`, not captured.
 
-AZOM plots this curve in absolute kg on a fixed axis: `YMax` = the
-pedal's Max Force ceiling, 200kg active / 20kg spring
-(`SettingsControl.UpdateMBoosterFeelAxis`), so moving Max Force or
-Deadzone visibly moves the curve and never rescales the graph — the
-user's choice (2026-11-24), accepting that a light setting sits low on a
-200kg axis (the bug report 6SWSMJX0 trade-off). Both Max-Force-fitted
-axes tried before were rejected: × 1.25 headroom rounded up to
+AZOM plots this curve in absolute kg, `YMax` = Max Force (or Deadzone, if
+higher) exactly (`SettingsControl.UpdateMBoosterFeelAxis`, rerun by both
+sliders): moving Max Force changes the axis labels and the kg in the
+points, not where the points sit (with Deadzone 0; a Deadzone above 0
+lifts the start, so the points shift slightly). Labels can be fractional
+kg. Tried and dropped: × 1.25 headroom rounded up to
 4 × {1,2,5,10,20,25,50} jumped the whole curve each time Max Force crossed
-a step (6.4, 16, 32, 64, 80 kg), and a top of exactly Max Force left the
-curve motionless with only the labels changing. The start
+a step (6.4, 16, 32, 64, 80 kg); a fixed axis at the Max Force ceiling
+(200kg active / 20kg spring) moved the curve with the slider but squashed
+a light setting low on the plot (bug report 6SWSMJX0). The start
 point sits at `DeadzoneKg`; every other point is stored as a percentage
 of the span and converted for display and drag only
 (`MozaCurveEditor.SpanLow`/`SpanHigh`, both one-way from their sliders,

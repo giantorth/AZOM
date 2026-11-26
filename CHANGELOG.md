@@ -12,7 +12,7 @@ All notable changes to the AZOM plugin are documented here.
 
 - **Truck-sim stalk keys reach ETS2/ATS on Linux;** for a game in another Wine prefix or native, with an LSU Wine that forwards SendInput.
 - **mBooster Pedal Feel curve allows "A"-shaped curves;** any point, the last included, can sit below the one before it, and dragging the last point no longer changes Max Force or rescales the graph.
-- **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its scale is fixed at the pedal's Max Force ceiling, so the curve moves with the slider.
+- **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.
 - **Shift-dragging an mBooster Pedal Feel point lands on 5 kg steps;** it gave 136/144 instead of 135/145.
 
 ## [1.7.5]

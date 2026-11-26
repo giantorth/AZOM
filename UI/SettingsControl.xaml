@@ -2473,13 +2473,12 @@
                                                          KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                          Text="0.0"/>
                                             </StackPanel>
-                                            <!-- Y axis is absolute force: 0 to this role's Max Force ceiling
-                                                 (set in UpdateMBoosterConfigVisibilityForRole, since the ceiling
-                                                 is 200kg for a Brake but 20kg for a Throttle/Clutch). The 6
-                                                 nodes and the last point (EndY) are percentages of the
-                                                 Deadzone-Max Force span — SpanLow/SpanHigh convert them — so
-                                                 the Deadzone slider moves the start and the Max Force slider
-                                                 rescales every point. Dragging the last point moves only it. -->
+                                            <!-- Y axis is absolute force: 0 to Max Force (or Deadzone, if
+                                                 higher), set in UpdateMBoosterFeelAxis. The 6 nodes and the
+                                                 last point (EndY) are percentages of the Deadzone-Max Force
+                                                 span — SpanLow/SpanHigh convert them — so the Deadzone slider
+                                                 moves the start and the Max Force slider changes only the kg
+                                                 labels. Dragging the last point moves only it. -->
                                             <ctrl:MozaCurveEditor Grid.Row="1" Grid.Column="1" x:Name="MBoosterInputCurveEditor" Height="220" NodeCount="6"
                                                                   AllowHorizontalDrag="True" AnchorAtTopRight="True"
                                                                   ShowAnchorPoints="True" AnchorEndDraggableInY="True"

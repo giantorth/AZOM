@@ -242,18 +242,19 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
-        /// Pedal Feel plots absolute kg on a fixed axis: this pedal's Max
-        /// Force ceiling (200kg active, 20kg spring), so moving Max Force or
-        /// Deadzone visibly moves the curve and never rescales the graph.
-        /// Axes fitted to Max Force either jumped at each rounding step or,
-        /// topped at Max Force exactly, never showed the curve move. Rerun
-        /// whenever the ceiling changes.
+        /// Pedal Feel plots absolute kg, topped at Max Force (or Deadzone, if
+        /// higher): moving Max Force changes the labels and the kg in the
+        /// points, not where the points sit. Stepped "nice" maxima jumped the
+        /// whole curve at each step.
         /// </summary>
         private void UpdateMBoosterFeelAxis()
         {
             var editor = MBoosterInputCurveEditor;
-            if (editor == null || MBoosterMaxForceSlider == null) return;
-            double yMax = Math.Max(1, MBoosterMaxForceSlider.Maximum);
+            // Null during InitializeComponent (the sliders' ValueChanged can
+            // run before later-declared elements exist).
+            if (editor == null || MBoosterMaxForceSlider == null || MBoosterDeadzoneSlider == null) return;
+            double yMax = Math.Max(MBoosterMaxForceSlider.Value, MBoosterDeadzoneSlider.Value);
+            if (yMax <= 0) yMax = 1;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             editor.YMax = yMax;
             editor.YAxisLabels = string.Join(",",
