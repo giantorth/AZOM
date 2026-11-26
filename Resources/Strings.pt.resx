@@ -983,4 +983,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Parado</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embreagem pressionada</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Última largada {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Sucesso · {0}%</value></data>
 </root>

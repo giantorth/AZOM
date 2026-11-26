@@ -125,7 +125,7 @@ Web dash (phone/tablet): `Web/controls.js` `renderButtonItem` sends `pressed`/`r
 | Property | Value |
 |---|---|
 | `ClutchBitePoint` | bite point in use, 0–100; -1 uncalibrated |
-| `ClutchBitePointCalibration` | `BitePointCalState`: `NotReady`, `Waiting`, `Armed`, `Releasing`, `TooFast` (5 s after a skipped launch) |
+| `ClutchBitePointCalibration` | `BitePointCalState`: `NotReady`, `Waiting`, `Armed`, `Releasing`, then `Captured` or `TooFast` for 5 s after a launch kept or skipped |
 | `ClutchBitePointScope` / `ClutchBitePointSamples` | `Car`, `Game` or `""`; samples behind the value |
 | `ClutchBitePointClutch` | clutch the calibration reads, 0–100; -1 none |
 | `ClutchBitePointInGame` / `HasClutch` / `InGear` / `Stopped` / `ClutchIn` | standing-start conditions on the last data tick; all true = `Armed` |

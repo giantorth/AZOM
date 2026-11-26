@@ -75,6 +75,7 @@ namespace MozaPlugin.Integration.ControlDash
                 ["BackgroundColor"] = Js("BackgroundColor", state +
                     StateCase(BitePointCalState.Armed, ReadyColor) +
                     StateCase(BitePointCalState.Releasing, MeasuringColor) +
+                    StateCase(BitePointCalState.Captured, ReadyColor) +
                     StateCase(BitePointCalState.TooFast, AmberColor) +
                     "return " + JsStr(MutedColor) + ";"),
             };
@@ -84,6 +85,8 @@ namespace MozaPlugin.Integration.ControlDash
                 ["Text"] = Js("Text", state +
                     StateCase(BitePointCalState.Armed, Strings.BiteCal_Ready) +
                     StateCase(BitePointCalState.Releasing, Strings.BiteCal_Measuring) +
+                    "if (s == " + JsStr(nameof(BitePointCalState.Captured)) + ") return " +
+                    JsStr(Strings.BiteCal_Captured) + ".replace('{0}', " + Prop("ClutchBitePointLastSample") + ");\r\n" +
                     StateCase(BitePointCalState.TooFast, Strings.BiteCal_TooFast) +
                     StateCase(BitePointCalState.Waiting, Strings.BiteCal_Waiting) +
                     "return " + JsStr(Strings.BiteCal_NotReady) + ";"),

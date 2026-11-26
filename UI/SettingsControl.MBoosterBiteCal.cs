@@ -21,7 +21,7 @@ namespace MozaPlugin.UI
         {
             var info = _plugin.ClutchBitePointInfo();
             MBoosterBiteCalState.Text = MozaPlugin.BitePointValueText(info);
-            MBoosterBiteCalIndicator.Show(info, _plugin.BitePointCalibrationState);
+            MBoosterBiteCalIndicator.Show(info, _plugin.BitePointCalibrationState, _plugin.BitePointLastLaunch);
             MBoosterBiteCalResetButton.IsEnabled = info.IsCalibrated && !info.Inherited;
 
             var vis = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;

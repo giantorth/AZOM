@@ -8,7 +8,7 @@ namespace MozaControls
 {
     /// <summary>
     /// Clutch bite point calibration pill: dot lit while a standing start can be
-    /// measured or was just too fast, text from <see cref="MozaPlugin.MozaPlugin.BitePointIndicatorText"/>.
+    /// measured and for its result, text from <see cref="MozaPlugin.MozaPlugin.BitePointIndicatorText"/>.
     /// Uses the theme's brushes where present (plugin tab), else the same colours
     /// (ShakeIt editor).
     /// </summary>
@@ -40,12 +40,13 @@ namespace MozaControls
             Child = row;
         }
 
-        internal void Show(in MozaPlugin.MozaPlugin.BitePointInfo info, BitePointCalState state)
+        internal void Show(in MozaPlugin.MozaPlugin.BitePointInfo info, BitePointCalState state,
+                           MozaPlugin.MozaPlugin.BitePointLaunch? launch)
         {
-            _text.Text = MozaPlugin.MozaPlugin.BitePointIndicatorText(info, state);
+            _text.Text = MozaPlugin.MozaPlugin.BitePointIndicatorText(info, state, launch);
             _dot.Fill = state switch
             {
-                BitePointCalState.Armed => ThemeBrush("GreenBrush", ReadyFallback),
+                BitePointCalState.Armed or BitePointCalState.Captured => ThemeBrush("GreenBrush", ReadyFallback),
                 BitePointCalState.Releasing => ThemeBrush("CyanBrush", MeasuringFallback),
                 BitePointCalState.TooFast => ThemeBrush("AmberBrush", TooFastFallback),
                 _ => ThemeBrush("TextMutedBrush", IdleFallback),

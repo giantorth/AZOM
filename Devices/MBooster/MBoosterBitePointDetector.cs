@@ -14,7 +14,9 @@ namespace MozaPlugin.Devices.MBooster
         Armed,
         // Clutch coming up with the car still stopped.
         Releasing,
-        // The last release was too fast to count; held a few seconds.
+        // The last launch was stored; held a few seconds.
+        Captured,
+        // The last launch was too fast to count; held a few seconds.
         TooFast,
     }
 

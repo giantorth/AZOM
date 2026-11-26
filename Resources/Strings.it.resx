@@ -987,4 +987,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Fermo</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Frizione premuta</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Ultima partenza {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Riuscito · {0}%</value></data>
 </root>

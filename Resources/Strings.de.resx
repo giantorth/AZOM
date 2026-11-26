@@ -984,4 +984,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Stillstand</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Kupplung getreten</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Letzter Start {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Erfolg · {0}%</value></data>
 </root>

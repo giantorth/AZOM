@@ -190,7 +190,7 @@ namespace MozaPlugin.Integration
                     ? Math.Round(clutch01 * 100) + "%" : "—";
 
                 _status.Text = MozaPlugin.BitePointValueText(info);
-                _indicator.Show(info, plugin.BitePointCalibrationState);
+                _indicator.Show(info, plugin.BitePointCalibrationState, plugin.BitePointLastLaunch);
                 _reset.IsEnabled = info.IsCalibrated && !info.Inherited;
                 _useCalibratedRow.Visibility = info.IsCalibrated ? Visibility.Visible : Visibility.Collapsed;
                 _useCalibrated.SelectedIndex = _effect.UseCalibratedBitePoint ? 0 : 1;

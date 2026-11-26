@@ -984,4 +984,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>已停车</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>离合器已踩下</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>上次起步 {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>成功 · {0}%</value></data>
 </root>

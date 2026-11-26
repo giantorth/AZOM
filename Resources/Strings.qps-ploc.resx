@@ -981,4 +981,5 @@
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Sit-woof!</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Paw-pressed!</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Last zoom {0}% · {1}%/s!</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Good-boy · {0}%!</value></data>
 </root>

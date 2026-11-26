@@ -984,4 +984,5 @@ Id : {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>À l'arrêt</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embrayage enfoncé</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Dernier départ {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Réussi · {0}%</value></data>
 </root>

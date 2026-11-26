@@ -984,4 +984,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Đã dừng</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Đã đạp côn</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Lần xuất phát cuối {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Thành công · {0}%</value></data>
 </root>

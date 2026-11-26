@@ -989,4 +989,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Stillestående</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Clutch inne</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Siste start {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Vellykket · {0}%</value></data>
 </root>

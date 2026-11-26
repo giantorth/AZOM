@@ -983,4 +983,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>Σταματημένο</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Συμπλέκτης πατημένος</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Τελευταία εκκίνηση {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Επιτυχία · {0}%</value></data>
 </root>

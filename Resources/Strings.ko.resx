@@ -983,4 +983,5 @@ Id: {2}</value></data>
   <data name="BiteDash_Stopped" xml:space="preserve"><value>정지</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>클러치 밟음</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>마지막 출발 {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>성공 · {0}%</value></data>
 </root>

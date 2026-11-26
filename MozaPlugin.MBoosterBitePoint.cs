@@ -29,8 +29,8 @@ namespace MozaPlugin
         // Pedal fraction per second: full travel in 0.6 s.
         private const double MaxAutoReleaseRatePerSec = 1.0 / 0.6;
 
-        // How long BitePointCalState.TooFast is shown after a skipped release.
-        private const double TooFastShownSec = 5.0;
+        // How long BitePointCalState.Captured / TooFast is shown after a launch.
+        private const double ResultShownSec = 5.0;
 
         // Clutch travel (%) within which an automatic sample agrees with an
         // inherited game calibration.
@@ -43,8 +43,8 @@ namespace MozaPlugin
         private string? _bitePointAutoKey;
         // Set from any thread when the clutch signal changes: the data thread restarts detection.
         private int _bitePointAutoRestart;
-        // Stopwatch ticks until which a skipped too-fast release is reported; 0 = none. Data thread only.
-        private long _bitePointTooFastUntil;
+        // Stopwatch ticks until which the last launch's result is reported; 0 = none. Data thread only.
+        private long _bitePointResultUntil;
         // BitePointCalState as of the last data tick.
         private volatile int _bitePointCalState;
         // BitePointConditions as of the last data tick.
@@ -323,13 +323,14 @@ namespace MozaPlugin
         internal static string BitePointValueText(in BitePointInfo info) =>
             info.IsCalibrated ? info.Pct + "%" : "—";
 
-        /// <summary>Calibration indicator text: a standing start being measured or just
-        /// skipped, else whether the vehicle or the game is calibrated and from how many samples.</summary>
-        internal static string BitePointIndicatorText(in BitePointInfo info, BitePointCalState state)
+        /// <summary>Calibration indicator text: a standing start being measured or its result,
+        /// else whether the vehicle or the game is calibrated and from how many samples.</summary>
+        internal static string BitePointIndicatorText(in BitePointInfo info, BitePointCalState state, BitePointLaunch? launch)
         {
             if (state == BitePointCalState.Armed) return Strings.BiteCal_Ready;
             if (state == BitePointCalState.Releasing) return Strings.BiteCal_Measuring;
             if (state == BitePointCalState.TooFast) return Strings.BiteCal_TooFast;
+            if (state == BitePointCalState.Captured && launch != null) return string.Format(Strings.BiteCal_Captured, launch.Pct);
             if (!info.IsCalibrated) return Strings.BiteCal_NotCalibrated;
             return string.Format(info.OwnVehicle ? Strings.BiteCal_CarCalibrated : Strings.BiteCal_GameCalibrated,
                 info.SampleCount);
@@ -527,31 +528,29 @@ namespace MozaPlugin
             {
                 _bitePointAutoDetector.Reset();
                 _bitePointAutoKey = key;
-                _bitePointTooFastUntil = 0;
+                _bitePointResultUntil = 0;
                 _bitePointLastLaunch = null;
             }
             if (_bitePointAutoDetector.Update(ready, speedKmh, clutch01, out var sample) && key != null)
             {
                 bool skipped = sample.ReleaseRatePerSec > MaxAutoReleaseRatePerSec;
                 _bitePointLastLaunch = new BitePointLaunch(sample.Pct, (int)Math.Round(sample.ReleaseRatePerSec * 100), skipped);
+                _bitePointResultUntil = Stopwatch.GetTimestamp() + (long)(ResultShownSec * Stopwatch.Frequency);
                 if (!skipped) StoreAutoSample(key, sample);
-                else
-                {
-                    MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
-                    _bitePointTooFastUntil = Stopwatch.GetTimestamp() + (long)(TooFastShownSec * Stopwatch.Frequency);
-                }
+                else MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
             }
 
             var phase = _bitePointAutoDetector.Current;
             BitePointCalState state;
             if (ready && phase != MBoosterBitePointDetector.Phase.Waiting)
             {
-                // The next attempt replaces a too-fast notice.
-                _bitePointTooFastUntil = 0;
+                // The next attempt replaces the last result.
+                _bitePointResultUntil = 0;
                 state = phase == MBoosterBitePointDetector.Phase.Armed ? BitePointCalState.Armed : BitePointCalState.Releasing;
             }
-            else if (_bitePointTooFastUntil != 0 && Stopwatch.GetTimestamp() < _bitePointTooFastUntil)
-                state = BitePointCalState.TooFast;
+            else if (_bitePointResultUntil != 0 && Stopwatch.GetTimestamp() < _bitePointResultUntil
+                     && _bitePointLastLaunch is { } last)
+                state = last.Skipped ? BitePointCalState.TooFast : BitePointCalState.Captured;
             else
                 state = ready ? BitePointCalState.Waiting : BitePointCalState.NotReady;
             _bitePointCalState = (int)state;
