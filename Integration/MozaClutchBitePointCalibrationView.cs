@@ -36,7 +36,8 @@ namespace MozaPlugin.Integration
     /// <summary>
     /// Clutch and Bite Point sections (clutch source, calibration, Calibrated/Manual
     /// picker and Trigger Input Level) for the ShakeIt clutch effect editors — the same plugin state the
-    /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). Trigger Input
+    /// mBooster tab's card shows (MozaPlugin.MBoosterBitePoint.cs). The source picker is
+    /// locked to the mBooster pedal while the plugin tab drives an mBooster clutch. Trigger Input
     /// Level shows the calibrated value read-only while it is in use, else the
     /// effect's editable fallback. Polls while on screen.
     /// </summary>
@@ -131,7 +132,7 @@ namespace MozaPlugin.Integration
             {
                 var plugin = MozaPlugin.Instance;
                 if (plugin == null || _refreshing || _source.SelectedIndex < 0) return;
-                plugin.BitePointSource = (MBoosterBitePointSource)_source.SelectedIndex;
+                plugin.ChosenBitePointSource = (MBoosterBitePointSource)_source.SelectedIndex;
                 Refresh();
                 if (plugin.BitePointSource == MBoosterBitePointSource.Formula && plugin.BitePointSourceFormula.Length == 0)
                     EditFormula();
@@ -189,6 +190,7 @@ namespace MozaPlugin.Integration
             {
                 var source = plugin.BitePointSource;
                 _source.SelectedIndex = (int)source;
+                _source.IsEnabled = !plugin.BitePointSourceIsMBoosterClutch;
                 bool formula = source == MBoosterBitePointSource.Formula;
                 _sourceFormula.Visibility = formula ? Visibility.Visible : Visibility.Collapsed;
                 string formulaText = plugin.BitePointSourceFormula;

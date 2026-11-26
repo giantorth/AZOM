@@ -52,8 +52,9 @@ namespace MozaPlugin
         private long _bitePointSourceClutchBits = BitConverter.DoubleToInt64Bits(double.NaN);
         // HidAxis source reader; created on first use, disposed at shutdown.
         private HidAxisReader? _bitePointHidReader;
-        private bool _bitePointHidApplied;
         private readonly object _bitePointHidLock = new object();
+        // Effective source last applied by SyncBitePointSource, as int; -1 = none yet.
+        private int _bitePointAppliedSource = -1;
         // Handed to the mBooster workers so a HID clutch is read live each motor tick.
         private Func<double>? _bitePointLiveClutch;
 
@@ -116,19 +117,39 @@ namespace MozaPlugin
             };
         }
 
-        /// <summary>Where the trigger and calibration read the clutch. Changing it stops any run.</summary>
-        internal MBoosterBitePointSource BitePointSource
+        /// <summary>The clutch source picked in the ShakeIt editor; see <see cref="BitePointSource"/>.</summary>
+        internal MBoosterBitePointSource ChosenBitePointSource
         {
             get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.Game;
             set
             {
                 if (_settings == null || _settings.MBoosterBitePointSource == value) return;
                 _settings.MBoosterBitePointSource = value;
-                _bitePointCalibrator.Stop();
-                _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
-                ApplyBitePointHidReader();
+                SyncBitePointSource();
                 PersistSettings();
             }
+        }
+
+        /// <summary>The plugin tab drives a connected, motorized Clutch pedal, so the
+        /// clutch is read from that pedal whatever <see cref="ChosenBitePointSource"/> says.</summary>
+        internal bool BitePointSourceIsMBoosterClutch =>
+            MBoosterRoutedToPluginTab
+            && _mboosterRegistry?.TryGetEffectPedal(MBoosterRole.Clutch, out _, out _) == true;
+
+        /// <summary>Where the trigger and calibration read the clutch. Any thread.</summary>
+        internal MBoosterBitePointSource BitePointSource =>
+            BitePointSourceIsMBoosterClutch ? MBoosterBitePointSource.MBoosterPedal : ChosenBitePointSource;
+
+        // On a change of BitePointSource: stop any run, re-point the HID reader. Any thread.
+        private void SyncBitePointSource()
+        {
+            int source = (int)BitePointSource;
+            if (Volatile.Read(ref _bitePointAppliedSource) == source) return;
+            int was = Interlocked.Exchange(ref _bitePointAppliedSource, source);
+            if (was == source) return;
+            if (was >= 0) _bitePointCalibrator.Stop();
+            _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
+            ApplyBitePointHidReader();
         }
 
         /// <summary>Stored formula for <see cref="MBoosterBitePointSource.Formula"/>.</summary>
@@ -465,11 +486,7 @@ namespace MozaPlugin
         /// <summary>Data thread: read the clutch source, refresh the current value, observe standing starts.</summary>
         private void UpdateClutchBitePoint(PluginManager pluginManager, ref GameData data)
         {
-            if (!_bitePointHidApplied)
-            {
-                _bitePointHidApplied = true;
-                ApplyBitePointHidReader();
-            }
+            SyncBitePointSource();
             Interlocked.Exchange(ref _bitePointSourceClutchBits, BitConverter.DoubleToInt64Bits(ReadBitePointSource(ref data)));
 
             string? game;

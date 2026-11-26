@@ -374,9 +374,12 @@ namespace MozaPlugin.UI
                 $"Merged pos:     T={data.ThrottlePosition} B={data.BrakePosition} C={data.ClutchPosition}" +
                 $"  (max seen this session: T={maxT} B={maxB} C={maxC})");
             int bitePedal = plugin.ClutchBitePedalPct;
+            var biteSource = plugin.BitePointSource;
+            var biteChosen = plugin.ChosenBitePointSource;
             sb.AppendLine(
                 $"Bite point:     {(plugin.CurrentClutchBitePointPct < 0 ? "—" : plugin.CurrentClutchBitePointPct + "%")} " +
-                $"({plugin.BitePointSource}) = {(bitePedal < 0 ? "—" : bitePedal + "%")} clutch pedal travel");
+                $"({biteSource}{(biteChosen != biteSource ? ", chosen " + biteChosen : "")}) = " +
+                $"{(bitePedal < 0 ? "—" : bitePedal + "%")} clutch pedal travel");
             for (int i = 0; i < devs.Count; i++)
             {
                 var d = devs[i];

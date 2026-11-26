@@ -4,14 +4,15 @@ using System.Windows.Controls;
 using MozaPlugin.Devices.MBooster;
 using MozaPlugin.Resources;
 using static MozaPlugin.UI.UiHelpers;
-using ClutchSource = MozaPlugin.Devices.MBooster.MBoosterBitePointSource;
 
 namespace MozaPlugin.UI
 {
     /// <summary>
     /// Clutch bite point calibration section of the mBooster Clutch Bite Point card
-    /// (per game; see MozaPlugin.MBoosterBitePoint.cs). Trigger Input Level shows
-    /// the calibrated value while the calibration is in use, else the fallback.
+    /// (per game; see MozaPlugin.MBoosterBitePoint.cs). No clutch source picker:
+    /// the card's effect reads the mBooster clutch (MozaPlugin.BitePointSource).
+    /// Trigger Input Level shows the calibrated value while the calibration is in
+    /// use, else the fallback.
     /// </summary>
     public partial class SettingsControl
     {
@@ -19,20 +20,6 @@ namespace MozaPlugin.UI
         /// <summary>Repaint from plugin state. Runs under the refresh tick's suppressor.</summary>
         private void RefreshMBoosterBiteCal()
         {
-            var source = _plugin.BitePointSource;
-            MBoosterBiteSource.SelectedIndex = (int)source;
-            bool formula = source == ClutchSource.Formula;
-            MBoosterBiteSourceFx.Visibility = formula ? Visibility.Visible : Visibility.Collapsed;
-            string formulaText = _plugin.BitePointSourceFormula;
-            MBoosterBiteSourceFormulaText.Text = formulaText;
-            MBoosterBiteSourceFormulaText.Visibility = formula && formulaText.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-            bool hid = source == ClutchSource.HidAxis;
-            if (hid && MBoosterBiteHidHost.Content == null) MBoosterBiteHidHost.Content = new HidAxisPicker();
-            var hidVis = hid ? Visibility.Visible : Visibility.Collapsed;
-            if (MBoosterBiteHidHost.Visibility != hidVis) MBoosterBiteHidHost.Visibility = hidVis;
-            MBoosterBiteSourceValue.Text = _plugin.TryGetBitePointClutchPosition(out double clutch01)
-                ? Math.Round(clutch01 * 100) + "%" : "—";
-
             var info = _plugin.ClutchBitePointInfo();
             bool running = _plugin.IsBitePointCalibrationRunning;
             MBoosterBiteCalState.Text = _plugin.BitePointStatusText(info);
@@ -65,24 +52,6 @@ namespace MozaPlugin.UI
             return (fx?.BitePoint?.UseCalibratedBitePoint ?? true)
                    && game.Length > 0
                    && _plugin.ClutchBitePointInfo().IsCalibrated;
-        }
-
-        private void MBoosterBiteSource_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressEvents || MBoosterBiteSource.SelectedIndex < 0) return;
-            _plugin.BitePointSource = (ClutchSource)MBoosterBiteSource.SelectedIndex;
-            using (_suppressor.Begin()) RefreshMBoosterBiteCal();
-            if (_plugin.BitePointSource == ClutchSource.Formula && _plugin.BitePointSourceFormula.Length == 0)
-                MBoosterBiteSourceFx_Click(sender, e);
-        }
-
-        private async void MBoosterBiteSourceFx_Click(object sender, RoutedEventArgs e)
-        {
-            string? formula = await FormulaEditing.EditAsync(this, _plugin.ChannelFormulaEngine,
-                _plugin.BitePointSourceFormula, Strings.Label_ClutchSource);
-            if (formula == null) return;
-            _plugin.BitePointSourceFormula = formula;
-            using (_suppressor.Begin()) RefreshMBoosterBiteCal();
         }
 
         private void MBoosterBiteCal_Click(object sender, RoutedEventArgs e)

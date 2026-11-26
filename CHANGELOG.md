@@ -11,6 +11,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Changed
 
 - **Help tab guides grouped by category;** Setup, Wheelbase, Pedals, Shifters & Stalks, LEDs, Dashboard, Controls and Plugin, matching the website.
+- **mBooster Clutch Bite Point card reads the mBooster clutch;** it no longer offers a clutch source.
 
 ## Fixed
 

@@ -2125,7 +2125,11 @@ unit interpolates between nodes linearly or by spline (which it does is
 not known).
 
 **Units.** The calibration (`MBoosterClutchBitePointCalibrations`) is in the
-clutch source's units; the curve's X is the pedal's own travel. AZOM places
+clutch source's units; the curve's X is the pedal's own travel. The source
+(`MozaPlugin.BitePointSource`) is the *mBooster pedal* while the plugin tab
+drives the vibrations and a connected, motorized pedal holds the Clutch role
+(the tab's Clutch Bite Point card has no picker); otherwise it is the ShakeIt
+editor's pick (`MBoosterBitePointSource`). AZOM places
 the bite point the way the graph's live dot reads the pedal:
 `LastAxisRawPercentPreThreshold` (raw HID, before the host-side Max
 Threshold gain). Whether the unit's X axis is that reading, or travel before
