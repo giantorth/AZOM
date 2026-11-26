@@ -384,8 +384,43 @@ read-back re-applies the lane. The per-role output curve
 NOT affected — those genuinely are per-pedal registers that the host
 aggregates, and a passive pedal has them.
 
-**Inferred from the wire shape, not observed** — no capture of Pit House
-editing a passive pedal exists to confirm how it handles this.
+**Inferred from the wire shape, partly observed.** Pit House 1.4.2.7 editing a
+passive pedal's output curve and range from its Mechanical Pedals page
+(moza-simulator, 2026-11-26) sent only the role-keyed registers to the host —
+`throttle-y1..y5` (`0x0E`–`0x11`, `0x1B`) and `throttle-max` (`0x03`) for a
+passive pedal holding Throttle — and no singleton. Whether that page offers the
+singletons at all was not checked.
+
+### Channel connect state — group `0x25` cmd `0x80` (Pit House only)
+
+Pit House polls `25 12 80 00 00` on the host about once a second (twice per
+round — one read per parameter) and lists passive pedals from the answer, not
+from the heartbeat text. The reply is `a5 21 80 <T> <C>`: Pit House's
+`throttleChannel_connectState` (high byte, host channel T) and
+`clutchChannel_connectState` (low byte, channel C). Channel B is the unit's
+own motor pedal and has no byte.
+
+| value | Pit House log (`MBoost通道管理`) | meaning |
+|---|---|---|
+| `0` | `<ch>通道无连接！` | nothing on the channel |
+| `1` | `<ch>通道连接上机械踏板！` | mechanical (passive) pedal — listed under **Mechanical Pedals** |
+| `2` | `<ch>通道连接上电动踏板！` | electric pedal — a chained mBooster |
+
+Established against the moza-simulator (Pit House 1.4.2.7, 2026-11-26) by
+changing only the simulator's answer while Pit House ran: `0000` → no
+passive pedal shown and "throttle channel not connected"; `0101` → both
+channels mechanical (`[P01机械通道变化] … connectState= 1`); `0001` → only T
+flipped back to 0, which fixes the byte order; `0201` → T electric. The
+meaning of `2` comes from Pit House's message table and its log line, not
+from hardware. **No real-hardware capture of this register yet** — the
+simulator answered `0000` in every earlier session, which is why Pit House
+never showed a passive pedal against it. AZOM never reads it; its passive
+detection is the heartbeat's `type: passive pedal`.
+
+The same poll also reads `25 12 10/11/12 00 00` (Pit House's
+`throttle/brake/clutch_senstate`, sensor state by the order of its parameter
+table — unconfirmed; the simulator answers 0 and Pit House raised nothing) and
+cmds `1..3` (output position).
 
 ### Passive pedals are configured from the Pedals tab (bug report RCPWVWQ5)
 
@@ -396,7 +431,16 @@ role leaves the mBooster tab and appears as its role's column on the
 **Pedals** tab (`MozaMBoosterRegistry.IsPedalsTabPassive`; first passive
 pedal per role wins; never while plain CRP/SRP pedals hold the pedal slot).
 The active pedal stays on the mBooster tab. A passive pedal set to Disabled
-has no Pedals-tab column, so it stays on the mBooster tab to be reassigned.
+has no Pedals-tab column, so it stays on the mBooster tab to be reassigned —
+routed lanes only: on a USB lane a passive pedal's role is the host's channel
+register, never Disabled (see "On a USB lane the roles are the hardware's").
+Its column carries a **Role** picker (Throttle/Brake/Clutch;
+`PassivePedalRole_SelectionChanged`) — the mBooster tab doesn't list a
+Pedals-tab passive pedal, so without it the role could only move by swapping
+from the motor pedal's row. Same path as that row's combo: a hardware swap on
+a USB lane, the profile's role on a routed one; the pedal moves to the new
+role's column once the host's map reads back. Pit House puts the same switch
+on the mechanical pedal's own page.
 
 Storage stays the pedal's mBooster config (`Direction`/`Min`/`Max` plus
 `HardwareCurveY`), so the connect-time apply replays it and both USB and
@@ -1646,8 +1690,20 @@ default, so a role chosen in Pit House survives an untouched profile
 bug report NPN9FR6W started in a profile with the brake set to Throttle while
 the unit read Brake). Single-active-unit lanes only, and never while a role
 write is waiting for the heartbeat. A passive pedal's role lives on the host's
-channel register (`0x21`/`0x23`); no capture shows Pit House writing one, so
-the plugin doesn't.
+channel register (`0x21`/`0x23`), and Pit House writes it with the same plain
+echoed write (Pit House 1.4.2.7 against the moza-simulator `mbooster` chain —
+active brake on the host, chained throttle on T, passive clutch on C —
+2026-11-26, the passive pedal set to Throttle from its "Clutch Setting" page):
+
+```text
+h2b  24 12 23 00 01      host channel C (passive pedal) -> Throttle
+```
+
+That one frame is the whole change: no swap, and no stored config pushed (a
+passive pedal has nothing on the unit to configure). Its curve and range then
+go to the host under the new role (`throttle-y1..y5`, `throttle-max`). The
+plugin writes it the same way when a role change swaps with a passive pedal —
+see "the roles are the hardware's" below.
 
 **Writing a chained pedal's role** (bug report 4J8FZ5AF). A role write goes to
 the edited pedal's host channel register — `0x22` for the host's own motor
@@ -1659,18 +1715,30 @@ chained pedal kept reporting as Clutch through the host's `0x23`. With one
 remote channel and one answering chained unit the link is that unit; with
 several, the unit whose own `0x22` matches the channel's role.
 
-**On a lane of active pedals the roles are the hardware's.** Once the host's
-map has been read, a USB lane whose connected pedals are all active takes an
-axis's role from it — axis = role, see below — not from the per-axis profile
-setting (`MBoosterDeviceController.DeviceRolesKnown` / `AxisRole`). The
-per-axis `AxisRoles` went stale on every role write there, since the write
+**On a USB lane the roles are the hardware's.** Once the host's map has been
+read and every connected pedal is typed (active or passive), a USB lane takes
+an axis's role from it — axis = role, see below — not from the per-axis
+profile setting (`MBoosterDeviceController.DeviceRolesKnown` / `AxisRole`).
+The per-axis `AxisRoles` went stale on every role write there, since the write
 moves the pedal to another axis: 4J8FZ5AF's labels named the host's brake
 "Clutch" and the chained clutch "Throttle", and the next edit started from
 those. A role edit there (`AssignAxisRole`) swaps with the connected pedal
-already holding the new role; an unconnected channel is left holding a
-duplicate, as Pit House leaves it. Lanes with a passive pedal connected, and
-routed lanes, keep the profile's roles and write each active pedal's role as
-before (`WriteAxisRoles`).
+already holding the new role — a passive one included, through its host
+channel register only (`TryChannelUnit`; no pending-role entry, the map
+read-back confirms it) — and an unconnected channel is left holding a
+duplicate, as Pit House leaves it. Disabled is not a hardware role, so a
+connected passive pedal always holds one there.
+
+Lanes with a passive pedal used to be excluded (profile roles, only the
+motor pedal's role written) because no capture showed a passive channel
+register being written. That broke role changes on the common rig with one:
+a motor pedal's role write moved it to another axis under the profile's
+per-axis roles, and the swapped passive pedal's new role stayed profile-only,
+so the hardware kept a duplicate (moza-simulator, 2026-11-26: chained throttle
+set to Clutch left the host at `3/2/3`). Since the move the profile's role is
+re-applied on connect (`SyncPedalRole`) only for a lane's lone pedal there,
+as on chains of active pedals. Routed lanes keep the profile's roles and
+write each active pedal's role as before (`WriteAxisRoles`).
 
 **Settings follow the chain.** A lane's settings are keyed by the serial of
 the unit on USB. In 4J8FZ5AF the chain was re-cabled so the other unit is on
@@ -1683,13 +1751,25 @@ serial keys a real entry, the plugin moves that entry to the lane
 **Duplicate roles are allowed.** Pit House, setting the host's Brake to
 Throttle while the chained unit was Throttle (2026-09-29), wrote only the host
 (`22 00 01` plus the throttle role's stored config and throttle min/max /
-y1-y4) and logged both units as `role= "Throttle"`, no conflict. The plugin
-swaps only with another connected motor pedal. Its role map is keyed by role, so for a
-shared role: a passive pedal's writes go to the host, a role's sole motor pedal
+y1-y4) and logged both units as `role= "Throttle"`, no conflict. Pit House
+1.4.2.7 (2026-11-26, same rig as above) never swaps either: chained Throttle →
+Clutch wrote host `21 00 03` + `24 1d 22 00 03` and left the passive clutch on
+`0x23` = 3 (two clutches); chained → Brake wrote `21 00 02` + `24 1d 22 00 02`
+next to the host's Brake (two brakes). Its log names the step
+(`updateMainDeviceChannelRole "throttle"` — the host's channel-T register
+follows the chained unit's role) and flags the transient mismatch
+(`角色一致性检查 … Inconsistency: true`), nothing more. The plugin
+swaps with the connected pedal holding the new role (USB lanes, passive
+included). Its role map is keyed by role, so for a shared role (one Pit House
+left): a passive pedal's writes go to the host, a role's sole motor pedal
 keeps the map's placement, and two motor pedals on one role get no config
-writes (logged) — the map cannot tell them apart. The host heartbeat reports
-per role name; the simulator collapses two same-role units into one, and what
-real firmware reports then is not captured.
+writes (logged) — the map cannot tell them apart. While two connected
+channels share a role the plugin's host map is incomplete
+(`HostChannelRoles`), so it can't change roles on that lane until the
+duplicate is resolved (in Pit House). The host heartbeat names channels, not
+roles (GQ8HAWCV), so a duplicate doesn't change its pedal lines; the
+simulator named them by role until 2026-11-26 and collapsed a duplicate into
+one line.
 
 After each, Pit House's topology lines follow the new values. For JCJ5AEA2's
 chained unit (really the throttle, `0x22` = 2) the repair is Pit House's own

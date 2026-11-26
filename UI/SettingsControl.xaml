@@ -1517,6 +1517,18 @@
                                 <Button x:Name="ThrottleCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="ThrottleCalStartButton_Click"/>
                             </ctrl:SectionCard.Header>
                             <StackPanel>
+                                <!-- An mBooster passive pedal's role (PassivePedalRole_SelectionChanged);
+                                     shown only while this column holds one. -->
+                                <Grid x:Name="ThrottlePassiveRoleRow" Margin="0,0,0,10" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" x:Name="ThrottlePassiveRoleCombo" Tag="throttle" MinWidth="120"
+                                              SelectionChanged="PassivePedalRole_SelectionChanged">
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
+                                    </ComboBox>
+                                </Grid>
                                 <TextBlock x:Name="ThrottleCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
                                 <ProgressBar x:Name="ThrottleLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
                                              Foreground="{StaticResource GreenBrush}" Margin="0,0,0,12"/>
@@ -1567,6 +1579,16 @@
                                 <Button x:Name="BrakeCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="BrakeCalStartButton_Click"/>
                             </ctrl:SectionCard.Header>
                             <StackPanel>
+                                <Grid x:Name="BrakePassiveRoleRow" Margin="0,0,0,10" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" x:Name="BrakePassiveRoleCombo" Tag="brake" MinWidth="120"
+                                              SelectionChanged="PassivePedalRole_SelectionChanged">
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
+                                    </ComboBox>
+                                </Grid>
                                 <TextBlock x:Name="BrakeCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
                                 <ProgressBar x:Name="BrakeLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
                                              Foreground="{StaticResource RedBrush}" Margin="0,0,0,12"/>
@@ -1624,6 +1646,16 @@
                                 <Button x:Name="ClutchCalStartButton" Content="{x:Static res:Strings.Button_Calibrate}" Padding="10,2" Click="ClutchCalStartButton_Click"/>
                             </ctrl:SectionCard.Header>
                             <StackPanel>
+                                <Grid x:Name="ClutchPassiveRoleRow" Margin="0,0,0,10" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_Role}" Style="{StaticResource LabelText}" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" x:Name="ClutchPassiveRoleCombo" Tag="clutch" MinWidth="120"
+                                              SelectionChanged="PassivePedalRole_SelectionChanged">
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Throttle}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Brake}"/>
+                                        <ComboBoxItem Content="{x:Static res:Strings.Option_Clutch}"/>
+                                    </ComboBox>
+                                </Grid>
                                 <TextBlock x:Name="ClutchCalStatus" Style="{StaticResource MutedHintText}" TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
                                 <ProgressBar x:Name="ClutchLiveBar" Height="8" Minimum="0" Maximum="100" Value="0"
                                              Foreground="{StaticResource CyanBrush}" Margin="0,0,0,12"/>

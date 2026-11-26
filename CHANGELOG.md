@@ -19,6 +19,7 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster Pedal Feel curve allows "A"-shaped curves;** any point, the last included, can sit below the one before it, and dragging the last point no longer changes Max Force or rescales the graph.
 - **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.
 - **Shift-dragging an mBooster Pedal Feel point lands on 5 kg steps;** it gave 136/144 instead of 135/145.
+- **mBooster role changes work with a passive pedal connected;** the passive pedal's role is now written to the mBooster when a role change swaps with it, and roles follow the hardware as on chains, so a swap no longer leaves two pedals on one role or mislabels them. A passive pedal's column on the Pedals tab has its own Role picker.
 
 ## [1.7.5]
 
