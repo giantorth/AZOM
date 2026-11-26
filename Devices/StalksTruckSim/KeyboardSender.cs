@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using MozaPlugin.Protocol;
 
 namespace MozaPlugin.Devices.StalksTruckSim
 {
@@ -12,7 +13,8 @@ namespace MozaPlugin.Devices.StalksTruckSim
     /// what ETS2/ATS read). All taps are played on a dedicated worker thread so the
     /// callers (HID read thread, SimHub <c>DataUpdate</c> thread) never block on
     /// key hold / inter-tap timing, and every send is gated on the game being the
-    /// foreground window so keys can never leak into another app.
+    /// foreground window so keys can never leak into another app (under Wine, any
+    /// host window outside the prefix passes, see <see cref="CheckForeground"/>).
     /// </summary>
     internal sealed class KeyboardSender : IDisposable
     {
@@ -166,21 +168,40 @@ namespace MozaPlugin.Devices.StalksTruckSim
         /// <summary>True when a configured truck-game process owns the foreground
         /// window. Used by the controller to avoid advancing tracked wiper/light
         /// stages while alt-tabbed (when key output would be dropped).</summary>
-        internal bool IsGameForeground()
+        internal bool IsGameForeground() => CheckForeground(out _);
+
+        /// <summary>Foreground owner and gate verdict, for the diagnostics dump.</summary>
+        internal string DescribeForeground()
         {
+            bool game = CheckForeground(out string owner);
+            return $"{owner} ({(game ? "keys sent" : "keys held back")})";
+        }
+
+        private bool CheckForeground(out string owner)
+        {
+            owner = "none";
             var procs = _foregroundProcs;
-            if (procs.Length == 0) return true;
+            if (procs.Length == 0) { owner = "any"; return true; }
             try
             {
                 IntPtr hwnd = GetForegroundWindow();
+                // Wine makes the desktop window foreground while the host's active window
+                // belongs to another X client (a game in another prefix, or a native one).
+                // That window can't be identified from inside Wine, so it counts as the
+                // game; sangria winex11 forwards SendInput to it through XTEST.
+                if (WineHost.IsWine && (hwnd == IntPtr.Zero || hwnd == GetDesktopWindow()))
+                {
+                    owner = "host window outside Wine";
+                    return true;
+                }
                 if (hwnd == IntPtr.Zero) return false;
                 GetWindowThreadProcessId(hwnd, out uint pid);
                 if (pid == 0) return false;
                 using (var p = Process.GetProcessById((int)pid))
                 {
-                    string name = p.ProcessName;
+                    owner = p.ProcessName;
                     foreach (var want in procs)
-                        if (string.Equals(name, want, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (string.Equals(owner, want, StringComparison.OrdinalIgnoreCase)) return true;
                 }
             }
             catch { }
@@ -222,6 +243,9 @@ namespace MozaPlugin.Devices.StalksTruckSim
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDesktopWindow();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);

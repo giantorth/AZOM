@@ -568,6 +568,8 @@ namespace MozaPlugin.UI
             var s = plugin?.Settings;
             var cfg = s?.StalksTruckSim;
             sb.AppendLine($"Mode:           {(s == null ? "—" : s.StalksMode.ToString())}");
+            if (s?.StalksMode == Devices.StalksTruckSim.StalkMode.TruckSim && plugin?.StalksController != null)
+                sb.AppendLine($"Key gate:       {plugin.StalksController.DescribeGate()}");
             if (cfg == null) return sb.ToString().TrimEnd();
 
             sb.AppendLine(
