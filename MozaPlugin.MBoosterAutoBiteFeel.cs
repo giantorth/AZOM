@@ -66,7 +66,7 @@ namespace MozaPlugin
             int bite = _clutchBitePedalPct;
             if (p == null || !p.Enabled || bite < 0) return false;
             if (c.AxisRole(axis) != MBoosterRole.Clutch || !c.IsAxisMotorized(axis)) return false;
-            MBoosterAutoBiteCurve.Build(bite, p.WidthPct, p.BeforePct, p.AfterPct, out y, out x, out endY);
+            MBoosterAutoBiteCurve.Build(bite, p.WidthPct, p.BeforePct, p.AfterPct, p.EndPct, out y, out x, out endY);
             return true;
         }
 

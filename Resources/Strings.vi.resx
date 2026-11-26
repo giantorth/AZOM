@@ -967,4 +967,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Điểm bám tự động</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Trước điểm bám (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Sau điểm bám (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Kết thúc hành trình (%)</value></data>
 </root>

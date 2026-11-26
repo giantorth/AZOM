@@ -2113,8 +2113,9 @@ set). Pit House has no equivalent.
 **Shape** (`MBoosterAutoBiteCurve`, Y in % of the Deadzone→Max Force span):
 a ramp from the Deadzone start point up to *Before* at `bite − Width`, 100 %
 (Max Force, so the slider sets the peak height) at the bite point, *After*
-at `bite + Width`, flat after that to the last point. Defaults: Width ±8 %
-of travel, Before 50 %, After 40 %. Three nodes take `bite − Width`,
+at `bite + Width`, then a straight line to *End* at the last point (100 %
+travel). Defaults: Width ±8 % of travel, Before 50 %, After 40 %, End
+40 % (flat). Three nodes take `bite − Width`,
 `bite`, `bite + Width` (clamped to 1..99 so the editor's 1-unit gaps to
 the end points hold; the bite point is held to 2..98). The other three
 split between the two sides in proportion to each side's length, evenly

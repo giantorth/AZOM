@@ -967,4 +967,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>自动接合点</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>接合点前 (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>接合点后 (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>行程终点 (%)</value></data>
 </root>

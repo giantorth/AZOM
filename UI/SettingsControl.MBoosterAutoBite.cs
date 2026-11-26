@@ -38,6 +38,8 @@ namespace MozaPlugin.UI
                 p?.BeforePct ?? MBoosterUiConstants.AutoBiteBeforeDefaultPct);
             SeedAutoBiteSlider(MBoosterAutoBiteAfterSlider, MBoosterAutoBiteAfterValue,
                 p?.AfterPct ?? MBoosterUiConstants.AutoBiteAfterDefaultPct);
+            SeedAutoBiteSlider(MBoosterAutoBiteEndSlider, MBoosterAutoBiteEndValue,
+                p?.EndPct ?? MBoosterUiConstants.AutoBiteEndDefaultPct);
             ApplyMBoosterAutoBiteState(fx, showCurve: true);
         }
 
@@ -125,6 +127,9 @@ namespace MozaPlugin.UI
 
         private void MBoosterAutoBiteAfterSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
             OnIntSliderChanged(e.NewValue, MBoosterAutoBiteAfterValue, "", v => SetMBoosterAutoBite(p => p.AfterPct = v));
+
+        private void MBoosterAutoBiteEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+            OnIntSliderChanged(e.NewValue, MBoosterAutoBiteEndValue, "", v => SetMBoosterAutoBite(p => p.EndPct = v));
 
         private void SetMBoosterAutoBite(Action<MBoosterAutoBiteFeel> set)
         {

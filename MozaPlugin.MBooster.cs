@@ -318,7 +318,7 @@ namespace MozaPlugin
             if (into.AutoBiteFeel == null) into.AutoBiteFeel = from.AutoBiteFeel?.Clone();
             else if (from.AutoBiteFeel is { } fa && (fa.Enabled != into.AutoBiteFeel.Enabled
                      || fa.WidthPct != into.AutoBiteFeel.WidthPct || fa.BeforePct != into.AutoBiteFeel.BeforePct
-                     || fa.AfterPct != into.AutoBiteFeel.AfterPct))
+                     || fa.AfterPct != into.AutoBiteFeel.AfterPct || fa.EndPct != into.AutoBiteFeel.EndPct))
                 conflicts.Add(label + "AutoBiteFeel");
 
             // MBoosterSegmentedDampingSettings is a sealed class, so these are

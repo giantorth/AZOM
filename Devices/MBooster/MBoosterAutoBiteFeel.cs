@@ -11,9 +11,11 @@ namespace MozaPlugin.Devices.MBooster
         public bool Enabled { get; set; }
         // Peak half-width, pedal travel (%).
         public int WidthPct { get; set; } = MBoosterUiConstants.AutoBiteWidthDefaultPct;
-        // Force up to the peak and after it, % of the Deadzone→Max Force span.
+        // Force up to the peak, just after it and at the end of travel, % of
+        // the Deadzone→Max Force span.
         public int BeforePct { get; set; } = MBoosterUiConstants.AutoBiteBeforeDefaultPct;
         public int AfterPct { get; set; } = MBoosterUiConstants.AutoBiteAfterDefaultPct;
+        public int EndPct { get; set; } = MBoosterUiConstants.AutoBiteEndDefaultPct;
 
         public MBoosterAutoBiteFeel Clone() => (MBoosterAutoBiteFeel)MemberwiseClone();
     }
@@ -35,7 +37,8 @@ namespace MozaPlugin.Devices.MBooster
     /// <summary>
     /// The automatic bite point Pedal Feel template: a ramp from the Deadzone
     /// start point up to Before at bite − Width, the peak (100 %, Max Force) at
-    /// the bite point, After at bite + Width and flat on to the last point. The
+    /// the bite point, After at bite + Width and a straight line on to End at
+    /// the last point. The
     /// three other nodes go to the two sides in proportion to their length,
     /// evenly spaced. The peak sits on a node, so it holds whether the unit
     /// interpolates between nodes linearly or by spline.
@@ -52,7 +55,7 @@ namespace MozaPlugin.Devices.MBooster
         /// <param name="y">Node Y, % of the Deadzone→Max Force span (InputCurveY's units).</param>
         /// <param name="x">Node X, % of travel (InputCurveX's units), whole and increasing.</param>
         /// <param name="endY">Last point Y (InputCurveEndY's units).</param>
-        public static void Build(double bitePct, int widthPct, int beforePct, int afterPct,
+        public static void Build(double bitePct, int widthPct, int beforePct, int afterPct, int endPct,
             out float[] y, out float[] x, out float endY)
         {
             int n = MBoosterUiConstants.PedalFeelNodeCount;
@@ -63,6 +66,7 @@ namespace MozaPlugin.Devices.MBooster
             int right = Math.Min(MaxX, bite + w);
             double before = Clamp(beforePct, 0, 100);
             double after = Clamp(afterPct, 0, 100);
+            double end = Clamp(endPct, 0, 100);
 
             // Whole X positions left free on each side; together always more
             // than `free`, since Width is at most 25.
@@ -88,10 +92,11 @@ namespace MozaPlugin.Devices.MBooster
             x[k] = right; y[k++] = Pct(after);
             for (int i = 1; i <= nRight; i++, k++)
             {
-                x[k] = right + (int)Math.Round((100 - right) * i / (double)(nRight + 1), MidpointRounding.AwayFromZero);
-                y[k] = Pct(after);
+                int xi = right + (int)Math.Round((100 - right) * i / (double)(nRight + 1), MidpointRounding.AwayFromZero);
+                x[k] = xi;
+                y[k] = Pct(after + (end - after) * (xi - right) / (100 - right));
             }
-            endY = Pct(after);
+            endY = Pct(end);
         }
 
         private static float Pct(double v) => (float)Math.Round(v, MBoosterUiConstants.PedalFeelYDecimals);

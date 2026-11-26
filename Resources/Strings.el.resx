@@ -966,4 +966,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Αυτόματο σημείο εμπλοκής</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Πριν το σημείο εμπλοκής (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Μετά το σημείο εμπλοκής (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Τέλος διαδρομής (%)</value></data>
 </root>

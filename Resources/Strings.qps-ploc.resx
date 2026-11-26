@@ -964,4 +964,5 @@
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Auto-chomp!</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Pre-chomp! (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Post-chomp! (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Last chomp! (%)</value></data>
 </root>

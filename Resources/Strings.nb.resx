@@ -972,4 +972,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatisk bitepunkt</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Før bitepunktet (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Etter bitepunktet (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Slutt på bevegelse (%)</value></data>
 </root>

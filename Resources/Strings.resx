@@ -974,4 +974,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatic bite point</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Before bite (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>After bite (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>End of travel (%)</value></data>
 </root>

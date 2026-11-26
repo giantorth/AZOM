@@ -2561,6 +2561,19 @@
                                                              KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
                                                              Text="40"/>
                                                 </Grid>
+                                                <Grid Margin="0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_AutoBiteEnd}" Style="{StaticResource SliderLabel}"/>
+                                                    <Slider Grid.Column="1" x:Name="MBoosterAutoBiteEndSlider" Style="{StaticResource SettingSlider}" Minimum="0" Maximum="100" TickFrequency="1" ValueChanged="MBoosterAutoBiteEndSlider_ValueChanged"/>
+                                                    <TextBox Grid.Column="2" x:Name="MBoosterAutoBiteEndValue" Style="{StaticResource SliderValueEditBox}"
+                                                             Tag="{Binding ElementName=MBoosterAutoBiteEndSlider}"
+                                                             KeyDown="SliderValueBox_KeyDown" LostFocus="SliderValueBox_LostFocus"
+                                                             Text="40"/>
+                                                </Grid>
                                             </StackPanel>
                                         </StackPanel><!-- MBoosterAutoBitePanel -->
                                         </StackPanel><!-- MBoosterDeadzoneMaxForcePanel -->

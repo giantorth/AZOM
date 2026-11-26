@@ -540,7 +540,7 @@ namespace MozaPlugin.UI
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
                     $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")} " +
                     $"inCurveEnd={FmtPct(cfg.InputCurveEndY)} " +
-                    $"autoBite={(cfg.AutoBiteFeel is { } ab ? $"{(ab.Enabled ? "on" : "off")}(w{ab.WidthPct}/b{ab.BeforePct}/a{ab.AfterPct})" : "—")}");
+                    $"autoBite={(cfg.AutoBiteFeel is { } ab ? $"{(ab.Enabled ? "on" : "off")}(w{ab.WidthPct}/b{ab.BeforePct}/a{ab.AfterPct}/e{ab.EndPct})" : "—")}");
             }
         }
 

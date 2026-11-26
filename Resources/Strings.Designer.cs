@@ -1032,5 +1032,6 @@ namespace MozaPlugin.Resources
         public static string Label_AutoBitePoint => Get("Label_AutoBitePoint");
         public static string SliderLabel_AutoBiteBefore => Get("SliderLabel_AutoBiteBefore");
         public static string SliderLabel_AutoBiteAfter => Get("SliderLabel_AutoBiteAfter");
+        public static string SliderLabel_AutoBiteEnd => Get("SliderLabel_AutoBiteEnd");
     }
 }

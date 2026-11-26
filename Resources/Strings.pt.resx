@@ -966,4 +966,5 @@ Id: {2}</value></data>
   <data name="Label_AutoBitePoint" xml:space="preserve"><value>Ponto de engate automático</value></data>
   <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Antes do ponto de engate (%)</value></data>
   <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Depois do ponto de engate (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Fim do curso (%)</value></data>
 </root>

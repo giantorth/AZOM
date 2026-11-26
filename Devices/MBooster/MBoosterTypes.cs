@@ -142,13 +142,14 @@ namespace MozaPlugin.Devices.MBooster
         public const int BitePointPulseRateDefaultHz = 10;
 
         // Automatic bite point (MBoosterAutoBiteCurve): the peak's half-width
-        // in pedal travel (%), and the force before and after it (% of the
-        // Deadzone→Max Force span).
+        // in pedal travel (%), and the force before it, after it and at the end
+        // of travel (% of the Deadzone→Max Force span).
         public const int AutoBiteWidthMinPct = 2;
         public const int AutoBiteWidthMaxPct = 25;
         public const int AutoBiteWidthDefaultPct = 8;
         public const int AutoBiteBeforeDefaultPct = 50;
         public const int AutoBiteAfterDefaultPct = 40;
+        public const int AutoBiteEndDefaultPct = 40;
 
         /// <summary>
         /// The ripple rate a Bite Point with no Pulse rate set plays: before the
