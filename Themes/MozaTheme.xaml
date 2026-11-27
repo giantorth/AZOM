@@ -42,6 +42,7 @@
     <Color x:Key="GreenColor">#FF39FF88</Color>
     <Color x:Key="AmberColor">#FFFFB84D</Color>
     <Color x:Key="AmberSoftColor">#22FFB84D</Color>
+    <Color x:Key="YellowColor">#FFFFE14D</Color>
     <Color x:Key="RedColor">#FFFF5566</Color>
     <Color x:Key="BlueColor">#FF4D8CFF</Color>
 
@@ -71,6 +72,7 @@
     <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource GreenColor}"/>
     <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}"/>
     <SolidColorBrush x:Key="AmberSoftBrush" Color="{StaticResource AmberSoftColor}"/>
+    <SolidColorBrush x:Key="YellowBrush" Color="{StaticResource YellowColor}"/>
     <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}"/>
     <SolidColorBrush x:Key="BlueBrush" Color="{StaticResource BlueColor}"/>
 
@@ -914,7 +916,7 @@
                       StrokeDashArray="4 3" Opacity="0.85"
                       Data="{Binding ReferenceLineGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <!-- Curve -->
-                <Path Stroke="{TemplateBinding AccentBrush}" StrokeThickness="2.5"
+                <Path Stroke="{TemplateBinding AccentBrush}" StrokeThickness="{TemplateBinding CurveStrokeThickness}"
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                       Fill="{x:Null}"
                       Effect="{StaticResource CyanGlowSoftEffect}"
@@ -931,7 +933,7 @@
                      vertically; every current ShowAnchorPoints user sets that. -->
                 <Border Width="28" Height="28" CornerRadius="14" Opacity="0.45" IsHitTestVisible="False"
                         Background="#FF1E242A"
-                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="{TemplateBinding AnchorStartBorderThickness}"
                         Visibility="{Binding AnchorStartVisible, RelativeSource={RelativeSource TemplatedParent}}"
                         Canvas.Left="{Binding AnchorStartLeft, RelativeSource={RelativeSource TemplatedParent}}"
                         Canvas.Top="{Binding AnchorStartTop, RelativeSource={RelativeSource TemplatedParent}}">
@@ -943,7 +945,7 @@
                 </Border>
                 <Border Width="28" Height="28" CornerRadius="14" IsHitTestVisible="False"
                         Background="#FF1E242A"
-                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="2"
+                        BorderBrush="{TemplateBinding AccentBrush}" BorderThickness="{TemplateBinding AnchorEndBorderThickness}"
                         Effect="{StaticResource CyanGlowSoftEffect}"
                         Visibility="{Binding AnchorEndVisible, RelativeSource={RelativeSource TemplatedParent}}"
                         Canvas.Left="{Binding AnchorEndLeft, RelativeSource={RelativeSource TemplatedParent}}"
@@ -1094,6 +1096,14 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsHitTestVisible="False"/>
                 </Border>
+                <!-- Threshold point (see MozaCurveEditor.ThresholdY). Above the
+                     nodes so one never hides it; hit-test-transparent so drags
+                     still reach the node underneath. -->
+                <Ellipse Width="10" Height="10" Fill="{StaticResource YellowBrush}" Stroke="#FF1E242A" StrokeThickness="1.5"
+                         IsHitTestVisible="False"
+                         Visibility="{Binding ThresholdMarkerVisible, RelativeSource={RelativeSource TemplatedParent}}"
+                         Canvas.Left="{Binding ThresholdMarkerLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                         Canvas.Top="{Binding ThresholdMarkerTop, RelativeSource={RelativeSource TemplatedParent}}"/>
 
                 <!-- Y-axis labels -->
                 <TextBlock Text="{Binding YAxisLabel0, RelativeSource={RelativeSource TemplatedParent}}"

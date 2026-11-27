@@ -11,8 +11,8 @@ namespace MozaPlugin
     /// bite point.
     ///
     /// The calibration is stored in the clutch source's units; the curve's X is
-    /// the pedal's own travel as the graph's live dot reads it (raw HID, before
-    /// Max Threshold). The mBooster pedal source converts directly; every other
+    /// the pedal's own travel as the graph's live dot reads it (the HID
+    /// position). The mBooster pedal source is that same reading; every other
     /// source goes through a per-game <see cref="MBoosterBitePointPedalMap"/>
     /// learned while source and pedal both hold steady. Until the map covers the
     /// bite point, the stored curve stays.
@@ -121,15 +121,14 @@ namespace MozaPlugin
                 return;
             }
             var c = found!;
-            var raw = c.LastAxisRawPercentPreThreshold;
-            double pedalPct = axis < raw.Length ? raw[axis] : 0;
+            double pedalPct = c.AxisPedalPosition(axis) * 100.0;
 
             if (BitePointSource != MBoosterBitePointSource.MBoosterPedal && gameKey != null && driving && !double.IsNaN(source01))
                 LearnBitePedalMap(gameKey, source01 * 100.0, pedalPct);
             else
                 _mapHistCount = 0;
 
-            _clutchBitePedalPct = BiteInPedalTravel(c, axis, gameKey);
+            _clutchBitePedalPct = BiteInPedalTravel(gameKey);
             KeepAutoBiteFeelPushed(c, axis, pedalPct);
         }
 
@@ -190,18 +189,12 @@ namespace MozaPlugin
             return false;
         }
 
-        private int BiteInPedalTravel(MBoosterDeviceController c, int axis, string? gameKey)
+        private int BiteInPedalTravel(string? gameKey)
         {
             int bite = _currentClutchBitePointPct;
             if (bite < 0) return -1;
-            if (BitePointSource == MBoosterBitePointSource.MBoosterPedal)
-            {
-                // The source is the shaped position: undo the Max Threshold gain,
-                // which only a USB lane's HID reading carries.
-                var cfg = MozaMBoosterRegistry.PeekPedalConfig(c.CurrentSettings, axis, c.SoleConnectedAxis());
-                double gain = c.IsRouted || cfg == null ? 1.0 : MozaMBoosterRegistry.MaxThresholdGain(cfg, c.IsAxisMotorized(axis));
-                return (int)Math.Round(bite / gain, MidpointRounding.AwayFromZero);
-            }
+            // The source is the pedal's own HID position, already in travel.
+            if (BitePointSource == MBoosterBitePointSource.MBoosterPedal) return bite;
             var maps = _settings?.MBoosterBitePointPedalMaps;
             if (gameKey == null || maps == null || !maps.TryGetValue(gameKey, out var map) || map == null) return -1;
             return map.TryMap(bite, out double p) ? (int)Math.Round(p, MidpointRounding.AwayFromZero) : -1;
@@ -233,8 +226,7 @@ namespace MozaPlugin
             // the clutch has been pressed since.
             c.QueueCalibWrite($"{dev:x2}:feel-curve", () =>
             {
-                var rawNow = c.LastAxisRawPercentPreThreshold;
-                if (axis < rawNow.Length && rawNow[axis] >= AutoBiteRestPct) return;
+                if (c.AxisPedalPosition(axis) * 100.0 >= AutoBiteRestPct) return;
                 var cfgNow = MozaMBoosterRegistry.PeekPedalConfig(c.CurrentSettings, axis, c.SoleConnectedAxis());
                 if (cfgNow?.AutoBiteFeel?.Enabled == true)
                     PushResolvedFeelCurve(cfgNow, c, axis, dev, guard: MBoosterFeelPushGuard.IfSetOrSent);

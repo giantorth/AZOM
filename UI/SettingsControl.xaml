@@ -2487,8 +2487,7 @@
                                             <!-- Live "position % · kg force" readout, updated at 30 Hz in
                                                  UpdateMBoosterCurveMarkers alongside this tab's other live
                                                  displays. kg is a computed estimate (raw position % scaled by
-                                                 this pedal's own Max Force, i.e. what force reads 100%
-                                                 travel), not a directly-read sensor value. -->
+                                                 this pedal's own Max Force), not a directly-read sensor value. -->
                                             <TextBlock Grid.Row="0" Grid.Column="1" x:Name="MBoosterPedalFeelLiveLabel" Text="{x:Static res:Strings.Label_InputForce}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
                                             <TextBlock Grid.Row="0" Grid.Column="2" Text="{x:Static res:Strings.SliderLabel_MaxForceKg}" Style="{StaticResource SliderLabel}"
                                                        MinWidth="0" MaxWidth="70" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,6"/>
@@ -2714,6 +2713,11 @@
                                              any active pedal, hidden for passive ones (see
                                              UpdateMBoosterConfigVisibilityForRole). -->
                                         <StackPanel x:Name="MBoosterLoadCellPanel">
+                                        <!-- While on, the curve's start point follows the Pedal Feel
+                                             Deadzone (ApplyMBoosterAutoDeadzone) and can't be dragged. -->
+                                        <ctrl:OffOnToggle x:Name="MBoosterAutoDeadzoneEnable" Content="{x:Static res:Strings.Label_AutoDeadzone}"
+                                                          HorizontalAlignment="Left" Margin="0,0,0,8"
+                                                          Checked="MBoosterAutoDeadzoneEnable_Changed" Unchecked="MBoosterAutoDeadzoneEnable_Changed"/>
                                         <Grid Margin="0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>

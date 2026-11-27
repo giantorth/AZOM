@@ -530,7 +530,7 @@ namespace MozaPlugin.UI
                     $"             simInput: ratio={FmtPct(cfg.SensorOutputRatioPct)} " +
                     $"maxThreshold={FmtKg(cfg.MaxThresholdKg)} " +
                     $"dir={(cfg.Direction < 0 ? "—" : cfg.Direction.ToString())} " +
-                    $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())} " +
+                    $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())}{(cfg.AutoDeadzone ? "(auto)" : "")} " +
                     $"max={(cfg.Max < 0 ? "—" : cfg.Max.ToString())} " +
                     $"curve={(cfg.HardwareCurveY != null ? string.Join("/", cfg.HardwareCurveY.Select(v => v.ToString("F0", CultureInfo.InvariantCulture))) : "—")}");
                 sb.AppendLine(

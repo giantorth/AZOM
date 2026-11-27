@@ -989,4 +989,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Nova versão do painel do SimHub: {0}. Ao instalá-la, sua cópia atual fica guardada na pasta _Backups.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Carro ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Jogo ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Zona morta automática</value></data>
 </root>

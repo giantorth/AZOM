@@ -995,4 +995,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Ny versjon av SimHub-dashbord: {0}. Når du installerer den, beholdes din nåværende kopi i _Backups-mappen.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Bil ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Spill ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatisk dødsone</value></data>
 </root>

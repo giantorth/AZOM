@@ -223,7 +223,12 @@ namespace MozaPlugin.UI
         {
             if (MBoosterDevicePanel.Visibility != Visibility.Visible) return;
             var selected = _plugin?.MBoosterRegistry?.FindByIdentity(_mboosterSelectedIdentity ?? "");
-            if (selected == null) return;
+            if (selected == null)
+            {
+                // Don't leave a departed device's live dot on the demo panel.
+                MBoosterInputCurveEditor.LiveX = double.NaN;
+                return;
+            }
 
             // Effects card pedal trace — same 30 Hz cadence as the Inputs
             // tab's pedal bars above, and the same merged 0-100 values
@@ -240,13 +245,10 @@ namespace MozaPlugin.UI
             // Track the SELECTED pedal's own axis, not always the master's —
             // otherwise every pedal page showed the master (throttle) input.
             int idx = _mboosterEffectPedalIndex;
-            // TRUE raw reading — % of Max Force's own hardware ceiling, i.e.
-            // the physical force the user is actually applying to the pedal,
-            // captured in OnHidAxisUpdate BEFORE the host-side Max Threshold
-            // rescale. This is the Pedal Feel curve's real input domain
+            // TRUE raw reading — the pedal's HID position as the unit
+            // reports it. This is the Pedal Feel curve's real input domain
             // (Deadzone-Max Force span) and what "Input Force" should show.
-            double rawInput = (idx >= 0 && idx < selected.LastAxisRawPercentPreThreshold.Length)
-                ? selected.LastAxisRawPercentPreThreshold[idx] : 0.0;
+            double rawInput = selected.AxisPedalPosition(idx) * 100.0;
 
             // Pedal Feel's curve is now a REAL hardware effect (see
             // MozaMBoosterRegistry.ComputeFeelCurveX) — the device reshapes
@@ -263,11 +265,9 @@ namespace MozaPlugin.UI
 
             // Live "position % · kg force" readout above the Pedal Feel
             // curve editor (MBoosterPedalFeelLiveLabel) — the raw force the
-            // user is applying to the pedal, independent of Max Threshold's
-            // sim-facing output scaling. kg is an estimate, not a directly-
-            // read sensor value: rawInput/100 * Max Force's own kg ceiling
-            // (the reference its own 100% represents — see OnHidAxisUpdate),
-            // falling back to 200kg if Max Force itself is unset.
+            // user is applying to the pedal. kg is an estimate, not a
+            // directly-read sensor value: rawInput/100 * Max Force's own kg
+            // ceiling, falling back to 200kg if Max Force itself is unset.
             if (hidConnected)
             {
                 var cfg = PeekMBoosterEffectTarget();

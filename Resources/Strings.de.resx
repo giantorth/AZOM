@@ -990,4 +990,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Neue SimHub-Dashboard-Version: {0}. Bei der Installation bleibt deine aktuelle Kopie im Ordner _Backups erhalten.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Fahrzeug ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Spiel ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatische Totzone</value></data>
 </root>

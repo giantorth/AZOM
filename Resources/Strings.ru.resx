@@ -990,4 +990,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Новая версия панели SimHub: {0}. При установке ваша текущая копия сохранится в папке _Backups.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Автомобиль ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Игра ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Автоматическая мёртвая зона</value></data>
 </root>

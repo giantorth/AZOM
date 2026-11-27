@@ -208,7 +208,7 @@ namespace MozaPlugin
                 && c.EndstopFrontStiffness < 0 && c.EndstopEndStiffness < 0
                 && c.NaturalFrictionPct < 0
                 && c.DampingPressPct < 0 && c.DampingReleasePct < 0
-                && c.AutoBiteFeel == null
+                && c.AutoBiteFeel == null && !c.AutoDeadzone
                 && c.SegmentedDamping.Divider1Pressed < 0 && c.SegmentedDamping.Divider2Pressed < 0
                 && c.SegmentedDamping.Seg1Pressed < 0 && c.SegmentedDamping.Seg2Pressed < 0 && c.SegmentedDamping.Seg3Pressed < 0
                 && c.SegmentedDamping.Divider1Released < 0 && c.SegmentedDamping.Divider2Released < 0
@@ -320,6 +320,8 @@ namespace MozaPlugin
                      || fa.WidthPct != into.AutoBiteFeel.WidthPct || fa.BeforePct != into.AutoBiteFeel.BeforePct
                      || fa.AfterPct != into.AutoBiteFeel.AfterPct || fa.EndPct != into.AutoBiteFeel.EndPct))
                 conflicts.Add(label + "AutoBiteFeel");
+            // A bool has no unset state: on in either copy stays on.
+            into.AutoDeadzone |= from.AutoDeadzone;
 
             // MBoosterSegmentedDampingSettings is a sealed class, so these are
             // references — mutating sd edits into.SegmentedDamping in place.

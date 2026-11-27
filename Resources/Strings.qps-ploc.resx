@@ -987,4 +987,5 @@
   <data name="Banner_DashUpdate" xml:space="preserve"><value>New dash-bone: {0}! Old bone buried in _Backups!</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Car-woof ×{0}!</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Game-woof ×{0}!</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Auto-howl!</value></data>
 </root>

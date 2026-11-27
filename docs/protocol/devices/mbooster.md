@@ -291,8 +291,8 @@ decoding 184→50→140 kg) drew no commit at all.
 
 Two user-visible symptoms followed, both reported as bugs: Max Threshold
 read as **inverted** (with the hardware write discarded, its only surviving
-effect was as the host-side `fullScaleKg` denominator — see
-[Sim Input Mapping](#sim-input-mapping)), and every vibration effect on the
+effect was as a host-side `fullScaleKg` denominator AZOM has since
+removed), and every vibration effect on the
 brake was silently dead.
 
 `MBoosterDeviceController.ActiveAxisCount` is therefore the authority:
@@ -367,8 +367,8 @@ on load-cell ownership alone, in the apply, the UI write path and
 `MBoosterLoadCellPanel`'s visibility. Every active pedal has a load cell
 whatever its role, and Pit House exports `<role>_press_combine` for each
 role. They used to also require the Brake role, which hid them on an
-active Throttle/Clutch pedal while the host-side Max Threshold rescale
-still applied the stored value (VYNRCAZ1: a hidden 50 kg threshold over a
+active Throttle/Clutch pedal while AZOM's host-side Max Threshold rescale
+(since removed) still applied the stored value (VYNRCAZ1: a hidden 50 kg threshold over a
 21 kg Max Force capped clutch output at 42%).
 
 Ownership (`OwnsSingletonRegisters`) follows Pit House's model rather than
@@ -1863,8 +1863,9 @@ parking still applies to whichever calibrations still carry it.
 ## Sim Input Mapping
 
 Three hardware calibrations on the pedal's own unit (`MotorDeviceForRole` —
-see [Chain topology](#chain-topology--connectivity-diagnostics)); Max
-Threshold's effect is applied host-side.
+see [Chain topology](#chain-topology--connectivity-diagnostics)), all
+applied by the unit itself: the HID position is already the value the game
+sees, and AZOM uses it as reported.
 
 - **Sensor Output Ratio** (`SensorOutputRatioPct`, 0–100%) — blends the
   angle sensor (0%) against the load cell (100%). Wire command
@@ -1878,27 +1879,16 @@ Threshold's effect is applied host-side.
   1311 exactly; an unlabeled capture decoding to ~126 kg against an
   independently-reported real Pit House setting of ~125 kg). See
   `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`.
-  **CORRECTED**: earlier text here claimed this write "recalibrates the
-  sensor's own full-scale range on the DEVICE" (raw HID axis reads
-  `MaxThresholdKg` of force at 100%). Hardware testing disproved that: the
-  write demonstrably reaches the device and reads back correctly (same
-  "write succeeds ⇒ assumed real" reasoning that also mis-closed the Max
-  Force "does nothing" reports twice — KY3HK4QP, 5VR5AQ8Y — before *that*
-  turned out to need the Pedal Feel curve to actually have a shape), but
-  changing it does not change how much force the raw HID axis needs to
-  reach 100%, confirmed with Max Force held constant and Threshold swept
-  full range both directions. The raw HID axis's 100% is actually **Max
-  Force's own kg ceiling** (the Pedal Feel curve's real hardware full
-  scale — see below). Max Threshold is therefore implemented **host-side**
-  instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
-  position — already 0–100% of Max Force's span — into 0–100% of
-  Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
-  for AZOM's own telemetry. A Threshold at or above Max Force is a no-op:
-  the raw axis saturates at Max Force, so a higher Threshold could never
-  reach 100% (VYNRCAZ1). Passive pedals (no load cell) skip it; like any host-side remap it never reaches the
-  game's view of the axis. The `mbooster-brake-threshold` write is still sent
-  (harmless, matches whatever Pit House itself does with the field even if
-  it isn't the mechanism that matters) but AZOM no longer depends on it.
+  **The unit applies it** (confirmed on hardware, 2026-11-27): it picks
+  where on the load cell's 0–200 kg reading 100% travel lands. It is
+  independent of Max Force, which only bounds the Pedal Feel graph — a
+  Threshold below Max Force is fully supported, and nothing stops a Pedal
+  Feel curve asking for more force than Threshold. With a Sensor Output
+  Ratio blend, Threshold scales only the load cell's share.
+  **Retracted**: an earlier revision claimed the unit ignored this write
+  and hit 100% at Max Force, and AZOM rescaled its HID reading by
+  `MaxForceKg / ThresholdKg` on top — applying Threshold twice. That
+  rescale is gone.
 - **Output curve** (`HardwareCurveY` + `Min`/`Max`) — **device calibration,
   the same registers Pit House drives** (moza-simulator `mbooster` bridge
   with Pit House 1.4.1.13, 2026-10-10, every point dragged through its
@@ -1922,7 +1912,19 @@ Threshold's effect is applied host-side.
   read back exactly their Exponential shape (6/14/28/54/100).
 
   So "no output until 20% pedal" is `<role>-min` = 20 — a device setting,
-  not a curve shape. AZOM's editor is the same model
+  not a curve shape.
+
+  **Automatic deadzone** (`AutoDeadzone`, AZOM-only, load-cell owners):
+  while on, the UI sets the start to where the output leaves 0 as the pedal
+  leaves the Pedal Feel Deadzone, and locks that point
+  (`MozaCurveEditor.LockFirstNodeX`). Through the deadzone the pedal hasn't
+  moved, so the angle sensor reads 0 and only the load cell's share of the
+  blend rises: `start = ratio × Deadzone / Max Threshold`, capped at 100%
+  and at the end minus `OutputCurveMinRangePct`, rounded to a whole % — angle
+  only needs no offset (`MozaMBoosterRegistry.AutoDeadzoneStartPct`). It's
+  recomputed from the sliders on each user edit of Deadzone, Sensor Output
+  Ratio, Max Threshold or Automatic bite point, and stored and written as
+  `Min` like a drag, so the apply path is unchanged. AZOM's editor is the same model
   (`MozaCurveEditor.EndpointRangeMode`: start X = Min, Y pinned at 0; end
   X = Max; middle points derived), stored in the fields the Pedals tab
   uses for a passive pedal, and written by the connect/profile apply and
@@ -2210,16 +2212,13 @@ clutch source's units; the curve's X is the pedal's own travel. The source
 drives the vibrations and a connected, motorized pedal holds the Clutch role
 (the tab's Clutch Bite Point card has no picker); otherwise it is the ShakeIt
 editor's pick (`MBoosterBitePointSource`). AZOM places
-the bite point the way the graph's live dot reads the pedal:
-`LastAxisRawPercentPreThreshold` (raw HID, before the host-side Max
-Threshold gain). Whether the unit's X axis is that reading, or travel before
+the bite point the way the graph's live dot reads the pedal: its HID
+position (`AxisPedalPosition`). Whether the unit's X axis is that reading, or travel before
 its own output curve and Min/Max, is **unverified**; with a linear output
 curve over 0–100 the two coincide. Check on hardware: hold the clutch at the
 bite point and the dot should sit on the peak, where the force peaks.
 
-- *mBooster pedal* source: the bite point is the shaped position; dividing
-  by `MaxThresholdGain` gives the raw reading (USB lanes only; a routed
-  lane's position carries no gain).
+- *mBooster pedal* source: the bite point is already in that reading.
 - *Game / Formula / HID axis*: `MBoosterBitePointPedalMap`, one per game key
   (`MBoosterBitePointPedalMaps`, no vehicle keys — input processing is per
   game): source % (101 bins) → pedal travel, learned on the data thread
@@ -2847,12 +2846,25 @@ contains that pixel X, then inverts that segment's X(t) via bisection
 read off the exact point ON the spline. The two editors get different
 values so each shows what it actually receives:
 
-- **Input Curve**: `LastAxisRawPercentPreThreshold` — the HID reading
-  before the host-side Max Threshold rescale (on a routed lane, the base's
-  reading mirrored in by role).
+- **Input Curve**: `AxisPedalPosition` — the HID reading as the unit
+  reports it (on a routed lane, the base's reading mirrored in by role).
 - **Output Curve**: hidden since the curve moved onto the device (see
   [Sim Input Mapping](#sim-input-mapping)) — AZOM has no reading of its
   input to place.
+
+The Pedal Feel curve also carries a yellow **Max Threshold** dot
+(`MozaCurveEditor.ThresholdY`, set by
+`SettingsControl.UpdateMBoosterThresholdMarker` straight from the two
+sliders) where the drawn curve first reaches Max Threshold's kg — the
+leftmost peak when several do, since that's where the sim hits 100%, or the
+curve's start if it already begins above. Shown while Threshold is below Max
+Force and the curve actually reaches it; editing the curve moves it.
+
+The same graph's weight follows three more sliders
+(`SettingsControl.UpdateMBoosterFeelCurveWeight`): the first and last points'
+outlines scale with Front / End Limit stiffness (1 = 2 px, 10 = 3×), the
+curve line with Natural Friction as the pedal gets it (0 = 2.5 px, 100 = 3×;
+switched off counts as 0).
 
 A separate card (Pit House calls this class of setting "input
 mapping") holds the Pit House-parity controls, all still under

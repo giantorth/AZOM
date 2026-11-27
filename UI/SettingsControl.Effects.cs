@@ -263,6 +263,41 @@ namespace MozaPlugin.UI
         }
 
         /// <summary>
+        /// Pedal Feel's yellow Max Threshold dot, straight from the two
+        /// sliders: the editor puts it where the curve first reaches
+        /// Threshold's kg, shown only while Threshold is below Max Force.
+        /// </summary>
+        private void UpdateMBoosterThresholdMarker()
+        {
+            var editor = MBoosterInputCurveEditor;
+            // Null during InitializeComponent, same as UpdateMBoosterFeelAxis.
+            if (editor == null || MBoosterMaxThresholdSlider == null || MBoosterMaxForceSlider == null) return;
+            double thr = MBoosterMaxThresholdSlider.Value;
+            editor.ThresholdY = thr > 0 && thr < MBoosterMaxForceSlider.Value ? thr : double.NaN;
+        }
+
+        /// <summary>
+        /// Pedal Feel graph weight, straight from the sliders: the first and last
+        /// points' outlines follow Front / End Limit stiffness (1 = as drawn,
+        /// 10 = 3×), the curve follows Natural Friction as the pedal gets it
+        /// (0 = as drawn, 100 = 3×; switched off counts as 0).
+        /// </summary>
+        private void UpdateMBoosterFeelCurveWeight()
+        {
+            var editor = MBoosterInputCurveEditor;
+            // Null during InitializeComponent, same as UpdateMBoosterFeelAxis.
+            if (editor == null || MBoosterEndstopFrontSlider == null || MBoosterEndstopEndSlider == null
+                || MBoosterNaturalFrictionSlider == null || MBoosterNaturalFrictionEnable == null) return;
+            double StiffnessScale(Slider s) => 1.0 + 2.0 * Math.Max(0, Math.Min(1, (s.Value - 1.0) / 9.0));
+            double border = MozaControls.MozaCurveEditor.DefaultNodeBorderThickness;
+            editor.AnchorStartBorderThickness = new Thickness(border * StiffnessScale(MBoosterEndstopFrontSlider));
+            editor.AnchorEndBorderThickness = new Thickness(border * StiffnessScale(MBoosterEndstopEndSlider));
+            double friction = MBoosterNaturalFrictionEnable.IsChecked == true ? MBoosterNaturalFrictionSlider.Value : 0;
+            editor.CurveStrokeThickness = MozaControls.MozaCurveEditor.DefaultCurveStrokeThickness
+                * (1.0 + 2.0 * Math.Max(0, Math.Min(1, friction / 100.0)));
+        }
+
+        /// <summary>
         /// Show the load-cell Sim Input controls (Sensor Output Ratio + Max
         /// Threshold) for any active pedal, whatever its role. Pedal travel,
         /// endstop, the output curve and Pedal Feel stay visible for every pedal.
@@ -276,6 +311,8 @@ namespace MozaPlugin.UI
             // active pedal's.
             bool ownsLoadCell = CurrentMBoosterController()?.OwnsSingletonRegisters(_mboosterEffectPedalIndex) ?? false;
             MBoosterLoadCellPanel.Visibility = ownsLoadCell ? Visibility.Visible : Visibility.Collapsed;
+            // Ownership can land after the seed (0x22 read-back).
+            MBoosterCurveEditor.LockFirstNodeX = MBoosterAutoDeadzoneActive(PeekMBoosterEffectTarget());
             // Same gate as MozaPlugin.TryAutoBiteFeelCurve.
             bool clutchFeel = isClutch && (CurrentMBoosterController()?.IsAxisMotorized(_mboosterEffectPedalIndex) ?? false);
             MBoosterAutoBitePanel.Visibility = clutchFeel ? Visibility.Visible : Visibility.Collapsed;

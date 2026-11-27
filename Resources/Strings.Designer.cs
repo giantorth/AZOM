@@ -1055,5 +1055,6 @@ namespace MozaPlugin.Resources
         public static string Banner_DashUpdate => Get("Banner_DashUpdate");
         public static string BiteCal_CarCount => Get("BiteCal_CarCount");
         public static string BiteCal_GameCount => Get("BiteCal_GameCount");
+        public static string Label_AutoDeadzone => Get("Label_AutoDeadzone");
     }
 }

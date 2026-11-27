@@ -7,6 +7,9 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point, following the game and car.
+- **mBooster Automatic deadzone;** the Sim Input Mapping curve starts where the Pedal Feel deadzone ends, for any Sensor Output Ratio blend.
+- **mBooster Pedal Feel graph shows End Stop and Natural Friction;** the end points' outlines thicken with Front / End Limit stiffness and the curve with Natural Friction.
+- **mBooster Max Threshold point on the Pedal Feel graph;** a yellow dot marks where the curve reaches Max Threshold's force when it's below Max Force.
 - **MOZA Clutch Bite Point overlays;** a full one with calibration state, sample count, live clutch against the bite point, standing-start checks and the last launch, and a Mini one that appears only while a standing start can be measured.
 
 ## Changed
@@ -22,6 +25,7 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster Pedal Feel curve allows "A"-shaped curves;** any point, the last included, can sit below the one before it, and dragging the last point no longer changes Max Force or rescales the graph.
 - **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.
 - **Shift-dragging an mBooster Pedal Feel point lands on 5 kg steps;** it gave 136/144 instead of 135/145.
+- **mBooster Max Threshold no longer applied twice;** AZOM's own pedal readings and effects now match what the pedal reports.
 - **mBooster role changes work with a passive pedal connected;** the passive pedal's role is now written to the mBooster when a role change swaps with it, and roles follow the hardware as on chains, so a swap no longer leaves two pedals on one role or mislabels them. A passive pedal's column on the Pedals tab has its own Role picker.
 - **HMA150 port self-test passes with a correct corner assignment;** each corner was sent to the controller mirrored left↔right, so both axis checks failed.
 

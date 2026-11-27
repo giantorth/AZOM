@@ -990,4 +990,5 @@ Id : {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Nouvelle version du tableau de bord SimHub : {0}. L'installer conserve votre copie actuelle dans son dossier _Backups.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Voiture ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Jeu ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Zone morte automatique</value></data>
 </root>

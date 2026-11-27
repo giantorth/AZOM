@@ -828,6 +828,7 @@ namespace MozaPlugin.UI
             float thr = fx?.MaxThresholdKg ?? -1;
             MBoosterMaxThresholdSlider.Value = thr >= 0 ? thr : 100;
             SetValueText(MBoosterMaxThresholdValue, MBoosterMaxThresholdSlider.Value.ToString("F0"));
+            SeedMBoosterAutoDeadzone(fx);
             // Pedal Feel — the curve the pedal gets, the automatic bite point
             // one included.
             SeedMBoosterAutoBite(fx);

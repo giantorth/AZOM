@@ -117,6 +117,8 @@ namespace MozaPlugin.UI
             PushMBoosterFeelCurve(s, MBoosterFeelPushGuard.IfSetOrSent);
             _plugin.SaveSettings();
             using (_suppressor.Begin()) ApplyMBoosterAutoBiteState(s, showCurve: true);
+            // Its angle-only Sensor Output Ratio moves the automatic deadzone.
+            ApplyMBoosterAutoDeadzone();
         }
 
         private void MBoosterAutoBiteWidthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>

@@ -989,4 +989,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>새 SimHub 대시보드 버전: {0}. 설치하면 현재 사본은 _Backups 폴더에 보관됩니다.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>차량 ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>게임 ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>자동 데드존</value></data>
 </root>

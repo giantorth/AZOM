@@ -990,4 +990,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Phiên bản bảng điều khiển SimHub mới: {0}. Khi cài đặt, bản hiện tại của bạn được giữ trong thư mục _Backups.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Xe ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Trò chơi ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Vùng chết tự động</value></data>
 </root>

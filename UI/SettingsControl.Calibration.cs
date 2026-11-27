@@ -465,11 +465,12 @@ namespace MozaPlugin.UI
             s.DeadzoneKg = (float)v;
             PushMBoosterFeelCurve(s);
             _plugin.SaveSettings();
+            ApplyMBoosterAutoDeadzone();
         }
 
-        // Max Force (0..200kg on an active pedal) — the force at which the
-        // pedal's raw HID axis reaches 100% travel, and the Pedal Feel curve's
-        // 100% level: it rescales every point, the last one included. The
+        // Max Force (0..200kg on an active pedal) — the Pedal Feel curve's
+        // 100% level, nothing more (Max Threshold sets what reads 100%
+        // output): it rescales every point, the last one included. The
         // last point's own drag does not move it (see InputCurveEndY).
         // CONFIRMED real hardware calibration
         // (mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
@@ -480,6 +481,7 @@ namespace MozaPlugin.UI
         private void MBoosterMaxForceSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             UpdateMBoosterFeelAxis();
+            UpdateMBoosterThresholdMarker();
             OnIntSliderChanged(e.NewValue, MBoosterMaxForceValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -504,6 +506,7 @@ namespace MozaPlugin.UI
             QueueMBoosterPedalFeelPush("angle-ratio",
                 (c, dev) => c.SendFloatWrite("mbooster-brake-angle-ratio", v, dev));
             _plugin.SaveSettings();
+            ApplyMBoosterAutoDeadzone();
         }
 
         // Max Threshold (kg) — Pit House's load-cell-force-for-100%-output
@@ -512,7 +515,10 @@ namespace MozaPlugin.UI
         // uint (NOT a float) on a fixed 0-200kg scale — see
         // MozaMBoosterProtocol.EncodeThresholdKg and
         // docs/protocol/devices/mbooster.md "Sim Input Mapping".
-        private void MBoosterMaxThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        private void MBoosterMaxThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // View-only, so it also follows suppressed seeds.
+            UpdateMBoosterThresholdMarker();
             OnIntSliderChanged(e.NewValue, MBoosterMaxThresholdValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -521,7 +527,9 @@ namespace MozaPlugin.UI
                 QueueMBoosterPedalFeelPush("brake-threshold", (c, dev) =>
                     c.SendIntWrite("mbooster-brake-threshold",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev));
+                ApplyMBoosterAutoDeadzone();
             });
+        }
 
         // End Stop Stiffness (Front Limit / End Limit), 1-10 — Pit House's
         // own hardware calibration. Reverse-engineered from two real
@@ -529,7 +537,10 @@ namespace MozaPlugin.UI
         // (mbooster-brake-endstop-front/-end), 2-byte int on a fixed 1-10
         // scale — see MozaMBoosterProtocol.EncodeEndstopStiffness and
         // docs/protocol/devices/mbooster.md "Pedal Feel".
-        private void MBoosterEndstopFrontSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        private void MBoosterEndstopFrontSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // View-only, so it also follows suppressed seeds.
+            UpdateMBoosterFeelCurveWeight();
             OnIntSliderChanged(e.NewValue, MBoosterEndstopFrontValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -539,8 +550,11 @@ namespace MozaPlugin.UI
                     c.SendIntWrite("mbooster-brake-endstop-front",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
+        }
 
-        private void MBoosterEndstopEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        private void MBoosterEndstopEndSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateMBoosterFeelCurveWeight();
             OnIntSliderChanged(e.NewValue, MBoosterEndstopEndValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -550,6 +564,7 @@ namespace MozaPlugin.UI
                     c.SendIntWrite("mbooster-brake-endstop-end",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeEndstopStiffness(v), dev));
             });
+        }
 
         // Natural Friction (0-100%) — simulates a frictional force
         // independent of game output. Reverse-engineered from two real Pit
@@ -563,7 +578,9 @@ namespace MozaPlugin.UI
         // separate wire enable bit — the capture's toggle-off write simply
         // sent raw 0 (confirmed via the firmware's own debug log echoing
         // it as fixed-point 0.0).
-        private void MBoosterNaturalFrictionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) =>
+        private void MBoosterNaturalFrictionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateMBoosterFeelCurveWeight();
             OnIntSliderChanged(e.NewValue, MBoosterNaturalFrictionValue, "", v =>
             {
                 var s = CurrentMBoosterEffectTarget();
@@ -576,6 +593,7 @@ namespace MozaPlugin.UI
                     c.SendIntWrite("mbooster-brake-friction-1", raw, dev);
                 });
             });
+        }
 
         // Master on/off for Natural Friction — see
         // MBoosterDeviceSettings.NaturalFrictionEnabled. Off pushes raw 0
@@ -585,6 +603,7 @@ namespace MozaPlugin.UI
         // is disabled while off to avoid a drag implicitly re-enabling it.
         private void MBoosterNaturalFrictionEnable_Changed(object sender, RoutedEventArgs e)
         {
+            UpdateMBoosterFeelCurveWeight();
             if (_suppressEvents) return;
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;

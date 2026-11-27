@@ -337,7 +337,7 @@ namespace MozaPlugin.Devices.MBooster
             return axisIndex == 0;
         }
 
-        /// <summary>Axis <paramref name="axisIndex"/>'s shaped HID position (0..1).</summary>
+        /// <summary>Axis <paramref name="axisIndex"/>'s HID position (0..1), as the unit reports it.</summary>
         public double AxisPedalPosition(int axisIndex) =>
             axisIndex == 0 ? LastHidPosition
             : (axisIndex < LastAxisPositions.Length ? LastAxisPositions[axisIndex] : 0.0);
@@ -388,14 +388,6 @@ namespace MozaPlugin.Devices.MBooster
         // can tear (not last-value-wins), so every consumer clamps to 0..1 and a
         // torn sample costs one tick of a wrong amplitude, never a crash.
         public readonly double[] LastAxisPositions = new double[MaxAxes];
-
-        // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
-        // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
-        // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
-        // force the user is actually applying to the pedal. This is the
-        // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
-        // what the "Input Force" live label/marker should show.
-        public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
         // lone pedal, up to 3 for a full chain. 0 until the first axis update.

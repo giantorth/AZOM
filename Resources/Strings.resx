@@ -997,4 +997,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>New SimHub dashboard version: {0}. Installing it keeps your current copy in its _Backups folder.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Car ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Game ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatic deadzone</value></data>
 </root>

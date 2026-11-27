@@ -989,4 +989,5 @@ Id: {2}</value></data>
   <data name="Banner_DashUpdate" xml:space="preserve"><value>Νέα έκδοση πίνακα SimHub: {0}. Η εγκατάσταση κρατά το τρέχον αντίγραφό σας στον φάκελο _Backups.</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Αυτοκίνητο ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Παιχνίδι ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Αυτόματη νεκρή ζώνη</value></data>
 </root>
