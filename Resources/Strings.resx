@@ -975,7 +975,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Controls</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Ready to calibrate</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Measuring</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Car calibrated ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Game calibrated ×{0}</value></data>
@@ -992,4 +992,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Clutch pressed</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Last launch {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Success · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA Clutch Bite Point Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Shows the clutch bar only while a standing start can be measured, then its result.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>New SimHub dashboard version: {0}. Installing it keeps your current copy in its _Backups folder.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Car ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Game ×{0}</value></data>
 </root>

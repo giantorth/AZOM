@@ -118,9 +118,9 @@ Web dash (phone/tablet): `Web/controls.js` `renderButtonItem` sends `pressed`/`r
 - **FFB Output Curve:** a plot of (0,0) → points 1–4 → (100, Y5), drawn as rectangles whose `Left`/`Top` are bound to the point properties (no line item exists), plus one card per point: ◄ ► = input (X), ▼ ▲ = output (Y). Point 5 is output-only. X steps are clamped 1 unit inside the neighbouring points, as the curve editor's drag is.
 - Roboto has no ▲►▼◄; arrow glyphs use Cousine, which is also in `DashFonts` (the web dash serves `DashFonts` through `/FontFaces.css`).
 
-### MOZA clutch bite point overlay
+### MOZA clutch bite point overlays
 
-`Integration/ControlDash/BitePointDashBuilder.cs` generates "MOZA Clutch Bite Point", a 520×208 display-only overlay (`IsOverlay` and `EnableClickThroughOverlay` true; black dashboard background, transparent screen, as the stock overlays). It reads the `AZOM.ClutchBitePoint*` properties:
+`Integration/ControlDash/BitePointDashBuilder.cs` generates two display-only overlays (`IsOverlay` and `EnableClickThroughOverlay` true; black dashboard background, transparent screen, as the stock overlays): "MOZA Clutch Bite Point" (540×208) and "MOZA Clutch Bite Point Mini" (225×33: state, calibration count and clutch bar in one layer whose `Visible` is bound to `Armed`, `Releasing`, `Captured` or `TooFast`, so it is blank while `NotReady` or `Waiting`). They read the `AZOM.ClutchBitePoint*` properties:
 
 | Property | Value |
 |---|---|
@@ -128,12 +128,16 @@ Web dash (phone/tablet): `Web/controls.js` `renderButtonItem` sends `pressed`/`r
 | `ClutchBitePointCalibration` | `BitePointCalState`: `NotReady`, `Waiting`, `Armed`, `Releasing`, then `Captured` or `TooFast` for 5 s after a launch kept or skipped |
 | `ClutchBitePointScope` / `ClutchBitePointSamples` | `Car`, `Game` or `""`; samples behind the value |
 | `ClutchBitePointClutch` | clutch the calibration reads, 0–100; -1 none |
-| `ClutchBitePointInGame` / `HasClutch` / `InGear` / `Stopped` / `ClutchIn` | standing-start conditions on the last data tick; all true = `Armed` |
+| `ClutchBitePointInGame` / `HasClutch` / `InGear` / `Stopped` / `ClutchIn` | standing-start conditions on the last data tick, `Stopped` = below 0.5 km/h for 1 s (a spin passes through zero speed); all true = `Armed` |
 | `ClutchBitePointLastSample` / `LastRate` / `LastSkipped` | last launch for the current game and car: bite %, release %/s, too fast to count; -1 / false when none |
 
 ### Install
 
-`DashTemplateInstaller` writes both dashboards to `DashTemplates` at Init when the bytes change; the SHA-256 of the last write is kept in `<Name>.djson.azom`, and a `.djson` that no longer matches it (edited in Dash Studio) is left alone. The primitives both builders use (items, bindings, envelope, palette) are in `DashItems`.
+The builders emit only what differs from SimHub's defaults (`DashItems`: items, bindings, envelope, palette), plus `UseStrictJSIsolation: false` — `true` is what Dash Studio calls "legacy strict Javascript formula isolation", a full JS engine per formula (`NCalcEngineBase`: `JsEngine.CreateInstance()` per formula vs one scoped engine per dashboard), and a missing key deserializes as `true` (`[DefaultValue(true)]`, `Populate`); it only matters with external scripts — and `JSExt: 0` on JavaScript formulas (no extension libraries; a formula without it loads local + global, 3). Static item values are a Ready-state preview: Dash Studio's editor and thumbnails don't evaluate bindings.
+
+`DashTemplateInstaller` has Dash Studio itself write them: `EditorModel.LoadFromFile` on the generated djson (staged in a temp folder, on the UI dispatcher), then `SaveToFile(<DashTemplates>/<Name>/<Name>.djson, thumbnails: true)` from a background thread — `SaveToFile` blocks on the UI dispatcher, so never call it there. That gives SimHub's full default set, `.metadata`, `.png` + per-screen `.NN.png` thumbnails, `_SHFonts`, and the replaced copy in `_Backups`. `LoadFromFile` needs `GraphicalDashPlugin.GetSettings()`, which exists only once `GraphicalDashPlugin.Init` has built its dashboard list; plugin init order isn't fixed, so the installer runs then, or on the first `PluginManager.DashboardListUpdated`.
+
+**Updates.** `<Name>.djson.azom` holds the installed version (SHA-256 of the generated djson) and the SHA-256 of the file as SimHub saved it (1.7.5 wrote one line, the SHA-256 of the file as written). A new version replaces a byte-identical copy silently; a copy saved in Dash Studio since — Dash Studio re-serializes on every save, edited or not, and gives the dashboard a new `Id` — is listed in the plugin's banner stack (Install update / Dismiss). Dismiss records that version in `DashTemplateDismissedVersions`. SimHub keys a dashboard's overlay/profile settings by its lower-cased name (`DashStudioSettings_2.json`), not by `Id`.
 
 ## Logging
 

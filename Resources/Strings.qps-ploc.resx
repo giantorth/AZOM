@@ -965,7 +965,7 @@
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Ruff Woof Arf!</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Grr Bark!</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Snuffle Woof!</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Ready-ruff!</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Ready-ruff to calibrate!</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Sniffing!</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Car-sniffed ×{0}!</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Game-sniffed ×{0}!</value></data>
@@ -982,4 +982,9 @@
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Paw-pressed!</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Last zoom {0}% · {1}%/s!</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Good-boy · {0}%!</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Clutch Bark-point Puppy!</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Clutch-bar pops up only for sit-zoomies, then the treat!</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>New dash-bone: {0}! Old bone buried in _Backups!</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Car-woof ×{0}!</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Game-woof ×{0}!</value></data>
 </root>

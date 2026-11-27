@@ -968,7 +968,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>仪表盘</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>控制</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>插件</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>就绪</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>可开始校准</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>测量中</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>车辆已校准 ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>游戏已校准 ×{0}</value></data>
@@ -985,4 +985,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>离合器已踩下</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>上次起步 {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>成功 · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA 离合器结合点 迷你</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>仅在可以测量静止起步时显示离合器条，随后显示其结果。</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>新的 SimHub 仪表盘版本：{0}。安装后，你当前的副本会保留在其 _Backups 文件夹中。</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>车辆 ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>游戏 ×{0}</value></data>
 </root>

@@ -967,7 +967,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Painel</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Controles</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto para calibrar</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Medindo</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Carro calibrado ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Jogo calibrado ×{0}</value></data>
@@ -984,4 +984,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embreagem pressionada</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Última largada {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Sucesso · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Ponto de acoplamento da embreagem MOZA Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Mostra a barra da embreagem só enquanto uma largada parada pode ser medida e, depois, o resultado dela.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Nova versão do painel do SimHub: {0}. Ao instalá-la, sua cópia atual fica guardada na pasta _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Carro ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Jogo ×{0}</value></data>
 </root>

@@ -577,6 +577,11 @@ namespace MozaPlugin.Settings
         // reappears.
         public bool SdkPromptDismissed { get; set; } = false;
 
+        // Generated dashboard name → version the user chose not to install over
+        // their own copy (see DashTemplateInstaller). Absent = not dismissed.
+        public Dictionary<string, string> DashTemplateDismissedVersions { get; set; }
+            = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // NOTE: ports for both UDP surfaces are NOT settings — they are
         // protocol-mandated and not actually configurable in practice.
         //   * CoAP SDK port 40266 is hardcoded as `mov dx, 0x9D4A` in

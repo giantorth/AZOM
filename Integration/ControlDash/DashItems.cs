@@ -1,21 +1,15 @@
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MozaPlugin.Integration.ControlDash
 {
-    /// <summary>A generated dashboard and its metadata sidecar.</summary>
-    internal sealed class DashOutput
-    {
-        public string Djson = "";
-        public string Metadata = "";
-    }
-
     /// <summary>
     /// Dash Studio item, binding and envelope primitives shared by the generated
     /// dashboards (see docs/simhub.md "Dash Studio dashboards"), and their palette.
+    /// Only what differs from SimHub's defaults is written; <see cref="DashTemplateInstaller"/>
+    /// has SimHub save the result, which fills in the rest.
     /// </summary>
     internal static class DashItems
     {
@@ -39,11 +33,11 @@ namespace MozaPlugin.Integration.ControlDash
 
         // ── Envelope ────────────────────────────────────────────────────────
 
-        /// <summary>The dashboard and its metadata; every screen shows in game and idle.</summary>
-        internal static DashOutput Dashboard(string id, int w, int h, string background, JArray screens,
-                                             string title, string description, bool overlay)
+        /// <summary>The dashboard's djson; every screen shows in game and idle. SimHub
+        /// fills in the rest of the metadata when it saves it.</summary>
+        internal static string Dashboard(string id, int w, int h, string background, JArray screens,
+                                         string title, string description, bool overlay)
         {
-            var meta = Metadata(screens.Count, w, h, title, description, overlay);
             var dash = new JObject
             {
                 ["Version"] = 2,
@@ -53,40 +47,22 @@ namespace MozaPlugin.Integration.ControlDash
                 ["BackgroundColor"] = background,
                 ["Screens"] = screens,
                 ["Images"] = new JArray(),
-                ["Metadata"] = meta,
+                ["Metadata"] = new JObject
+                {
+                    ["Title"] = title,
+                    ["Description"] = description,
+                    ["Author"] = "AZOM",
+                },
                 ["ShowOnScreenControls"] = false,
                 ["IsOverlay"] = overlay,
                 // An overlay without buttons lets clicks through to the game.
                 ["EnableClickThroughOverlay"] = overlay,
                 ["EnableOnDashboardMessaging"] = false,
+                // true = SimHub's "legacy strict" isolation, a full JS engine per formula;
+                // missing deserializes as true. No formula here uses external scripts.
+                ["UseStrictJSIsolation"] = false,
             };
-
-            return new DashOutput
-            {
-                Djson = dash.ToString(Formatting.Indented),
-                Metadata = meta.ToString(Formatting.Indented),
-            };
-        }
-
-        private static JObject Metadata(int screenCount, int w, int h, string title, string description, bool overlay)
-        {
-            var all = new JArray(Enumerable.Range(0, screenCount));
-            return new JObject
-            {
-                ["Title"] = title,
-                ["Description"] = description,
-                ["Author"] = "AZOM",
-                ["ScreenCount"] = (double)screenCount,
-                ["InGameScreensIndexs"] = all,
-                ["IdleScreensIndexs"] = new JArray(all),
-                ["PitScreensIndexs"] = new JArray(),
-                ["MainPreviewIndex"] = 0,
-                ["IsOverlay"] = overlay,
-                ["Width"] = (double)w,
-                ["Height"] = (double)h,
-                ["MetadataVersion"] = 2.0,
-                ["EnableOnDashboardMessaging"] = false,
-            };
+            return dash.ToString(Formatting.Indented);
         }
 
         // ── Items ───────────────────────────────────────────────────────────
@@ -230,9 +206,10 @@ namespace MozaPlugin.Integration.ControlDash
             ["TargetPropertyName"] = target,
         };
 
+        // JSExt 0: no JavaScript extension libraries (SimHub loads local + global without it).
         internal static JObject Js(string target, string expr) => new JObject
         {
-            ["Formula"] = new JObject { ["Interpreter"] = 1, ["Expression"] = expr },
+            ["Formula"] = new JObject { ["JSExt"] = 0, ["Interpreter"] = 1, ["Expression"] = expr },
             ["Mode"] = 2,
             ["TargetPropertyName"] = target,
         };

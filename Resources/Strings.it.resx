@@ -971,7 +971,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Comandi</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Pronto a calibrare</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Misurazione</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Auto calibrata ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Gioco calibrato ×{0}</value></data>
@@ -988,4 +988,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Frizione premuta</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Ultima partenza {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Riuscito · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Punto di attacco della frizione MOZA Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Mostra la barra della frizione solo finché è possibile misurare una partenza da fermo, poi il suo esito.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Nuova versione della dashboard SimHub: {0}. Installandola, la tua copia attuale resta nella cartella _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Auto ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Gioco ×{0}</value></data>
 </root>

@@ -516,12 +516,6 @@ namespace MozaPlugin
             bool inGame = key != null && data.GameRunning && !data.GamePaused && nd != null;
             bool ready = inGame && hasClutch && inGear;
             double speedKmh = nd?.SpeedKmh ?? double.NaN;
-            _bitePointConditions = (int)(
-                (inGame ? BitePointConditions.InGame : 0)
-                | (hasClutch ? BitePointConditions.HasClutch : 0)
-                | (inGear ? BitePointConditions.InGear : 0)
-                | (speedKmh < MBoosterBitePointDetector.StandstillKmh ? BitePointConditions.Stopped : 0)
-                | (hasClutch && clutch01 >= MBoosterBitePointDetector.ClutchInLevel ? BitePointConditions.ClutchIn : 0));
 
             if (Interlocked.Exchange(ref _bitePointAutoRestart, 0) != 0
                 || !string.Equals(key, _bitePointAutoKey, StringComparison.OrdinalIgnoreCase))
@@ -539,6 +533,12 @@ namespace MozaPlugin
                 if (!skipped) StoreAutoSample(key, sample);
                 else MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
             }
+            _bitePointConditions = (int)(
+                (inGame ? BitePointConditions.InGame : 0)
+                | (hasClutch ? BitePointConditions.HasClutch : 0)
+                | (inGear ? BitePointConditions.InGear : 0)
+                | (_bitePointAutoDetector.IsStopped ? BitePointConditions.Stopped : 0)
+                | (hasClutch && clutch01 >= MBoosterBitePointDetector.ClutchInLevel ? BitePointConditions.ClutchIn : 0));
 
             var phase = _bitePointAutoDetector.Current;
             BitePointCalState state;

@@ -1050,5 +1050,10 @@ namespace MozaPlugin.Resources
         public static string BiteDash_ClutchPressed => Get("BiteDash_ClutchPressed");
         public static string BiteDash_LastLaunch => Get("BiteDash_LastLaunch");
         public static string BiteCal_Captured => Get("BiteCal_Captured");
+        public static string BiteDash_MiniTitle => Get("BiteDash_MiniTitle");
+        public static string BiteDash_MiniDescription => Get("BiteDash_MiniDescription");
+        public static string Banner_DashUpdate => Get("Banner_DashUpdate");
+        public static string BiteCal_CarCount => Get("BiteCal_CarCount");
+        public static string BiteCal_GameCount => Get("BiteCal_GameCount");
     }
 }

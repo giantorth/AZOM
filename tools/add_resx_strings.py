@@ -11,13 +11,15 @@ Idempotent: keys already present in a file are skipped, so re-running after a
 partial edit is safe.
 
 Usage:
-    python3 tools/add_resx_strings.py tools/<data>.json [--repo .] [--check]
+    python3 tools/add_resx_strings.py tools/<data>.json [--repo .] [--check] [--replace]
 
 --check exits non-zero if any key is missing from any file (no writes).
+--replace also rewrites the value of keys already present, in place.
 """
 import argparse
 import json
 import os
+import re
 import sys
 from xml.sax.saxutils import escape
 
@@ -44,15 +46,24 @@ def resx_entry(key, value):
     return f'  <data name="{key}" xml:space="preserve"><value>{escape(value)}</value></data>\n'
 
 
-def patch_resx(path, locale, data, check):
+def patch_resx(path, locale, data, check, replace=False):
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
-    missing, added = [], []
+    original = text
+    missing, changed = [], []
     insert = ""
     for key, vals in data.items():
         if locale not in vals:
             raise SystemExit(f"key '{key}' missing locale '{locale}'")
         if f'name="{key}"' in text:
+            if replace and not check:
+                pattern = re.compile(
+                    r'(<data name="' + re.escape(key) + r'"[^>]*>\s*<value>)(.*?)(</value>)', re.S)
+                value = escape(vals[locale])
+                text, n = pattern.subn(lambda m: m.group(1) + value + m.group(3), text, count=1)
+                if n != 1:
+                    raise SystemExit(f"{path}: can't find the value of '{key}'")
+                changed.append(key)
             continue
         missing.append(key)
         insert += resx_entry(key, vals[locale])
@@ -63,10 +74,11 @@ def patch_resx(path, locale, data, check):
         if idx < 0:
             raise SystemExit(f"{path}: no </root>")
         text = text[:idx] + insert + text[idx:]
+        changed += missing
+    if text != original:
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
-        added = missing
-    return [], added
+    return [], changed
 
 
 def patch_designer(path, data, check):
@@ -94,6 +106,7 @@ def main():
     ap.add_argument("data")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--replace", action="store_true")
     args = ap.parse_args()
 
     with open(args.data, "r", encoding="utf-8") as f:
@@ -103,12 +116,12 @@ def main():
     any_missing = False
     for fname, locale in LOCALES.items():
         path = os.path.join(res_dir, fname)
-        missing, added = patch_resx(path, locale, data, args.check)
+        missing, changed = patch_resx(path, locale, data, args.check, args.replace)
         if args.check and missing:
             any_missing = True
             print(f"MISSING in {fname}: {len(missing)} -> {missing}")
-        elif added:
-            print(f"{fname}: +{len(added)}")
+        elif changed:
+            print(f"{fname}: {len(changed)} written")
 
     designer = os.path.join(res_dir, "Strings.Designer.cs")
     missing, added = patch_designer(designer, data, args.check)

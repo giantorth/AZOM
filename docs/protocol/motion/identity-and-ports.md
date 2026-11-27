@@ -113,10 +113,14 @@ actuator from port 3 to port 2, and its row for port 3 reads Device2. Its rows (
 Device7 FR, Device8 FL) and writes (`3←5, 4←7, 5←1, 6←3`) give the same codes. The labels fit
 Device = 5 − port for ports 1–4 and 13 − port for ports 5–8 (ports 1, 7 and 8 not seen).
 
-Plugin 1.7.4–1.7.5 used the codes mirrored left↔right (1 = FR, 3 = FL, 5 = RL, 7 = RR), from
-reading the rows as ascending ports. A correct assignment then failed both axis checks of the
-port self-test (bundles `AX787D2P`, `VFS6EMWG`, two different rigs). In both, the front check
-tilted the rig in pitch and roll, each opposite in sign to the back check.
+Plugin 1.7.4 to 1.7.6-pr.183.ddbc8d6 used the codes mirrored left↔right (1 = FR, 3 = FL, 5 = RL,
+7 = RR), from reading the rows as ascending ports. A correct assignment then failed both axis
+checks of the port self-test (bundles `AX787D2P`, `VFS6EMWG`, two different rigs). In both, the
+front check tilted the rig in pitch and roll, each opposite in sign to the back check. Bundle
+`Z75GQA4C` (the `VFS6EMWG` rig, same controller and actuator UIDs) settles it on hardware. The map
+`1←5, 2←7, 3←3, 4←1` passed the self-test. Its left↔right mirror `1←7, 2←5, 3←1, 4←3` failed twice.
+That mirror is the corner-by-name assignment the user made in `VFS6EMWG`: port 1 Rear-Right,
+2 Rear-Left, 3 Front-Right, 4 Front-Left. The passing map is the same corners under the codes above.
 
 The wire always uses the 1-based port number (`0x13 + port` = slave id).
 

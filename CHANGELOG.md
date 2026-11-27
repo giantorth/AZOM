@@ -7,7 +7,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point, following the game and car.
-- **MOZA Clutch Bite Point overlays, full and Mini;** show calibration state, car or game sample count, the live clutch against the bite point, what a standing start still needs and the last launch, from new `AZOM.ClutchBitePoint*` properties.
+- **MOZA Clutch Bite Point overlays;** a full one with calibration state, sample count, live clutch against the bite point, standing-start checks and the last launch, and a Mini one that appears only while a standing start can be measured.
 
 ## Changed
 
@@ -17,6 +17,7 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **MOZA dashboard updates are offered, not skipped;** a copy saved in Dash Studio gets an Install update / Dismiss banner, and the dashboards now come with thumbnails.
 - **Truck-sim stalk keys reach ETS2/ATS on Linux;** for a game in another Wine prefix or native, with an LSU Wine that forwards SendInput.
 - **mBooster Pedal Feel curve allows "A"-shaped curves;** any point, the last included, can sit below the one before it, and dragging the last point no longer changes Max Force or rescales the graph.
 - **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.

@@ -85,6 +85,7 @@ namespace MozaPlugin.UI
             if (!UpdateInstallCoordinator.Instance.InstallInProgress) RefreshUpdateBanner();
             RefreshSdkPrompt();
             RefreshLegacyLfeBanner();
+            RefreshDashUpdateBanner();
         }
 
         // ===== 1. Status hints =====
@@ -318,6 +319,29 @@ namespace MozaPlugin.UI
                 try { plugin!.PersistSettings(); } catch { /* best-effort */ }
             }
             RefreshLegacyLfeBanner();
+        }
+
+        // ===== 5. Generated dashboard update =====
+
+        private void RefreshDashUpdateBanner()
+        {
+            var names = Integration.ControlDash.DashTemplateInstaller.PendingNames;
+            DashUpdateBanner.Visibility = names.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (names.Count > 0)
+                DashUpdateBannerText.Text = string.Format(Strings.Banner_DashUpdate, string.Join(", ", names));
+        }
+
+        private void DashUpdateInstall_Click(object sender, RoutedEventArgs e)
+        {
+            Integration.ControlDash.DashTemplateInstaller.InstallPending();
+            RefreshDashUpdateBanner();
+        }
+
+        private void DashUpdateDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            var plugin = MozaPlugin.Instance;
+            if (plugin != null) Integration.ControlDash.DashTemplateInstaller.DismissPending(plugin);
+            RefreshDashUpdateBanner();
         }
     }
 }

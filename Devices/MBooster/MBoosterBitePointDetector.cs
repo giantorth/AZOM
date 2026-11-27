@@ -30,7 +30,7 @@ namespace MozaPlugin.Devices.MBooster
         // The clutch source reports a position.
         HasClutch = 2,
         InGear = 4,
-        // Below MBoosterBitePointDetector.StandstillKmh.
+        // MBoosterBitePointDetector.IsStopped: below StandstillKmh for StandstillHoldSec.
         Stopped = 8,
         // Pressed past MBoosterBitePointDetector.ClutchInLevel.
         ClutchIn = 16,
@@ -51,8 +51,9 @@ namespace MozaPlugin.Devices.MBooster
     }
 
     /// <summary>
-    /// Standing-start bite point detection: the car stops in gear with the
-    /// clutch pressed in, then the clutch comes up. Once the speed has risen
+    /// Standing-start bite point detection: the car stands still for
+    /// <see cref="StandstillHoldSec"/> in gear with the clutch pressed in, then
+    /// the clutch comes up. Once the speed has risen
     /// <see cref="ConfirmRiseKmh"/> over standstill, the moment the rise began is
     /// fitted from the whole release (<c>PedalWhenItBit</c>), and the bite point
     /// is the clutch-pedal position then: by the first frame the car is seen
@@ -65,8 +66,10 @@ namespace MozaPlugin.Devices.MBooster
 
         // Pedal position (0..1) counted as "clutch fully in".
         internal const double ClutchInLevel = 0.95;
-        // Below this the car counts as stopped.
+        // Below this the car counts as stopped...
         internal const double StandstillKmh = 0.5;
+        // ...once it has been for this long: a spin passes through zero speed.
+        internal const double StandstillHoldSec = 1.0;
         // Rise over the standstill speed that starts the fitted window...
         internal const double OnsetRiseKmh = 0.3;
         // ...and the rise that confirms the car is really pulling away and ends it.
@@ -88,8 +91,13 @@ namespace MozaPlugin.Devices.MBooster
         private double _onsetPedal = double.NaN;
         private long _onsetTicks;
         private double _onsetRate;
+        // Stopwatch ticks the current standstill began; 0 = moving or no speed.
+        private long _stoppedSince;
 
         public Phase Current { get; private set; }
+
+        /// <summary>Below <see cref="StandstillKmh"/> for <see cref="StandstillHoldSec"/>, as of the last update.</summary>
+        public bool IsStopped { get; private set; }
 
         public void Reset()
         {
@@ -103,6 +111,14 @@ namespace MozaPlugin.Devices.MBooster
         public bool Update(bool ready, double speedKmh, double pedal01, out BitePointSample sample)
         {
             sample = default;
+            long now = Stopwatch.GetTimestamp();
+            if (speedKmh < StandstillKmh)
+            {
+                if (_stoppedSince == 0) _stoppedSince = now;
+            }
+            else _stoppedSince = 0;
+            IsStopped = _stoppedSince != 0 && now - _stoppedSince >= (long)(StandstillHoldSec * Stopwatch.Frequency);
+
             if (!ready || double.IsNaN(speedKmh) || double.IsNaN(pedal01))
             {
                 Reset();
@@ -114,7 +130,7 @@ namespace MozaPlugin.Devices.MBooster
             switch (Current)
             {
                 case Phase.Waiting:
-                    if (stopped && clutchIn) Current = Phase.Armed;
+                    if (IsStopped && clutchIn) Current = Phase.Armed;
                     break;
 
                 case Phase.Armed:
@@ -125,7 +141,7 @@ namespace MozaPlugin.Devices.MBooster
                         _onsetPedal = double.NaN;
                         _histCount = 0;
                         // Anchors the release rate even when the onset comes on the next frame.
-                        Record(Stopwatch.GetTimestamp(), pedal01, 0);
+                        Record(now, pedal01, 0);
                         Current = Phase.Releasing;
                     }
                     break;
@@ -134,10 +150,9 @@ namespace MozaPlugin.Devices.MBooster
                     if (clutchIn)
                     {
                         // Pressed back in: re-arm if still stopped.
-                        Current = stopped ? Phase.Armed : Phase.Waiting;
+                        Current = IsStopped ? Phase.Armed : Phase.Waiting;
                         break;
                     }
-                    long now = Stopwatch.GetTimestamp();
                     double rise = speedKmh - _baselineKmh;
                     Record(now, pedal01, rise);
                     if (rise <= OnsetRiseKmh)

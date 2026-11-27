@@ -183,8 +183,8 @@ namespace MozaPlugin.Integration.ControlDash
 
         // ── Output ──────────────────────────────────────────────────────────
 
-        /// <summary>Build the dashboard and its metadata sidecar for the current UI culture.</summary>
-        internal static DashOutput Build(bool fahrenheit)
+        /// <summary>The dashboard djson for the current UI culture.</summary>
+        internal static string Build(bool fahrenheit)
         {
             var pages = Pages();
             var screens = new JArray();

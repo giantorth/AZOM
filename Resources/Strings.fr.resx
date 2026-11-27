@@ -968,7 +968,7 @@ Id : {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Tableau de bord</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Commandes</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Prêt</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Prêt à calibrer</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Mesure en cours</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Voiture calibrée ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Jeu calibré ×{0}</value></data>
@@ -985,4 +985,9 @@ Id : {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embrayage enfoncé</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Dernier départ {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Réussi · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Point de patinage de l'embrayage MOZA Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Affiche la barre d'embrayage uniquement tant qu'un départ arrêté peut être mesuré, puis son résultat.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Nouvelle version du tableau de bord SimHub : {0}. L'installer conserve votre copie actuelle dans son dossier _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Voiture ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Jeu ×{0}</value></data>
 </root>

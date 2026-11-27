@@ -967,7 +967,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>대시보드</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>컨트롤</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>플러그인</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>준비됨</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>보정 준비됨</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>측정 중</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>차량 보정됨 ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>게임 보정됨 ×{0}</value></data>
@@ -984,4 +984,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>클러치 밟음</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>마지막 출발 {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>성공 · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA 클러치 물림 지점 미니</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>정지 출발을 측정할 수 있는 동안에만 클러치 막대를 표시하고, 이후 그 결과를 표시합니다.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>새 SimHub 대시보드 버전: {0}. 설치하면 현재 사본은 _Backups 폴더에 보관됩니다.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>차량 ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>게임 ×{0}</value></data>
 </root>

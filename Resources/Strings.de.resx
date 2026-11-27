@@ -968,7 +968,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Bedienelemente</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Bereit</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Bereit zum Kalibrieren</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Messung läuft</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Fahrzeug kalibriert ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Spiel kalibriert ×{0}</value></data>
@@ -985,4 +985,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Kupplung getreten</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Letzter Start {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Erfolg · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA Kupplungs-Schleifpunkt Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Zeigt die Kupplungsleiste nur, solange ein Start aus dem Stand gemessen werden kann, danach dessen Ergebnis.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Neue SimHub-Dashboard-Version: {0}. Bei der Installation bleibt deine aktuelle Kopie im Ordner _Backups erhalten.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Fahrzeug ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Spiel ×{0}</value></data>
 </root>

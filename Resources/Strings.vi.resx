@@ -968,7 +968,7 @@ Id: {2}</value></data>
   <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Bảng điều khiển</value></data>
   <data name="GuideCategory_Controls" xml:space="preserve"><value>Điều khiển</value></data>
   <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
-  <data name="BiteCal_Ready" xml:space="preserve"><value>Sẵn sàng</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Sẵn sàng hiệu chuẩn</value></data>
   <data name="BiteCal_Measuring" xml:space="preserve"><value>Đang đo</value></data>
   <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Xe đã hiệu chuẩn ×{0}</value></data>
   <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Trò chơi đã hiệu chuẩn ×{0}</value></data>
@@ -985,4 +985,9 @@ Id: {2}</value></data>
   <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Đã đạp côn</value></data>
   <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Lần xuất phát cuối {0}% · {1}%/s</value></data>
   <data name="BiteCal_Captured" xml:space="preserve"><value>Thành công · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Điểm bắt côn ly hợp MOZA thu gọn</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Chỉ hiển thị thanh côn khi có thể đo một lần xuất phát tại chỗ, sau đó là kết quả.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Phiên bản bảng điều khiển SimHub mới: {0}. Khi cài đặt, bản hiện tại của bạn được giữ trong thư mục _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Xe ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Trò chơi ×{0}</value></data>
 </root>
