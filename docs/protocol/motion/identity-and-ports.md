@@ -83,7 +83,7 @@ Connection"). The assignment is stored in the controller.
 | write | `1E 12 02 [port] 01 [role] 00` | assign role to port; echoed on `9E 21` |
 | read | `1F 12 02 [port] 00 00 00` → `9F 21 02 [port] 00 [role] 00` | current role of port; the host reads all 8 at connect |
 
-Observed stored map (both rigs): ports 1,2(or 3),7,8 → role 0 (unassigned); the four actuators
+Observed stored map (both captures, one rig): ports 1,2(or 3),7,8 → role 0 (unassigned); the four actuators
 carry roles **5, 7, 1, 3**. Firmware echoes each write as `serial_reply_app.c:333 port:N axis:R`
 (preceded by `controller_model.c:227 e2p port: (N), axis: (R)` in `ports and self test` and bundle
 `AX787D2P`), and the `0x1F/02` readback returns the new role at once.
@@ -91,24 +91,34 @@ carry roles **5, 7, 1, 3**. Firmware echoes each write as `serial_reply_app.c:33
 The map is committed only by a passing port self-test, as Table 2 parameters:
 `Param (8 + role) = port` for roles 1/3/5/7 (`Selftest`: `9 = 5, 11 = 6, 13 = 3, 15 = 4` for ports
 3/4/5/6 ← 5/7/1/3; `ports and self test`: `13 = 2` with port 2 ← 5) and `Param 27 = 4`. A failed
-self-test writes 0 to Params 9–16 and 27 (bundle `AX787D2P`). The role reads after a failed test
-have not been captured.
+self-test writes 0 to Params 9–16 and 27 (bundle `AX787D2P`), and the role reads then return 0
+for every port (bundle `VFS6EMWG`).
 
-| Role code | Corner (inferred) | Evidence |
-|-----------|-------------------|----------|
-| `0` | none / unassigned | empty ports read 0 |
-| `1` | Front-Right | `Selftest`: port 5 ← 1 while the UI shows the third populated port as "Front-Right Actuator" |
-| `3` | Front-Left | port 6 ← 3; the fourth dropdown (hidden by a tooltip in both videos) is the remaining corner |
-| `5` | Rear-Left | first populated port ← 5, UI "Rear-Left Actuator" |
-| `7` | Rear-Right | second populated port ← 7, UI "Rear-Right Actuator" |
+| Role code | Corner | `ports and self test` | `Selftest` |
+|-----------|--------|-----------------------|------------|
+| `0` | none / unassigned | empty ports read 0 | — |
+| `1` | Front-Left | port 5 = Device8 "Front-Left Actuator" | port 5 = Device8, same |
+| `3` | Front-Right | port 6 = Device7 "Front-Right Actuator" | port 6 = Device7, same |
+| `5` | Rear-Right | port 2 = Device3 "Rear-Right Actuator" | port 3 = Device2, same |
+| `7` | Rear-Left | port 4 = Device1 "Rear-Left Actuator" | port 4 = Device1, same |
 
-The dropdown lists the corners as Front-Left, Front-Right, Rear-Left, Rear-Right. The code ↔
-corner pairing above assumes the UI's four "Device N" rows are in ascending port order (their
-labels — `Device1/3/7/8` and `Device1/2/7/8` on the two rigs — are **not** the wire port numbers).
-Treat 1↔FR / 3↔FL as *inferred*; 5↔RL / 7↔RR are consistent in both captures.
+The dropdown lists the corners as Front-Left, Front-Right, Rear-Left, Rear-Right. Its rows are
+labelled "Device N", which is **not** the wire port. In `ports and self test` Motion Manager sends
+identify-port (`0x20/02 04 [port]`) when a row's dropdown opens and run-state stop when it
+closes. The four open/close spans in the screen recording (7.5–10, 11.5–14.5, 17–18.5 and
+20.5–22.5 s) line up with identify 4, 2, 6 and 5 at a steady ~5.5 s offset. That pins Device1 = port 4,
+Device3 = port 2, Device7 = port 6 and Device8 = port 5; the role writes (`2←5, 4←7, 5←1, 6←3`)
+then give the codes above. `Selftest` was recorded on the same rig before `dev2-3` moved one
+actuator from port 3 to port 2, and its row for port 3 reads Device2. Its rows (Device1 RL, Device2 RR,
+Device7 FR, Device8 FL) and writes (`3←5, 4←7, 5←1, 6←3`) give the same codes. The labels fit
+Device = 5 − port for ports 1–4 and 13 − port for ports 5–8 (ports 1, 7 and 8 not seen).
 
-The Motion Manager "Device N" dropdown labels and the firmware's port numbering differ; the
-wire always uses the 1-based port number (`0x13 + port` = slave id).
+Plugin 1.7.4–1.7.5 used the codes mirrored left↔right (1 = FR, 3 = FL, 5 = RL, 7 = RR), from
+reading the rows as ascending ports. A correct assignment then failed both axis checks of the
+port self-test (bundles `AX787D2P`, `VFS6EMWG`, two different rigs). In both, the front check
+tilted the rig in pitch and roll, each opposite in sign to the back check.
+
+The wire always uses the 1-based port number (`0x13 + port` = slave id).
 
 ## Re-seating a cable (`dev2-3`)
 

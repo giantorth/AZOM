@@ -7,7 +7,7 @@ All notable changes to the AZOM plugin are documented here.
 ## Added
 
 - **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point, following the game and car.
-- **MOZA Clutch Bite Point overlay;** shows calibration state, car or game sample count, the live clutch against the bite point, what a standing start still needs and the last launch, from new `AZOM.ClutchBitePoint*` properties.
+- **MOZA Clutch Bite Point overlays, full and Mini;** show calibration state, car or game sample count, the live clutch against the bite point, what a standing start still needs and the last launch, from new `AZOM.ClutchBitePoint*` properties.
 
 ## Changed
 
@@ -22,6 +22,7 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.
 - **Shift-dragging an mBooster Pedal Feel point lands on 5 kg steps;** it gave 136/144 instead of 135/145.
 - **mBooster role changes work with a passive pedal connected;** the passive pedal's role is now written to the mBooster when a role change swaps with it, and roles follow the hardware as on chains, so a swap no longer leaves two pedals on one role or mislabels them. A passive pedal's column on the Pedals tab has its own Role picker.
+- **HMA150 port self-test passes with a correct corner assignment;** each corner was sent to the controller mirrored left↔right, so both axis checks failed.
 
 ## [1.7.5]
 
