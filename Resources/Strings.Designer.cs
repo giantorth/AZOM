@@ -1060,5 +1060,6 @@ namespace MozaPlugin.Resources
         public static string SliderLabel_FrequencyRoughness => Get("SliderLabel_FrequencyRoughness");
         public static string SliderLabel_IntensityRoughness => Get("SliderLabel_IntensityRoughness");
         public static string SliderLabel_WhiteNoise => Get("SliderLabel_WhiteNoise");
+        public static string Label_UsableTravelMm => Get("Label_UsableTravelMm");
     }
 }

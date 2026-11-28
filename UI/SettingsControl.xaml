@@ -2613,10 +2613,22 @@
                                              belong to the pedal that owns that hardware — hidden for a passive
                                              pedal by UpdateMBoosterEffectPassiveState. -->
                                         <StackPanel x:Name="MBoosterTravelEndstopPanel">
-                                        <TextBlock Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left" Margin="0,0,0,6"/>
+                                        <!-- Values are screw mm (the wire's); the scale shows Pit House's pedal-face arc mm. -->
+                                        <Grid Margin="0,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Static res:Strings.SliderLabel_TravelRangeMm}" Style="{StaticResource SliderLabel}" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="1" Text="{x:Static res:Strings.Label_UsableTravelMm}" Style="{StaticResource KvKeyText}"/>
+                                            <TextBlock Grid.Column="2" x:Name="MBoosterTravelSpanValue" Style="{StaticResource KvValueText}"
+                                                       Foreground="{StaticResource CyanBrush}" Margin="0"/>
+                                        </Grid>
                                         <ctrl:MozaRangeSlider x:Name="MBoosterTravelRangeSlider" Height="90" Margin="0,0,0,16"
                                                               AccentBrush="{StaticResource CyanBrush}"
                                                               Minimum="3.8" Maximum="49.7" MinGap="3.8"
+                                                              Scale="{x:Static ui:MBoosterTravelArcScale.Instance}"
                                                               Unit="mm" Decimals="1"
                                                               LowValue="3.8" HighValue="35.9"
                                                               RangeChanged="MBoosterTravelRangeSlider_RangeChanged"/>

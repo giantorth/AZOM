@@ -1000,4 +1000,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frekvens (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensitet (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Hvit støy (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Brukbar vandring (mm)</value></data>
 </root>

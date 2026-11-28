@@ -995,4 +995,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Частота (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Интенсивность (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Белый шум (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Полезный ход (мм)</value></data>
 </root>

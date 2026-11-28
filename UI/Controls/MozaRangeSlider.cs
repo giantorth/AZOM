@@ -8,12 +8,32 @@ using System.Windows.Media;
 namespace MozaControls
 {
     /// <summary>
+    /// Non-linear display units for <see cref="MozaRangeSlider"/>. Values,
+    /// bounds and gaps stay in the slider's own units; the scale places them
+    /// on the track, labels them and decides what a drag commits.
+    /// </summary>
+    public interface IRangeSliderScale
+    {
+        /// <summary>Display position of a value inside [Minimum, Maximum].</summary>
+        double ToDisplay(double value);
+
+        /// <summary>Label text for a value inside [Minimum, Maximum].</summary>
+        string Format(double value);
+
+        /// <summary>Value committed when the thumb at <paramref name="current"/>,
+        /// limited to [<paramref name="lo"/>, <paramref name="hi"/>], is dragged
+        /// to display position <paramref name="display"/>.</summary>
+        double Edit(double display, double current, double lo, double hi);
+    }
+
+    /// <summary>
     /// Two-thumb range slider — drag independent Low/High handles along one
     /// horizontal track, each clamped against the other by [MinGap, MaxGap]
     /// so the two can never cross and the gap between them always stays in
     /// range. Used for the mBooster Pedal Feel "Start/End of Travel (mm)"
-    /// control, the Pedals tab's per-pedal output range, and the LFE/S12
-    /// frequency limits. See docs/protocol/devices/mbooster.md "Pedal Feel".
+    /// control (screw mm shown as arc mm through <see cref="Scale"/>), the
+    /// Pedals tab's per-pedal output range, and the LFE/S12 frequency limits.
+    /// See docs/protocol/devices/mbooster.md "Pedal Feel".
     /// </summary>
     public class MozaRangeSlider : Control
     {
@@ -95,6 +115,13 @@ namespace MozaControls
                 new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaRangeSlider)d).Recompute()));
         public string Unit { get => (string)GetValue(UnitProperty); set => SetValue(UnitProperty, value); }
+
+        /// <summary>Optional display units; null lays out, labels and steps the values linearly.</summary>
+        public static readonly DependencyProperty ScaleProperty =
+            DependencyProperty.Register(nameof(Scale), typeof(IRangeSliderScale), typeof(MozaRangeSlider),
+                new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaRangeSlider)d).Recompute()));
+        public IRangeSliderScale? Scale { get => (IRangeSliderScale?)GetValue(ScaleProperty); set => SetValue(ScaleProperty, value); }
 
         public static readonly DependencyProperty AccentBrushProperty =
             DependencyProperty.Register(nameof(AccentBrush), typeof(Brush), typeof(MozaRangeSlider),
@@ -256,26 +283,36 @@ namespace MozaControls
             double plotW = Math.Max(1, w - EdgePad - EdgePad);
             double frac = (p.X - EdgePad) / plotW;
             if (frac < 0) frac = 0; if (frac > 1) frac = 1;
-            double val = Minimum + frac * (Maximum - Minimum);
-            double decimals = Math.Max(0, Decimals);
+            double dMin = Display(Minimum), dMax = Display(Maximum);
+            double val = dMin + frac * (dMax - dMin);
 
             if (_dragThumb == 0)
             {
                 double lo = Math.Max(Minimum, HighValue - MaxGap);
                 double hi = HighValue - MinGap;
                 if (hi < lo) hi = lo;
-                val = Math.Max(lo, Math.Min(hi, val));
-                LowValue = Math.Round(val, (int)decimals);
+                LowValue = Commit(val, LowValue, lo, hi);
             }
             else if (_dragThumb == 1)
             {
                 double lo = LowValue + MinGap;
                 double hi = Math.Min(Maximum, LowValue + MaxGap);
                 if (hi < lo) hi = lo;
-                val = Math.Max(lo, Math.Min(hi, val));
-                HighValue = Math.Round(val, (int)decimals);
+                HighValue = Commit(val, HighValue, lo, hi);
             }
         }
+
+        private double Display(double value) => Scale?.ToDisplay(value) ?? value;
+
+        private double Commit(double display, double current, double lo, double hi)
+        {
+            var scale = Scale;
+            if (scale != null) return scale.Edit(display, current, lo, hi);
+            return Math.Round(Math.Max(lo, Math.Min(hi, display)), Math.Max(0, Decimals));
+        }
+
+        private string Label(double value) =>
+            Scale?.Format(value) ?? value.ToString("F" + Math.Max(0, Decimals), CultureInfo.InvariantCulture);
 
         private void Recompute()
         {
@@ -284,15 +321,16 @@ namespace MozaControls
             if (w <= 0 || h <= 0) return;
 
             double plotW = Math.Max(1, w - EdgePad - EdgePad);
-            double range = Math.Max(1e-6, Maximum - Minimum);
+            double dMin = Display(Minimum);
+            double range = Math.Max(1e-6, Display(Maximum) - dMin);
             double nodeHalf = NodeSize / 2.0;
             double thumbCy = nodeHalf + 4;
 
             double lowClamped = Math.Max(Minimum, Math.Min(Maximum, LowValue));
             double highClamped = Math.Max(Minimum, Math.Min(Maximum, HighValue));
 
-            double lowFrac = (lowClamped - Minimum) / range;
-            double highFrac = (highClamped - Minimum) / range;
+            double lowFrac = (Display(lowClamped) - dMin) / range;
+            double highFrac = (Display(highClamped) - dMin) / range;
             double lowX = EdgePad + lowFrac * plotW;
             double highX = EdgePad + highFrac * plotW;
 
@@ -300,12 +338,11 @@ namespace MozaControls
             SetValue(HighThumbXKey, highX - nodeHalf);
             SetValue(ThumbTopKey, thumbCy - nodeHalf);
 
-            string fmt = "F" + Math.Max(0, Decimals);
             string unit = Unit ?? "";
-            SetValue(LowLabelKey, lowClamped.ToString(fmt, CultureInfo.InvariantCulture));
-            SetValue(HighLabelKey, highClamped.ToString(fmt, CultureInfo.InvariantCulture));
-            SetValue(MinLabelKey, Minimum.ToString(fmt, CultureInfo.InvariantCulture) + unit);
-            SetValue(MaxLabelKey, Maximum.ToString(fmt, CultureInfo.InvariantCulture) + unit);
+            SetValue(LowLabelKey, Label(lowClamped));
+            SetValue(HighLabelKey, Label(highClamped));
+            SetValue(MinLabelKey, Label(Minimum) + unit);
+            SetValue(MaxLabelKey, Label(Maximum) + unit);
             SetValue(EndLabelTopKey, thumbCy + nodeHalf + EndLabelGap);
 
             // Full track (dim) spans the whole Minimum..Maximum span.

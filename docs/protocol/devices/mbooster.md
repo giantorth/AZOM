@@ -2346,13 +2346,23 @@ End thumb to 40/30mm) turned up two previously-undocumented wire
 commands: `mbooster-brake-travel-start` (cmdId `0x84`) and
 `mbooster-brake-travel-end` (cmdId `0x85`), group 35 read / 36 write,
 2-byte ints — same shape as the raw Min/Max calibration commands.
-Encoding mirrors `MaxThresholdKg`'s pattern on a fixed 0–53.5mm scale
-(53.5 = `TravelMinMm` 3.8 + `TravelMaxMm` 49.7, i.e. the slider's own
-bounds) over the 0–65535 range: `raw = round(mm * 65536 / 53.5)`. All 4
-capture data points matched within 1 raw unit (~0.001mm), and the
-shared 30mm target hit the identical raw value (`0x8f8d`) via both
-cmdIds — as solid a cross-check as the `MaxThresholdKg` evidence had.
-See `MozaMBoosterProtocol.EncodeTravelMm`/`DecodeTravelMm`.
+The value is the **ball-screw position** in mm, on a fixed 0–53.5 mm scale
+over the 0–65535 range. 53.5 mm is Pit House's `stoke_length`, the full
+screw stroke. It also equals 3.8 + 49.7, but that is a coincidence.
+
+Pit House 1.4.2.7 encodes `raw = round(mm × 65535 / 53.5)`. All six of its
+writes logged against moza-simulator on 2026-11-27 match this exactly:
+3.8 → `0x122f`, 49.7 → `0xedd0`, 7.736186… → `0x2504`, 42.373033… → `0xcac1`,
+21.390046… → `0x665a` and 25.690046… → `0x7aed`. AZOM's
+`MozaMBoosterProtocol.EncodeTravelMm`/`DecodeTravelMm` use `× 65536`, which
+is 1 raw unit (~0.0008 mm) high on four of those six. The original
+4-point capture is consistent with both divisors: 10, 20 and 30 mm encode
+the same way under each (30 mm is `0x8f8d`, the shared target), and only
+40 mm differs (`0xbf66` vs `0xbf67`), which is the "within 1 raw unit"
+match.
+
+The Pit House UI never shows this number. It shows pedal-face arc mm; see
+[Travel display: pedal-face arc mm](#travel-display-pedal-face-arc-mm-pit-house-1427).
 
 This is a genuine dual-thumb range slider (`MozaControls.MozaRangeSlider`,
 `UI/Controls/MozaRangeSlider.cs`) — no dual-thumb control existed
@@ -2360,12 +2370,17 @@ anywhere in this app before; every other "linked min/max" pair
 (Handbrake, Throttle, Brake, Clutch, mBooster's own raw Min/Max
 calibration) is two separate `Slider` controls with mutual clamping
 via the shared `OnMinMaxSliderChanged` helper. The two thumbs
-(`LowValue`/`HighValue`) are bounded to `[3.8mm, 49.7mm]`
+(`LowValue`/`HighValue`) hold screw mm, and their labels show arc mm (see
+[AZOM's arc display](#azoms-arc-display)). They are bounded to `[3.8mm, 49.7mm]`
 (`MBoosterUiConstants.TravelMinMm`/`TravelMaxMm`) and clamped against
 each other so their gap never drops below 3.8mm (`TravelMinGapMm`). There
 is no maximum gap: an earlier 32.1mm cap is contradicted by Pit House
 itself, which sent start 4.0mm / end 48.8mm (moza-simulator bridge,
-2026-09-29). `TravelStartMm`/`TravelEndMm` default
+2026-09-29). Pit House's own rules depend on the pedal's firmware: on
+1.2.8.0 or later the minimum gap is 4.3 mm, not 3.8 mm. The 32.1 mm cap is
+its brake rule for firmware below 1.2.8.0. See
+[Pit House's travel bounds](#pit-houses-travel-bounds-screw-mm).
+`TravelStartMm`/`TravelEndMm` default
 to `-1` (same "not yet set / no override" sentinel as
 Direction/Min/Max/`MaxThresholdKg`) so a fresh profile never overwrites
 whatever calibration is already on the device; the UI seeds the
@@ -2514,6 +2529,146 @@ at 0%), both from the UI (`SettingsControl.PushSegmentedDamping`) and on
 connect (`MozaPlugin.ApplyMBoosterToHardware`). Switching it back on
 resumes whatever divider/segment values were last stored (or factory
 defaults for a still-untouched profile).
+
+### Travel display: pedal-face arc mm (Pit House 1.4.2.7)
+
+`0x84`/`0x85` carry ball-screw mm, but Pit House 1.4.2.7 shows and accepts
+travel as **arc length along the pedal face**, in mm. The conversion is in a
+JS library in the exe's embedded Qt resources, which the Pedals QML imports
+as `Travel` (`generation`, `arcMm`, `arcLengthMm`, `displayTick`, `_inverse`,
+`screwMmForEdit`). Pit House logs every edit:
+
+```
+Pedals - travel 1 throttle_machinelimit_max_v128 arc mm: 63.8 inverse screw mm: 49.625432390617746
+  adopted screw mm: 49.699999999999996 old screw mm: 42 bounds screw mm: 8.1 49.699999999999996
+  adoption: upper-bound result: 0
+```
+
+The `1` after `travel` is the generation. The device only ever receives screw
+mm, and the generation does not change the wire format.
+
+#### Generation selection
+
+```js
+function generation(model, hardware) {
+    if (!Family.isMember(model))          // "mBooster" or "mBooster Ultra"
+        return 0
+    if (hardware === "RS21-P01-HW PM-CU-V12")
+        return 1
+    if (hardware === "RS21-P01-HW PM-CU-V20")
+        return 2
+    return 0
+}
+```
+
+`model` is the program's `productModelName` and `hardware` is
+`controllerInfo.hardwareVersion`. Pit House's `MBoosterFamily.js` names the
+two generations of the P01 family `mBooster` (V1) and `mBooster Ultra` (V2).
+It shows the Ultra product image for hardware `RS21-P01-HW PM-CU-V20`. Either
+model name is accepted with either hardware string, so the hardware string
+alone selects the formula. At generation 0 (any other model or hardware
+string), the travel range slider and the G-Force max pedal movement control
+are disabled: both have `travelGeneration > 0` in their `enabled` condition.
+
+#### Formula
+
+x is the screw position in mm, 0 ≤ x ≤ 53.5. Outside that range `arcMm`
+returns NaN.
+
+```
+arc(x) = R × (θ0 − acos((K − (D − x)²) / M))
+x(arc) = D − sqrt(K − M × cos(θ0 − arc / R))
+```
+
+This is the law of cosines for a triangle with two fixed sides a and b
+(K = a² + b², M = 2ab) and a third side c = D − x, which gets shorter as the
+screw extends. At x = 0 the included angle is θ0, so arc(0) = 0. The arc is
+the change in that angle times the radius R.
+
+| | Generation 1 | Generation 2 |
+|---|---|---|
+| Hardware string | `RS21-P01-HW PM-CU-V12` | `RS21-P01-HW PM-CU-V20` |
+| Product (per `MBoosterFamily.js`) | mBooster (V1) | mBooster Ultra (V2) |
+| R (mm) | 163.293297 | 154.268313 |
+| θ0 (rad) | 1.053970521 (60.388°) | 0.952645063464 (54.583°) |
+| D (mm) | 162.210043 | 153.625703 |
+| K (mm²) | 49241.8953 | 51646.3321 |
+| M (mm²) | 46405.038043 | 48393.523641 |
+| Fixed sides a / b (mm), derived | 181.265 / 128.003 | 186.662 / 129.629 |
+| Side c from x = 0 to 53.5 (mm) | 162.210 → 108.710 | 153.626 → 100.126 |
+| Rotation over the full stroke | 24.140° | 23.905° |
+| Arc over the full stroke (x = 0–53.5) | 68.80 mm | 64.37 mm |
+| Arc mm per screw mm | 1.313 at x = 0; minimum 1.276 at x ≈ 33.9; 1.294 at x = 53.5 | 1.202 at x = 0; minimum 1.190 at x ≈ 19.3; 1.251 at x = 53.5 |
+| Screw 3.8 / 49.7 shown as | 4.9 / 63.8 | 4.5 / 59.6 |
+| Travel shown at full range | 58.9 mm | 55.0 mm |
+| G-Force max movement 15 shown as | 19.4 | 17.9 |
+
+Generation 1 reproduces exactly every arc → screw conversion Pit House logged
+against moza-simulator on 2026-11-27 (6 distinct values; the sim reports
+`RS21-P01-HW PM-CU-V12` with firmware 1.2.8.0). The generation 2 constants
+come from the code only. They have not been checked against a V20 unit.
+
+#### Display and snapping
+
+- `displayTick(a) = floor((a + 0.000001) × 10)`. Values are shown rounded
+  down to 0.1 mm, so arc 63.896 shows as 63.8.
+- The travel figure is `displayTick(arc(end) − arc(start)) / 10`. For
+  example, 63.896 − 4.975 = 58.921, shown as 58.9 mm. It is not calculated
+  from the two shown limits, so it can differ from their difference by 0.1.
+- `screwMmForEdit(g, a, current, lo, hi)` converts a typed or dragged arc `a`
+  into the screw value to send:
+  1. If `current` is inside [lo, hi] and shows as the same 0.1 mm tick as
+     `a`, it returns `current` unchanged.
+  2. If `a` is at or below the shown value of `lo`, or in the same tick, it
+     returns `lo`. The same rule applies at `hi`.
+  3. Otherwise it returns the exact inverse, clamped to [lo, hi].
+
+  So each slider end sends the exact bound. A typed 4.9 sends 3.8 (arc
+  4.975), and a typed 63.8 sends 49.7 (arc 63.896), although the inverse of
+  63.8 is 49.625. The log's `adoption:` field gives the branch:
+  `lower-bound`, `upper-bound` or `interior`.
+
+#### Pit House's travel bounds (screw mm)
+
+These come from `travelBounds()` in the Pedals QML and do not depend on the
+generation. The start thumb is limited to
+[max(lower, end − maxGap), min(upper, end − minGap)]. The end thumb is
+limited to [max(lower, start + minGap), min(upper, start + maxGap)].
+
+| | App firmware ≥ 1.2.8.0 (`_v128`) | Below 1.2.8.0, brake | Below 1.2.8.0, throttle / clutch |
+|---|---|---|---|
+| lower | 3.8 | 3.8 | 3.8 |
+| upper | 49.7 | 49.7 | 49.7 |
+| min gap | 4.3 | 4.3 (53.5 × 0.08) | 10.7 (53.5 × 0.2) |
+| max gap | 45.9 | 32.1 (53.5 × 0.6) | 53.5 (no limit) |
+
+Below 1.2.8.0 the upper bound is `clutch_throttle_machinelimit_max_end`,
+round(53.5 × 0.93, 1) − 0.1 = 49.7, for every role. The gaps are rounded to
+0.1 mm.
+
+The G-Force max pedal movement (`<p>_gforce_max_pedal_movement`) uses the
+same conversion, with edit bounds of 0–15 screw mm (`defaultPedalTravelMm`).
+Pit House logs those edits as `Pedals - G movement`.
+
+#### AZOM's arc display
+
+AZOM's Start / End of Travel slider shows arc mm with the generation 1
+formula (`MBoosterTravelArc`, through `MBoosterTravelArcScale` on the
+`MozaRangeSlider`). It does not read the hardware string, and it has no
+generation 2 constants, because no V20 unit is known in the field.
+
+- The thumbs, the end labels (4.9 / 63.8) and **Usable travel (mm)**
+  (`displayTick(arc(end) − arc(start)) / 10`) use Pit House's floor to 0.1.
+  The epsilon is 0.001, not 0.000001. Values stored as float, or read back
+  from the wire (±0.0005 arc mm), otherwise show 0.1 low for about 13% of
+  ticks.
+- The track is linear in arc mm. A drag steps 0.1 arc mm and commits
+  through `screwMmForEdit`, so each end commits the exact bound.
+- `TravelStartMm`/`TravelEndMm`, the wire, diagnostics and the 3.8 mm minimum
+  gap (`TravelMinGapMm`) stay in screw mm. The slider seeds from the stored
+  value without rounding it to 0.1 screw mm.
+- The Pit House import preview shows the travel pair in arc mm.
+- G-Force max pedal movement still shows screw mm.
 
 ### Deadzone / Max Force — REVISED: real hardware calibration, not host-side (bug bundle 5VR5AQ8Y)
 
@@ -3149,7 +3304,11 @@ as superseded; older presets without it fall back to the plain keys.
 
 Travel values are **mm**: Pit House's `LocalParameters/MBoost/<uid>.json`
 stores the pedal's `0x84`/`0x85` read-back under `brake_machinelimit_*`, e.g.
-19.81994382022472 = raw `0x5ed7` × 53.5 / 65536 exactly. The curve caches fit
+19.81994382022472 next to raw `0x5ed7` (24279). That is close to raw `0x5ed7`
+under either divisor but matches neither: × 53.5 / 65536 = 19.82005 and
+× 53.5 / 65535 = 19.82035. How Pit House got the stored value is not known.
+Pit House uses the `_v128` key family when the pedal's app firmware is
+1.2.8.0 or later (`isV128RangeSupported` in the Pedals QML). The curve caches fit
 their own `_v128` ranges at k/7 (stroke 7.3…24.8 in 3.8–28.3; forces
 11.57…45.0 in 6–45).
 

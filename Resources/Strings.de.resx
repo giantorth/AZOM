@@ -995,4 +995,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frequenz (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensität (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Weißes Rauschen (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Nutzbarer Pedalweg (mm)</value></data>
 </root>

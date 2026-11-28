@@ -994,4 +994,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>주파수 (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>강도 (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>백색 잡음 (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>사용 가능 이동 거리 (mm)</value></data>
 </root>

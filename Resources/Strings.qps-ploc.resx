@@ -992,4 +992,5 @@
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Woof-rate (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Grr (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Static-yap (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Ruff Arf!</value></data>
 </root>

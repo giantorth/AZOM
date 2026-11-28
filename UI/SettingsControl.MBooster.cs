@@ -875,10 +875,14 @@ namespace MozaPlugin.UI
             float ts = fx?.TravelStartMm ?? -1, te = fx?.TravelEndMm ?? -1;
             if (!unsetOnly || ts < 0 || te < 0)
             {
-                MBoosterTravelRangeSlider.LowValue = Math.Round(Pick(ts, "mbooster-brake-travel-start",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelMinMm), 1);
-                MBoosterTravelRangeSlider.HighValue = Math.Round(Pick(te, "mbooster-brake-travel-end",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelDefaultEndMm), 1);
+                // Unrounded: the slider steps in arc mm, so a stored end isn't
+                // on a 0.1 screw mm grid, and rounding it would rewrite it on
+                // the other end's next edit.
+                MBoosterTravelRangeSlider.LowValue = Pick(ts, "mbooster-brake-travel-start",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelMinMm);
+                MBoosterTravelRangeSlider.HighValue = Pick(te, "mbooster-brake-travel-end",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelDefaultEndMm);
+                UpdateMBoosterTravelSpan();
             }
 
             void Int(Slider slider, TextBox box, float stored, string name, Func<int, double> decode, double fallback)

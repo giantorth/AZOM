@@ -396,6 +396,8 @@ namespace MozaPlugin.UI
 
         private void MBoosterTravelRangeSlider_RangeChanged(object sender, EventArgs e)
         {
+            // View-only, so it also follows suppressed seeds.
+            UpdateMBoosterTravelSpan();
             if (_suppressEvents) return;
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
@@ -445,6 +447,17 @@ namespace MozaPlugin.UI
         // Travel ends changed since the last flushed push, per unit.
         private readonly Dictionary<byte, (bool Start, bool End)> _mboosterTravelDirty =
             new Dictionary<byte, (bool Start, bool End)>();
+
+        /// <summary>Usable travel in arc mm, from the ends the slider shows.</summary>
+        private void UpdateMBoosterTravelSpan()
+        {
+            var slider = MBoosterTravelRangeSlider;
+            if (slider == null || MBoosterTravelSpanValue == null) return;
+            double start = Math.Max(slider.Minimum, Math.Min(slider.Maximum, slider.LowValue));
+            double end = Math.Max(slider.Minimum, Math.Min(slider.Maximum, slider.HighValue));
+            MBoosterTravelSpanValue.Text = MBoosterTravelArc.ShownSpanMm(start, end)
+                .ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        }
 
         // Deadzone at the start of pedal travel (0..37kg Brake) — CONFIRMED real
         // hardware calibration (mbooster-brake-deadzone, cmdId 0xAB selector

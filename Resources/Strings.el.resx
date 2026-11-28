@@ -994,4 +994,5 @@ Id: {2}</value></data>
   <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Συχνότητα (%)</value></data>
   <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Ένταση (%)</value></data>
   <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Λευκός θόρυβος (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Ωφέλιμη διαδρομή (mm)</value></data>
 </root>

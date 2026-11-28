@@ -634,10 +634,12 @@ namespace MozaPlugin.UI.Import
                 if (end - start < MBoosterUiConstants.TravelMinGapMm)
                     end = Math.Min(MBoosterUiConstants.TravelMaxMm, start + MBoosterUiConstants.TravelMinGapMm);
 
+                // Arc mm, as the Pedal Feel slider and Pit House show them.
+                var arc = MBoosterTravelArcScale.Instance;
                 string oldDisplay = _read.TravelStartMm < 0 || _read.TravelEndMm < 0
                     ? "(unset)"
-                    : $"{_read.TravelStartMm.ToString("F1", CultureInfo.InvariantCulture)}–{_read.TravelEndMm.ToString("F1", CultureInfo.InvariantCulture)} mm";
-                string newDisplay = $"{start.ToString("F1", CultureInfo.InvariantCulture)}–{end.ToString("F1", CultureInfo.InvariantCulture)} mm";
+                    : $"{arc.Format(_read.TravelStartMm)}–{arc.Format(_read.TravelEndMm)} mm";
+                string newDisplay = $"{arc.Format(start)}–{arc.Format(end)} mm";
 
                 float s = start, e = end;
                 Add("Travel start–end (mm)", oldDisplay, newDisplay,
