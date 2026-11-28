@@ -141,6 +141,16 @@ namespace MozaPlugin.Devices.MBooster
         public const int BitePointPulseRateMaxHz = 25;
         public const int BitePointPulseRateDefaultHz = 10;
 
+        // Automatic bite point (MBoosterAutoBiteCurve): the peak's half-width
+        // in pedal travel (%), and the force before it, after it and at the end
+        // of travel (% of the Deadzone→Max Force span).
+        public const int AutoBiteWidthMinPct = 2;
+        public const int AutoBiteWidthMaxPct = 25;
+        public const int AutoBiteWidthDefaultPct = 8;
+        public const int AutoBiteBeforeDefaultPct = 50;
+        public const int AutoBiteAfterDefaultPct = 40;
+        public const int AutoBiteEndDefaultPct = 40;
+
         /// <summary>
         /// The ripple rate a Bite Point with no Pulse rate set plays: before the
         /// setting existed the ripple ran at the tone frequency but was only
@@ -231,11 +241,16 @@ namespace MozaPlugin.Devices.MBooster
         // see MozaMBoosterRegistry.ComputeFeelCurveY and
         // MBoosterDeviceController.PushFeelCurveResync. See
         // docs/protocol/devices/mbooster.md "Sim Input Mapping" / "Pedal Feel".
-        // Pedal Feel's 6 draggable nodes sit between two FIXED points the
-        // user can't drag — (0,0) = Deadzone and (100,100) = Max Force — for
-        // 8 points on the graph, matching selectors 0x07-0x0E one for one.
+        // Pedal Feel's 6 draggable nodes sit between the (0,0) Deadzone point
+        // and the last point at X=100 (InputCurveEndY) — 8 points on the
+        // graph, matching selectors 0x07-0x0E one for one.
         public const int SimInputMappingNodeCount = 6;
         public const int PedalFeelNodeCount = 6;
+
+        // Decimal places Pedal Feel Y percentages (InputCurveY/EndY) are kept
+        // to. Whole percents were 2kg steps on a 200kg span, so Shift's 5kg
+        // snap couldn't land (145kg = 72.5%).
+        public const int PedalFeelYDecimals = 2;
 
         // Least output-curve range (Max - Min), %: Pit House stopped the
         // start point at 90 against an end at 100, and the end at 10 against
@@ -631,6 +646,7 @@ namespace MozaPlugin.Devices.MBooster
         // Pedal Feel
         float[]? InputCurveY { get; set; }
         float[]? InputCurveX { get; set; }
+        float InputCurveEndY { get; set; }
         float DeadzoneKg { get; set; }
         float MaxForceKg { get; set; }
         float TravelStartMm { get; set; }
@@ -645,6 +661,10 @@ namespace MozaPlugin.Devices.MBooster
         float DampingPressPct { get; set; }
         float DampingReleasePct { get; set; }
         MBoosterSegmentedDampingSettings SegmentedDamping { get; set; }
+        // Automatic bite point Pedal Feel; null = never set.
+        MBoosterAutoBiteFeel? AutoBiteFeel { get; set; }
+        // Sim Input Mapping start follows the Pedal Feel Deadzone.
+        bool AutoDeadzone { get; set; }
     }
 
     /// <summary>
@@ -678,6 +698,8 @@ namespace MozaPlugin.Devices.MBooster
         // X position (0-100% of the Deadzone-Max Force span) of each Pedal
         // Feel node — see MBoosterDeviceSettings.InputCurveX.
         public float[]? InputCurveX { get; set; } = null;
+        // See MBoosterDeviceSettings.InputCurveEndY.
+        public float InputCurveEndY { get; set; } = -1;
         public float DeadzoneKg { get; set; } = -1;
         public float MaxForceKg { get; set; } = -1;
         public float TravelStartMm { get; set; } = -1;
@@ -691,6 +713,10 @@ namespace MozaPlugin.Devices.MBooster
         public float DampingPressPct { get; set; } = -1;
         public float DampingReleasePct { get; set; } = -1;
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
+        // See MBoosterDeviceSettings.AutoBiteFeel.
+        public MBoosterAutoBiteFeel? AutoBiteFeel { get; set; } = null;
+        // See MBoosterDeviceSettings.AutoDeadzone.
+        public bool AutoDeadzone { get; set; }
 
         // Per-pedal vibration effects (same defaults as the master's flat fields).
         public MBoosterEffectSettings Abs { get; set; } = new MBoosterEffectSettings { FrequencyHz = 22 };
@@ -720,6 +746,7 @@ namespace MozaPlugin.Devices.MBooster
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
                 InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
+                InputCurveEndY = InputCurveEndY,
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,
@@ -731,6 +758,8 @@ namespace MozaPlugin.Devices.MBooster
                 DampingPressPct = DampingPressPct,
                 DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
+                AutoBiteFeel = AutoBiteFeel?.Clone(),
+                AutoDeadzone = AutoDeadzone,
                 Abs = Abs?.Clone() ?? new MBoosterEffectSettings(),
                 Lockup = Lockup?.Clone() ?? new MBoosterEffectSettings(),
                 Threshold = Threshold?.Clone() ?? new MBoosterEffectSettings(),
@@ -949,6 +978,12 @@ namespace MozaPlugin.Devices.MBooster
         // and MBoosterDeviceController.PushFeelCurveResync.
         public float[]? InputCurveX { get; set; } = null;
 
+        // The Pedal Feel graph's last point (selector 0x0E), 0-100% of the
+        // Deadzone-Max Force span like InputCurveY; may sit below the nodes.
+        // Max Force is the graph's top, so it scales this point too. -1 =
+        // unset, i.e. 100% (the point at Max Force).
+        public float InputCurveEndY { get; set; } = -1;
+
         // Deadzone at the start of pedal travel, in kg of force (0..37) —
         // REAL hardware calibration (wire command mbooster-brake-deadzone,
         // cmdId 0xAB selector 0x07), reverse-engineered from
@@ -961,11 +996,14 @@ namespace MozaPlugin.Devices.MBooster
         // default); see docs/protocol/devices/mbooster.md "Pedal Feel".
         public float DeadzoneKg { get; set; } = -1;
 
-        // Force (kg, 0..200 on an active pedal) at which the pedal's raw HID axis reaches
-        // 100% travel — REAL hardware calibration (wire command
-        // mbooster-brake-maxforce, cmdId 0xAB selector 0x0E), reverse-
-        // engineered from max-force-24-75-128-166-200.pcapng (bug bundle
-        // 5VR5AQ8Y). Same kg encoding as MaxThresholdKg. Confirmed NOT
+        // Force (kg, 0..200 on an active pedal) at the top of the Pedal Feel
+        // graph — every point is a percentage of Deadzone..this. It only
+        // bounds the graph; what reads 100% output is MaxThresholdKg, which
+        // may sit below it. REAL hardware
+        // calibration: selector 0x0E (mbooster-brake-maxforce) carries the
+        // last point, which is this value while InputCurveEndY is 100%,
+        // reverse-engineered from max-force-24-75-128-166-200.pcapng (bug
+        // bundle 5VR5AQ8Y). Same kg encoding as MaxThresholdKg. Confirmed NOT
         // clamped to MaxThresholdKg on the wire (128/166kg sent while
         // Threshold read back 125kg) — it's an independent parameter, not
         // a rescale of Threshold's own ceiling. -1 = "not yet set / no
@@ -1047,6 +1085,17 @@ namespace MozaPlugin.Devices.MBooster
         // docs/protocol/devices/mbooster.md "Segmented Damping".
         public MBoosterSegmentedDampingSettings SegmentedDamping { get; set; } = new MBoosterSegmentedDampingSettings();
 
+        // Automatic bite point: while on, a clutch pedal's Pedal Feel curve is
+        // MBoosterAutoBiteCurve's template peaking at the calibrated bite point
+        // instead of InputCurveY/X/EndY, which stay as they are. Null = never set.
+        public MBoosterAutoBiteFeel? AutoBiteFeel { get; set; } = null;
+
+        // Automatic deadzone: while on, the UI keeps Min (the Sim Input
+        // Mapping start) where the output leaves 0 as the pedal leaves the
+        // Pedal Feel Deadzone — see MozaMBoosterRegistry.AutoDeadzoneStartPct.
+        // Min itself stays the stored, written value.
+        public bool AutoDeadzone { get; set; }
+
         // Auto-sleep timeout in minutes (0 = off, 1..300), register 0xB4 on
         // the host unit. -1 = no override.
         public int SleepMinutes { get; set; } = -1;
@@ -1082,6 +1131,7 @@ namespace MozaPlugin.Devices.MBooster
                 MaxThresholdKg = MaxThresholdKg,
                 InputCurveY = InputCurveY == null ? null : (float[])InputCurveY.Clone(),
                 InputCurveX = InputCurveX == null ? null : (float[])InputCurveX.Clone(),
+                InputCurveEndY = InputCurveEndY,
                 DeadzoneKg = DeadzoneKg,
                 MaxForceKg = MaxForceKg,
                 TravelStartMm = TravelStartMm,
@@ -1093,6 +1143,8 @@ namespace MozaPlugin.Devices.MBooster
                 DampingPressPct = DampingPressPct,
                 DampingReleasePct = DampingReleasePct,
                 SegmentedDamping = SegmentedDamping?.Clone() ?? new MBoosterSegmentedDampingSettings(),
+                AutoBiteFeel = AutoBiteFeel?.Clone(),
+                AutoDeadzone = AutoDeadzone,
                 SleepMinutes = SleepMinutes,
             };
         }

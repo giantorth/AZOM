@@ -167,5 +167,30 @@
             </Grid>
         </Border>
 
+        <!-- 5. A generated SimHub dashboard has a new version, but the installed
+             copy was saved in Dash Studio since (DashTemplateInstaller.PendingNames). -->
+        <Border x:Name="DashUpdateBanner"
+                Visibility="Collapsed" Margin="0,8,0,0"
+                BorderBrush="{StaticResource CyanBrush}" BorderThickness="1"
+                Background="{StaticResource BgDeepBrush}" CornerRadius="4" Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" x:Name="DashUpdateBannerText"
+                           FontFamily="{StaticResource FontUi}" FontSize="12.5" FontWeight="SemiBold"
+                           Foreground="{StaticResource CyanBrush}"
+                           TextWrapping="Wrap" VerticalAlignment="Center"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button Content="{x:Static res:Strings.Button_InstallUpdate}"
+                            Click="DashUpdateInstall_Click" Margin="0,0,8,0"/>
+                    <Button Content="{x:Static res:Strings.Button_Dismiss}"
+                            Click="DashUpdateDismiss_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
     </StackPanel>
 </UserControl>

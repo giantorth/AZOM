@@ -870,13 +870,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Kalibrert</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manuell</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>TILBAKESTILL</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Inaktiv</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Venter</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Klar</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Slipper</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Avbrutt</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Automatisk kalibrering</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} målinger</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Clutchkilde</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster-pedal</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Clutch-klopunkt</value></data>
@@ -888,7 +881,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Trykk</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Slipp</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Begge</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Spillverdi</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID-akse</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Enhet</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ANGI OMRÅDE</value></data>
@@ -909,10 +901,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under bitepunktet</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Helt sluppet</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Alltid</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Sylindere</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsering (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Styrke over bakketopper</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blokkerer tilgang til MOZA-enheter</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så programtillegget kan ikke koble til.</value></data>
@@ -969,4 +959,46 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM standardeffekter</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Hjullåsing</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Strømmemodus</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatisk bitepunkt</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Før bitepunktet (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Etter bitepunktet (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Slutt på bevegelse (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Oppsett</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Rattbase</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pedaler</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Girspaker og rattspaker</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED-er</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Kontroller</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Klar til kalibrering</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Måler</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Bil kalibrert ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Spill kalibrert ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Ikke kalibrert</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>For raskt</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA clutch-klopunkt</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Viser kalibreringen av clutch-klopunktet mens du kjører.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Ikke klar</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Venter</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>I spillet</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Clutch-signal</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>I gir</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Stillestående</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Clutch inne</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Siste start {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Vellykket · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA clutch-klopunkt mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Viser clutch-linjen bare mens en stående start kan måles, og deretter resultatet.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Ny versjon av SimHub-dashbord: {0}. Når du installerer den, beholdes din nåværende kopi i _Backups-mappen.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Bil ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Spill ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatisk dødsone</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Min frekvens (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Ruhet</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Takt (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frekvens (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensitet (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Hvit støy (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Brukbar vandring (mm)</value></data>
 </root>

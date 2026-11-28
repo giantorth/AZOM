@@ -44,15 +44,29 @@ namespace MozaPlugin.UI
         private void AboutKofiButton_Click(object sender, System.Windows.RoutedEventArgs e)    => UiHelpers.OpenExternalUrl(AboutKofiUrl);
         private void BugReportPrivacyLink_Click(object sender, System.Windows.RoutedEventArgs e) => UiHelpers.OpenExternalUrl(PrivacyPolicyUrl);
 
-        // Guide list published by the site at build time, in site order. Fetched
-        // once per AppDomain; the built-in list below shows until it arrives and
-        // stays if the fetch fails.
+        // Guide list published by the site at build time, in site order (grouped
+        // by category). Fetched once per AppDomain; the built-in list below shows
+        // until it arrives and stays if the fetch fails.
         private const string AboutGuidesJsonUrl = AboutGuidesUrl + "guides.json";
-        private static volatile IReadOnlyList<(string Slug, string Title, string Url)>? s_siteGuides;
+        private static volatile IReadOnlyList<(string Slug, string Title, string Url, string? Category, string? CategoryTitle)>? s_siteGuides;
         private static bool s_siteGuidesRequested;
         // Raised on a pool thread once s_siteGuides is set.
         private static event Action? s_siteGuidesUpdated;
         private bool _siteGuidesHooked;
+
+        // Localized titles for the site's category slugs. Categories the site
+        // adds later show with the site's English title.
+        private static readonly (string Slug, Func<string> Title)[] AboutGuideCategories =
+        {
+            ("setup",               () => Strings.GuideCategory_Setup),
+            ("wheelbase",           () => Strings.GuideCategory_Wheelbase),
+            ("pedals",              () => Strings.GuideCategory_Pedals),
+            ("shifters-and-stalks", () => Strings.GuideCategory_ShiftersStalks),
+            ("leds",                () => Strings.GuideCategory_Leds),
+            ("dashboard",           () => Strings.GuideCategory_Dashboard),
+            ("controls",            () => Strings.GuideCategory_Controls),
+            ("plugin",              () => Strings.GuideCategory_Plugin),
+        };
 
         // Built-in fallback, and the localized titles for known slugs. Guides
         // the site adds later show with the site's English title.
@@ -62,6 +76,7 @@ namespace MozaPlugin.UI
             ("install-the-plugin",          () => Strings.Guide_InstallPlugin),
             ("linux-setup",                 () => Strings.Guide_LinuxSetup),
             ("add-your-device",             () => Strings.Guide_AddDevice),
+            ("import-a-profile",            () => Strings.Guide_ImportProfile),
             ("configure-the-wheelbase",     () => Strings.Guide_ConfigureWheelbase),
             ("lfe-effects",                 () => Strings.Guide_LfeEffects),
             ("pedals-and-handbrake",        () => Strings.Guide_PedalsHandbrake),
@@ -70,7 +85,6 @@ namespace MozaPlugin.UI
             ("ab9-shifter",                 () => Strings.Guide_Ab9Shifter),
             ("hgp-sgp-shifters",            () => Strings.Guide_HgpSgpShifters),
             ("stalks",                      () => Strings.Guide_Stalks),
-            ("import-a-profile",            () => Strings.Guide_ImportProfile),
             ("wheel-leds-and-knobs",        () => Strings.Guide_WheelLedsKnobs),
             ("atsr-led-profiles",           () => Strings.Guide_AtsrLeds),
             ("dashboard-and-channels",      () => Strings.Guide_DashboardChannels),
@@ -119,18 +133,23 @@ namespace MozaPlugin.UI
             try
             {
                 string json = await UpdateCheck.UpdateCheckService.Http
-                    .GetStringAsync(AboutGuidesJsonUrl).ConfigureAwait(false);
-                var list = new List<(string Slug, string Title, string Url)>();
+                    .GetStringAsync(AboutGuidesJsonUrl + "?v=" + Uri.EscapeDataString(DiagnosticsTextBuilder.GetPluginVersion()))
+                    .ConfigureAwait(false);
+                var list = new List<(string Slug, string Title, string Url, string? Category, string? CategoryTitle)>();
                 foreach (var item in Newtonsoft.Json.Linq.JArray.Parse(json))
                 {
                     string? slug = (string?)item["slug"];
                     string? title = (string?)item["title"];
                     string? url = (string?)item["url"];
+                    string? category = (string?)item["category"];
+                    string? categoryTitle = (string?)item["categoryTitle"];
                     // Only open links on the guides site, whatever the file says.
                     if (string.IsNullOrWhiteSpace(slug) || string.IsNullOrWhiteSpace(title)
                         || url == null || !url.StartsWith(AboutGuidesUrl, StringComparison.Ordinal))
                         continue;
-                    list.Add((slug!, title!, url));
+                    list.Add((slug!, title!, url,
+                        string.IsNullOrWhiteSpace(category) ? null : category,
+                        string.IsNullOrWhiteSpace(categoryTitle) ? null : categoryTitle));
                 }
                 if (list.Count == 0) return;
                 s_siteGuides = list;
@@ -145,42 +164,91 @@ namespace MozaPlugin.UI
         private void RenderAboutGuides()
         {
             if (GuidesLeftColumn == null || GuidesRightColumn == null) return;
-            var guides = new List<(string Title, string Url)>();
+            var guides = new List<(string? Category, string? CategoryTitle, string Title, string Url)>();
             if (s_siteGuides != null)
             {
                 foreach (var g in s_siteGuides)
                 {
-                    string title = g.Title;
-                    foreach (var known in AboutGuides)
-                        if (known.Slug == g.Slug) { title = known.Title(); break; }
-                    guides.Add((title, g.Url));
+                    int k = Array.FindIndex(AboutGuides, a => a.Slug == g.Slug);
+                    guides.Add((g.Category, g.CategoryTitle, k >= 0 ? AboutGuides[k].Title() : g.Title, g.Url));
                 }
             }
             else
             {
                 foreach (var g in AboutGuides)
-                    guides.Add((g.Title(), AboutGuidesUrl + g.Slug + "/"));
+                    guides.Add((null, null, g.Title(), AboutGuidesUrl + g.Slug + "/"));
+            }
+
+            // Groups in first-seen order. Guides without a category (the built-in
+            // list, or a site list that lacks them) go last as header-less single
+            // rows, so a flat list still splits evenly across the columns.
+            var groups = new List<(string? Title, List<(string Title, string Url)> Links)>();
+            var bySlug = new Dictionary<string, List<(string Title, string Url)>>(StringComparer.Ordinal);
+            var uncategorized = new List<(string? Title, List<(string Title, string Url)> Links)>();
+            foreach (var g in guides)
+            {
+                if (g.Category == null)
+                {
+                    uncategorized.Add((null, new List<(string Title, string Url)> { (g.Title, g.Url) }));
+                    continue;
+                }
+                if (!bySlug.TryGetValue(g.Category, out var links))
+                {
+                    links = new List<(string Title, string Url)>();
+                    bySlug[g.Category] = links;
+                    int c = Array.FindIndex(AboutGuideCategories, a => a.Slug == g.Category);
+                    groups.Add((c >= 0 ? AboutGuideCategories[c].Title() : g.CategoryTitle ?? g.Category, links));
+                }
+                links.Add((g.Title, g.Url));
+            }
+            groups.AddRange(uncategorized);
+
+            // Whole groups per column, split where the taller column is shortest
+            // (left wins ties). A header counts as one row.
+            int Rows(int i) => groups[i].Links.Count + (groups[i].Title != null ? 1 : 0);
+            int total = 0;
+            for (int i = 0; i < groups.Count; i++) total += Rows(i);
+            int split = 0, bestTaller = int.MaxValue, leftRows = 0;
+            for (int k = 0; k <= groups.Count; k++)
+            {
+                if (k > 0) leftRows += Rows(k - 1);
+                int taller = Math.Max(leftRows, total - leftRows);
+                if (taller <= bestTaller) { bestTaller = taller; split = k; }
             }
 
             GuidesLeftColumn.Children.Clear();
             GuidesRightColumn.Children.Clear();
-            int leftCount = (guides.Count + 1) / 2;
-            for (int i = 0; i < guides.Count; i++)
+            var brush = TryFindResource("CyanBrush") as Brush;
+            var font = TryFindResource("FontUi") as FontFamily;
+            var headerStyle = TryFindResource("SectionTitleText") as Style;
+            for (int i = 0; i < groups.Count; i++)
             {
-                string url = guides[i].Url;
-                var link = new Hyperlink(new Run(guides[i].Title)) { ToolTip = url };
-                link.Click += (s, e) => UiHelpers.OpenExternalUrl(url);
-                if (TryFindResource("CyanBrush") is Brush brush)
-                    link.Foreground = brush;
-                var text = new TextBlock(link)
+                var column = i < split ? GuidesLeftColumn : GuidesRightColumn;
+                if (groups[i].Title != null)
                 {
-                    TextWrapping = TextWrapping.Wrap,
-                    FontSize = 13,
-                    Margin = new Thickness(0, 0, 0, 6),
-                };
-                if (TryFindResource("FontUi") is FontFamily font)
-                    text.FontFamily = font;
-                (i < leftCount ? GuidesLeftColumn : GuidesRightColumn).Children.Add(text);
+                    var header = new TextBlock
+                    {
+                        Text = groups[i].Title,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, column.Children.Count == 0 ? 0 : 8, 0, 4),
+                    };
+                    if (headerStyle != null) header.Style = headerStyle;
+                    column.Children.Add(header);
+                }
+                foreach (var (title, url) in groups[i].Links)
+                {
+                    var link = new Hyperlink(new Run(title)) { ToolTip = url };
+                    link.Click += (s, e) => UiHelpers.OpenExternalUrl(url);
+                    if (brush != null) link.Foreground = brush;
+                    var text = new TextBlock(link)
+                    {
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = 13,
+                        Margin = new Thickness(0, 0, 0, 6),
+                    };
+                    if (font != null) text.FontFamily = font;
+                    column.Children.Add(text);
+                }
             }
         }
 

@@ -231,9 +231,6 @@ namespace MozaPlugin.Settings
         public Dictionary<string, MBoosterBitePointCalibration> MBoosterClutchBitePointCalibrations { get; set; }
             = new Dictionary<string, MBoosterBitePointCalibration>(StringComparer.OrdinalIgnoreCase);
 
-        // Learn and refine the bite point from every clean standing start.
-        public bool MBoosterBitePointAutoCalibrate { get; set; } = true;
-
         // Clutch position the Bite Point trigger and calibration read.
         public MBoosterBitePointSource MBoosterBitePointSource { get; set; } = MBoosterBitePointSource.Game;
 
@@ -245,6 +242,12 @@ namespace MozaPlugin.Settings
 
         // Clutch travel times Prediction learns (MBoosterBitePointTravel); null = none yet.
         public Devices.MBooster.MBoosterBitePointTravelTimes? MBoosterBitePointTravelTimes { get; set; }
+
+        // Clutch source position → clutch mBooster pedal travel, per game key as
+        // in MBoosterClutchBitePointCalibrations (no vehicle keys). Places the
+        // bite point on the Automatic bite point curve. Copy-on-write.
+        public Dictionary<string, MBoosterBitePointPedalMap> MBoosterBitePointPedalMaps { get; set; }
+            = new Dictionary<string, MBoosterBitePointPedalMap>(StringComparer.OrdinalIgnoreCase);
 
         // Routed-lane identities ("routedpedals:<port>") whose pedal slot (dev 0x19)
         // last identified as an mBooster rather than CRP/SRP pedals. Read by
@@ -573,6 +576,11 @@ namespace MozaPlugin.Settings
         // dismisses the banner or clicks Configure SDK — persisted so it never
         // reappears.
         public bool SdkPromptDismissed { get; set; } = false;
+
+        // Generated dashboard name → version the user chose not to install over
+        // their own copy (see DashTemplateInstaller). Absent = not dismissed.
+        public Dictionary<string, string> DashTemplateDismissedVersions { get; set; }
+            = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // NOTE: ports for both UDP surfaces are NOT settings — they are
         // protocol-mandated and not actually configurable in practice.

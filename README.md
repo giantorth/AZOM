@@ -50,31 +50,31 @@ Screen-by-screen walkthrough: **[Install the Plugin](https://giant.orth.cc/guide
 
 ## Guides
 
-| | |
-|---|---|
-| **[Getting Started](https://giant.orth.cc/guides/getting-started/)** | Download to connected wheel in a few minutes |
-| **[Install the Plugin](https://giant.orth.cc/guides/install-the-plugin/)** | Every screen of the install, in order |
-| **[Linux Setup](https://giant.orth.cc/guides/linux-setup/)** | SimHub under Wine via `linux-simracing-utils` |
-| **[Add Your Device](https://giant.orth.cc/guides/add-your-device/)** | Register the wheel as a native SimHub device |
-| **[Configure the Wheelbase](https://giant.orth.cc/guides/configure-the-wheelbase/)** | Rotation, FFB strength, damping, equalizer, output curve |
-| **[LFE Effects](https://giant.orth.cc/guides/lfe-effects/)** | Host-rendered low-frequency haptics through the base |
-| **[Pedals & Handbrake](https://giant.orth.cc/guides/pedals-and-handbrake/)** | Range, direction, calibration, output curves |
-| **[mBooster](https://giant.orth.cc/guides/mbooster/)** | Active-pedal feel in mm and kg, plus telemetry haptics |
-| **[Pedal Haptics](https://giant.orth.cc/guides/pedal-haptics/)** | S12 vibration units as SimHub ShakeIt devices |
-| **[AB9 Active Shifter](https://giant.orth.cc/guides/ab9-shifter/)** | Shift pattern, mechanical feel, vibration |
-| **[HGP & SGP Shifters](https://giant.orth.cc/guides/hgp-sgp-shifters/)** | Passive H-pattern and sequential shifters |
-| **[Multi-Function Stalks](https://giant.orth.cc/guides/stalks/)** | Button box, or wipers and lights in ETS2/ATS |
-| **[Import a Profile](https://giant.orth.cc/guides/import-a-profile/)** | Load a Pit House preset, with a diff before applying |
-| **[Wheel LEDs & Knobs](https://giant.orth.cc/guides/wheel-leds-and-knobs/)** | RPM lights, knob rings, onboard idle effects |
-| **[Advanced LEDs with ATSR](https://giant.orth.cc/guides/atsr-led-profiles/)** | Telemetry-driven effects from ATSR-EVO |
-| **[Dashboard & Channels](https://giant.orth.cc/guides/dashboard-and-channels/)** | Stream telemetry to the wheel LCD, bind every channel |
-| **[Wheel Files & Dashboard Upload](https://giant.orth.cc/guides/wheel-files/)** | Upload `.mzdash` layouts, convert SimHub dashboards |
-| **[Controls & Actions](https://giant.orth.cc/guides/controls-and-actions/)** | Bind wheel buttons to AZOM actions |
-| **[Control Mapper](https://giant.orth.cc/guides/control-mapper/)** | Make several wheels act as one virtual controller |
-| **[Properties & Actions Reference](https://giant.orth.cc/guides/properties-and-actions/)** | Every `AZOM.*` property and action, with ranges |
-| **[SDK & iRacing](https://giant.orth.cc/guides/sdk-and-iracing/)** | The embedded MOZA SDK server, for iRacing and 360 Hz |
-| **[Plugin Options](https://giant.orth.cc/guides/options/)** | Plugin-wide switches, updates, device definitions |
-| **[Diagnostics & Bug Reports](https://giant.orth.cc/guides/diagnostics-and-bug-reports/)** | The Help tab: diagnostic report, redacted bundles |
+| | | |
+|---|---|---|
+| **Setup** | [Getting Started](https://giant.orth.cc/guides/getting-started/) | Download to connected wheel in a few minutes |
+| | [Install the Plugin](https://giant.orth.cc/guides/install-the-plugin/) | Every screen of the install, in order |
+| | [Linux Setup](https://giant.orth.cc/guides/linux-setup/) | SimHub under Wine via `linux-simracing-utils` |
+| | [Add Your Device](https://giant.orth.cc/guides/add-your-device/) | Register the wheel as a native SimHub device |
+| | [Import a Profile](https://giant.orth.cc/guides/import-a-profile/) | Load a Pit House preset, with a diff before applying |
+| **Wheelbase** | [Configure the Wheelbase](https://giant.orth.cc/guides/configure-the-wheelbase/) | Rotation, FFB strength, damping, equalizer, output curve |
+| | [LFE Effects](https://giant.orth.cc/guides/lfe-effects/) | Host-rendered low-frequency haptics through the base |
+| **Pedals** | [Pedals & Handbrake](https://giant.orth.cc/guides/pedals-and-handbrake/) | Range, direction, calibration, output curves |
+| | [mBooster](https://giant.orth.cc/guides/mbooster/) | Active-pedal feel in mm and kg, plus telemetry haptics |
+| | [Pedal Haptics](https://giant.orth.cc/guides/pedal-haptics/) | S12 vibration units as SimHub ShakeIt devices |
+| **Shifters & Stalks** | [AB9 Active Shifter](https://giant.orth.cc/guides/ab9-shifter/) | Shift pattern, mechanical feel, vibration |
+| | [HGP & SGP Shifters](https://giant.orth.cc/guides/hgp-sgp-shifters/) | Passive H-pattern and sequential shifters |
+| | [Multi-Function Stalks](https://giant.orth.cc/guides/stalks/) | Button box, or wipers and lights in ETS2/ATS |
+| **LEDs** | [Wheel LEDs & Knobs](https://giant.orth.cc/guides/wheel-leds-and-knobs/) | RPM lights, knob rings, onboard idle effects |
+| | [Advanced LEDs with ATSR](https://giant.orth.cc/guides/atsr-led-profiles/) | Telemetry-driven effects from ATSR-EVO |
+| **Dashboard** | [Dashboard & Channels](https://giant.orth.cc/guides/dashboard-and-channels/) | Stream telemetry to the wheel LCD, bind every channel |
+| | [Wheel Files & Dashboard Upload](https://giant.orth.cc/guides/wheel-files/) | Upload `.mzdash` layouts, convert SimHub dashboards |
+| **Controls** | [Controls & Actions](https://giant.orth.cc/guides/controls-and-actions/) | Bind wheel buttons to AZOM actions |
+| | [Control Mapper](https://giant.orth.cc/guides/control-mapper/) | Make several wheels act as one virtual controller |
+| | [Properties & Actions Reference](https://giant.orth.cc/guides/properties-and-actions/) | Every `AZOM.*` property and action, with ranges |
+| **Plugin** | [SDK & iRacing](https://giant.orth.cc/guides/sdk-and-iracing/) | The embedded MOZA SDK server, for iRacing and 360 Hz |
+| | [Plugin Options](https://giant.orth.cc/guides/options/) | Plugin-wide switches, updates, device definitions |
+| | [Diagnostics & Bug Reports](https://giant.orth.cc/guides/diagnostics-and-bug-reports/) | The Help tab: diagnostic report, redacted bundles |
 
 ## What It Does
 
@@ -135,6 +135,17 @@ Spanish language with English dub and subtitles available.
 - **[Discord](https://discord.gg/J4enw43e62)** — discuss features and development.
 - **[Report a problem](https://giant.orth.cc/guides/diagnostics-and-bug-reports/)** — the plugin's Help tab submits a redacted diagnostic bundle in one click. See the **[privacy policy](https://giant.orth.cc/privacy/)** for what is sent and how long it is kept.
 - **[Sponsor](https://github.com/sponsors/giantorth)** / **[Ko-fi](https://ko-fi.com/giantorth)** — the money just buys more MOZA hardware to support.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+`MozaPlugin.dll` in stable releases and PR pre-releases is built and signed by this repository's GitHub Actions. Every build signed with the SignPath Foundation certificate is approved manually.
+
+- **Committers and reviewers:** [giantorth](https://github.com/giantorth)
+- **Approvers:** [giantorth](https://github.com/giantorth)
+
+**Privacy:** what the plugin sends, and when, is described in the [privacy policy](https://giant.orth.cc/privacy/).
 
 ## Building from Source
 

@@ -26,17 +26,16 @@ namespace MozaPlugin.Protocol
     }
 
     /// <summary>
-    /// Corner role stored per actuator port (<c>0x1E/02</c>). Rear-left / rear-right are
-    /// consistent across captures; front-right / front-left are inferred
-    /// (docs/protocol/motion/identity-and-ports.md).
+    /// Corner role stored per actuator port (<c>0x1E/02</c>); pinned against Motion Manager's UI in
+    /// docs/protocol/motion/identity-and-ports.md.
     /// </summary>
     public enum MotionCorner : byte
     {
         None = 0,
-        FrontRight = 1,
-        FrontLeft = 3,
-        RearLeft = 5,
-        RearRight = 7,
+        FrontLeft = 1,
+        FrontRight = 3,
+        RearRight = 5,
+        RearLeft = 7,
     }
 
     /// <summary>Last <c>0x20/02</c> sub-command (stop / hold / run / identify-port).</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using GameReaderCommon;
 using MozaPlugin.Devices.MBooster;
@@ -11,9 +12,8 @@ namespace MozaPlugin
 {
     /// <summary>
     /// Clutch bite point for the Clutch Bite Point effect: the clutch position
-    /// source, storage per game and per vehicle (both per source), user-started
-    /// calibration runs, and automatic learning/refinement from every clean
-    /// standing start.
+    /// source, storage per game and per vehicle (both per source), and
+    /// calibration learned and refined from every clean standing start.
     ///
     /// A game's first calibration seeds both the game and the vehicle it was
     /// made in. A vehicle with no calibration of its own inherits the game's;
@@ -29,16 +29,28 @@ namespace MozaPlugin
         // Pedal fraction per second: full travel in 0.6 s.
         private const double MaxAutoReleaseRatePerSec = 1.0 / 0.6;
 
+        // How long BitePointCalState.Captured / TooFast is shown after a launch.
+        private const double ResultShownSec = 5.0;
+
         // Clutch travel (%) within which an automatic sample agrees with an
         // inherited game calibration.
         private const int InheritAgreementPct = 5;
 
         private const string VehicleKeySeparator = "|car:";
 
-        private readonly MBoosterBitePointCalibrator _bitePointCalibrator = new MBoosterBitePointCalibrator();
         // Data thread only.
         private readonly MBoosterBitePointDetector _bitePointAutoDetector = new MBoosterBitePointDetector();
         private string? _bitePointAutoKey;
+        // Set from any thread when the clutch signal changes: the data thread restarts detection.
+        private int _bitePointAutoRestart;
+        // Stopwatch ticks until which the last launch's result is reported; 0 = none. Data thread only.
+        private long _bitePointResultUntil;
+        // BitePointCalState as of the last data tick.
+        private volatile int _bitePointCalState;
+        // BitePointConditions as of the last data tick.
+        private volatile int _bitePointConditions;
+        // Last standing start measured for the current game and vehicle; null = none yet.
+        private volatile BitePointLaunch? _bitePointLastLaunch;
         private string? _bitePointVehicleGame;
         private Func<string?, double>? _bitePointFormulaResolver;
         // Serializes writers; readers use the copy-on-write dictionary snapshot.
@@ -52,8 +64,9 @@ namespace MozaPlugin
         private long _bitePointSourceClutchBits = BitConverter.DoubleToInt64Bits(double.NaN);
         // HidAxis source reader; created on first use, disposed at shutdown.
         private HidAxisReader? _bitePointHidReader;
-        private bool _bitePointHidApplied;
         private readonly object _bitePointHidLock = new object();
+        // Effective source last applied by SyncBitePointSource, as int; -1 = none yet.
+        private int _bitePointAppliedSource = -1;
         // Handed to the mBooster workers so a HID clutch is read live each motor tick.
         private Func<double>? _bitePointLiveClutch;
 
@@ -64,15 +77,38 @@ namespace MozaPlugin
             public readonly int SampleCount;
             /// <summary>The vehicle has none of its own; this is the game's.</summary>
             public readonly bool Inherited;
+            /// <summary>The current vehicle's own calibration.</summary>
+            public readonly bool OwnVehicle;
 
-            public BitePointInfo(int pct, int sampleCount, bool inherited)
+            public BitePointInfo(int pct, int sampleCount, bool inherited, bool ownVehicle)
             {
                 Pct = pct;
                 SampleCount = sampleCount;
                 Inherited = inherited;
+                OwnVehicle = ownVehicle;
             }
 
             public bool IsCalibrated => Pct >= 0;
+
+            /// <summary>"Car", "Game", or "" when uncalibrated (AZOM.ClutchBitePointScope).</summary>
+            public string Scope => !IsCalibrated ? "" : OwnVehicle ? "Car" : "Game";
+        }
+
+        /// <summary>A measured standing start.</summary>
+        internal sealed class BitePointLaunch
+        {
+            public readonly int Pct;
+            /// <summary>Clutch release rate at the bite, % of travel per second.</summary>
+            public readonly int ReleaseRatePct;
+            /// <summary>Released too fast to count.</summary>
+            public readonly bool Skipped;
+
+            public BitePointLaunch(int pct, int releaseRatePct, bool skipped)
+            {
+                Pct = pct;
+                ReleaseRatePct = releaseRatePct;
+                Skipped = skipped;
+            }
         }
 
         /// <summary>SimHub's current game code, or null.</summary>
@@ -88,20 +124,18 @@ namespace MozaPlugin
         /// <summary>The bite point in use (0..100) for the current game, vehicle and source, -1 when uncalibrated.</summary>
         internal int CurrentClutchBitePointPct => _currentClutchBitePointPct;
 
-        internal BitePointCalState BitePointCalibrationState => _bitePointCalibrator.State;
+        /// <summary>Whether a standing start can be measured now. Any thread.</summary>
+        internal BitePointCalState BitePointCalibrationState => (BitePointCalState)_bitePointCalState;
 
-        internal bool IsBitePointCalibrationRunning => _bitePointCalibrator.IsActive;
+        /// <summary>True when every one of <paramref name="conditions"/> was met on the last data tick. Any thread.</summary>
+        internal bool BitePointConditionsMet(BitePointConditions conditions) =>
+            ((BitePointConditions)_bitePointConditions & conditions) == conditions;
 
-        internal bool BitePointAutoCalibrate
-        {
-            get => _settings?.MBoosterBitePointAutoCalibrate ?? true;
-            set
-            {
-                if (_settings == null || _settings.MBoosterBitePointAutoCalibrate == value) return;
-                _settings.MBoosterBitePointAutoCalibrate = value;
-                PersistSettings();
-            }
-        }
+        /// <summary>Last standing start measured for the current game and vehicle, or null. Any thread.</summary>
+        internal BitePointLaunch? BitePointLastLaunch => _bitePointLastLaunch;
+
+        // Drop a measurement in progress: it read the old clutch signal.
+        private void RestartBitePointDetection() => Interlocked.Exchange(ref _bitePointAutoRestart, 1);
 
         /// <summary>Load the saved Prediction travel times and save each new one.
         /// Init and Clear all settings.</summary>
@@ -116,19 +150,39 @@ namespace MozaPlugin
             };
         }
 
-        /// <summary>Where the trigger and calibration read the clutch. Changing it stops any run.</summary>
-        internal MBoosterBitePointSource BitePointSource
+        /// <summary>The clutch source picked in the ShakeIt editor; see <see cref="BitePointSource"/>.</summary>
+        internal MBoosterBitePointSource ChosenBitePointSource
         {
             get => _settings?.MBoosterBitePointSource ?? MBoosterBitePointSource.Game;
             set
             {
                 if (_settings == null || _settings.MBoosterBitePointSource == value) return;
                 _settings.MBoosterBitePointSource = value;
-                _bitePointCalibrator.Stop();
-                _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
-                ApplyBitePointHidReader();
+                SyncBitePointSource();
                 PersistSettings();
             }
+        }
+
+        /// <summary>The plugin tab drives a connected, motorized Clutch pedal, so the
+        /// clutch is read from that pedal whatever <see cref="ChosenBitePointSource"/> says.</summary>
+        internal bool BitePointSourceIsMBoosterClutch =>
+            MBoosterRoutedToPluginTab
+            && _mboosterRegistry?.TryGetEffectPedal(MBoosterRole.Clutch, out _, out _) == true;
+
+        /// <summary>Where the trigger and calibration read the clutch. Any thread.</summary>
+        internal MBoosterBitePointSource BitePointSource =>
+            BitePointSourceIsMBoosterClutch ? MBoosterBitePointSource.MBoosterPedal : ChosenBitePointSource;
+
+        // On a change of BitePointSource: restart detection, re-point the HID reader. Any thread.
+        private void SyncBitePointSource()
+        {
+            int source = (int)BitePointSource;
+            if (Volatile.Read(ref _bitePointAppliedSource) == source) return;
+            int was = Interlocked.Exchange(ref _bitePointAppliedSource, source);
+            if (was == source) return;
+            if (was >= 0) RestartBitePointDetection();
+            _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
+            ApplyBitePointHidReader();
         }
 
         /// <summary>Stored formula for <see cref="MBoosterBitePointSource.Formula"/>.</summary>
@@ -140,13 +194,13 @@ namespace MozaPlugin
                 value ??= "";
                 if (_settings == null || _settings.MBoosterBitePointSourceFormula == value) return;
                 _settings.MBoosterBitePointSourceFormula = value;
-                if (BitePointSource == MBoosterBitePointSource.Formula) _bitePointCalibrator.Stop();
+                if (BitePointSource == MBoosterBitePointSource.Formula) RestartBitePointDetection();
                 PersistSettings();
             }
         }
 
         /// <summary>The axis read for <see cref="MBoosterBitePointSource.HidAxis"/>; changing the
-        /// axis (not just its travel) stops any run.</summary>
+        /// axis (not just its travel) restarts detection.</summary>
         internal HidAxisSelection? BitePointHidAxis
         {
             get => _settings?.MBoosterBitePointHidAxis;
@@ -156,7 +210,7 @@ namespace MozaPlugin
                 var old = _settings.MBoosterBitePointHidAxis;
                 _settings.MBoosterBitePointHidAxis = value;
                 if (BitePointSource == MBoosterBitePointSource.HidAxis && !(value?.SameAxis(old) ?? old == null))
-                    _bitePointCalibrator.Stop();
+                    RestartBitePointDetection();
                 ApplyBitePointHidReader();
                 PersistSettings();
             }
@@ -265,24 +319,21 @@ namespace MozaPlugin
             return !double.IsNaN(position01);
         }
 
-        /// <summary>Status line for the calibration UI: the bite point value, then the
-        /// run's phase or what the value rests on.</summary>
-        internal string BitePointStatusText(in BitePointInfo info)
+        /// <summary>The bite point value for the calibration UI.</summary>
+        internal static string BitePointValueText(in BitePointInfo info) =>
+            info.IsCalibrated ? info.Pct + "%" : "—";
+
+        /// <summary>Calibration indicator text: a standing start being measured or its result,
+        /// else whether the vehicle or the game is calibrated and from how many samples.</summary>
+        internal static string BitePointIndicatorText(in BitePointInfo info, BitePointCalState state, BitePointLaunch? launch)
         {
-            string state;
-            switch (_bitePointCalibrator.State)
-            {
-                case BitePointCalState.Waiting: state = Strings.BiteCal_Waiting; break;
-                case BitePointCalState.Armed: state = Strings.BiteCal_Armed; break;
-                case BitePointCalState.Releasing: state = Strings.BiteCal_Releasing; break;
-                case BitePointCalState.Cancelled: state = Strings.BiteCal_Cancelled; break;
-                default:
-                    state = !info.IsCalibrated ? Strings.BiteCal_Idle
-                        : info.Inherited ? Strings.BiteCal_GameValue
-                        : string.Format(Strings.BiteCal_Samples, info.SampleCount);
-                    break;
-            }
-            return info.IsCalibrated ? info.Pct + "% · " + state : state;
+            if (state == BitePointCalState.Armed) return Strings.BiteCal_Ready;
+            if (state == BitePointCalState.Releasing) return Strings.BiteCal_Measuring;
+            if (state == BitePointCalState.TooFast) return Strings.BiteCal_TooFast;
+            if (state == BitePointCalState.Captured && launch != null) return string.Format(Strings.BiteCal_Captured, launch.Pct);
+            if (!info.IsCalibrated) return Strings.BiteCal_NotCalibrated;
+            return string.Format(info.OwnVehicle ? Strings.BiteCal_CarCalibrated : Strings.BiteCal_GameCalibrated,
+                info.SampleCount);
         }
 
         // Settings key for a game under the current source. The mBooster pedal
@@ -313,25 +364,21 @@ namespace MozaPlugin
         {
             var map = _settings?.MBoosterClutchBitePointCalibrations;
             string? gameKey = GameKey(CurrentGameName);
-            if (map == null || gameKey == null) return new BitePointInfo(-1, 0, false);
+            if (map == null || gameKey == null) return new BitePointInfo(-1, 0, false, false);
             string? vehicleKey = VehicleKey(gameKey, _currentBitePointVehicle);
             if (vehicleKey != null && map.TryGetValue(vehicleKey, out var own) && own != null)
-                return new BitePointInfo(own.Pct, own.Samples?.Count ?? 0, false);
+                return new BitePointInfo(own.Pct, own.Samples?.Count ?? 0, false, true);
             if (map.TryGetValue(gameKey, out var game) && game != null)
-                return new BitePointInfo(game.Pct, game.Samples?.Count ?? 0, vehicleKey != null);
-            return new BitePointInfo(-1, 0, false);
+                return new BitePointInfo(game.Pct, game.Samples?.Count ?? 0, vehicleKey != null, false);
+            return new BitePointInfo(-1, 0, false, false);
         }
 
-        /// <summary>Start a calibration run for the current vehicle, or cancel the one in progress.</summary>
-        internal void ToggleBitePointCalibration() => _bitePointCalibrator.Toggle();
-
         /// <summary>
-        /// Clear the current vehicle's own calibration (it falls back to the game's)
-        /// and stop any run. With no vehicle known, clears the game's.
+        /// Clear the current vehicle's own calibration (it falls back to the game's).
+        /// With no vehicle known, clears the game's.
         /// </summary>
         internal void ResetClutchBitePoint()
         {
-            _bitePointCalibrator.Stop();
             string? gameKey = GameKey(CurrentGameName);
             string? key = VehicleKey(gameKey, _currentBitePointVehicle) ?? gameKey;
             if (key == null) return;
@@ -361,22 +408,7 @@ namespace MozaPlugin
             return cal;
         }
 
-        // A user-started run: the key's own calibration restarts from this sample,
-        // and a game with no calibration yet takes it too.
-        private void StoreRunSample(string key, BitePointSample sample)
-        {
-            string gameKey = GameKeyOf(key);
-            int pct = sample.Pct;
-            UpdateCalibrations(map =>
-            {
-                map[key] = SingleSample(pct);
-                if (!map.ContainsKey(gameKey)) map[gameKey] = SingleSample(pct);
-                return true;
-            });
-            MozaLog.Info($"[AZOM/mBooster] Clutch bite point for {key} calibrated at {pct}% (released at {sample.ReleaseRatePerSec * 100:F0}%/s)");
-        }
-
-        // An automatic sample. See the class summary for how a vehicle inherits.
+        // A standing-start sample. See the class summary for how a vehicle inherits.
         private void StoreAutoSample(string key, BitePointSample sample)
         {
             string gameKey = GameKeyOf(key);
@@ -462,14 +494,10 @@ namespace MozaPlugin
                 ? _bitePointLiveClutch ??= () => TryGetBitePointClutchPosition(out double p) ? p : double.NaN
                 : null;
 
-        /// <summary>Data thread: read the clutch source, refresh the current value, observe standing starts.</summary>
+        /// <summary>Data thread: read the clutch source, refresh the current value, learn from standing starts.</summary>
         private void UpdateClutchBitePoint(PluginManager pluginManager, ref GameData data)
         {
-            if (!_bitePointHidApplied)
-            {
-                _bitePointHidApplied = true;
-                ApplyBitePointHidReader();
-            }
+            SyncBitePointSource();
             Interlocked.Exchange(ref _bitePointSourceClutchBits, BitConverter.DoubleToInt64Bits(ReadBitePointSource(ref data)));
 
             string? game;
@@ -482,32 +510,50 @@ namespace MozaPlugin
             _currentClutchBitePointPct = ClutchBitePointInfo().Pct;
 
             bool hasClutch = TryGetBitePointClutchPosition(out double clutch01);
+            UpdateAutoBiteFeel(gameKey, data.GameRunning && !data.GamePaused, hasClutch ? clutch01 : double.NaN);
             string? gear = nd?.Gear;
             bool inGear = !string.IsNullOrEmpty(gear) && gear != "N" && gear != "0";
-            bool ready = data.GameRunning && !data.GamePaused && nd != null && hasClutch && inGear;
+            bool inGame = key != null && data.GameRunning && !data.GamePaused && nd != null;
+            bool ready = inGame && hasClutch && inGear;
             double speedKmh = nd?.SpeedKmh ?? double.NaN;
 
-            if (_bitePointCalibrator.Update(key, ready, speedKmh, clutch01, out string runKey, out var runSample))
-                StoreRunSample(runKey, runSample);
-
-            if (_bitePointCalibrator.IsActive || !BitePointAutoCalibrate || key == null)
-            {
-                _bitePointAutoDetector.Reset();
-                _bitePointAutoKey = null;
-                return;
-            }
-            if (!string.Equals(key, _bitePointAutoKey, StringComparison.OrdinalIgnoreCase))
+            if (Interlocked.Exchange(ref _bitePointAutoRestart, 0) != 0
+                || !string.Equals(key, _bitePointAutoKey, StringComparison.OrdinalIgnoreCase))
             {
                 _bitePointAutoDetector.Reset();
                 _bitePointAutoKey = key;
+                _bitePointResultUntil = 0;
+                _bitePointLastLaunch = null;
             }
-            if (!_bitePointAutoDetector.Update(ready, speedKmh, clutch01, out var sample)) return;
-            if (sample.ReleaseRatePerSec > MaxAutoReleaseRatePerSec)
+            if (_bitePointAutoDetector.Update(ready, speedKmh, clutch01, out var sample) && key != null)
             {
-                MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
-                return;
+                bool skipped = sample.ReleaseRatePerSec > MaxAutoReleaseRatePerSec;
+                _bitePointLastLaunch = new BitePointLaunch(sample.Pct, (int)Math.Round(sample.ReleaseRatePerSec * 100), skipped);
+                _bitePointResultUntil = Stopwatch.GetTimestamp() + (long)(ResultShownSec * Stopwatch.Frequency);
+                if (!skipped) StoreAutoSample(key, sample);
+                else MozaLog.Debug($"[AZOM/mBooster] Bite point sample {sample.Pct}% skipped: released at {sample.ReleaseRatePerSec * 100:F0}%/s");
             }
-            StoreAutoSample(key, sample);
+            _bitePointConditions = (int)(
+                (inGame ? BitePointConditions.InGame : 0)
+                | (hasClutch ? BitePointConditions.HasClutch : 0)
+                | (inGear ? BitePointConditions.InGear : 0)
+                | (_bitePointAutoDetector.IsStopped ? BitePointConditions.Stopped : 0)
+                | (hasClutch && clutch01 >= MBoosterBitePointDetector.ClutchInLevel ? BitePointConditions.ClutchIn : 0));
+
+            var phase = _bitePointAutoDetector.Current;
+            BitePointCalState state;
+            if (ready && phase != MBoosterBitePointDetector.Phase.Waiting)
+            {
+                // The next attempt replaces the last result.
+                _bitePointResultUntil = 0;
+                state = phase == MBoosterBitePointDetector.Phase.Armed ? BitePointCalState.Armed : BitePointCalState.Releasing;
+            }
+            else if (_bitePointResultUntil != 0 && Stopwatch.GetTimestamp() < _bitePointResultUntil
+                     && _bitePointLastLaunch is { } last)
+                state = last.Skipped ? BitePointCalState.TooFast : BitePointCalState.Captured;
+            else
+                state = ready ? BitePointCalState.Waiting : BitePointCalState.NotReady;
+            _bitePointCalState = (int)state;
         }
     }
 }

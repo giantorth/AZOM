@@ -373,6 +373,13 @@ namespace MozaPlugin.UI
             sb.AppendLine(
                 $"Merged pos:     T={data.ThrottlePosition} B={data.BrakePosition} C={data.ClutchPosition}" +
                 $"  (max seen this session: T={maxT} B={maxB} C={maxC})");
+            int bitePedal = plugin.ClutchBitePedalPct;
+            var biteSource = plugin.BitePointSource;
+            var biteChosen = plugin.ChosenBitePointSource;
+            sb.AppendLine(
+                $"Bite point:     {(plugin.CurrentClutchBitePointPct < 0 ? "—" : plugin.CurrentClutchBitePointPct + "%")} " +
+                $"({biteSource}{(biteChosen != biteSource ? ", chosen " + biteChosen : "")}) = " +
+                $"{(bitePedal < 0 ? "—" : bitePedal + "%")} clutch pedal travel");
             for (int i = 0; i < devs.Count; i++)
             {
                 var d = devs[i];
@@ -523,7 +530,7 @@ namespace MozaPlugin.UI
                     $"             simInput: ratio={FmtPct(cfg.SensorOutputRatioPct)} " +
                     $"maxThreshold={FmtKg(cfg.MaxThresholdKg)} " +
                     $"dir={(cfg.Direction < 0 ? "—" : cfg.Direction.ToString())} " +
-                    $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())} " +
+                    $"min={(cfg.Min < 0 ? "—" : cfg.Min.ToString())}{(cfg.AutoDeadzone ? "(auto)" : "")} " +
                     $"max={(cfg.Max < 0 ? "—" : cfg.Max.ToString())} " +
                     $"curve={(cfg.HardwareCurveY != null ? string.Join("/", cfg.HardwareCurveY.Select(v => v.ToString("F0", CultureInfo.InvariantCulture))) : "—")}");
                 sb.AppendLine(
@@ -534,7 +541,9 @@ namespace MozaPlugin.UI
                     $"friction={FmtPct(cfg.NaturalFrictionPct)} " +
                     $"damping={FmtPct(cfg.DampingPressPct)}/{FmtPct(cfg.DampingReleasePct)} " +
                     $"inCurveY={(cfg.InputCurveY != null ? "set" : "—")} " +
-                    $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")}");
+                    $"inCurveX={(cfg.InputCurveX != null ? "set" : "—")} " +
+                    $"inCurveEnd={FmtPct(cfg.InputCurveEndY)} " +
+                    $"autoBite={(cfg.AutoBiteFeel is { } ab ? $"{(ab.Enabled ? "on" : "off")}(w{ab.WidthPct}/b{ab.BeforePct}/a{ab.AfterPct}/e{ab.EndPct})" : "—")}");
             }
         }
 
@@ -567,6 +576,8 @@ namespace MozaPlugin.UI
             var s = plugin?.Settings;
             var cfg = s?.StalksTruckSim;
             sb.AppendLine($"Mode:           {(s == null ? "—" : s.StalksMode.ToString())}");
+            if (s?.StalksMode == Devices.StalksTruckSim.StalkMode.TruckSim && plugin?.StalksController != null)
+                sb.AppendLine($"Key gate:       {plugin.StalksController.DescribeGate()}");
             if (cfg == null) return sb.ToString().TrimEnd();
 
             sb.AppendLine(

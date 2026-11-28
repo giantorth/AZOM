@@ -337,7 +337,7 @@ namespace MozaPlugin.Devices.MBooster
             return axisIndex == 0;
         }
 
-        /// <summary>Axis <paramref name="axisIndex"/>'s shaped HID position (0..1).</summary>
+        /// <summary>Axis <paramref name="axisIndex"/>'s HID position (0..1), as the unit reports it.</summary>
         public double AxisPedalPosition(int axisIndex) =>
             axisIndex == 0 ? LastHidPosition
             : (axisIndex < LastAxisPositions.Length ? LastAxisPositions[axisIndex] : 0.0);
@@ -388,14 +388,6 @@ namespace MozaPlugin.Devices.MBooster
         // can tear (not last-value-wins), so every consumer clamps to 0..1 and a
         // torn sample costs one tick of a wrong amplitude, never a crash.
         public readonly double[] LastAxisPositions = new double[MaxAxes];
-
-        // Per-axis TRUE raw HID percent (0..100), captured BEFORE the host-side
-        // Max Threshold rescale (see MozaMBoosterRegistry.OnHidAxisUpdate) —
-        // i.e. genuinely "% of Max Force's own hardware ceiling", the physical
-        // force the user is actually applying to the pedal. This is the
-        // Pedal Feel curve's real input domain (Deadzone-Max Force span), and
-        // what the "Input Force" live label/marker should show.
-        public readonly double[] LastAxisRawPercentPreThreshold = new double[MaxAxes];
 
         // Highest axis index + 1 the HID has reported for this lane: 1 for a
         // lone pedal, up to 3 for a full chain. 0 until the first axis update.
@@ -887,9 +879,10 @@ namespace MozaPlugin.Devices.MBooster
         /// 0x21/0x22/0x23 hold the role (1 T, 2 B, 3 C) of its local channels
         /// T/B/C and decide the HID axis each reports on. A connected pedal
         /// already holding the role takes the old one, as the plugin always
-        /// did; an unconnected channel keeps its duplicate, as Pit House leaves
-        /// it. False (nothing written) until the heartbeat has typed and placed
-        /// both pedals.
+        /// did — a passive pedal too, through its host channel register
+        /// (<see cref="TryChannelUnit"/>); an unconnected channel keeps its
+        /// duplicate, as Pit House leaves it. False (nothing written) until the
+        /// heartbeat has typed and placed both pedals.
         /// </summary>
         public bool AssignAxisRole(int axisIndex, int newRoleIndex)
         {
@@ -913,10 +906,12 @@ namespace MozaPlugin.Devices.MBooster
 
         /// <summary>
         /// Write roles the profile already holds to the motor pedals on the
-        /// given axes — lanes whose roles are the profile's (passive pedals
-        /// connected, routed lanes). Each active pedal gets its own role, a
-        /// passive or unplaced one nothing, as before. True if anything was
-        /// written.
+        /// given axes — lanes whose roles are the profile's (routed lanes, or a
+        /// USB lane before its role map and pedal types are known). Each active
+        /// pedal gets its own role, a passive or unplaced one nothing, as
+        /// before: there the profile keeps the passive pedal's role, and a
+        /// write would move it to another axis under the profile's per-axis
+        /// roles. True if anything was written.
         /// </summary>
         public bool WriteAxisRoles(IList<(int Axis, int Role)> axisRoles)
         {
@@ -927,7 +922,8 @@ namespace MozaPlugin.Devices.MBooster
             {
                 if (role < 0 || role > 2) continue;
                 int ch = ConnectedChannel(cur, axis: axis);
-                if (ch < 0 || cur[ch] == role + 1 || !TryChannelUnit(ch, cur, out _, out _)) continue;
+                if (ch < 0 || cur[ch] == role + 1 || IsPassiveChannel(ch)
+                    || !TryChannelUnit(ch, cur, out _, out _)) continue;
                 writes.Add((ch, role));
             }
             return writes.Count > 0 && WriteChannelRoles(writes, cur, "profile roles");
@@ -952,7 +948,10 @@ namespace MozaPlugin.Devices.MBooster
                 var (ch, role) = writes[i];
                 SendIntWrite(ChannelRoleRegister(ch), role + 1, HostDeviceId);
                 parts.Add($"host {"TBC"[ch]}={RoleName(role)}");
-                if (chained[i] == null) MarkPendingRole(role, HostDeviceId);
+                // A passive pedal isn't in the role→motor map, so a pending
+                // entry for it would never resolve (and would hold SyncPedalRole
+                // for the full timeout); its map read-back is the confirmation.
+                if (chained[i] == null && !IsPassiveChannel(ch)) MarkPendingRole(role, HostDeviceId);
             }
             for (int i = 0; i < writes.Count; i++)
             {
@@ -986,18 +985,21 @@ namespace MozaPlugin.Devices.MBooster
             return -1;
         }
 
-        /// <summary>The motor behind a connected host channel: the host's own
-        /// (local active) or the chained unit on its link (remote active).
-        /// False for a passive channel, or before the heartbeat has typed and
-        /// placed it.</summary>
+        /// <summary>The unit behind a connected host channel: the host for its
+        /// own motor pedal (local active) and for a passive pedal wired to it
+        /// (its role is the host's channel register alone — Pit House 1.4.2.7
+        /// writes `24 12 23 00 &lt;role&gt;` for one, 2026-11-26), or the chained
+        /// unit on its link (remote active). False before the heartbeat has
+        /// typed and placed it.</summary>
         private bool TryChannelUnit(int channel, int[] hostRoles, out bool remote, out byte unit)
         {
             remote = false;
             unit = HostDeviceId;
             var types = _slotTypes;
             var loc = _slotLocality;
-            if (!AxisTypesComplete || types == null || loc == null
-                || channel >= types.Length || channel >= loc.Length || types[channel] != 1)
+            if (!AxisTypesComplete || types == null || channel >= types.Length) return false;
+            if (types[channel] == 2) return true;
+            if (loc == null || channel >= loc.Length || types[channel] != 1)
                 return false;
             if (loc[channel] == LocalityHost) return true;
             if (loc[channel] != LocalityRemote) return false;
@@ -1043,6 +1045,14 @@ namespace MozaPlugin.Devices.MBooster
             return DeviceRolesKnown
                 ? AssignAxisRole(axis, roleIndex)
                 : WriteAxisRoles(new[] { (axis, roleIndex) });
+        }
+
+        /// <summary>Whether the heartbeat typed host channel
+        /// <paramref name="channel"/> as a passive pedal (type 2).</summary>
+        private bool IsPassiveChannel(int channel)
+        {
+            var types = _slotTypes;
+            return types != null && channel < types.Length && types[channel] == 2;
         }
 
         private static string ChannelRoleRegister(int channel) =>
@@ -1141,20 +1151,22 @@ namespace MozaPlugin.Devices.MBooster
         /// Whether a USB lane's roles come from the host's pedal-role map
         /// (0x21/0x22/0x23): once read, each channel reports on the HID axis of
         /// its role, so the axis IS the role (Rx Throttle, Ry Brake, Rz Clutch)
-        /// — what games see. Only lanes of active pedals (bug report 4J8FZ5AF);
-        /// a lane with a passive pedal connected, a routed lane (its axes are
-        /// its channels) or one whose pedal types aren't known keeps the
-        /// profile's roles.
+        /// — what games see (bug report 4J8FZ5AF). Passive pedals included:
+        /// their channel register moves them the same way, and Pit House writes
+        /// it (2026-11-26), so a role change can swap with one instead of
+        /// leaving the profile's per-axis roles to go stale as the pedals move.
+        /// A routed lane (its axes are its channels) or one whose pedal types
+        /// aren't known keeps the profile's roles.
         /// </summary>
-        public bool DeviceRolesKnown => _ownsConnection && _deviceRoleMap && AllConnectedActive();
+        public bool DeviceRolesKnown => _ownsConnection && _deviceRoleMap && AllConnectedTyped();
 
-        private bool AllConnectedActive()
+        private bool AllConnectedTyped()
         {
             var types = AxisTypesComplete ? _slotTypes : _seededSlotTypes;
             var connected = _slotConnected;
             if (types == null || connected == null) return false;
             for (int ch = 0; ch < 3 && ch < connected.Length; ch++)
-                if (connected[ch] && (ch >= types.Length || types[ch] != 1)) return false;
+                if (connected[ch] && (ch >= types.Length || (types[ch] != 1 && types[ch] != 2))) return false;
             return true;
         }
 
@@ -1851,7 +1863,7 @@ namespace MozaPlugin.Devices.MBooster
             // next apply skip a write the reconnected unit needs.
             lock (_statusLock) { _outputRegs.Clear(); _outputFloatRegs.Clear(); }
             // The next connect-time apply resends every feel-curve X.
-            lock (_lastFeelX) _lastFeelX.Clear();
+            lock (_lastFeel) _lastFeel.Clear();
             lock (_lastSegDamp) { _lastSegDamp.Clear(); _plainDampingLatest.Clear(); }
         }
 
@@ -2667,45 +2679,91 @@ namespace MozaPlugin.Devices.MBooster
         /// 0-200kg full scale (the two axes are NOT interchangeable — see
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveY"/> and
         /// <see cref="MozaMBoosterRegistry.ComputeFeelCurveX"/>).
+        /// <paramref name="inputCurveEndY"/> is the last point's Y, same span
+        /// (-1 = 100%); it, not Max Force itself, is what 0x0E carries.
         /// </summary>
         /// <param name="allX">Send every X regardless — Pit House's Travel
         /// start/end bursts carry all six.</param>
-        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, byte device,
-            bool allX = false)
+        public void PushFeelCurveResync(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX,
+            float inputCurveEndY, byte device, bool allX = false)
         {
-
-            var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
-            var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+            var raw = new FeelCurveRaw(deadzoneKg, maxForceKg, inputCurveY, inputCurveX, inputCurveEndY);
             // Pit House's bursts (moza-simulator bridge, 2026-09-29): a
             // Deadzone change is 0x07 + 0x08-0x0D + 0x0E, a Max Force change
             // 0x08-0x0D + 0x0E, a node drag adds that node's X. So Deadzone
             // and X go only where they changed since the last push to this
             // unit (everything after a reconnect); the Y nodes and Max Force
             // always.
-            int rawDz = MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg);
-            var rawX = new int[midX.Length + 1];
-            for (int i = 0; i < midX.Length; i++) rawX[i] = MozaMBoosterProtocol.EncodeThresholdKg(midX[i]);
-            rawX[midX.Length] = rawDz;
-            int[]? lastX;
-            lock (_lastFeelX)
+            FeelCurveRaw? last;
+            lock (_lastFeel)
             {
-                _lastFeelX.TryGetValue(device, out lastX);
-                _lastFeelX[device] = rawX;
+                _lastFeel.TryGetValue(device, out last);
+                _lastFeel[device] = raw;
             }
-            if (lastX == null || lastX.Length != rawX.Length || lastX[midX.Length] != rawDz)
-                SendIntWrite("mbooster-brake-deadzone", rawDz, device);
-            for (int i = 0; i < midY.Length; i++)
+            if (last == null || last.Deadzone != raw.Deadzone)
+                SendIntWrite("mbooster-brake-deadzone", raw.Deadzone, device);
+            for (int i = 0; i < raw.Y.Length; i++)
             {
-                if (allX || lastX == null || lastX.Length != rawX.Length || lastX[i] != rawX[i])
-                    SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", rawX[i], device);
-                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", MozaMBoosterProtocol.EncodeThresholdKg(midY[i]), device);
+                if (allX || last == null || last.X[i] != raw.X[i])
+                    SendIntWrite($"mbooster-brake-feelcurve-x-{i + 1}", raw.X[i], device);
+                SendIntWrite($"mbooster-brake-feelcurve-{i + 1}", raw.Y[i], device);
             }
-            SendIntWrite("mbooster-brake-maxforce", MozaMBoosterProtocol.EncodeThresholdKg(maxForceKg), device);
+            SendIntWrite("mbooster-brake-maxforce", raw.End, device);
         }
 
-        // Feel-curve X raw values (then the Deadzone) last written, per device id (see
-        // PushFeelCurveResync). Cleared on disconnect.
-        private readonly Dictionary<byte, int[]> _lastFeelX = new Dictionary<byte, int[]>();
+        /// <summary>Whether the last feel curve pushed to <paramref name="device"/>
+        /// since connect encodes the same as this one; false when none was.</summary>
+        public bool IsFeelCurvePushed(byte device, double deadzoneKg, double maxForceKg,
+            float[]? inputCurveY, float[]? inputCurveX, float inputCurveEndY)
+        {
+            FeelCurveRaw? last;
+            lock (_lastFeel) _lastFeel.TryGetValue(device, out last);
+            return last != null && last.SameAs(new FeelCurveRaw(deadzoneKg, maxForceKg, inputCurveY, inputCurveX, inputCurveEndY));
+        }
+
+        /// <summary>A feel curve has been pushed to <paramref name="device"/>
+        /// since connect, so it no longer holds its own.</summary>
+        public bool AnyFeelCurvePushed(byte device)
+        {
+            lock (_lastFeel) return _lastFeel.ContainsKey(device);
+        }
+
+        // The 0xAB family as written: X/Y nodes, last point (0x0E), Deadzone.
+        private sealed class FeelCurveRaw
+        {
+            public readonly int[] X;
+            public readonly int[] Y;
+            public readonly int End;
+            public readonly int Deadzone;
+
+            public FeelCurveRaw(double deadzoneKg, double maxForceKg, float[]? inputCurveY, float[]? inputCurveX, float inputCurveEndY)
+            {
+                var midX = MozaMBoosterRegistry.ComputeFeelCurveX(inputCurveX);
+                var midY = MozaMBoosterRegistry.ComputeFeelCurveY(deadzoneKg, maxForceKg, inputCurveY);
+                X = new int[midX.Length];
+                Y = new int[midY.Length];
+                for (int i = 0; i < midX.Length; i++) X[i] = MozaMBoosterProtocol.EncodeThresholdKg(midX[i]);
+                for (int i = 0; i < midY.Length; i++) Y[i] = MozaMBoosterProtocol.EncodeThresholdKg(midY[i]);
+                End = MozaMBoosterProtocol.EncodeThresholdKg(
+                    MozaMBoosterRegistry.ComputeFeelCurveEndY(deadzoneKg, maxForceKg, inputCurveEndY));
+                Deadzone = MozaMBoosterProtocol.EncodeThresholdKg(deadzoneKg);
+            }
+
+            public bool SameAs(FeelCurveRaw o) =>
+                End == o.End && Deadzone == o.Deadzone && Same(X, o.X) && Same(Y, o.Y);
+
+            private static bool Same(int[] a, int[] b)
+            {
+                if (a.Length != b.Length) return false;
+                for (int i = 0; i < a.Length; i++)
+                    if (a[i] != b[i]) return false;
+                return true;
+            }
+        }
+
+        // Feel curve last written, per device id (see PushFeelCurveResync).
+        // Cleared on disconnect.
+        private readonly Dictionary<byte, FeelCurveRaw> _lastFeel = new Dictionary<byte, FeelCurveRaw>();
 
         // ── Coalescing gate for UI-driven calibration writes ──
         // A slider raises ValueChanged per tick, and every one of these

@@ -865,13 +865,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Калиброванная</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Вручную</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>СБРОС</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Неактивно</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Ожидание</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Готово</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Отпускание</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Отменено</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Автокалибровка</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>Замеров: {0}</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Источник сцепления</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Педаль mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Точка схватывания сцепления</value></data>
@@ -883,7 +876,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Нажатие</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Отпускание</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Оба</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Значение игры</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Ось HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Устройство</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ЗАДАТЬ ДИАПАЗОН</value></data>
@@ -904,10 +896,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Ниже точки схватывания</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Полностью отпущено</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Всегда</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Цилиндры</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Макс. частота (Гц)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Сила на холостых (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Пульсация (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Сила на гребнях</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux блокирует доступ к устройствам MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому плагин не может к нему подключиться.</value></data>
@@ -964,4 +954,46 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Стандартные эффекты AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Блокировка колеса</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Режим стримера</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Автоматическая точка схватывания</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>До точки схватывания (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>После точки схватывания (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Конец хода (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Установка и настройка</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>База руля</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Педали</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Шифтеры и подрулевые переключатели</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>Светодиоды</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Табло</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Органы управления</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Плагин</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Готово к калибровке</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Измерение</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Автомобиль откалиброван ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Игра откалибрована ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Не откалибровано</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Слишком быстро</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Точка схватывания сцепления MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Показывает калибровку точки схватывания сцепления во время езды.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Не готово</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Ожидание</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>В игре</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Сигнал сцепления</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Передача включена</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Остановлен</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Сцепление выжато</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Последний старт {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Успешно · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Точка схватывания сцепления MOZA (мини)</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Показывает полосу сцепления, только пока можно измерить старт с места, а затем его результат.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Новая версия панели SimHub: {0}. При установке ваша текущая копия сохранится в папке _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Автомобиль ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Игра ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Автоматическая мёртвая зона</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Мин. частота (Гц)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Неровность</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Темп (Гц)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Частота (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Интенсивность (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Белый шум (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Полезный ход (мм)</value></data>
 </root>

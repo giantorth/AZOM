@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Run the SimHub interface harness (see Program.cs) against a SimHub installation.
+#
+#   simhub-interface-test --simhub <dir> --plugin <MozaPlugin.dll> [--contract]
+#                         [--label <text>] [--report <file.md>] [--expect-version <x.y.z>]
+#
+# Builds the harness when its sources are newer than the exe. On Windows the exe runs
+# directly; elsewhere it runs under Wine, so set WINE and WINEPREFIX to a prefix with
+# .NET Framework 4.8 — the one SimHub runs in works:
+#
+#   WINE=~/linux-simracing-utils/bin/wine WINEPREFIX=~/linux-simracing-utils/pfx \
+#   tests/simhub-interface/simhub-interface-test --contract \
+#       --simhub ~/linux-simracing-utils/pfx/drive_c/Program\ Files\ \(x86\)/SimHub \
+#       --plugin bin/x86/Release/MozaPlugin.dll
+#
+# Exit code 0 pass, 1 failures, 2 usage/setup error.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exe="$here/bin/Release/simhub-interface-test.exe"
+
+if [ $# -eq 0 ]; then
+    sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+    exit 2
+fi
+
+needs_build=0
+[ -f "$exe" ] || needs_build=1
+if [ "$needs_build" -eq 0 ]; then
+    for src in "$here"/*.cs "$here"/*.csproj; do
+        [ "$src" -nt "$exe" ] && needs_build=1
+    done
+fi
+if [ "$needs_build" -eq 1 ]; then
+    dotnet build -c Release --nologo -v quiet "$here/simhub-interface-test.csproj" >/dev/null
+fi
+
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) exec "$exe" "$@" ;;
+esac
+
+wine="${WINE:-wine}"
+args=()
+path_next=0
+for a in "$@"; do
+    if [ "$path_next" -eq 1 ]; then
+        a="$("$wine" winepath -w "$a" 2>/dev/null | tr -d '\r')"
+        path_next=0
+    fi
+    case "$a" in --simhub|--plugin|--report) path_next=1 ;; esac
+    args+=("$a")
+done
+WINEDEBUG="${WINEDEBUG:--all}" exec "$wine" "$exe" "${args[@]}"

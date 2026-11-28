@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <!-- SimHub and MozaPlugin are 32-bit and get loaded in-process. -->
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>simhub-interface-test</AssemblyName>
+    <RootNamespace>SimHubInterfaceTest</RootNamespace>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Standalone test harness: never part of the plugin build or the sln. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- No SimHub or MozaPlugin reference on purpose: everything is reached by name at
+       run time, so one build tests any SimHub version and any plugin build. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

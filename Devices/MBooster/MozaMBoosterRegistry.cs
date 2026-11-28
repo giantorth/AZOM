@@ -81,6 +81,18 @@ namespace MozaPlugin.Devices.MBooster
         public bool TryGetEffectPedalPosition(MBoosterRole role, out double position01)
         {
             position01 = 0;
+            if (!TryGetEffectPedal(role, out var c, out int axis) || c == null) return false;
+            position01 = c.AxisPedalPosition(axis);
+            return true;
+        }
+
+        /// <summary>
+        /// Lane and axis of the first pedal holding <paramref name="role"/> whose
+        /// effect worker plays (connected and motorized), in MergePositions'
+        /// order and role resolution. Lock-free.
+        /// </summary>
+        public bool TryGetEffectPedal(MBoosterRole role, out MBoosterDeviceController? controller, out int axis)
+        {
             // One worker per motor device id, each gated on its own axis.
             int workerAxes = MozaMBoosterProtocol.MotorDeviceIds.Length;
             foreach (var c in _orderSnapshot)
@@ -90,10 +102,13 @@ namespace MozaPlugin.Devices.MBooster
                 for (int a = 0; a < workerAxes; a++)
                 {
                     if (!c.IsAxisEffectCapable(a) || c.AxisRole(a, s) != role) continue;
-                    position01 = c.AxisPedalPosition(a);
+                    controller = c;
+                    axis = a;
                     return true;
                 }
             }
+            controller = null;
+            axis = -1;
             return false;
         }
 
@@ -604,9 +619,6 @@ namespace MozaPlugin.Devices.MBooster
                                 default: v = 0; break;
                             }
                             c.LastAxisPositions[a] = v;
-                            // The base reports the shaped value, as a USB
-                            // lane's HID does — feeds the Input Force readout.
-                            if (a < c.LastAxisRawPercentPreThreshold.Length) c.LastAxisRawPercentPreThreshold[a] = v * 100.0;
                             if (a == 0) c.LastHidPosition = v;
                         }
                     }
@@ -636,65 +648,17 @@ namespace MozaPlugin.Devices.MBooster
                 c = PairHidLane(identity, containerId ?? string.Empty, key);
             if (c == null) return;
 
-            // Pedal Feel (Deadzone, Max Force, InputCurveY) and the output
-            // curve (HardwareCurveY over Min..Max, mbooster-{role}-y1..y5)
-            // are device calibration: the unit has already shaped this value.
-            // Only Max Threshold is still applied here. Per-axis: the master
-            // (axis 0) uses the lane's flat fields, each chained pedal its
-            // own per-pedal entry.
-            var laneSettings = c.CurrentSettings;
-            IMBoosterPedalConfig? cfg = laneSettings;
-            if (axisIndex > 0)
-            {
-                var pedals = laneSettings?.Pedals;
-                if (pedals != null && pedals.TryGetValue(axisIndex, out var pp)) cfg = pp;
-                // Sole-connected-pedal fallback: a standalone unit's pedal on
-                // a non-zero axis may keep its config in the flat fields —
-                // see MBoosterDeviceController.SoleConnectedAxis.
-                else cfg = c.SoleConnectedAxis() == axisIndex ? laneSettings : null;
-            }
+            // Taken as the unit reports it: Pedal Feel, Sensor Output Ratio,
+            // Max Threshold and the output curve are all device calibration,
+            // so this is already the value the game sees.
+            if (axisIndex == 0) c.LastHidPosition = pos01;
 
-            double posPct = pos01 * 100.0;
-            if (cfg != null)
-            {
-                // Capture the TRUE raw reading — % of Max Force's own
-                // hardware ceiling, i.e. the physical force the user is
-                // actually applying — BEFORE the Threshold rescale below
-                // changes posPct's meaning. Powers the "Input Force" live
-                // label/marker; see LastAxisRawPercentPreThreshold's doc.
-                if (axisIndex < c.LastAxisRawPercentPreThreshold.Length) c.LastAxisRawPercentPreThreshold[axisIndex] = posPct;
-
-                // Max Threshold — HOST-SIDE rescale. Raw HID 100% is the
-                // Pedal Feel curve's own hardware ceiling (Max Force's kg
-                // value — see MBoosterDeviceController.PushFeelCurveResync),
-                // NOT Max Threshold: the mbooster-brake-threshold wire write
-                // (cmdId 0xB3) does not reliably change that on-device, per
-                // hardware testing (bug bundle — "Max Threshold does
-                // nothing" investigation). Max Threshold is meant to be a
-                // purely host-side remap of the ALREADY-Max-Force-scaled raw
-                // position into "100% at Threshold's kg" for the sim. Unset
-                // (-1) or non-positive Threshold is a no-op (ratio 1, same as
-                // Threshold == Max Force) so an uncustomized profile keeps
-                // its previous raw-passthrough behavior unchanged.
-                // Raw HID saturates at Max Force, so a Threshold above it is
-                // unreachable and counts as Max Force (VYNRCAZ1: 50 kg over
-                // 21 kg capped output at 42%). A passive pedal has no load
-                // cell; its stored Threshold is hidden and never applies.
-                double maxForceKg = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200.0;
-                double thresholdKg = cfg.MaxThresholdKg;
-                if (thresholdKg > 0 && thresholdKg < maxForceKg && c.IsAxisMotorized(axisIndex))
-                    posPct = Math.Min(100.0, posPct * (maxForceKg / thresholdKg));
-            }
-
-            double shaped01 = posPct / 100.0;
-            if (axisIndex == 0) c.LastHidPosition = shaped01;
-
-            c.LastAxisPositions[axisIndex] = shaped01;
+            c.LastAxisPositions[axisIndex] = pos01;
             if (axisIndex + 1 > c.AxisCount) c.AxisCount = axisIndex + 1;
 
             // Merge step: re-compute the active positions across all devices
             // every time any one of them ticks. Cheap (N ≤ 3 typically).
-            MergePositions(c, laneSettings);
+            MergePositions(c, c.CurrentSettings);
         }
 
         /// <summary>
@@ -970,6 +934,14 @@ namespace MozaPlugin.Devices.MBooster
         }
 
         /// <summary>
+        /// The Pedal Feel graph's last point in kg (selector 0x0E) —
+        /// <paramref name="endPct"/> of the Deadzone-Max Force span, Max
+        /// Force itself when unset (&lt; 0).
+        /// </summary>
+        internal static double ComputeFeelCurveEndY(double deadzoneKg, double maxForceKg, float endPct)
+            => endPct >= 0 ? deadzoneKg + endPct / 100.0 * (maxForceKg - deadzoneKg) : maxForceKg;
+
+        /// <summary>
         /// The 6 X points of the Pedal Feel curve, in kg, ready to write to
         /// <c>mbooster-brake-feelcurve-x-1..6</c>. UNLIKE the Y nodes above,
         /// X is NOT relative to the pedal's own Deadzone-Max Force span —
@@ -996,6 +968,36 @@ namespace MozaPlugin.Devices.MBooster
                 result[i] = frac01 * 200.0;
             }
             return result;
+        }
+
+        /// <summary>Whether the profile sets any part of the 8-value feel curve
+        /// family (Deadzone, Max Force, nodes, last point). Without one, a push
+        /// would write defaults over the unit's own values.</summary>
+        internal static bool IsFeelCurveSet(IMBoosterPedalConfig cfg) =>
+            cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0
+            || (cfg.InputCurveY != null && cfg.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
+            || (cfg.InputCurveX != null && cfg.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
+            || cfg.InputCurveEndY >= 0;
+
+        /// <summary>Sensor Output Ratio the pedal runs with: angle only (0) for a
+        /// clutch on Automatic bite point — with load cell in the mix its output
+        /// would dip after the force peak and the bite point it's placed by would
+        /// follow the curve — else the stored value (-1 unset).</summary>
+        internal static float EffectiveSensorRatioPct(IMBoosterPedalConfig cfg, MBoosterRole role) =>
+            role == MBoosterRole.Clutch && cfg.AutoBiteFeel?.Enabled == true ? 0f : cfg.SensorOutputRatioPct;
+
+        /// <summary>
+        /// Automatic deadzone's Sim Input Mapping start (Min, whole %): the
+        /// output as the pedal leaves the Pedal Feel deadzone. The pedal hasn't
+        /// moved yet, so the angle sensor still reads 0 and only the load cell's
+        /// share of the blend has risen — Deadzone over Max Threshold (the load
+        /// cell's 100%), capped at full.
+        /// </summary>
+        internal static int AutoDeadzoneStartPct(double sensorRatioPct, double deadzoneKg, double maxThresholdKg)
+        {
+            if (sensorRatioPct <= 0 || deadzoneKg <= 0) return 0;
+            double loadCell01 = maxThresholdKg > 0 ? Math.Min(1.0, deadzoneKg / maxThresholdKg) : 1.0;
+            return (int)Math.Round(Math.Min(100.0, sensorRatioPct) * loadCell01, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>

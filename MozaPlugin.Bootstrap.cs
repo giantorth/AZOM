@@ -326,7 +326,7 @@ namespace MozaPlugin
                 _simHubRegistrar = new SimHubRegistrar(this);
                 _simHubRegistrar.RegisterProperties(pluginManager);
                 _simHubRegistrar.RegisterActions();
-                ControlDashInstaller.InstallInBackground(_data.UseFahrenheit);
+                DashTemplateInstaller.InstallWhenDashStudioReady(pluginManager, _data.UseFahrenheit);
 
                 // Wheelbase + Universal HUB + unknown Moza PIDs. Excludes
                 // pedals/shifter/handbrake/AB9 (they ignore base probes).

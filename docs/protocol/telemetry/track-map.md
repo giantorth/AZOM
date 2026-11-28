@@ -19,7 +19,8 @@ Both are gated behind `EnableRadarTrackMapChannels`; `OpponentCount` /
 `Location_N` / `ri_N` slots via `OpponentCount`: it draws `Location_0..OpponentCount`,
 so a car in a higher slot is invisible even with a valid position (bundle XMVWAYC1:
 `OpponentCount` 22, opponents sent in `Location_33+`, only the player drawn).
-AC slots are carIds (dense); for list-only games (iRacing, replays) the plugin
+AC slots are carIds (dense), from the raw `ACRawData.Graphics.CarCoordinates`
+(public fields; ACC/ACR/EVO raw types are not read); for list-only games (iRacing, replays) the plugin
 assigns dense slots `1..opponents` per driver Id (`AssignOpponentSlots`): kept while
 present, a new car takes the lowest slot no present car holds.
 
@@ -103,7 +104,8 @@ logged `not exist …/iracing/nurburgring combinedShortB.mztrack` while
 
 ### Transform source by game
 
-- **AC** — `TrackMapTransform.ResolveMapIni` (track's map.ini). The result is
+- **AC** — `TrackMapTransform.ResolveMapIni` (`content/tracks/<track>[/<layout>]/data/map.ini`,
+  from the raw `StaticInfo.Track` / `TrackConfiguration`). The result is
   cached per track folder for the process lifetime, a "no map.ini" null
   included, so builders re-resolving on track change don't re-read the file on
   the tick thread. AC's `content/` directory (running AC process, else Steam

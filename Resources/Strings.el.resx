@@ -864,13 +864,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Βαθμονομημένο</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Χειροκίνητο</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>ΕΠΑΝΑΦΟΡΑ</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Αδράνεια</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Έτοιμο</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Απελευθέρωση</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Ακυρώθηκε</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Αυτόματη βαθμονόμηση</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} δείγματα</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Πηγή συμπλέκτη</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Πεντάλ mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Σημείο εμπλοκής συμπλέκτη</value></data>
@@ -882,7 +875,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Πάτημα</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Απελευθέρωση</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Και τα δύο</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Τιμή παιχνιδιού</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Άξονας HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Συσκευή</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>ΟΡΙΣΜΟΣ ΕΥΡΟΥΣ</value></data>
@@ -903,10 +895,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Κάτω από το σημείο εμπλοκής</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Πλήρως ελεύθερος</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Πάντα</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Κύλινδροι</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Μέγιστη συχνότητα (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Ένταση στο ρελαντί (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Παλμός (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Ένταση σε κορυφές</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Το Linux εμποδίζει την πρόσβαση στις συσκευές MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ο χρήστης Linux σας δεν μπορεί να ανοίξει το {0}, οπότε το πρόσθετο δεν μπορεί να συνδεθεί σε αυτό.</value></data>
@@ -963,4 +953,46 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Προεπιλεγμένα εφέ AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Μπλοκάρισμα τροχού</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Λειτουργία streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Αυτόματο σημείο εμπλοκής</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Πριν το σημείο εμπλοκής (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Μετά το σημείο εμπλοκής (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Τέλος διαδρομής (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Εγκατάσταση</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Βάση τιμονιού</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Πεντάλ</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Λεβιέδες &amp; διακόπτες</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Πίνακας οργάνων</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Χειριστήρια</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Έτοιμο για βαθμονόμηση</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Μέτρηση</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Αυτοκίνητο βαθμονομημένο ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Παιχνίδι βαθμονομημένο ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Μη βαθμονομημένο</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Πολύ γρήγορα</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA Σημείο εμπλοκής συμπλέκτη</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Εμφανίζει τη βαθμονόμηση του σημείου εμπλοκής του συμπλέκτη ενώ οδηγείτε.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Μη έτοιμο</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Αναμονή</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>Σε παιχνίδι</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Σήμα συμπλέκτη</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Με ταχύτητα</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Σταματημένο</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Συμπλέκτης πατημένος</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Τελευταία εκκίνηση {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Επιτυχία · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA Σημείο εμπλοκής συμπλέκτη Μίνι</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Εμφανίζει τη μπάρα του συμπλέκτη μόνο όσο μπορεί να μετρηθεί μια εκκίνηση από στάση, και μετά το αποτέλεσμά της.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Νέα έκδοση πίνακα SimHub: {0}. Η εγκατάσταση κρατά το τρέχον αντίγραφό σας στον φάκελο _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Αυτοκίνητο ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Παιχνίδι ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Αυτόματη νεκρή ζώνη</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Ελάχιστη συχνότητα (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Τραχύτητα</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Ρυθμός (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Συχνότητα (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Ένταση (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Λευκός θόρυβος (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Ωφέλιμη διαδρομή (mm)</value></data>
 </root>

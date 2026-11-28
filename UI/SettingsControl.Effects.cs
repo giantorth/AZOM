@@ -241,38 +241,60 @@ namespace MozaPlugin.UI
             if (MBoosterCustomEffectsCard.Visibility != v) MBoosterCustomEffectsCard.Visibility = v;
         }
 
-        // Pedal Feel axis maxima as 4 × step, so the 5 Y labels stay whole kg.
-        private static readonly double[] MBoosterFeelAxisSteps = { 1, 2, 5, 10, 20, 25, 50 };
-
         /// <summary>
-        /// Pedal Feel plots absolute kg. Scale its Y axis to the current Max
-        /// Force (or Deadzone, if higher) plus headroom for dragging the
-        /// top-right point up, capped at this pedal's Max Force ceiling — a
-        /// fixed ceiling axis squashed a 40kg curve into the bottom fifth of a
-        /// 200kg plot (bug report 6SWSMJX0). Skipped mid-drag: the drag writes
-        /// Max Force, so rescaling would move the axis under the pointer; the
-        /// editor's DragCompleted reruns it.
+        /// Pedal Feel plots absolute kg, topped at Max Force (or Deadzone, if
+        /// higher): moving Max Force changes the labels and the kg in the
+        /// points, not where the points sit. Stepped "nice" maxima jumped the
+        /// whole curve at each step.
         /// </summary>
         private void UpdateMBoosterFeelAxis()
         {
             var editor = MBoosterInputCurveEditor;
             // Null during InitializeComponent (the sliders' ValueChanged can
             // run before later-declared elements exist).
-            if (editor == null || editor.IsDragging
-                || MBoosterMaxForceSlider == null || MBoosterDeadzoneSlider == null) return;
-            double ceiling = MBoosterMaxForceSlider.Maximum;
-            double target = Math.Max(MBoosterMaxForceSlider.Value, MBoosterDeadzoneSlider.Value) * 1.25;
-            double yMax = ceiling;
-            foreach (double step in MBoosterFeelAxisSteps)
-            {
-                if (4 * step >= target) { yMax = Math.Min(ceiling, 4 * step); break; }
-            }
-            if (yMax <= 0) yMax = Math.Max(1, ceiling);
+            if (editor == null || MBoosterMaxForceSlider == null || MBoosterDeadzoneSlider == null) return;
+            double yMax = Math.Max(MBoosterMaxForceSlider.Value, MBoosterDeadzoneSlider.Value);
+            if (yMax <= 0) yMax = 1;
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             editor.YMax = yMax;
             editor.YAxisLabels = string.Join(",",
                 yMax.ToString("0.#", inv), (yMax * 0.75).ToString("0.#", inv),
                 (yMax * 0.5).ToString("0.#", inv), (yMax * 0.25).ToString("0.#", inv), "0");
+        }
+
+        /// <summary>
+        /// Pedal Feel's yellow Max Threshold dot, straight from the two
+        /// sliders: the editor puts it where the curve first reaches
+        /// Threshold's kg, shown only while Threshold is below Max Force.
+        /// </summary>
+        private void UpdateMBoosterThresholdMarker()
+        {
+            var editor = MBoosterInputCurveEditor;
+            // Null during InitializeComponent, same as UpdateMBoosterFeelAxis.
+            if (editor == null || MBoosterMaxThresholdSlider == null || MBoosterMaxForceSlider == null) return;
+            double thr = MBoosterMaxThresholdSlider.Value;
+            editor.ThresholdY = thr > 0 && thr < MBoosterMaxForceSlider.Value ? thr : double.NaN;
+        }
+
+        /// <summary>
+        /// Pedal Feel graph weight, straight from the sliders: the first and last
+        /// points' outlines follow Front / End Limit stiffness (1 = as drawn,
+        /// 10 = 3×), the curve follows Natural Friction as the pedal gets it
+        /// (0 = as drawn, 100 = 3×; switched off counts as 0).
+        /// </summary>
+        private void UpdateMBoosterFeelCurveWeight()
+        {
+            var editor = MBoosterInputCurveEditor;
+            // Null during InitializeComponent, same as UpdateMBoosterFeelAxis.
+            if (editor == null || MBoosterEndstopFrontSlider == null || MBoosterEndstopEndSlider == null
+                || MBoosterNaturalFrictionSlider == null || MBoosterNaturalFrictionEnable == null) return;
+            double StiffnessScale(Slider s) => 1.0 + 2.0 * Math.Max(0, Math.Min(1, (s.Value - 1.0) / 9.0));
+            double border = MozaControls.MozaCurveEditor.DefaultNodeBorderThickness;
+            editor.AnchorStartBorderThickness = new Thickness(border * StiffnessScale(MBoosterEndstopFrontSlider));
+            editor.AnchorEndBorderThickness = new Thickness(border * StiffnessScale(MBoosterEndstopEndSlider));
+            double friction = MBoosterNaturalFrictionEnable.IsChecked == true ? MBoosterNaturalFrictionSlider.Value : 0;
+            editor.CurveStrokeThickness = MozaControls.MozaCurveEditor.DefaultCurveStrokeThickness
+                * (1.0 + 2.0 * Math.Max(0, Math.Min(1, friction / 100.0)));
         }
 
         /// <summary>
@@ -289,6 +311,11 @@ namespace MozaPlugin.UI
             // active pedal's.
             bool ownsLoadCell = CurrentMBoosterController()?.OwnsSingletonRegisters(_mboosterEffectPedalIndex) ?? false;
             MBoosterLoadCellPanel.Visibility = ownsLoadCell ? Visibility.Visible : Visibility.Collapsed;
+            // Ownership can land after the seed (0x22 read-back).
+            MBoosterCurveEditor.LockFirstNodeX = MBoosterAutoDeadzoneActive(PeekMBoosterEffectTarget());
+            // Same gate as MozaPlugin.TryAutoBiteFeelCurve.
+            bool clutchFeel = isClutch && (CurrentMBoosterController()?.IsAxisMotorized(_mboosterEffectPedalIndex) ?? false);
+            MBoosterAutoBitePanel.Visibility = clutchFeel ? Visibility.Visible : Visibility.Collapsed;
 
             // Max Force/Deadzone slider bounds are role-scoped: Throttle and
             // Clutch are both much lighter springs than a brake's load cell,
@@ -323,8 +350,6 @@ namespace MozaPlugin.UI
                 MBoosterMaxForceSlider.Maximum = mfMax;
                 MBoosterDeadzoneSlider.Minimum = dzMin;
                 MBoosterDeadzoneSlider.Maximum = dzMax;
-                // Inside the suppressor too: SpanHigh is bound TwoWay to the
-                // Max Force slider, so the editor can push a value back.
                 UpdateMBoosterFeelAxis();
             }
 
@@ -365,6 +390,7 @@ namespace MozaPlugin.UI
             MBoosterEffectsCardsPanel.Visibility = Visibility.Visible;
             MBoosterEffectsPassiveNote.Visibility = Visibility.Collapsed;
             MBoosterLoadCellPanel.Visibility = Visibility.Visible;
+            MBoosterAutoBitePanel.Visibility = Visibility.Visible;
             MBoosterTravelEndstopPanel.Visibility = Visibility.Visible;
             MBoosterDeadzoneMaxForcePanel.Visibility = Visibility.Visible;
             MBoosterNaturalFrictionPanel.Visibility = Visibility.Visible;

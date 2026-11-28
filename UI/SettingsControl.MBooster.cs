@@ -336,7 +336,11 @@ namespace MozaPlugin.UI
                 if (s.SleepMinutes < 0) SeedMBoosterSleep(s, selected);
                 // So can the Pedal Feel read-backs.
                 using (_suppressor.Begin())
+                {
                     SeedMBoosterPedalFeelRegisters(PeekMBoosterEffectTarget(), unsetOnly: true);
+                    // The bite point moves with the game, vehicle and calibration.
+                    ApplyMBoosterAutoBiteState(PeekMBoosterEffectTarget(), showCurve: false);
+                }
                 return;
             }
             // Diagnostic trail for the "curve values wrong until profile
@@ -348,7 +352,7 @@ namespace MozaPlugin.UI
                 var fxLog = PeekMBoosterEffectTarget();
                 string Fmt(float[]? a) => a == null ? "null" : "[" + string.Join(",", a) + "]";
                 MozaLog.Info($"[AZOM\\mBooster] RefreshMBoosterTab seeding: profile='{currentProfileName}' identity='{selected.Identity}' pedalIdx={_mboosterEffectPedalIndex} "
-                    + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)}");
+                    + $"curve={Fmt(fxLog?.HardwareCurveY)} min={fxLog?.Min} max={fxLog?.Max} InputCurveY={Fmt(fxLog?.InputCurveY)} InputCurveX={Fmt(fxLog?.InputCurveX)} InputCurveEndY={fxLog?.InputCurveEndY}");
             }
             // The seed below shows every Test toggle off (custom-effect rows
             // are rebuilt off too), so nothing may keep running behind them —
@@ -824,23 +828,10 @@ namespace MozaPlugin.UI
             float thr = fx?.MaxThresholdKg ?? -1;
             MBoosterMaxThresholdSlider.Value = thr >= 0 ? thr : 100;
             SetValueText(MBoosterMaxThresholdValue, MBoosterMaxThresholdSlider.Value.ToString("F0"));
-            // Pedal Feel
-            var inputCurve = (fx?.InputCurveY != null && fx.InputCurveY.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                ? fx.InputCurveY : MBoosterInputCurveDefault;
-            MBoosterInputY1Slider.Value = inputCurve[0];
-            MBoosterInputY2Slider.Value = inputCurve[1];
-            MBoosterInputY3Slider.Value = inputCurve[2];
-            MBoosterInputY4Slider.Value = inputCurve[3];
-            MBoosterInputY5Slider.Value = inputCurve[4];
-            MBoosterInputY6Slider.Value = inputCurve[5];
-            var inputCurveX = (fx?.InputCurveX != null && fx.InputCurveX.Length == MBoosterUiConstants.PedalFeelNodeCount)
-                ? fx.InputCurveX : MBoosterInputCurveDefault;
-            MBoosterInputX1Slider.Value = inputCurveX[0];
-            MBoosterInputX2Slider.Value = inputCurveX[1];
-            MBoosterInputX3Slider.Value = inputCurveX[2];
-            MBoosterInputX4Slider.Value = inputCurveX[3];
-            MBoosterInputX5Slider.Value = inputCurveX[4];
-            MBoosterInputX6Slider.Value = inputCurveX[5];
+            SeedMBoosterAutoDeadzone(fx);
+            // Pedal Feel — the curve the pedal gets, the automatic bite point
+            // one included.
+            SeedMBoosterAutoBite(fx);
             float mf = fx?.MaxForceKg ?? -1;
             MBoosterMaxForceSlider.Value = mf >= 0 ? mf : 200;
             SetValueText(MBoosterMaxForceValue, MBoosterMaxForceSlider.Value.ToString("F0"));
@@ -884,10 +875,14 @@ namespace MozaPlugin.UI
             float ts = fx?.TravelStartMm ?? -1, te = fx?.TravelEndMm ?? -1;
             if (!unsetOnly || ts < 0 || te < 0)
             {
-                MBoosterTravelRangeSlider.LowValue = Math.Round(Pick(ts, "mbooster-brake-travel-start",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelMinMm), 1);
-                MBoosterTravelRangeSlider.HighValue = Math.Round(Pick(te, "mbooster-brake-travel-end",
-                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelDefaultEndMm), 1);
+                // Unrounded: the slider steps in arc mm, so a stored end isn't
+                // on a 0.1 screw mm grid, and rounding it would rewrite it on
+                // the other end's next edit.
+                MBoosterTravelRangeSlider.LowValue = Pick(ts, "mbooster-brake-travel-start",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelMinMm);
+                MBoosterTravelRangeSlider.HighValue = Pick(te, "mbooster-brake-travel-end",
+                    global::MozaPlugin.Protocol.MozaMBoosterProtocol.DecodeTravelMm, MBoosterUiConstants.TravelDefaultEndMm);
+                UpdateMBoosterTravelSpan();
             }
 
             void Int(Slider slider, TextBox box, float stored, string name, Func<int, double> decode, double fallback)

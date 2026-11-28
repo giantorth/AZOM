@@ -113,12 +113,21 @@ namespace MozaControls
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool LockLastNodeX { get => (bool)GetValue(LockLastNodeXProperty); set => SetValue(LockLastNodeXProperty, value); }
 
+        // The first node's counterpart: pinned in X while something else owns
+        // it — the mBooster output curve's range start under Automatic
+        // deadzone. In EndpointRangeMode that node has no Y drag either.
+        public static readonly DependencyProperty LockFirstNodeXProperty =
+            DependencyProperty.Register(nameof(LockFirstNodeX), typeof(bool), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(false));
+        public bool LockFirstNodeX { get => (bool)GetValue(LockFirstNodeXProperty); set => SetValue(LockFirstNodeXProperty, value); }
+
         // Pit House's mBooster output curve (with AllowHorizontalDrag): the
         // first node is the range start — X only, Y pinned at YMin — and the
         // last is the range end, X and Y. The nodes between are Y-only and sit
         // evenly spaced between the two, so X2..X(n-1) are derived and never
         // written. Used by MBoosterCurveEditor; X1/X(n) bind to the pedal's
-        // Min/Max.
+        // Min/Max. The plot outside the two endpoints is shaded and labelled
+        // with its width in % rather than drawn as curve.
         public static readonly DependencyProperty EndpointRangeModeProperty =
             DependencyProperty.Register(nameof(EndpointRangeMode), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -130,26 +139,6 @@ namespace MozaControls
             DependencyProperty.Register(nameof(MinEndpointGap), typeof(double), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(10.0));
         public double MinEndpointGap { get => (double)GetValue(MinEndpointGapProperty); set => SetValue(MinEndpointGapProperty, value); }
-
-        // True while a node or the end anchor is being dragged. Owners that
-        // rescale the axis from a value the drag itself writes (Pedal Feel:
-        // YMax from Max Force) wait for DragCompleted, else the axis moves
-        // under the pointer mid-gesture.
-        public bool IsDragging => _dragNode >= 0 || _dragEndAnchor;
-        public event EventHandler? DragCompleted;
-
-        // When true, a node's Y is ALSO clamped between its immediate
-        // neighbours' current Y (index-adjacent, same convention as the
-        // existing X neighbour-clamp below) — the first/last node clamp
-        // against YMin/YMax instead. Used by the Pedal Feel curve, where
-        // both axes are freely draggable so nothing else stops a node from
-        // being dragged past its neighbour's Y. Off by default so every other
-        // curve keeps its existing unconstrained Y-drag behaviour.
-        public static readonly DependencyProperty ClampYToAdjacentNodesProperty =
-            DependencyProperty.Register(nameof(ClampYToAdjacentNodes), typeof(bool), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
-                    (d, e) => ((MozaCurveEditor)d).Recompute()));
-        public bool ClampYToAdjacentNodes { get => (bool)GetValue(ClampYToAdjacentNodesProperty); set => SetValue(ClampYToAdjacentNodesProperty, value); }
 
         // Per-node Y cap for the LAST node only (NaN = disabled) — the 10-band
         // EQ's 100 Hz band stays 0-100% while every other band runs to YMax=500.
@@ -196,7 +185,8 @@ namespace MozaControls
 
         // When true (default — output-curve behaviour), the spline is anchored
         // at the plot's lower-left corner so the visual line implies a
-        // (0,0) → first-node segment. When false (EQ behaviour), the spline
+        // (0,0) → first-node segment (not drawn in EndpointRangeMode). When
+        // false (EQ behaviour), the spline
         // starts AT the first node and ends AT the last node with both
         // endpoints free-floating.
         public static readonly DependencyProperty AnchorAtOriginProperty =
@@ -205,15 +195,14 @@ namespace MozaControls
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public bool AnchorAtOrigin { get => (bool)GetValue(AnchorAtOriginProperty); set => SetValue(AnchorAtOriginProperty, value); }
 
-        // When true, the spline is ALSO anchored at the plot's upper-right
-        // corner (data-space 100,100) as a real drawn point, symmetric to
-        // AnchorAtOrigin's lower-left corner — so the visible line reaches
-        // (100,100) even when the last draggable node doesn't sit exactly
-        // there. Used by the Pedal Feel curve (MBoosterInputCurveEditor,
-        // both axes now draggable): its domain is 0-100% of the Deadzone→Max
-        // Force span on BOTH axes, so the curve should visually span that
-        // whole square. Off by default — every other curve already ends at
-        // its own last node/point with no separate corner anchor.
+        // When true, the spline is ALSO anchored at data X=100 as a real
+        // drawn point, at EndY (default: the top, data 100,100), symmetric to
+        // AnchorAtOrigin's lower-left corner — so the visible line runs to
+        // full-scale input even when the last draggable node doesn't sit
+        // there. Used by the Pedal Feel curve (MBoosterInputCurveEditor),
+        // whose last point is pinned at full-scale input. Off by default —
+        // every other curve already ends at its own last node/point with no
+        // separate end anchor.
         public static readonly DependencyProperty AnchorAtTopRightProperty =
             DependencyProperty.Register(nameof(AnchorAtTopRight), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -224,8 +213,8 @@ namespace MozaControls
         // DRAWN as node-styled circles — dimmed and hit-test-transparent, so
         // they read as real points that can't be dragged. Used by the Pedal
         // Feel curve, whose graph is 8 points: (0,0) set by the Deadzone
-        // slider, 6 draggable nodes, and a (100,100) node set by Max Force
-        // (selectors 0x07 / 0x08-0x0D / 0x0E — see
+        // slider, 6 draggable nodes, and a last point at X=100 (selectors
+        // 0x07 / 0x08-0x0D / 0x0E — see
         // docs/protocol/devices/mbooster.md "Pedal Feel"). Off by default:
         // AnchorAtOrigin is on for every output curve in the app, and none of
         // those show a point at the origin.
@@ -236,40 +225,43 @@ namespace MozaControls
         public bool ShowAnchorPoints { get => (bool)GetValue(ShowAnchorPointsProperty); set => SetValue(ShowAnchorPointsProperty, value); }
 
         // When true (with ShowAnchorPoints + AnchorAtTopRight), the top-right
-        // anchor point is draggable VERTICALLY — it writes SpanHigh, so bind
-        // that to whatever value the point represents (Pedal Feel: the Max
-        // Force slider) and the drag drives it. Never draggable in X: it is
-        // the curve's fixed end, at full-scale input. Pit House behaves the
-        // same way for this point.
+        // anchor point is draggable VERTICALLY — it writes EndY. Never
+        // draggable in X: it is the curve's fixed end, at full-scale input.
+        // Pit House behaves the same way for this point.
         public static readonly DependencyProperty AnchorEndDraggableInYProperty =
             DependencyProperty.Register(nameof(AnchorEndDraggableInY), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false));
         public bool AnchorEndDraggableInY { get => (bool)GetValue(AnchorEndDraggableInYProperty); set => SetValue(AnchorEndDraggableInYProperty, value); }
 
+        // Y of the top-right anchor point, in the same units as Y1..Y10 (so a
+        // percentage of the span in span mode). NaN = the top: SpanHigh, or
+        // YMax without a span. Free of the nodes — it may sit below them.
+        public static readonly DependencyProperty EndYProperty =
+            DependencyProperty.Register(nameof(EndY), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(double.NaN,
+                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).Recompute()));
+        public double EndY { get => (double)GetValue(EndYProperty); set => SetValue(EndYProperty, value); }
+
         // Y sub-range the node values are a PERCENTAGE of, in axis units
         // (NaN on either = off, the default: node Y values are plain axis
         // values, as every other curve in this app uses them).
         //
-        // The Pedal Feel curve needs this because its 6 stored nodes are
-        // percentages of the Deadzone→Max Force span while the plot itself
-        // has to be in absolute kg: the two ends of that span are themselves
-        // graph points (selectors 0x07 and 0x0E), and the top one is
-        // user-draggable, which a span-normalized axis cannot express — 100%
-        // *is* Max Force there, so the point could never move. With the
-        // absolute axis, dragging Max Force down rescales every node's kg
-        // while its stored percentage stays put, which is exactly what the
-        // wire does (see docs/protocol/devices/mbooster.md "Pedal Feel").
+        // The Pedal Feel curve's points are stored as percentages of the
+        // Deadzone→Max Force span, but plotted in absolute kg so the two
+        // sliders visibly move the curve: Deadzone lifts its start, and Max
+        // Force rescales every point while its stored percentage stays put,
+        // which is exactly what the wire does (see
+        // docs/protocol/devices/mbooster.md "Pedal Feel").
         public static readonly DependencyProperty SpanLowProperty =
             DependencyProperty.Register(nameof(SpanLow), typeof(double), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(double.NaN,
-                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public double SpanLow { get => (double)GetValue(SpanLowProperty); set => SetValue(SpanLowProperty, value); }
 
         public static readonly DependencyProperty SpanHighProperty =
             DependencyProperty.Register(nameof(SpanHigh), typeof(double), typeof(MozaCurveEditor),
-                new FrameworkPropertyMetadata(double.NaN,
-                    FrameworkPropertyMetadataOptions.BindsTwoWayByDefault | FrameworkPropertyMetadataOptions.AffectsRender,
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
                     (d, e) => ((MozaCurveEditor)d).Recompute()));
         public double SpanHigh { get => (double)GetValue(SpanHighProperty); set => SetValue(SpanHighProperty, value); }
 
@@ -277,12 +269,37 @@ namespace MozaControls
         // plain axis values.
         private bool SpanMode => !double.IsNaN(SpanLow) && !double.IsNaN(SpanHigh);
 
-        // Axis-unit width of that span. Zero (Max Force dragged down onto
+        // Axis-unit width of that span. Zero (Max Force set down onto
         // Deadzone) flattens the curve onto SpanLow rather than dividing by
         // zero; the inverse conversion refuses to run at all.
         private double SpanRange => Math.Max(0, SpanHigh - SpanLow);
 
         private bool EndAnchorGrabbable => AnchorEndDraggableInY && AnchorAtTopRight && ShowAnchorPoints;
+
+        // As drawn by default — keep in sync with the node Borders'
+        // BorderThickness and the curve Path in MozaCurveEditorTemplate.
+        public const double DefaultCurveStrokeThickness = 2.5;
+        public const double DefaultNodeBorderThickness = 2.0;
+
+        // The curve line's thickness. Pedal Feel scales it with Natural
+        // Friction.
+        public static readonly DependencyProperty CurveStrokeThicknessProperty =
+            DependencyProperty.Register(nameof(CurveStrokeThickness), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(DefaultCurveStrokeThickness));
+        public double CurveStrokeThickness { get => (double)GetValue(CurveStrokeThicknessProperty); set => SetValue(CurveStrokeThicknessProperty, value); }
+
+        // Outline of the two end points (see ShowAnchorPoints), drawn inward
+        // so the circles keep their size. Pedal Feel scales them with the
+        // Front / End Limit stiffness.
+        public static readonly DependencyProperty AnchorStartBorderThicknessProperty =
+            DependencyProperty.Register(nameof(AnchorStartBorderThickness), typeof(Thickness), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(new Thickness(DefaultNodeBorderThickness)));
+        public Thickness AnchorStartBorderThickness { get => (Thickness)GetValue(AnchorStartBorderThicknessProperty); set => SetValue(AnchorStartBorderThicknessProperty, value); }
+
+        public static readonly DependencyProperty AnchorEndBorderThicknessProperty =
+            DependencyProperty.Register(nameof(AnchorEndBorderThickness), typeof(Thickness), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(new Thickness(DefaultNodeBorderThickness)));
+        public Thickness AnchorEndBorderThickness { get => (Thickness)GetValue(AnchorEndBorderThicknessProperty); set => SetValue(AnchorEndBorderThicknessProperty, value); }
 
         // Diagonal y=x reference line from plot lower-left to upper-right —
         // the "nominal" / linear response. Shown on output curves to make it
@@ -329,18 +346,33 @@ namespace MozaControls
                     (d, e) => ((MozaCurveEditor)d).OnLiveXChanged()));
         public double LiveX { get => (double)GetValue(LiveXProperty); set => SetValue(LiveXProperty, value); }
 
-        // The spline/grid/labels only depend on the nodes and the size; the live
-        // marker (pushed at 30 Hz while a pedal moves) reuses what the last
-        // Recompute() built instead of rebuilding the whole editor per sample.
-        private (Point p1, Point c1, Point c2, Point p2)[]? _liveSegments;
-        private Point[]? _liveNodePts;
-        private double _livePlotW;
-        private double _liveAxisBottomY;
+        // Yellow dot ON the spline where it first reaches this Y value, in
+        // axis units (Pedal Feel: Max Threshold's kg). NaN (default) hides
+        // it, as does a curve that never reaches it.
+        public static readonly DependencyProperty ThresholdYProperty =
+            DependencyProperty.Register(nameof(ThresholdY), typeof(double), typeof(MozaCurveEditor),
+                new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender,
+                    (d, e) => ((MozaCurveEditor)d).OnThresholdYChanged()));
+        public double ThresholdY { get => (double)GetValue(ThresholdYProperty); set => SetValue(ThresholdYProperty, value); }
+
+        // The spline/grid/labels only depend on the nodes and the size; the
+        // live and threshold markers reuse what the last Recompute() built
+        // instead of rebuilding the whole editor per 30 Hz sample.
+        private (Point p1, Point c1, Point c2, Point p2)[]? _markerSegments;
+        private Point[]? _markerNodePts;
+        private double _markerPlotW;
+        private double _markerAxisBottomY;
 
         private void OnLiveXChanged()
         {
-            if (_liveSegments == null || _liveNodePts == null) { Recompute(); return; }
-            UpdateLiveMarker(_liveSegments, _liveNodePts, _livePlotW, _liveAxisBottomY);
+            if (_markerSegments == null || _markerNodePts == null) { Recompute(); return; }
+            UpdateLiveMarker(_markerSegments, _markerNodePts, _markerPlotW, _markerAxisBottomY);
+        }
+
+        private void OnThresholdYChanged()
+        {
+            if (_markerSegments == null) { Recompute(); return; }
+            UpdateThresholdMarker(_markerSegments, _markerAxisBottomY);
         }
 
         // -------- Read-only geometry / node positions surfaced to template --------
@@ -392,6 +424,69 @@ namespace MozaControls
                 typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
         public static readonly DependencyProperty LiveMarkerTopProperty = LiveMarkerTopKey.DependencyProperty;
         public double LiveMarkerTop => (double)GetValue(LiveMarkerTopProperty);
+
+        private static readonly DependencyPropertyKey ThresholdMarkerVisibleKey =
+            DependencyProperty.RegisterReadOnly(nameof(ThresholdMarkerVisible), typeof(Visibility),
+                typeof(MozaCurveEditor), new PropertyMetadata(Visibility.Collapsed));
+        public static readonly DependencyProperty ThresholdMarkerVisibleProperty = ThresholdMarkerVisibleKey.DependencyProperty;
+        public Visibility ThresholdMarkerVisible => (Visibility)GetValue(ThresholdMarkerVisibleProperty);
+
+        private static readonly DependencyPropertyKey ThresholdMarkerLeftKey =
+            DependencyProperty.RegisterReadOnly(nameof(ThresholdMarkerLeft), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty ThresholdMarkerLeftProperty = ThresholdMarkerLeftKey.DependencyProperty;
+        public double ThresholdMarkerLeft => (double)GetValue(ThresholdMarkerLeftProperty);
+
+        private static readonly DependencyPropertyKey ThresholdMarkerTopKey =
+            DependencyProperty.RegisterReadOnly(nameof(ThresholdMarkerTop), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty ThresholdMarkerTopProperty = ThresholdMarkerTopKey.DependencyProperty;
+        public double ThresholdMarkerTop => (double)GetValue(ThresholdMarkerTopProperty);
+
+        // EndpointRangeMode's two deadzones: the shaded bands, and each one's
+        // width in % with its TextBlock's top-left corner (parked off-canvas
+        // with no text when that end has none).
+        private static readonly DependencyPropertyKey RangeDeadzoneGeometryKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeDeadzoneGeometry), typeof(Geometry),
+                typeof(MozaCurveEditor), new PropertyMetadata(null));
+        public static readonly DependencyProperty RangeDeadzoneGeometryProperty = RangeDeadzoneGeometryKey.DependencyProperty;
+        public Geometry? RangeDeadzoneGeometry => (Geometry?)GetValue(RangeDeadzoneGeometryProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneTextKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneText), typeof(string),
+                typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty RangeStartDeadzoneTextProperty = RangeStartDeadzoneTextKey.DependencyProperty;
+        public string RangeStartDeadzoneText => (string)GetValue(RangeStartDeadzoneTextProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneLeftKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneLeft), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeStartDeadzoneLeftProperty = RangeStartDeadzoneLeftKey.DependencyProperty;
+        public double RangeStartDeadzoneLeft => (double)GetValue(RangeStartDeadzoneLeftProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneTopKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneTop), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeStartDeadzoneTopProperty = RangeStartDeadzoneTopKey.DependencyProperty;
+        public double RangeStartDeadzoneTop => (double)GetValue(RangeStartDeadzoneTopProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneTextKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneText), typeof(string),
+                typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty RangeEndDeadzoneTextProperty = RangeEndDeadzoneTextKey.DependencyProperty;
+        public string RangeEndDeadzoneText => (string)GetValue(RangeEndDeadzoneTextProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneLeftKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneLeft), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeEndDeadzoneLeftProperty = RangeEndDeadzoneLeftKey.DependencyProperty;
+        public double RangeEndDeadzoneLeft => (double)GetValue(RangeEndDeadzoneLeftProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneTopKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneTop), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeEndDeadzoneTopProperty = RangeEndDeadzoneTopKey.DependencyProperty;
+        public double RangeEndDeadzoneTop => (double)GetValue(RangeEndDeadzoneTopProperty);
 
         // The two fixed anchor points (see ShowAnchorPoints) — Border
         // top-left corner, same convention as NodeXKeys, with the anchor's
@@ -610,10 +705,16 @@ namespace MozaControls
         private const double NodeSize = 28;
         private const double NodeHalf = NodeSize / 2.0;
 
-        // Live position marker — deliberately smaller than the draggable
-        // nodes so it doesn't visually compete with them.
-        private const double LiveMarkerSize = 10;
-        private const double LiveMarkerHalf = LiveMarkerSize / 2.0;
+        // Live and threshold markers — deliberately smaller than the
+        // draggable nodes so they don't visually compete with them. Keep in
+        // sync with the Ellipse Width/Height in MozaCurveEditorTemplate.
+        private const double MarkerSize = 10;
+        private const double MarkerHalf = MarkerSize / 2.0;
+
+        // Deadzone % label box. Keep in sync with its TextBlock Width in
+        // MozaCurveEditorTemplate.
+        private const double DeadzoneLabelWidth = 36;
+        private const double DeadzoneLabelHalfHeight = 8;
 
         // The visual X axis is uniformly compressed by 0.98 so the 28-px node
         // circle (plus its glow) on the last node clears the outer Border's
@@ -722,13 +823,11 @@ namespace MozaControls
         }
 
         // Every path out of a drag lands here (mouse-up, lost capture, button
-        // released outside the canvas); raises DragCompleted once per gesture.
+        // released outside the canvas).
         private void EndDrag()
         {
-            bool was = IsDragging;
             _dragNode = -1;
             _dragEndAnchor = false;
-            if (was) DragCompleted?.Invoke(this, EventArgs.Empty);
         }
 
         private int FindClosestNode(Point p)
@@ -779,56 +878,50 @@ namespace MozaControls
             return YMin + y01 * Math.Max(1, YMax - YMin);
         }
 
+        // Pointer Y → a stored point value: whole axis units, or an unrounded
+        // percentage of SpanLow..SpanHigh when that's in use (the owner keeps
+        // its own precision — whole percents can't hold every axis value, so
+        // Shift's snap missed), clamped in that same space. Snap acts on the
+        // axis value shown in the point. False on a collapsed span (Max Force
+        // set down onto Deadzone), which has no Y to place a point at.
+        private bool TryPointerToStoredY(Point p, bool snap, out double v)
+        {
+            v = 0;
+            bool span = SpanMode;
+            double spanRange = span ? SpanRange : 0;
+            if (span && spanRange <= 0) return false;
+            double axisValue = PointerToAxisValue(p);
+            if (snap) axisValue = Snap(axisValue);
+            double storedMin = span ? 0.0 : YMin;
+            double storedMax = span ? 100.0 : YMax;
+            v = span
+                ? (axisValue - SpanLow) / spanRange * 100.0
+                : Math.Round(axisValue);
+            v = Math.Max(storedMin, Math.Min(storedMax, v));
+            return true;
+        }
+
         private void ApplyDrag(Point p)
         {
             bool snap = SnapModifier;
 
-            // Top-right anchor: vertical only, and it moves SpanHigh rather
-            // than any node (see AnchorEndDraggableInY). Never below SpanLow,
-            // the curve's own start point.
+            // Top-right anchor: vertical only, writes EndY (see
+            // AnchorEndDraggableInY).
             if (_dragEndAnchor)
             {
-                double lo = double.IsNaN(SpanLow) ? YMin : SpanLow;
-                double a = PointerToAxisValue(p);
-                if (snap) a = Snap(a);
-                SpanHigh = Math.Round(Math.Max(lo, Math.Min(YMax, a)));
+                if (TryPointerToStoredY(p, snap, out double end)) EndY = end;
                 return;
             }
 
             int lastNode = ClampedNodeCount() - 1;
             bool isEndpoint = _dragNode == 0 || _dragNode == lastNode;
 
-            // Vertical drag. A collapsed span (Max Force dragged down onto
-            // Deadzone) has no Y to place a node at, so it skips the vertical
-            // half and leaves horizontal drag working.
-            bool span = SpanMode;
-            double spanRange = span ? SpanRange : 0;
-            bool canDragY = (!span || spanRange > 0) && !(EndpointRangeMode && _dragNode == 0);
-            if (canDragY)
+            // Vertical drag; a collapsed span skips it and leaves horizontal
+            // drag working.
+            if (!(EndpointRangeMode && _dragNode == 0) && TryPointerToStoredY(p, snap, out double v))
             {
-                // Node values are stored in axis units, or as a percentage of
-                // SpanLow..SpanHigh when that's in use — convert the pointer
-                // back into whichever, then clamp in that same space.
-                // Snap acts on the axis value shown in the node.
-                double axisValue = PointerToAxisValue(p);
-                if (snap) axisValue = Snap(axisValue);
-                double storedMin = span ? 0.0 : YMin;
-                double storedMax = span ? 100.0 : YMax;
-                double v = span
-                    ? Math.Round((axisValue - SpanLow) / spanRange * 100.0)
-                    : Math.Round(axisValue);
-                v = Math.Max(storedMin, Math.Min(storedMax, v));
                 if (!double.IsNaN(LastNodeYMax) && _dragNode == lastNode)
                     v = Math.Min(v, LastNodeYMax);
-                // Clamp to the neighbours' Y too — same crossing-prevention
-                // reasoning as the X neighbour-clamp below, just per-axis.
-                if (ClampYToAdjacentNodes)
-                {
-                    double loY = _dragNode == 0 ? storedMin : GetY(_dragNode - 1);
-                    double hiY = _dragNode == lastNode ? storedMax : GetY(_dragNode + 1);
-                    if (hiY < loY) hiY = loY;
-                    v = Math.Max(loY, Math.Min(hiY, v));
-                }
                 SetY(_dragNode, v);
             }
 
@@ -838,6 +931,7 @@ namespace MozaControls
             // two endpoints against each other instead.
             if (AllowHorizontalDrag && _dragNode >= 0 && _dragNode < 6
                 && !(LockLastNodeX && _dragNode == lastNode)
+                && !(LockFirstNodeX && _dragNode == 0)
                 && !(EndpointRangeMode && !isEndpoint))
             {
                 double w = _canvas?.ActualWidth ?? ActualWidth;
@@ -914,24 +1008,6 @@ namespace MozaControls
                 case 7: Y8 = v; break;
                 case 8: Y9 = v; break;
                 case 9: Y10 = v; break;
-            }
-        }
-
-        private double GetY(int i)
-        {
-            switch (i)
-            {
-                case 0: return Y1;
-                case 1: return Y2;
-                case 2: return Y3;
-                case 3: return Y4;
-                case 4: return Y5;
-                case 5: return Y6;
-                case 6: return Y7;
-                case 7: return Y8;
-                case 8: return Y9;
-                case 9: return Y10;
-                default: return 0;
             }
         }
 
@@ -1078,11 +1154,18 @@ namespace MozaControls
             int realCount = nodeCount + (anchorStart ? 1 : 0) + (anchorEnd ? 1 : 0);
             var real = new Point[realCount];
             int wi = 0;
-            // In span mode the two anchors are the span's own ends (Pedal
-            // Feel: Deadzone and Max Force), so they ride up and down with
-            // those values instead of being pinned to the plot's corners.
+            // In span mode the start anchor is the span's low end (Pedal Feel:
+            // Deadzone) and the end anchor sits at EndY percent of the span
+            // (unset = its top, Max Force), so both ride with those values
+            // instead of being pinned to the plot's corners.
+            // Unclamped span here, as the wire computes it (see
+            // MozaMBoosterRegistry.ComputeFeelCurveEndY).
+            double endY = EndY;
+            double endRaw = spanMode
+                ? (double.IsNaN(endY) ? SpanHigh : spanLow + (endY / 100.0) * (SpanHigh - spanLow))
+                : (double.IsNaN(endY) ? YMax : endY);
             double startValue = spanMode ? Math.Max(YMin, Math.Min(YMax, spanLow)) : YMin;
-            double endValue = spanMode ? Math.Max(YMin, Math.Min(YMax, SpanHigh)) : YMax;
+            double endValue = Math.Max(YMin, Math.Min(YMax, endRaw));
             double startPixY = PadTop + (1 - (startValue - YMin) / range) * plotH;
             double endPixY = PadTop + (1 - (endValue - YMin) / range) * plotH;
             if (anchorStart) real[wi++] = new Point(PadLeft, startPixY);
@@ -1102,16 +1185,21 @@ namespace MozaControls
             for (int i = 0; i < realCount; i++) allPts[i + 1] = real[i];
             allPts[realCount + 1] = real[realCount - 1];
 
+            // EndpointRangeMode doesn't draw the origin → start lead-in (its
+            // start deadzone band stands for it), but keeps the origin as the
+            // tangent helper and in `segments`, so the curve's shape and the
+            // markers are unchanged.
+            int firstDrawn = EndpointRangeMode && anchorStart ? 1 : 0;
             var fig = new PathFigure
             {
-                StartPoint = real[0],
+                StartPoint = real[firstDrawn],
                 IsClosed = false,
                 IsFilled = false,
             };
-            // Cached alongside geometry construction so the live-position
-            // marker (below) can locate the exact pixel point ON the spline
-            // for a given data-space X, without re-deriving the Catmull-Rom
-            // tangents a second time.
+            // Cached alongside geometry construction so the live and
+            // threshold markers (below) can locate their exact pixel point ON
+            // the spline without re-deriving the Catmull-Rom tangents a
+            // second time.
             int segCount = realCount - 1;
             var segments = new (Point p1, Point c1, Point c2, Point p2)[segCount];
             for (int i = 0; i < segCount; i++)
@@ -1122,7 +1210,7 @@ namespace MozaControls
                 Point p3 = allPts[i + 3];
                 Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
                 Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
-                fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
+                if (i >= firstDrawn) fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
                 segments[i] = (p1, c1, c2, p2);
             }
             var geom = new PathGeometry();
@@ -1130,11 +1218,14 @@ namespace MozaControls
             geom.Freeze();
             SetValue(CurveGeometryKey, geom);
 
-            _liveSegments = segments;
-            _liveNodePts = pts;
-            _livePlotW = plotW;
-            _liveAxisBottomY = PadTop + plotH;
+            UpdateRangeDeadzones(pts, nodeCount, plotW, plotH);
+
+            _markerSegments = segments;
+            _markerNodePts = pts;
+            _markerPlotW = plotW;
+            _markerAxisBottomY = PadTop + plotH;
             UpdateLiveMarker(segments, pts, plotW, PadTop + plotH);
+            UpdateThresholdMarker(segments, PadTop + plotH);
 
             // ---- Background grid (4 interior horizontal + 4 vertical lines) ----
             // Vertical lines scale with the rightmost node fraction so they
@@ -1362,8 +1453,8 @@ namespace MozaControls
                     double markerY = CubicBezierPoint(seg.p1.Y, seg.c1.Y, seg.c2.Y, seg.p2.Y, finalT);
 
                     SetValue(LiveMarkerVisibleKey, Visibility.Visible);
-                    SetValue(LiveMarkerLeftKey, markerX - LiveMarkerHalf);
-                    SetValue(LiveMarkerTopKey, markerY - LiveMarkerHalf);
+                    SetValue(LiveMarkerLeftKey, markerX - MarkerHalf);
+                    SetValue(LiveMarkerTopKey, markerY - MarkerHalf);
 
                     var guide = new LineGeometry(new Point(markerX, axisBottomY), new Point(markerX, markerY));
                     guide.Freeze();
@@ -1380,6 +1471,110 @@ namespace MozaControls
                 SetValue(LiveGuideLineGeometryKey, null);
             }
         }
+
+        // EndpointRangeMode: output holds at 0 left of the start and at the
+        // end's Y right of the end — shade both full-height, each labelled
+        // with its width in %. The label sits in the plot half away from its
+        // own point.
+        private void UpdateRangeDeadzones(Point[] nodePts, int nodeCount, double plotW, double plotH)
+        {
+            int last = nodeCount - 1;
+            int startPct = EndpointRangeMode ? (int)Math.Round(NodeDataX(0, nodeCount)) : 0;
+            int endPct = EndpointRangeMode ? (int)Math.Round(100.0 - NodeDataX(last, nodeCount)) : 0;
+            double left = PadLeft, right = PadLeft + plotW;
+            double top = PadTop, bottom = PadTop + plotH;
+
+            var bands = new GeometryGroup();
+            if (startPct > 0)
+                bands.Children.Add(new RectangleGeometry(new Rect(new Point(left, top), new Point(nodePts[0].X, bottom))));
+            if (endPct > 0)
+                bands.Children.Add(new RectangleGeometry(new Rect(new Point(nodePts[last].X, top), new Point(right, bottom))));
+            if (bands.Children.Count > 0) bands.Freeze();
+            SetValue(RangeDeadzoneGeometryKey, bands.Children.Count > 0 ? bands : null);
+
+            void SetLabel(int pct, double bandLeft, double bandRight, Point node,
+                DependencyPropertyKey textKey, DependencyPropertyKey leftKey, DependencyPropertyKey topKey)
+            {
+                if (pct <= 0)
+                {
+                    SetValue(textKey, string.Empty);
+                    SetValue(leftKey, -10000.0);
+                    SetValue(topKey, -10000.0);
+                    return;
+                }
+                double x = (bandLeft + bandRight) / 2.0 - DeadzoneLabelWidth / 2.0;
+                x = Math.Max(left, Math.Min(right - DeadzoneLabelWidth, x));
+                double y = node.Y > top + plotH / 2.0 ? top + plotH / 4.0 : top + plotH * 3.0 / 4.0;
+                SetValue(textKey, pct.ToString(CultureInfo.InvariantCulture) + "%");
+                SetValue(leftKey, x);
+                SetValue(topKey, y - DeadzoneLabelHalfHeight);
+            }
+            SetLabel(startPct, left, nodePts[0].X, nodePts[0],
+                RangeStartDeadzoneTextKey, RangeStartDeadzoneLeftKey, RangeStartDeadzoneTopKey);
+            SetLabel(endPct, nodePts[last].X, right, nodePts[last],
+                RangeEndDeadzoneTextKey, RangeEndDeadzoneLeftKey, RangeEndDeadzoneTopKey);
+        }
+
+        // Threshold dot (see ThresholdY): where the drawn curve first reaches
+        // that height, leftmost when several peaks do, so editing the curve
+        // moves it to wherever the line now gets there. Hidden when it never
+        // does.
+        private void UpdateThresholdMarker((Point p1, Point c1, Point c2, Point p2)[] segments, double axisBottomY)
+        {
+            bool placed = TryFirstPointReaching(ThresholdY, segments, axisBottomY - PadTop, out Point p);
+            SetValue(ThresholdMarkerVisibleKey, placed ? Visibility.Visible : Visibility.Collapsed);
+            SetValue(ThresholdMarkerLeftKey, placed ? p.X - MarkerHalf : -10000.0);
+            SetValue(ThresholdMarkerTopKey, placed ? p.Y - MarkerHalf : -10000.0);
+        }
+
+        // First point, left to right, at or above the value — the curve's
+        // start when it already begins there. Samples each segment and
+        // bisects the step it crosses in: a Catmull-Rom segment's Y needn't
+        // be monotonic, so one bisection over a whole segment could miss an
+        // earlier crossing.
+        private bool TryFirstPointReaching(double value, (Point p1, Point c1, Point c2, Point p2)[] segments, double plotH, out Point point)
+        {
+            point = default;
+            if (double.IsNaN(value) || segments.Length == 0 || value < YMin || value > YMax) return false;
+            double range = Math.Max(1, YMax - YMin);
+            // Pixel Y grows downward: at or above the value is <= targetY.
+            double targetY = PadTop + (1 - (value - YMin) / range) * plotH;
+
+            const int Steps = 32;
+            foreach (var seg in segments)
+            {
+                double prevT = 0;
+                for (int i = 0; i <= Steps; i++)
+                {
+                    double t = (double)i / Steps;
+                    if (CubicBezierPoint(seg.p1.Y, seg.c1.Y, seg.c2.Y, seg.p2.Y, t) > targetY)
+                    {
+                        prevT = t;
+                        continue;
+                    }
+                    // A later segment's start is the previous one's end, which
+                    // would already have matched — so this is the curve's start.
+                    if (i == 0)
+                    {
+                        point = BezierAt(seg, 0);
+                        return true;
+                    }
+                    double loT = prevT, hiT = t;
+                    for (int iter = 0; iter < 24; iter++)
+                    {
+                        double tm = (loT + hiT) / 2.0;
+                        if (CubicBezierPoint(seg.p1.Y, seg.c1.Y, seg.c2.Y, seg.p2.Y, tm) > targetY) loT = tm; else hiT = tm;
+                    }
+                    point = BezierAt(seg, hiT);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static Point BezierAt((Point p1, Point c1, Point c2, Point p2) seg, double t) => new Point(
+            CubicBezierPoint(seg.p1.X, seg.c1.X, seg.c2.X, seg.p2.X, t),
+            CubicBezierPoint(seg.p1.Y, seg.c1.Y, seg.c2.Y, seg.p2.Y, t));
 
         private static double CubicBezierPoint(double p0, double c1, double c2, double p1, double t)
         {

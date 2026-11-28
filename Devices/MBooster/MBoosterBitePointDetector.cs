@@ -1,20 +1,39 @@
 using System;
 using System.Diagnostics;
-using System.Threading;
 
 namespace MozaPlugin.Devices.MBooster
 {
+    /// <summary>Automatic bite point calibration's readiness to measure a standing start.</summary>
     public enum BitePointCalState
     {
-        Idle,
-        // Started; needs the car stopped, in gear, with the clutch pressed in.
+        // No game, clutch reading or gear, or paused.
+        NotReady,
+        // Driving; needs the car stopped, in gear, with the clutch pressed in.
         Waiting,
-        // Conditions met; the next release past ClutchInLevel starts the run.
+        // Conditions met; the next release past ClutchInLevel is measured.
         Armed,
         // Clutch coming up with the car still stopped.
         Releasing,
+        // The last launch was stored; held a few seconds.
         Captured,
-        Cancelled,
+        // The last launch was too fast to count; held a few seconds.
+        TooFast,
+    }
+
+    /// <summary>What a standing start needs, as met on the last data tick.</summary>
+    [Flags]
+    public enum BitePointConditions
+    {
+        None = 0,
+        // Game running and not paused.
+        InGame = 1,
+        // The clutch source reports a position.
+        HasClutch = 2,
+        InGear = 4,
+        // MBoosterBitePointDetector.IsStopped: below StandstillKmh for StandstillHoldSec.
+        Stopped = 8,
+        // Pressed past MBoosterBitePointDetector.ClutchInLevel.
+        ClutchIn = 16,
     }
 
     /// <summary>One standing-start observation.</summary>
@@ -32,8 +51,9 @@ namespace MozaPlugin.Devices.MBooster
     }
 
     /// <summary>
-    /// Standing-start bite point detection: the car stops in gear with the
-    /// clutch pressed in, then the clutch comes up. Once the speed has risen
+    /// Standing-start bite point detection: the car stands still for
+    /// <see cref="StandstillHoldSec"/> in gear with the clutch pressed in, then
+    /// the clutch comes up. Once the speed has risen
     /// <see cref="ConfirmRiseKmh"/> over standstill, the moment the rise began is
     /// fitted from the whole release (<c>PedalWhenItBit</c>), and the bite point
     /// is the clutch-pedal position then: by the first frame the car is seen
@@ -46,8 +66,10 @@ namespace MozaPlugin.Devices.MBooster
 
         // Pedal position (0..1) counted as "clutch fully in".
         internal const double ClutchInLevel = 0.95;
-        // Below this the car counts as stopped.
+        // Below this the car counts as stopped...
         internal const double StandstillKmh = 0.5;
+        // ...once it has been for this long: a spin passes through zero speed.
+        internal const double StandstillHoldSec = 1.0;
         // Rise over the standstill speed that starts the fitted window...
         internal const double OnsetRiseKmh = 0.3;
         // ...and the rise that confirms the car is really pulling away and ends it.
@@ -69,8 +91,13 @@ namespace MozaPlugin.Devices.MBooster
         private double _onsetPedal = double.NaN;
         private long _onsetTicks;
         private double _onsetRate;
+        // Stopwatch ticks the current standstill began; 0 = moving or no speed.
+        private long _stoppedSince;
 
         public Phase Current { get; private set; }
+
+        /// <summary>Below <see cref="StandstillKmh"/> for <see cref="StandstillHoldSec"/>, as of the last update.</summary>
+        public bool IsStopped { get; private set; }
 
         public void Reset()
         {
@@ -84,6 +111,14 @@ namespace MozaPlugin.Devices.MBooster
         public bool Update(bool ready, double speedKmh, double pedal01, out BitePointSample sample)
         {
             sample = default;
+            long now = Stopwatch.GetTimestamp();
+            if (speedKmh < StandstillKmh)
+            {
+                if (_stoppedSince == 0) _stoppedSince = now;
+            }
+            else _stoppedSince = 0;
+            IsStopped = _stoppedSince != 0 && now - _stoppedSince >= (long)(StandstillHoldSec * Stopwatch.Frequency);
+
             if (!ready || double.IsNaN(speedKmh) || double.IsNaN(pedal01))
             {
                 Reset();
@@ -95,7 +130,7 @@ namespace MozaPlugin.Devices.MBooster
             switch (Current)
             {
                 case Phase.Waiting:
-                    if (stopped && clutchIn) Current = Phase.Armed;
+                    if (IsStopped && clutchIn) Current = Phase.Armed;
                     break;
 
                 case Phase.Armed:
@@ -106,7 +141,7 @@ namespace MozaPlugin.Devices.MBooster
                         _onsetPedal = double.NaN;
                         _histCount = 0;
                         // Anchors the release rate even when the onset comes on the next frame.
-                        Record(Stopwatch.GetTimestamp(), pedal01, 0);
+                        Record(now, pedal01, 0);
                         Current = Phase.Releasing;
                     }
                     break;
@@ -115,10 +150,9 @@ namespace MozaPlugin.Devices.MBooster
                     if (clutchIn)
                     {
                         // Pressed back in: re-arm if still stopped.
-                        Current = stopped ? Phase.Armed : Phase.Waiting;
+                        Current = IsStopped ? Phase.Armed : Phase.Waiting;
                         break;
                     }
-                    long now = Stopwatch.GetTimestamp();
                     double rise = speedKmh - _baselineKmh;
                     Record(now, pedal01, rise);
                     if (rise <= OnsetRiseKmh)
@@ -261,86 +295,5 @@ namespace MozaPlugin.Devices.MBooster
             }
             return 0;
         }
-    }
-
-    /// <summary>
-    /// A user-started calibration run. Commands arrive from any thread;
-    /// <see cref="Update"/> runs on the SimHub data thread and owns every state change.
-    /// </summary>
-    internal sealed class MBoosterBitePointCalibrator
-    {
-        private const int RequestNone = 0, RequestToggle = 1, RequestStop = 2;
-
-        private readonly MBoosterBitePointDetector _detector = new MBoosterBitePointDetector();
-        private int _request;
-        private int _state;
-        private string? _game;
-
-        public BitePointCalState State => (BitePointCalState)Volatile.Read(ref _state);
-
-        public bool IsActive
-        {
-            get
-            {
-                var s = State;
-                return s == BitePointCalState.Waiting || s == BitePointCalState.Armed || s == BitePointCalState.Releasing;
-            }
-        }
-
-        /// <summary>Start a run, or cancel the one in progress.</summary>
-        public void Toggle() => Interlocked.Exchange(ref _request, RequestToggle);
-
-        /// <summary>Drop any run and return to Idle.</summary>
-        public void Stop() => Interlocked.Exchange(ref _request, RequestStop);
-
-        /// <param name="game">SimHub game code.</param>
-        /// <param name="ready">Driving, in gear, with a clutch pedal reporting.</param>
-        /// <param name="capturedGame">Game the capture belongs to.</param>
-        /// <returns>True on the frame a bite point is captured.</returns>
-        public bool Update(string? game, bool ready, double speedKmh, double pedal01,
-            out string capturedGame, out BitePointSample sample)
-        {
-            capturedGame = "";
-            sample = default;
-
-            switch (Interlocked.Exchange(ref _request, RequestNone))
-            {
-                case RequestToggle:
-                    if (IsActive || string.IsNullOrEmpty(game)) SetState(BitePointCalState.Cancelled);
-                    else
-                    {
-                        _game = game;
-                        _detector.Reset();
-                        SetState(BitePointCalState.Waiting);
-                    }
-                    break;
-                case RequestStop:
-                    SetState(BitePointCalState.Idle);
-                    break;
-            }
-
-            if (!IsActive) return false;
-            if (!string.Equals(game, _game, StringComparison.OrdinalIgnoreCase))
-            {
-                SetState(BitePointCalState.Cancelled);
-                return false;
-            }
-
-            if (_detector.Update(ready, speedKmh, pedal01, out sample))
-            {
-                capturedGame = _game!;
-                SetState(BitePointCalState.Captured);
-                return true;
-            }
-            SetState(_detector.Current switch
-            {
-                MBoosterBitePointDetector.Phase.Armed => BitePointCalState.Armed,
-                MBoosterBitePointDetector.Phase.Releasing => BitePointCalState.Releasing,
-                _ => BitePointCalState.Waiting,
-            });
-            return false;
-        }
-
-        private void SetState(BitePointCalState s) => Volatile.Write(ref _state, (int)s);
     }
 }

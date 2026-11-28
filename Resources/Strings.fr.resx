@@ -865,13 +865,6 @@ Id : {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibré</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manuel</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>RÉINITIALISER</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Inactif</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>En attente</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Armé</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Relâchement</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Annulé</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Calibration automatique</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} échantillons</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Source d'embrayage</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>Pédale mBooster</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Point de patinage de l'embrayage</value></data>
@@ -883,7 +876,6 @@ Id : {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Appui</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Relâchement</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Les deux</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Valeur du jeu</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>Axe HID</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Périphérique</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>DÉFINIR LA PLAGE</value></data>
@@ -904,10 +896,8 @@ Id : {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Sous le point de patinage</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Entièrement relâché</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Toujours</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylindres</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Fréquence max. (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensité au ralenti (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsation (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Force sur les bosses</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux bloque l'accès aux périphériques MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Votre utilisateur Linux ne peut pas ouvrir {0}, le plugin ne peut donc pas s'y connecter.</value></data>
@@ -964,4 +954,46 @@ Id : {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>Effets par défaut AZOM</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Blocage de roue</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Mode streamer</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Point de patinage automatique</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Avant le point de patinage (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>Après le point de patinage (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>Fin de course (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Mise en route</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Base du volant</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pédales</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Leviers de vitesses &amp; commodos</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LEDs</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Tableau de bord</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Commandes</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Prêt à calibrer</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Mesure en cours</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Voiture calibrée ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Jeu calibré ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Non calibré</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Trop rapide</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>Point de patinage de l'embrayage MOZA</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Affiche la calibration du point de patinage de l'embrayage pendant la conduite.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Pas prêt</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>En attente</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>En jeu</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Signal d'embrayage</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>Rapport engagé</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>À l'arrêt</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Embrayage enfoncé</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Dernier départ {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Réussi · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>Point de patinage de l'embrayage MOZA Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Affiche la barre d'embrayage uniquement tant qu'un départ arrêté peut être mesuré, puis son résultat.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>Nouvelle version du tableau de bord SimHub : {0}. L'installer conserve votre copie actuelle dans son dossier _Backups.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Voiture ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Jeu ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Zone morte automatique</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Fréquence min. (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Rugosité</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Cadence (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Fréquence (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensité (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Bruit blanc (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Course utile (mm)</value></data>
 </root>

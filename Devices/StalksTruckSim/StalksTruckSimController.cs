@@ -63,6 +63,10 @@ namespace MozaPlugin.Devices.StalksTruckSim
 
         private bool Active => _truckSimEnabled && _truckGameRunning;
 
+        /// <summary>Key-output gate state, for the diagnostics dump.</summary>
+        public string DescribeGate()
+            => $"truck game running={_truckGameRunning}  foreground={_kb.DescribeForeground()}";
+
         /// <summary>Apply the current mode + config (call on load and on every UI edit).</summary>
         public void ApplySettings(StalkMode mode, StalkTruckSimSettings cfg)
         {

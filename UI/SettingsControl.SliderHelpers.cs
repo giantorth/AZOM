@@ -54,9 +54,13 @@ namespace MozaPlugin.UI
         // Same, for the hidden data-store sliders behind the curve/EQ editors,
         // which have no value box.
         private void OnIntSliderChanged(double newValue, Action<int> commit)
+            => OnDataSliderChanged(newValue, 0, v => commit((int)v));
+
+        // Data-store slider kept to <paramref name="decimals"/> places.
+        private void OnDataSliderChanged(double newValue, int decimals, Action<double> commit)
         {
             if (_suppressEvents) return;
-            commit((int)Math.Round(newValue));
+            commit(Math.Round(newValue, decimals));
             _plugin.SaveSettings();
         }
 

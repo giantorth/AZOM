@@ -864,13 +864,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>보정값</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>수동</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>초기화</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>비활성</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>대기 중</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>준비됨</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>해제 중</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>취소됨</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>자동 보정</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>샘플 {0}개</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>클러치 소스</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster 페달</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>클러치 물림 지점</value></data>
@@ -882,7 +875,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>밟을 때</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>뗄 때</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>둘 다</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>게임 값</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID 축</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>장치</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>범위 설정</value></data>
@@ -903,10 +895,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>물림점 아래</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>완전히 뗐을 때</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>항상</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>실린더</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>최대 주파수 (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>공회전 강도 (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>맥동 (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>언덕 정상 강도</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux가 MOZA 장치에 대한 접근을 차단하고 있습니다</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux 사용자가 {0}을(를) 열 수 없어 플러그인이 연결할 수 없습니다.</value></data>
@@ -963,4 +953,46 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM 기본 효과</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>휠 잠김</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>스트리머 모드</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>자동 물림점</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>물림점 이전 (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>물림점 이후 (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>이동 종료 (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>설치 및 설정</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>휠베이스</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>페달</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>시프터 및 스토크</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LED</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>대시보드</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>컨트롤</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>플러그인</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>보정 준비됨</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>측정 중</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>차량 보정됨 ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>게임 보정됨 ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>보정 안 됨</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>너무 빠름</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA 클러치 물림 지점</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>주행 중 클러치 물림 지점 보정 상태를 표시합니다.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>준비 안 됨</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>대기 중</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>게임 중</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>클러치 신호</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>기어 체결</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>정지</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>클러치 밟음</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>마지막 출발 {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>성공 · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA 클러치 물림 지점 미니</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>정지 출발을 측정할 수 있는 동안에만 클러치 막대를 표시하고, 이후 그 결과를 표시합니다.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>새 SimHub 대시보드 버전: {0}. 설치하면 현재 사본은 _Backups 폴더에 보관됩니다.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>차량 ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>게임 ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>자동 데드존</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>최소 주파수 (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>거칠기</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>속도 (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>주파수 (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>강도 (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>백색 잡음 (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>사용 가능 이동 거리 (mm)</value></data>
 </root>

@@ -79,6 +79,10 @@ namespace MozaPlugin.UI
                 SeedPassivePedal("throttle", ThrottleDirCheck, ThrottleRange, ThrottleRangeText, _throttleCurveSliders!);
                 SeedPassivePedal("brake", BrakeDirCheck, BrakeRange, BrakeRangeText, _brakeCurveSliders!);
                 SeedPassivePedal("clutch", ClutchDirCheck, ClutchRange, ClutchRangeText, _clutchCurveSliders!);
+                // A column's pedal holds that column's role.
+                SeedPassiveRoleCombo(ThrottlePassiveRoleCombo, 0);
+                SeedPassiveRoleCombo(BrakePassiveRoleCombo, 1);
+                SeedPassiveRoleCombo(ClutchPassiveRoleCombo, 2);
                 return;
             }
 
@@ -120,11 +124,44 @@ namespace MozaPlugin.UI
             BrakePedalGroup.Visibility = !passive || _passivePedals[1] != null ? Visibility.Visible : Visibility.Collapsed;
             ClutchPedalGroup.Visibility = !passive || _passivePedals[2] != null ? Visibility.Visible : Visibility.Collapsed;
             BrakeAngleRatioRow.Visibility = passive ? Visibility.Collapsed : Visibility.Visible;
+            // Role picker only on a column holding an mBooster passive pedal
+            // (CRP/SRP pedals have fixed roles).
+            ThrottlePassiveRoleRow.Visibility = passive && _passivePedals[0] != null ? Visibility.Visible : Visibility.Collapsed;
+            BrakePassiveRoleRow.Visibility = passive && _passivePedals[1] != null ? Visibility.Visible : Visibility.Collapsed;
+            ClutchPassiveRoleRow.Visibility = passive && _passivePedals[2] != null ? Visibility.Visible : Visibility.Collapsed;
             // A passive pedal's column edits its mBooster's settings entry —
             // read-only until that entry is final, same as the mBooster tab.
             ThrottlePedalGroup.IsEnabled = PassiveGroupEditable(0, passive);
             BrakePedalGroup.IsEnabled = PassiveGroupEditable(1, passive);
             ClutchPedalGroup.IsEnabled = PassiveGroupEditable(2, passive);
+        }
+
+        private static void SeedPassiveRoleCombo(ComboBox combo, int roleIndex)
+        {
+            // Not while the user has it open: the refresh tick would fight the pick.
+            if (!combo.IsDropDownOpen && combo.SelectedIndex != roleIndex) combo.SelectedIndex = roleIndex;
+        }
+
+        /// <summary>
+        /// Role picker on a passive pedal's column — the only place its role can
+        /// be changed, since the mBooster tab lists just the pedals it configures
+        /// (<see cref="MBoosterTabAxes"/>); Pit House puts it on the mechanical
+        /// pedal's page too. Same path as the mBooster tab's row combo
+        /// (<see cref="OnMBoosterDeviceRowRoleChanged"/>): on a USB lane a
+        /// hardware swap with the pedal holding the new role, the passive one
+        /// written to its host channel register (Pit House: `24 12 23 00
+        /// &lt;role&gt;`); on a routed lane the profile's role. The pedal moves
+        /// to the new role's column once the host's role map reads back.
+        /// </summary>
+        private void PassivePedalRole_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (!(sender is ComboBox combo) || !(combo.Tag is string pedal)) return;
+            var target = PassivePedalFor(pedal);
+            int picked = combo.SelectedIndex;
+            if (target == null || picked < 0 || picked > 2 || picked == PedalRoleIndex(pedal)) return;
+            OnMBoosterDeviceRowRoleChanged(target.Value.Controller.Identity, target.Value.Axis,
+                (MBoosterRole)(picked + 1));
         }
 
         private bool PassiveGroupEditable(int role, bool passive)

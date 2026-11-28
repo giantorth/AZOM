@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath artifact configuration, slug "mozaplugin-dll". SignPath keeps its
+     own copy, edited in the web UI: change both together. The signed artifact is
+     the zip actions/upload-artifact makes around bin/x86/Release/MozaPlugin.dll.
+     product-name / product-version are SignPath Foundation's required metadata
+     restrictions; ${version} is the ProductVersion string the workflow passes. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file path="MozaPlugin.dll" product-name="AZOM" product-version="${version}">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

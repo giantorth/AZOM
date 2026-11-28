@@ -202,12 +202,13 @@ namespace MozaPlugin
             return c.Direction < 0 && c.Min < 0 && c.Max < 0
                 && c.CurveY == null && c.CurveX == null && c.HardwareCurveY == null
                 && c.SensorOutputRatioPct < 0 && c.MaxThresholdKg < 0
-                && c.InputCurveY == null && c.InputCurveX == null
+                && c.InputCurveY == null && c.InputCurveX == null && c.InputCurveEndY < 0
                 && c.DeadzoneKg < 0 && c.MaxForceKg < 0
                 && c.TravelStartMm < 0 && c.TravelEndMm < 0
                 && c.EndstopFrontStiffness < 0 && c.EndstopEndStiffness < 0
                 && c.NaturalFrictionPct < 0
                 && c.DampingPressPct < 0 && c.DampingReleasePct < 0
+                && c.AutoBiteFeel == null && !c.AutoDeadzone
                 && c.SegmentedDamping.Divider1Pressed < 0 && c.SegmentedDamping.Divider2Pressed < 0
                 && c.SegmentedDamping.Seg1Pressed < 0 && c.SegmentedDamping.Seg2Pressed < 0 && c.SegmentedDamping.Seg3Pressed < 0
                 && c.SegmentedDamping.Divider1Released < 0 && c.SegmentedDamping.Divider2Released < 0
@@ -303,6 +304,7 @@ namespace MozaPlugin
             Flt("MaxThresholdKg", () => into.MaxThresholdKg, v => into.MaxThresholdKg = v, from.MaxThresholdKg);
             Arr("InputCurveY", () => into.InputCurveY, v => into.InputCurveY = v, from.InputCurveY);
             Arr("InputCurveX", () => into.InputCurveX, v => into.InputCurveX = v, from.InputCurveX);
+            Flt("InputCurveEndY", () => into.InputCurveEndY, v => into.InputCurveEndY = v, from.InputCurveEndY);
             Flt("DeadzoneKg", () => into.DeadzoneKg, v => into.DeadzoneKg = v, from.DeadzoneKg);
             Flt("MaxForceKg", () => into.MaxForceKg, v => into.MaxForceKg = v, from.MaxForceKg);
             Flt("TravelStartMm", () => into.TravelStartMm, v => into.TravelStartMm = v, from.TravelStartMm);
@@ -312,6 +314,14 @@ namespace MozaPlugin
             Flt("NaturalFrictionPct", () => into.NaturalFrictionPct, v => into.NaturalFrictionPct = v, from.NaturalFrictionPct);
             Flt("DampingPressPct", () => into.DampingPressPct, v => into.DampingPressPct = v, from.DampingPressPct);
             Flt("DampingReleasePct", () => into.DampingReleasePct, v => into.DampingReleasePct = v, from.DampingReleasePct);
+
+            if (into.AutoBiteFeel == null) into.AutoBiteFeel = from.AutoBiteFeel?.Clone();
+            else if (from.AutoBiteFeel is { } fa && (fa.Enabled != into.AutoBiteFeel.Enabled
+                     || fa.WidthPct != into.AutoBiteFeel.WidthPct || fa.BeforePct != into.AutoBiteFeel.BeforePct
+                     || fa.AfterPct != into.AutoBiteFeel.AfterPct || fa.EndPct != into.AutoBiteFeel.EndPct))
+                conflicts.Add(label + "AutoBiteFeel");
+            // A bool has no unset state: on in either copy stays on.
+            into.AutoDeadzone |= from.AutoDeadzone;
 
             // MBoosterSegmentedDampingSettings is a sealed class, so these are
             // references — mutating sd edits into.SegmentedDamping in place.

@@ -118,8 +118,9 @@ namespace MozaPlugin.Telemetry.Frames
         private static readonly ConcurrentDictionary<string, TrackMapTransform?> s_mapIniByTrack =
             new ConcurrentDictionary<string, TrackMapTransform?>(StringComparer.Ordinal);
 
-        /// <summary>Resolve the transform for an AC track folder (e.g. "ks_zandvoort")
-        /// from its map.ini; null when there is none (other games).</summary>
+        /// <summary>Resolve the transform for an AC track path under content/tracks
+        /// ("ks_zandvoort", "ks_nordschleife/nordschleife") from its map.ini; null when
+        /// there is none (other games).</summary>
         public static TrackMapTransform? ResolveMapIni(string? trackFolder)
         {
             if (string.IsNullOrEmpty(trackFolder)) return null;

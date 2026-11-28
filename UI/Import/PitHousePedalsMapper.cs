@@ -634,10 +634,12 @@ namespace MozaPlugin.UI.Import
                 if (end - start < MBoosterUiConstants.TravelMinGapMm)
                     end = Math.Min(MBoosterUiConstants.TravelMaxMm, start + MBoosterUiConstants.TravelMinGapMm);
 
+                // Arc mm, as the Pedal Feel slider and Pit House show them.
+                var arc = MBoosterTravelArcScale.Instance;
                 string oldDisplay = _read.TravelStartMm < 0 || _read.TravelEndMm < 0
                     ? "(unset)"
-                    : $"{_read.TravelStartMm.ToString("F1", CultureInfo.InvariantCulture)}–{_read.TravelEndMm.ToString("F1", CultureInfo.InvariantCulture)} mm";
-                string newDisplay = $"{start.ToString("F1", CultureInfo.InvariantCulture)}–{end.ToString("F1", CultureInfo.InvariantCulture)} mm";
+                    : $"{arc.Format(_read.TravelStartMm)}–{arc.Format(_read.TravelEndMm)} mm";
+                string newDisplay = $"{arc.Format(start)}–{arc.Format(end)} mm";
 
                 float s = start, e = end;
                 Add("Travel start–end (mm)", oldDisplay, newDisplay,
@@ -647,7 +649,8 @@ namespace MozaPlugin.UI.Import
 
             /// <summary>
             /// forcelimit_min/max → Deadzone/Max Force; forces_curve (kg, the 6
-            /// nodes then the Max Force point) → InputCurveY as % of that span;
+            /// nodes then the last point) → InputCurveY / InputCurveEndY as % of
+            /// that span;
             /// stroke_curve (mm, inside machinelimit_min..max) → InputCurveX as
             /// % of travel. A default PitHouse preset has both curves at exact
             /// k/7 steps of those ranges — the same k/7 the Pedal Feel wire
@@ -694,16 +697,19 @@ namespace MozaPlugin.UI.Import
                         // Relative to the preset's own span, before clamping —
                         // that is the span PitHouse sampled the nodes on.
                         double lo = dzRaw!.Value, span = mfRaw!.Value - dzRaw.Value;
+                        float SpanPct(double kg) => (float)Math.Round(
+                            Clamp(span > 0 ? (kg - lo) / span * 100.0 : 0, 0, 100), MBoosterUiConstants.PedalFeelYDecimals);
                         var y = new float[n];
-                        for (int i = 0; i < n; i++)
-                        {
-                            double pct = span > 0 ? (forces[i] - lo) / span * 100.0 : 0;
-                            y[i] = (float)Math.Round(Clamp(pct, 0, 100));
-                            // Nodes can't cross (the editor clamps Y to neighbours).
-                            if (i > 0 && y[i] < y[i - 1]) y[i] = y[i - 1];
-                        }
+                        for (int i = 0; i < n; i++) y[i] = SpanPct(forces[i]);
                         Add("Pedal feel curve (Y, % of deadzone→max force)", Nodes(_read.InputCurveY), Nodes(y),
                             Differs(_read.InputCurveY, y), c => c.InputCurveY = (float[])y.Clone());
+                        if (forces.Length > n)
+                        {
+                            float end = SpanPct(forces[n]);
+                            Add("Pedal feel last point (% of deadzone→max force)",
+                                _read.InputCurveEndY < 0 ? "(unset)" : FormatCurvePoint(_read.InputCurveEndY),
+                                FormatCurvePoint(end), _read.InputCurveEndY != end, c => c.InputCurveEndY = end);
+                        }
                     }
                 }
 

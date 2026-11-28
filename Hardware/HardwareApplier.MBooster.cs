@@ -218,10 +218,10 @@ namespace MozaPlugin.Hardware
                 // that owns them, whatever its role.
                 if (ownsPedalFeelHardware)
                 {
-                    if (cfg.SensorOutputRatioPct >= 0
-                        && DiffersFloat("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct))
+                    float ratio = MozaMBoosterRegistry.EffectiveSensorRatioPct(cfg, role);
+                    if (ratio >= 0 && DiffersFloat("mbooster-brake-angle-ratio", ratio))
                     {
-                        controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
+                        controller.SendFloatWrite("mbooster-brake-angle-ratio", ratio, dev);
                     }
                     if (cfg.MaxThresholdKg >= 0)
                     {
@@ -235,22 +235,15 @@ namespace MozaPlugin.Hardware
                 // MBoosterDeviceController.PushFeelCurveResync). Fresh
                 // profile with none set sends nothing, same guarantee as
                 // every other calibration write here. Once ANY of the three
-                // is set, the whole 8-value family is pushed together (the
-                // device has no partial-update form for it), using the
-                // pedal's own sane "off" default for whichever side has no
-                // override — 0kg deadzone, 200kg max force, and the curve's
-                // own default Linear shape (MozaMBoosterRegistry
-                // .FeelCurveFractions) for an uncustomized curve.
-                bool curveCustomized = (cfg.InputCurveY != null
-                    && cfg.InputCurveY.Length == global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount)
-                    || (cfg.InputCurveX != null
-                    && cfg.InputCurveX.Length == global::MozaPlugin.Devices.MBooster.MBoosterUiConstants.PedalFeelNodeCount);
-                if (ownsPedalFeelHardware && (cfg.DeadzoneKg >= 0 || cfg.MaxForceKg >= 0 || curveCustomized))
-                {
-                    double dz = cfg.DeadzoneKg >= 0 ? cfg.DeadzoneKg : 0;
-                    double mf = cfg.MaxForceKg >= 0 ? cfg.MaxForceKg : 200;
-                    controller.PushFeelCurveResync(dz, mf, cfg.InputCurveY, cfg.InputCurveX, dev);
-                }
+                // is set, or the automatic bite point curve applies, the
+                // whole 8-value family is pushed together (the device has no
+                // partial-update form for it), using the pedal's own sane
+                // "off" default for whichever side has no override — 0kg
+                // deadzone, 200kg max force, and the curve's own default
+                // Linear shape (MozaMBoosterRegistry.FeelCurveFractions) for
+                // an uncustomized curve.
+                if (ownsPedalFeelHardware)
+                    _plugin.PushResolvedFeelCurve(cfg, controller, axis, dev, guard: MBoosterFeelPushGuard.IfSet);
             }
 
             // Lane-wide; lives on the host unit only.

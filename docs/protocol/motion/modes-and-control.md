@@ -49,6 +49,8 @@ Leaving 13 (power-on, or Motion Manager connecting) logs the reverse: `Set Motor
 |-----|-----------|---------|
 | `0x80` | from ~0.4 s after `set mode 7` until `selfCheckSuccess` | travel self-check running |
 | `0x20` | during mode 8 and afterwards while the port map is unconfirmed (`ports and self test` starts with it set in mode 0; cleared when the self-test passes). Stays set after a failed self-test (bundle `AX787D2P`) | port configuration pending |
+| `0x10` | throughout bundle `VFS6EMWG` (a rig whose map never passed a self-test), with `0x20` | unknown |
+| `0x08` | first poll after the plugin connected to a controller in standby, cleared by the move to mode 0 (bundles `AX787D2P`, `VFS6EMWG`) | unknown |
 | `0x04` | controller just powered up (mode 13, before enrol) and right after a cable re-seat (mode 5) | topology changed / actuators not enrolled |
 | `0x01` | the transient mode-4 poll after game mode ended | unknown |
 
@@ -64,7 +66,7 @@ h2b  7E 01 21 12 03 [chk]                  readback: 7E 02 A1 21 03 [sub] [chk]
 | `01 00` | right after the config push on connect; after the game stops (`100_STROKE` 62.9 s) | stop / parked |
 | `02 00` | ×3 immediately after `set mode 3`; and repeatedly in game mode | hold |
 | `03 00` | 0.3 s after the `0x22` stream starts; and repeatedly in game mode | run |
-| `04 [port]` | user clicks a port in the "Controller" graphic (`ports and self test`: ports 4, 2, 6, 5) | identify port — the actuator on that port signals (lights/moves). Motion Manager follows every one with `01 00` 1.7–3.5 s later, and reads `21 12 03` back after both (readback `04`, then `01`) |
+| `04 [port]` | user opens a port's corner dropdown under "Controller Port Connection" (`ports and self test`: ports 4, 2, 6, 5); `01 00` follows when it closes, 1.7–3.5 s later. Both are read back with `21 12 03` | identify port — the actuator on that port signals (lights/moves). The video timing that pins this is in [`identity-and-ports.md`](identity-and-ports.md#port--axis-role-table) |
 
 In game mode the host flips between `03 00` and `02 00` many times per lap. Lining the writes up
 with the Spa replay: `03` arrives when brake pressure rises at speed (0.10–0.27 brake at
@@ -80,7 +82,7 @@ Polled at 2 Hz each; replies are fixed 13-byte records.
 
 | Byte | Values | Reading |
 |------|--------|---------|
-| b1 | `3C` (most captures), `3A` (`ports and self test`, `Coldstart`), `99` (bundle `AX787D2P`), `00` at power-up before enrol | unknown — stable per session, not a temperature (the log temps are 25–38 °C and change) |
+| b1 | `3C` (most captures), `3A` (`ports and self test`, `Coldstart`), `99` (bundle `AX787D2P`), `0F` (bundle `VFS6EMWG`), `00` at power-up before enrol | unknown — stable per session, not a temperature (the log temps are 25–38 °C and change) |
 | b3 | `04` | actuators present |
 | b4 | `04`, `00` at power-up | actuators enrolled / axes connected |
 | flags | as the mode-poll flag byte | — |
@@ -154,11 +156,13 @@ Controller side, from the `set mode 8`:
   (see [`identity-and-ports.md`](identity-and-ports.md#port--axis-role-table)), and flag `0x20`
   clears. The `Param 27` log line can arrive after the flag clears. No axis lines are logged.
   Motion Manager sends `set mode 0` on the flag clear.
-- **Fail** (bundle `AX787D2P`, plugin host): `Front_Axis Failed` at +6.8 s and
-  `Back_Axis Failed` at +13.5 s, each with its `check_pitch / pitch_horizon` and
+- **Fail** (bundles `AX787D2P`, `VFS6EMWG`; plugin host sending left↔right mirrored role codes,
+  see [`identity-and-ports.md`](identity-and-ports.md#port--axis-role-table)): `Front_Axis Failed`
+  at +6.8 s and `Back_Axis Failed` at +13.5 s, each with its `check_pitch / pitch_horizon` and
   `check_roll / roll_horizon` lines. Then `Table 2, Param 9`…`16` and `Param 27 Written: 0`, with
   no 257 clear. Flag `0x20` stays set and the controller stays in mode 8 until the host sets
-  another mode. No Motion Manager capture of a failed test exists.
+  another mode; after `set mode 0` the role reads return 0 for every port (`VFS6EMWG`). No
+  Motion Manager capture of a failed test exists.
 
 ### Game start / stop (`100_STROKE`, `spa`, `nurburgring`)
 

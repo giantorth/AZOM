@@ -36,7 +36,7 @@ namespace MozaPlugin.Devices.Motion
         private const int GameEntryTimeoutMs = 15_000;
         private const int ModeLossToleranceMs = 1_500;
         private const int PortSelfTestTimeoutMs = 40_000;
-        // Motion Manager sends run state stop 1.7–3.5 s after each identify-port (`ports and self test`).
+        // Motion Manager identifies while a port's corner dropdown is open (1.7–3.5 s in `ports and self test`).
         private const int IdentifyStopMs = 2_000;
         private const int LogRingSize = 200;
         private const int EnrolReadSpacingMs = 15;

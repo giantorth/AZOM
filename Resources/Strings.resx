@@ -872,13 +872,6 @@ Id: {2}</value></data>
   <data name="Option_BitePointCalibrated" xml:space="preserve"><value>Calibrated</value></data>
   <data name="Option_BitePointManual" xml:space="preserve"><value>Manual</value></data>
   <data name="Button_ResetCalibration" xml:space="preserve"><value>RESET</value></data>
-  <data name="BiteCal_Idle" xml:space="preserve"><value>Idle</value></data>
-  <data name="BiteCal_Waiting" xml:space="preserve"><value>Waiting</value></data>
-  <data name="BiteCal_Armed" xml:space="preserve"><value>Armed</value></data>
-  <data name="BiteCal_Releasing" xml:space="preserve"><value>Releasing</value></data>
-  <data name="BiteCal_Cancelled" xml:space="preserve"><value>Cancelled</value></data>
-  <data name="Label_AutoCalibrate" xml:space="preserve"><value>Auto-calibrate</value></data>
-  <data name="BiteCal_Samples" xml:space="preserve"><value>{0} samples</value></data>
   <data name="Label_ClutchSource" xml:space="preserve"><value>Clutch source</value></data>
   <data name="Option_ClutchSourceMBooster" xml:space="preserve"><value>mBooster pedal</value></data>
   <data name="Section_ClutchBitePoint" xml:space="preserve"><value>Clutch Bite Point</value></data>
@@ -890,7 +883,6 @@ Id: {2}</value></data>
   <data name="Option_BiteTriggerPress" xml:space="preserve"><value>Press</value></data>
   <data name="Option_BiteTriggerRelease" xml:space="preserve"><value>Release</value></data>
   <data name="Option_BiteTriggerBoth" xml:space="preserve"><value>Both</value></data>
-  <data name="BiteCal_GameValue" xml:space="preserve"><value>Game value</value></data>
   <data name="Option_ClutchSourceHid" xml:space="preserve"><value>HID axis</value></data>
   <data name="Label_HidDevice" xml:space="preserve"><value>Device</value></data>
   <data name="Button_SetRange" xml:space="preserve"><value>SET RANGE</value></data>
@@ -911,10 +903,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Below bite point</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Fully released</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Always</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylinders</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max frequency (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Idle strength (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Lope (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Crest strength</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux is blocking access to MOZA devices</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Your Linux user can't open {0}, so the plugin can't connect to it.</value></data>
@@ -971,4 +961,46 @@ Id: {2}</value></data>
   <data name="LedDefaults_ProfileName" xml:space="preserve"><value>AZOM Default Effects</value></data>
   <data name="LedDefaults_WheelLock" xml:space="preserve"><value>Wheel lock</value></data>
   <data name="SliderLabel_StreamerMode" xml:space="preserve"><value>Streamer Mode</value></data>
+  <data name="Label_AutoBitePoint" xml:space="preserve"><value>Automatic bite point</value></data>
+  <data name="SliderLabel_AutoBiteBefore" xml:space="preserve"><value>Before bite (%)</value></data>
+  <data name="SliderLabel_AutoBiteAfter" xml:space="preserve"><value>After bite (%)</value></data>
+  <data name="SliderLabel_AutoBiteEnd" xml:space="preserve"><value>End of travel (%)</value></data>
+  <data name="GuideCategory_Setup" xml:space="preserve"><value>Setup</value></data>
+  <data name="GuideCategory_Wheelbase" xml:space="preserve"><value>Wheelbase</value></data>
+  <data name="GuideCategory_Pedals" xml:space="preserve"><value>Pedals</value></data>
+  <data name="GuideCategory_ShiftersStalks" xml:space="preserve"><value>Shifters &amp; Stalks</value></data>
+  <data name="GuideCategory_Leds" xml:space="preserve"><value>LEDs</value></data>
+  <data name="GuideCategory_Dashboard" xml:space="preserve"><value>Dashboard</value></data>
+  <data name="GuideCategory_Controls" xml:space="preserve"><value>Controls</value></data>
+  <data name="GuideCategory_Plugin" xml:space="preserve"><value>Plugin</value></data>
+  <data name="BiteCal_Ready" xml:space="preserve"><value>Ready to calibrate</value></data>
+  <data name="BiteCal_Measuring" xml:space="preserve"><value>Measuring</value></data>
+  <data name="BiteCal_CarCalibrated" xml:space="preserve"><value>Car calibrated ×{0}</value></data>
+  <data name="BiteCal_GameCalibrated" xml:space="preserve"><value>Game calibrated ×{0}</value></data>
+  <data name="BiteCal_NotCalibrated" xml:space="preserve"><value>Not calibrated</value></data>
+  <data name="BiteCal_TooFast" xml:space="preserve"><value>Too fast</value></data>
+  <data name="BiteDash_Title" xml:space="preserve"><value>MOZA Clutch Bite Point</value></data>
+  <data name="BiteDash_Description" xml:space="preserve"><value>Shows the clutch bite point calibration while you drive.</value></data>
+  <data name="BiteCal_NotReady" xml:space="preserve"><value>Not ready</value></data>
+  <data name="BiteCal_Waiting" xml:space="preserve"><value>Waiting</value></data>
+  <data name="BiteDash_InGame" xml:space="preserve"><value>In game</value></data>
+  <data name="BiteDash_ClutchSignal" xml:space="preserve"><value>Clutch signal</value></data>
+  <data name="BiteDash_InGear" xml:space="preserve"><value>In gear</value></data>
+  <data name="BiteDash_Stopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="BiteDash_ClutchPressed" xml:space="preserve"><value>Clutch pressed</value></data>
+  <data name="BiteDash_LastLaunch" xml:space="preserve"><value>Last launch {0}% · {1}%/s</value></data>
+  <data name="BiteCal_Captured" xml:space="preserve"><value>Success · {0}%</value></data>
+  <data name="BiteDash_MiniTitle" xml:space="preserve"><value>MOZA Clutch Bite Point Mini</value></data>
+  <data name="BiteDash_MiniDescription" xml:space="preserve"><value>Shows the clutch bar only while a standing start can be measured, then its result.</value></data>
+  <data name="Banner_DashUpdate" xml:space="preserve"><value>New SimHub dashboard version: {0}. Installing it keeps your current copy in its _Backups folder.</value></data>
+  <data name="BiteCal_CarCount" xml:space="preserve"><value>Car ×{0}</value></data>
+  <data name="BiteCal_GameCount" xml:space="preserve"><value>Game ×{0}</value></data>
+  <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatic deadzone</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Min frequency (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Roughness</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Rate (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frequency (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensity (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>White noise (%)</value></data>
+  <data name="Label_UsableTravelMm" xml:space="preserve"><value>Usable travel (mm)</value></data>
 </root>

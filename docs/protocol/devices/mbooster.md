@@ -291,8 +291,8 @@ decoding 184→50→140 kg) drew no commit at all.
 
 Two user-visible symptoms followed, both reported as bugs: Max Threshold
 read as **inverted** (with the hardware write discarded, its only surviving
-effect was as the host-side `fullScaleKg` denominator — see
-[Sim Input Mapping](#sim-input-mapping)), and every vibration effect on the
+effect was as a host-side `fullScaleKg` denominator AZOM has since
+removed), and every vibration effect on the
 brake was silently dead.
 
 `MBoosterDeviceController.ActiveAxisCount` is therefore the authority:
@@ -367,8 +367,8 @@ on load-cell ownership alone, in the apply, the UI write path and
 `MBoosterLoadCellPanel`'s visibility. Every active pedal has a load cell
 whatever its role, and Pit House exports `<role>_press_combine` for each
 role. They used to also require the Brake role, which hid them on an
-active Throttle/Clutch pedal while the host-side Max Threshold rescale
-still applied the stored value (VYNRCAZ1: a hidden 50 kg threshold over a
+active Throttle/Clutch pedal while AZOM's host-side Max Threshold rescale
+(since removed) still applied the stored value (VYNRCAZ1: a hidden 50 kg threshold over a
 21 kg Max Force capped clutch output at 42%).
 
 Ownership (`OwnsSingletonRegisters`) follows Pit House's model rather than
@@ -384,8 +384,43 @@ read-back re-applies the lane. The per-role output curve
 NOT affected — those genuinely are per-pedal registers that the host
 aggregates, and a passive pedal has them.
 
-**Inferred from the wire shape, not observed** — no capture of Pit House
-editing a passive pedal exists to confirm how it handles this.
+**Inferred from the wire shape, partly observed.** Pit House 1.4.2.7 editing a
+passive pedal's output curve and range from its Mechanical Pedals page
+(moza-simulator, 2026-11-26) sent only the role-keyed registers to the host —
+`throttle-y1..y5` (`0x0E`–`0x11`, `0x1B`) and `throttle-max` (`0x03`) for a
+passive pedal holding Throttle — and no singleton. Whether that page offers the
+singletons at all was not checked.
+
+### Channel connect state — group `0x25` cmd `0x80` (Pit House only)
+
+Pit House polls `25 12 80 00 00` on the host about once a second (twice per
+round — one read per parameter) and lists passive pedals from the answer, not
+from the heartbeat text. The reply is `a5 21 80 <T> <C>`: Pit House's
+`throttleChannel_connectState` (high byte, host channel T) and
+`clutchChannel_connectState` (low byte, channel C). Channel B is the unit's
+own motor pedal and has no byte.
+
+| value | Pit House log (`MBoost通道管理`) | meaning |
+|---|---|---|
+| `0` | `<ch>通道无连接！` | nothing on the channel |
+| `1` | `<ch>通道连接上机械踏板！` | mechanical (passive) pedal — listed under **Mechanical Pedals** |
+| `2` | `<ch>通道连接上电动踏板！` | electric pedal — a chained mBooster |
+
+Established against the moza-simulator (Pit House 1.4.2.7, 2026-11-26) by
+changing only the simulator's answer while Pit House ran: `0000` → no
+passive pedal shown and "throttle channel not connected"; `0101` → both
+channels mechanical (`[P01机械通道变化] … connectState= 1`); `0001` → only T
+flipped back to 0, which fixes the byte order; `0201` → T electric. The
+meaning of `2` comes from Pit House's message table and its log line, not
+from hardware. **No real-hardware capture of this register yet** — the
+simulator answered `0000` in every earlier session, which is why Pit House
+never showed a passive pedal against it. AZOM never reads it; its passive
+detection is the heartbeat's `type: passive pedal`.
+
+The same poll also reads `25 12 10/11/12 00 00` (Pit House's
+`throttle/brake/clutch_senstate`, sensor state by the order of its parameter
+table — unconfirmed; the simulator answers 0 and Pit House raised nothing) and
+cmds `1..3` (output position).
 
 ### Passive pedals are configured from the Pedals tab (bug report RCPWVWQ5)
 
@@ -396,7 +431,16 @@ role leaves the mBooster tab and appears as its role's column on the
 **Pedals** tab (`MozaMBoosterRegistry.IsPedalsTabPassive`; first passive
 pedal per role wins; never while plain CRP/SRP pedals hold the pedal slot).
 The active pedal stays on the mBooster tab. A passive pedal set to Disabled
-has no Pedals-tab column, so it stays on the mBooster tab to be reassigned.
+has no Pedals-tab column, so it stays on the mBooster tab to be reassigned —
+routed lanes only: on a USB lane a passive pedal's role is the host's channel
+register, never Disabled (see "On a USB lane the roles are the hardware's").
+Its column carries a **Role** picker (Throttle/Brake/Clutch;
+`PassivePedalRole_SelectionChanged`) — the mBooster tab doesn't list a
+Pedals-tab passive pedal, so without it the role could only move by swapping
+from the motor pedal's row. Same path as that row's combo: a hardware swap on
+a USB lane, the profile's role on a routed one; the pedal moves to the new
+role's column once the host's map reads back. Pit House puts the same switch
+on the mechanical pedal's own page.
 
 Storage stays the pedal's mBooster config (`Direction`/`Min`/`Max` plus
 `HardwareCurveY`), so the connect-time apply replays it and both USB and
@@ -1646,8 +1690,20 @@ default, so a role chosen in Pit House survives an untouched profile
 bug report NPN9FR6W started in a profile with the brake set to Throttle while
 the unit read Brake). Single-active-unit lanes only, and never while a role
 write is waiting for the heartbeat. A passive pedal's role lives on the host's
-channel register (`0x21`/`0x23`); no capture shows Pit House writing one, so
-the plugin doesn't.
+channel register (`0x21`/`0x23`), and Pit House writes it with the same plain
+echoed write (Pit House 1.4.2.7 against the moza-simulator `mbooster` chain —
+active brake on the host, chained throttle on T, passive clutch on C —
+2026-11-26, the passive pedal set to Throttle from its "Clutch Setting" page):
+
+```text
+h2b  24 12 23 00 01      host channel C (passive pedal) -> Throttle
+```
+
+That one frame is the whole change: no swap, and no stored config pushed (a
+passive pedal has nothing on the unit to configure). Its curve and range then
+go to the host under the new role (`throttle-y1..y5`, `throttle-max`). The
+plugin writes it the same way when a role change swaps with a passive pedal —
+see "the roles are the hardware's" below.
 
 **Writing a chained pedal's role** (bug report 4J8FZ5AF). A role write goes to
 the edited pedal's host channel register — `0x22` for the host's own motor
@@ -1659,18 +1715,30 @@ chained pedal kept reporting as Clutch through the host's `0x23`. With one
 remote channel and one answering chained unit the link is that unit; with
 several, the unit whose own `0x22` matches the channel's role.
 
-**On a lane of active pedals the roles are the hardware's.** Once the host's
-map has been read, a USB lane whose connected pedals are all active takes an
-axis's role from it — axis = role, see below — not from the per-axis profile
-setting (`MBoosterDeviceController.DeviceRolesKnown` / `AxisRole`). The
-per-axis `AxisRoles` went stale on every role write there, since the write
+**On a USB lane the roles are the hardware's.** Once the host's map has been
+read and every connected pedal is typed (active or passive), a USB lane takes
+an axis's role from it — axis = role, see below — not from the per-axis
+profile setting (`MBoosterDeviceController.DeviceRolesKnown` / `AxisRole`).
+The per-axis `AxisRoles` went stale on every role write there, since the write
 moves the pedal to another axis: 4J8FZ5AF's labels named the host's brake
 "Clutch" and the chained clutch "Throttle", and the next edit started from
 those. A role edit there (`AssignAxisRole`) swaps with the connected pedal
-already holding the new role; an unconnected channel is left holding a
-duplicate, as Pit House leaves it. Lanes with a passive pedal connected, and
-routed lanes, keep the profile's roles and write each active pedal's role as
-before (`WriteAxisRoles`).
+already holding the new role — a passive one included, through its host
+channel register only (`TryChannelUnit`; no pending-role entry, the map
+read-back confirms it) — and an unconnected channel is left holding a
+duplicate, as Pit House leaves it. Disabled is not a hardware role, so a
+connected passive pedal always holds one there.
+
+Lanes with a passive pedal used to be excluded (profile roles, only the
+motor pedal's role written) because no capture showed a passive channel
+register being written. That broke role changes on the common rig with one:
+a motor pedal's role write moved it to another axis under the profile's
+per-axis roles, and the swapped passive pedal's new role stayed profile-only,
+so the hardware kept a duplicate (moza-simulator, 2026-11-26: chained throttle
+set to Clutch left the host at `3/2/3`). Since the move the profile's role is
+re-applied on connect (`SyncPedalRole`) only for a lane's lone pedal there,
+as on chains of active pedals. Routed lanes keep the profile's roles and
+write each active pedal's role as before (`WriteAxisRoles`).
 
 **Settings follow the chain.** A lane's settings are keyed by the serial of
 the unit on USB. In 4J8FZ5AF the chain was re-cabled so the other unit is on
@@ -1683,13 +1751,25 @@ serial keys a real entry, the plugin moves that entry to the lane
 **Duplicate roles are allowed.** Pit House, setting the host's Brake to
 Throttle while the chained unit was Throttle (2026-09-29), wrote only the host
 (`22 00 01` plus the throttle role's stored config and throttle min/max /
-y1-y4) and logged both units as `role= "Throttle"`, no conflict. The plugin
-swaps only with another connected motor pedal. Its role map is keyed by role, so for a
-shared role: a passive pedal's writes go to the host, a role's sole motor pedal
+y1-y4) and logged both units as `role= "Throttle"`, no conflict. Pit House
+1.4.2.7 (2026-11-26, same rig as above) never swaps either: chained Throttle →
+Clutch wrote host `21 00 03` + `24 1d 22 00 03` and left the passive clutch on
+`0x23` = 3 (two clutches); chained → Brake wrote `21 00 02` + `24 1d 22 00 02`
+next to the host's Brake (two brakes). Its log names the step
+(`updateMainDeviceChannelRole "throttle"` — the host's channel-T register
+follows the chained unit's role) and flags the transient mismatch
+(`角色一致性检查 … Inconsistency: true`), nothing more. The plugin
+swaps with the connected pedal holding the new role (USB lanes, passive
+included). Its role map is keyed by role, so for a shared role (one Pit House
+left): a passive pedal's writes go to the host, a role's sole motor pedal
 keeps the map's placement, and two motor pedals on one role get no config
-writes (logged) — the map cannot tell them apart. The host heartbeat reports
-per role name; the simulator collapses two same-role units into one, and what
-real firmware reports then is not captured.
+writes (logged) — the map cannot tell them apart. While two connected
+channels share a role the plugin's host map is incomplete
+(`HostChannelRoles`), so it can't change roles on that lane until the
+duplicate is resolved (in Pit House). The host heartbeat names channels, not
+roles (GQ8HAWCV), so a duplicate doesn't change its pedal lines; the
+simulator named them by role until 2026-11-26 and collapsed a duplicate into
+one line.
 
 After each, Pit House's topology lines follow the new values. For JCJ5AEA2's
 chained unit (really the throttle, `0x22` = 2) the repair is Pit House's own
@@ -1783,8 +1863,9 @@ parking still applies to whichever calibrations still carry it.
 ## Sim Input Mapping
 
 Three hardware calibrations on the pedal's own unit (`MotorDeviceForRole` —
-see [Chain topology](#chain-topology--connectivity-diagnostics)); Max
-Threshold's effect is applied host-side.
+see [Chain topology](#chain-topology--connectivity-diagnostics)), all
+applied by the unit itself: the HID position is already the value the game
+sees, and AZOM uses it as reported.
 
 - **Sensor Output Ratio** (`SensorOutputRatioPct`, 0–100%) — blends the
   angle sensor (0%) against the load cell (100%). Wire command
@@ -1798,27 +1879,16 @@ Threshold's effect is applied host-side.
   1311 exactly; an unlabeled capture decoding to ~126 kg against an
   independently-reported real Pit House setting of ~125 kg). See
   `MozaMBoosterProtocol.EncodeThresholdKg`/`DecodeThresholdKg`.
-  **CORRECTED**: earlier text here claimed this write "recalibrates the
-  sensor's own full-scale range on the DEVICE" (raw HID axis reads
-  `MaxThresholdKg` of force at 100%). Hardware testing disproved that: the
-  write demonstrably reaches the device and reads back correctly (same
-  "write succeeds ⇒ assumed real" reasoning that also mis-closed the Max
-  Force "does nothing" reports twice — KY3HK4QP, 5VR5AQ8Y — before *that*
-  turned out to need the Pedal Feel curve to actually have a shape), but
-  changing it does not change how much force the raw HID axis needs to
-  reach 100%, confirmed with Max Force held constant and Threshold swept
-  full range both directions. The raw HID axis's 100% is actually **Max
-  Force's own kg ceiling** (the Pedal Feel curve's real hardware full
-  scale — see below). Max Threshold is therefore implemented **host-side**
-  instead (`MozaMBoosterRegistry.OnHidAxisUpdate`): it rescales the raw
-  position — already 0–100% of Max Force's span — into 0–100% of
-  Threshold's span (`posPct * (MaxForceKg / ThresholdKg)`, clamped to 100)
-  for AZOM's own telemetry. A Threshold at or above Max Force is a no-op:
-  the raw axis saturates at Max Force, so a higher Threshold could never
-  reach 100% (VYNRCAZ1). Passive pedals (no load cell) skip it; like any host-side remap it never reaches the
-  game's view of the axis. The `mbooster-brake-threshold` write is still sent
-  (harmless, matches whatever Pit House itself does with the field even if
-  it isn't the mechanism that matters) but AZOM no longer depends on it.
+  **The unit applies it** (confirmed on hardware, 2026-11-27): it picks
+  where on the load cell's 0–200 kg reading 100% travel lands. It is
+  independent of Max Force, which only bounds the Pedal Feel graph — a
+  Threshold below Max Force is fully supported, and nothing stops a Pedal
+  Feel curve asking for more force than Threshold. With a Sensor Output
+  Ratio blend, Threshold scales only the load cell's share.
+  **Retracted**: an earlier revision claimed the unit ignored this write
+  and hit 100% at Max Force, and AZOM rescaled its HID reading by
+  `MaxForceKg / ThresholdKg` on top — applying Threshold twice. That
+  rescale is gone.
 - **Output curve** (`HardwareCurveY` + `Min`/`Max`) — **device calibration,
   the same registers Pit House drives** (moza-simulator `mbooster` bridge
   with Pit House 1.4.1.13, 2026-10-10, every point dragged through its
@@ -1842,7 +1912,21 @@ Threshold's effect is applied host-side.
   read back exactly their Exponential shape (6/14/28/54/100).
 
   So "no output until 20% pedal" is `<role>-min` = 20 — a device setting,
-  not a curve shape. AZOM's editor is the same model
+  not a curve shape. AZOM's graph shades those two deadzones — left of the
+  start, right of the end — each labelled with its width in %, and draws no
+  line from 0,0 to the start (`MozaCurveEditor.UpdateRangeDeadzones`).
+
+  **Automatic deadzone** (`AutoDeadzone`, AZOM-only, load-cell owners):
+  while on, the UI sets the start to where the output leaves 0 as the pedal
+  leaves the Pedal Feel Deadzone, and locks that point
+  (`MozaCurveEditor.LockFirstNodeX`). Through the deadzone the pedal hasn't
+  moved, so the angle sensor reads 0 and only the load cell's share of the
+  blend rises: `start = ratio × Deadzone / Max Threshold`, capped at 100%
+  and at the end minus `OutputCurveMinRangePct`, rounded to a whole % — angle
+  only needs no offset (`MozaMBoosterRegistry.AutoDeadzoneStartPct`). It's
+  recomputed from the sliders on each user edit of Deadzone, Sensor Output
+  Ratio, Max Threshold or Automatic bite point, and stored and written as
+  `Min` like a drag, so the apply path is unchanged. AZOM's editor is the same model
   (`MozaCurveEditor.EndpointRangeMode`: start X = Min, Y pinned at 0; end
   X = Max; middle points derived), stored in the fields the Pedals tab
   uses for a passive pedal, and written by the connect/profile apply and
@@ -2043,7 +2127,7 @@ Pit House draws this curve as **8 points**, one per Y selector in the
 |---|---|---|
 | `(0,0)` — start | `0x07` Deadzone | no — set by the Deadzone slider |
 | 6 interior nodes | `0x08`-`0x0D` | yes, both axes (`InputCurveY`/`InputCurveX`) |
-| `(100,100)` — terminates the line | `0x0E` Max Force | vertically only — X is pinned at full-scale input |
+| last point, X=100 — terminates the line | `0x0E` | vertically only (`InputCurveEndY`) — X is pinned at full-scale input |
 
 So "evenly spaced" for the interior nodes means **sevenths** — 7 equal
 gaps across the 8 points — which is exactly the `k/7` spacing the sweep
@@ -2053,35 +2137,120 @@ at. Source for the layout and the drag affordances is the user's own
 reading of Pit House's UI, not a capture; the selector mapping beside it
 is capture-confirmed.
 
-**The vertical drag on that last point forces the plot's Y axis to be
-absolute force.** Its Y *is* Max Force (`0x0E`) — there is no other
-selector left for it to be — so on a Y axis normalized to the
-Deadzone→Max Force span, that point is 100% by definition and could never
-move. AZOM therefore plots this curve in kg: `YMax` follows the current
-Max Force (or Deadzone, if higher) × 1.25, rounded up to 4 × {1,2,5,10,20,25,50}
-so the kg axis labels stay whole, capped at the role's Max Force ceiling
-(`SettingsControl.UpdateMBoosterFeelAxis`). It is held while the curve is
-being dragged (the top-point drag writes Max Force) and re-fit on
-`MozaCurveEditor.DragCompleted`. A fixed ceiling axis (200kg) squashed a
-40kg curve into the bottom fifth of the plot (bug report 6SWSMJX0). The `(0,0)` point sits at
-`DeadzoneKg` and the `(100,100)` point at `MaxForceKg`, both bound to
-their sliders (`MozaCurveEditor.SpanLow`/`SpanHigh`, the latter two-way so
-the drag writes the slider). The 6 interior nodes are **still stored** as
-percentages of the span — `SpanLow`/`SpanHigh` convert for display and
-drag only, so nothing about `InputCurveY`'s wire contract changes.
+**The Max Force slider is the top of the graph, not the last point**
+(user's reading of Pit House, 2026-11-24): it sets the force at 100% of
+the Deadzone→Max Force span and rescales every point, the last one
+included. Dragging the last point moves only that point and can put it
+below the nodes; it never moves the slider. AZOM stores it as
+`InputCurveEndY`, a percentage of the span like `InputCurveY` (unset =
+100%), and writes `0x0E` as `deadzone + endPct/100 × (maxForce − deadzone)`
+(`MozaMBoosterRegistry.ComputeFeelCurveEndY`). At the default 100% that is
+Max Force itself, which is all the captures below cover — that `0x0E`
+carries the lowered point is **inferred** from the graph having one point
+per selector and from PitHouse presets keeping `forces_curve[6]`
+separately from `forcelimit_max`, not captured.
+
+AZOM plots this curve in absolute kg, `YMax` = Max Force (or Deadzone, if
+higher) exactly (`SettingsControl.UpdateMBoosterFeelAxis`, rerun by both
+sliders): moving Max Force changes the axis labels and the kg in the
+points, not where the points sit (with Deadzone 0; a Deadzone above 0
+lifts the start, so the points shift slightly). Labels can be fractional
+kg. Tried and dropped: × 1.25 headroom rounded up to
+4 × {1,2,5,10,20,25,50} jumped the whole curve each time Max Force crossed
+a step (6.4, 16, 32, 64, 80 kg); a fixed axis at the Max Force ceiling
+(200kg active / 20kg spring) moved the curve with the slider but squashed
+a light setting low on the plot (bug report 6SWSMJX0). The start
+point sits at `DeadzoneKg`; every other point is stored as a percentage
+of the span and converted for display and drag only
+(`MozaCurveEditor.SpanLow`/`SpanHigh`, both one-way from their sliders,
+plus `EndY` for the last point). Those percentages are kept to two
+decimals (`MBoosterUiConstants.PedalFeelYDecimals`): whole percents are
+2kg steps on a 200kg span, so Shift's 5kg snap landed on 136/144 instead
+of 135/145.
 
 A consequence, and it matches the wire exactly: dragging Max Force down
-rescales every interior node's kg while its stored percentage stays put,
-which is precisely the `(value − deadzone) / (maxForce − deadzone)`
-invariance the four sweep captures measured. Deadzone likewise lifts where
-the curve starts — neither slider had any visible effect on the old
-span-normalized plot.
+rescales every point's kg while its stored percentage stays put, which is
+precisely the `(value − deadzone) / (maxForce − deadzone)` invariance the
+four sweep captures measured. Deadzone likewise lifts where the curve
+starts — neither slider had any visible effect on the old span-normalized
+plot.
 
 AZOM draws the two end points via `MozaCurveEditor.ShowAnchorPoints`
 (dimmed node circles on the `AnchorAtOrigin`/`AnchorAtTopRight` ends, the
-top one grabbable when `AnchorEndDraggableInY` is set), and keeps a 1-unit
-X gap between the last draggable node and the `(100,100)` point — the same
-gap every other neighbouring node pair keeps.
+last one grabbable when `AnchorEndDraggableInY` is set), and keeps a
+1-unit X gap between the last draggable node and the last point — the
+same gap every other neighbouring node pair keeps.
+
+Point Y is **not** ordered: each interior node and the last point take
+any 0–100% of the span regardless of their neighbours, so non-monotonic
+("A"-shaped) curves are valid — the pedal handles them (user report,
+2026-11-24). Only X is kept in order. The PitHouse preset importer keeps
+`forces_curve` values as-is for the same reason.
+
+### Automatic bite point — the curve drawn from the calibrated bite point
+
+Plugin-side only: it writes the same `0xAB` family as a hand-drawn curve,
+through `PushFeelCurveResync`. Shown for an active pedal with the Clutch role
+(`MBoosterAutoBitePanel`); stored per pedal as `AutoBiteFeel` (null = never
+set). Pit House has no equivalent.
+
+**Shape** (`MBoosterAutoBiteCurve`, Y in % of the Deadzone→Max Force span):
+a ramp from the Deadzone start point up to *Before* at `bite − Width`, 100 %
+(Max Force, so the slider sets the peak height) at the bite point, *After*
+at `bite + Width`, then a straight line to *End* at the last point (100 %
+travel). Defaults: Width ±8 % of travel, Before 50 %, After 40 %, End
+40 % (flat). Three nodes take `bite − Width`,
+`bite`, `bite + Width` (clamped to 1..99 so the editor's 1-unit gaps to
+the end points hold; the bite point is held to 2..98). The other three
+split between the two sides in proportion to each side's length, evenly
+spaced, X whole. Bite 35 → X `14 27 35 43 62 81`, Y `25.93 50 100 40 40 40`,
+last point 40. The peak is a node, so it lands at the bite point whether the
+unit interpolates between nodes linearly or by spline (which it does is
+not known).
+
+**Units.** The calibration (`MBoosterClutchBitePointCalibrations`) is in the
+clutch source's units; the curve's X is the pedal's own travel. The source
+(`MozaPlugin.BitePointSource`) is the *mBooster pedal* while the plugin tab
+drives the vibrations and a connected, motorized pedal holds the Clutch role
+(the tab's Clutch Bite Point card has no picker); otherwise it is the ShakeIt
+editor's pick (`MBoosterBitePointSource`). AZOM places
+the bite point the way the graph's live dot reads the pedal: its HID
+position (`AxisPedalPosition`). Whether the unit's X axis is that reading, or travel before
+its own output curve and Min/Max, is **unverified**; with a linear output
+curve over 0–100 the two coincide. Check on hardware: hold the clutch at the
+bite point and the dot should sit on the peak, where the force peaks.
+
+- *mBooster pedal* source: the bite point is already in that reading.
+- *Game / Formula / HID axis*: `MBoosterBitePointPedalMap`, one per game key
+  (`MBoosterBitePointPedalMaps`, no vehicle keys — input processing is per
+  game): source % (101 bins) → pedal travel, learned on the data thread
+  while the game runs, unpaused, whenever both positions stay within 2 %
+  over 0.2 s (10 %/s, so telemetry lag costs well under 1 %). Each steady
+  sample moves its bin 10 % toward the reading. A lookup takes the bite
+  point's own bin, else interpolates between the nearest seen bins on both
+  sides within 5 %; otherwise there is no bite point in travel. One slow
+  press of the clutch fills it; launches add samples around the bite point.
+  Recording the pedal at the fitted bite moment instead would carry the
+  game's speed-telemetry lag × release rate (the detector's own fit is
+  self-consistent in the game's units, the HID reading is ahead of it).
+
+**Writes.** `MozaPlugin.ResolveMBoosterFeelCurve` picks the automatic curve
+when it applies (on, active Clutch, bite point known in travel), else the
+stored `InputCurveY/X/EndY`, which are never overwritten. Every feel push
+goes through it: the UI's coalesced push, the Travel push, the connect and
+profile apply, and the data thread. The data thread checks every 250 ms and
+pushes when the resolved curve differs from the last one sent to that unit
+(`IsFeelCurvePushed`) — game, vehicle, calibration or source changes — only
+while the clutch is under 5 % travel, re-checked when the coalesced write
+runs; at most once per 2 s. With no bite point it puts the stored curve back,
+and writes defaults only over a curve already sent this connection, never
+over the unit's own values (`MBoosterFeelPushGuard`). Turning the option off
+pushes the stored curve from the UI under the same rule.
+
+**Sensor Output Ratio** is held at angle only (0) while it applies
+(`EffectiveSensorRatioPct`; set and written when it's turned on, the slider
+locked): with load cell in the blend, output would dip after the force peak,
+and the bite point placed by that output would move with the curve it drives.
 
 ### Pedal Feel default curve shape and node X domain — REVISED (mBooster "Deadzone slider does nothing" report)
 
@@ -2177,13 +2346,23 @@ End thumb to 40/30mm) turned up two previously-undocumented wire
 commands: `mbooster-brake-travel-start` (cmdId `0x84`) and
 `mbooster-brake-travel-end` (cmdId `0x85`), group 35 read / 36 write,
 2-byte ints — same shape as the raw Min/Max calibration commands.
-Encoding mirrors `MaxThresholdKg`'s pattern on a fixed 0–53.5mm scale
-(53.5 = `TravelMinMm` 3.8 + `TravelMaxMm` 49.7, i.e. the slider's own
-bounds) over the 0–65535 range: `raw = round(mm * 65536 / 53.5)`. All 4
-capture data points matched within 1 raw unit (~0.001mm), and the
-shared 30mm target hit the identical raw value (`0x8f8d`) via both
-cmdIds — as solid a cross-check as the `MaxThresholdKg` evidence had.
-See `MozaMBoosterProtocol.EncodeTravelMm`/`DecodeTravelMm`.
+The value is the **ball-screw position** in mm, on a fixed 0–53.5 mm scale
+over the 0–65535 range. 53.5 mm is Pit House's `stoke_length`, the full
+screw stroke. It also equals 3.8 + 49.7, but that is a coincidence.
+
+Pit House 1.4.2.7 encodes `raw = round(mm × 65535 / 53.5)`. All six of its
+writes logged against moza-simulator on 2026-11-27 match this exactly:
+3.8 → `0x122f`, 49.7 → `0xedd0`, 7.736186… → `0x2504`, 42.373033… → `0xcac1`,
+21.390046… → `0x665a` and 25.690046… → `0x7aed`. AZOM's
+`MozaMBoosterProtocol.EncodeTravelMm`/`DecodeTravelMm` use `× 65536`, which
+is 1 raw unit (~0.0008 mm) high on four of those six. The original
+4-point capture is consistent with both divisors: 10, 20 and 30 mm encode
+the same way under each (30 mm is `0x8f8d`, the shared target), and only
+40 mm differs (`0xbf66` vs `0xbf67`), which is the "within 1 raw unit"
+match.
+
+The Pit House UI never shows this number. It shows pedal-face arc mm; see
+[Travel display: pedal-face arc mm](#travel-display-pedal-face-arc-mm-pit-house-1427).
 
 This is a genuine dual-thumb range slider (`MozaControls.MozaRangeSlider`,
 `UI/Controls/MozaRangeSlider.cs`) — no dual-thumb control existed
@@ -2191,12 +2370,17 @@ anywhere in this app before; every other "linked min/max" pair
 (Handbrake, Throttle, Brake, Clutch, mBooster's own raw Min/Max
 calibration) is two separate `Slider` controls with mutual clamping
 via the shared `OnMinMaxSliderChanged` helper. The two thumbs
-(`LowValue`/`HighValue`) are bounded to `[3.8mm, 49.7mm]`
+(`LowValue`/`HighValue`) hold screw mm, and their labels show arc mm (see
+[AZOM's arc display](#azoms-arc-display)). They are bounded to `[3.8mm, 49.7mm]`
 (`MBoosterUiConstants.TravelMinMm`/`TravelMaxMm`) and clamped against
 each other so their gap never drops below 3.8mm (`TravelMinGapMm`). There
 is no maximum gap: an earlier 32.1mm cap is contradicted by Pit House
 itself, which sent start 4.0mm / end 48.8mm (moza-simulator bridge,
-2026-09-29). `TravelStartMm`/`TravelEndMm` default
+2026-09-29). Pit House's own rules depend on the pedal's firmware: on
+1.2.8.0 or later the minimum gap is 4.3 mm, not 3.8 mm. The 32.1 mm cap is
+its brake rule for firmware below 1.2.8.0. See
+[Pit House's travel bounds](#pit-houses-travel-bounds-screw-mm).
+`TravelStartMm`/`TravelEndMm` default
 to `-1` (same "not yet set / no override" sentinel as
 Direction/Min/Max/`MaxThresholdKg`) so a fresh profile never overwrites
 whatever calibration is already on the device; the UI seeds the
@@ -2345,6 +2529,146 @@ at 0%), both from the UI (`SettingsControl.PushSegmentedDamping`) and on
 connect (`MozaPlugin.ApplyMBoosterToHardware`). Switching it back on
 resumes whatever divider/segment values were last stored (or factory
 defaults for a still-untouched profile).
+
+### Travel display: pedal-face arc mm (Pit House 1.4.2.7)
+
+`0x84`/`0x85` carry ball-screw mm, but Pit House 1.4.2.7 shows and accepts
+travel as **arc length along the pedal face**, in mm. The conversion is in a
+JS library in the exe's embedded Qt resources, which the Pedals QML imports
+as `Travel` (`generation`, `arcMm`, `arcLengthMm`, `displayTick`, `_inverse`,
+`screwMmForEdit`). Pit House logs every edit:
+
+```
+Pedals - travel 1 throttle_machinelimit_max_v128 arc mm: 63.8 inverse screw mm: 49.625432390617746
+  adopted screw mm: 49.699999999999996 old screw mm: 42 bounds screw mm: 8.1 49.699999999999996
+  adoption: upper-bound result: 0
+```
+
+The `1` after `travel` is the generation. The device only ever receives screw
+mm, and the generation does not change the wire format.
+
+#### Generation selection
+
+```js
+function generation(model, hardware) {
+    if (!Family.isMember(model))          // "mBooster" or "mBooster Ultra"
+        return 0
+    if (hardware === "RS21-P01-HW PM-CU-V12")
+        return 1
+    if (hardware === "RS21-P01-HW PM-CU-V20")
+        return 2
+    return 0
+}
+```
+
+`model` is the program's `productModelName` and `hardware` is
+`controllerInfo.hardwareVersion`. Pit House's `MBoosterFamily.js` names the
+two generations of the P01 family `mBooster` (V1) and `mBooster Ultra` (V2).
+It shows the Ultra product image for hardware `RS21-P01-HW PM-CU-V20`. Either
+model name is accepted with either hardware string, so the hardware string
+alone selects the formula. At generation 0 (any other model or hardware
+string), the travel range slider and the G-Force max pedal movement control
+are disabled: both have `travelGeneration > 0` in their `enabled` condition.
+
+#### Formula
+
+x is the screw position in mm, 0 ≤ x ≤ 53.5. Outside that range `arcMm`
+returns NaN.
+
+```
+arc(x) = R × (θ0 − acos((K − (D − x)²) / M))
+x(arc) = D − sqrt(K − M × cos(θ0 − arc / R))
+```
+
+This is the law of cosines for a triangle with two fixed sides a and b
+(K = a² + b², M = 2ab) and a third side c = D − x, which gets shorter as the
+screw extends. At x = 0 the included angle is θ0, so arc(0) = 0. The arc is
+the change in that angle times the radius R.
+
+| | Generation 1 | Generation 2 |
+|---|---|---|
+| Hardware string | `RS21-P01-HW PM-CU-V12` | `RS21-P01-HW PM-CU-V20` |
+| Product (per `MBoosterFamily.js`) | mBooster (V1) | mBooster Ultra (V2) |
+| R (mm) | 163.293297 | 154.268313 |
+| θ0 (rad) | 1.053970521 (60.388°) | 0.952645063464 (54.583°) |
+| D (mm) | 162.210043 | 153.625703 |
+| K (mm²) | 49241.8953 | 51646.3321 |
+| M (mm²) | 46405.038043 | 48393.523641 |
+| Fixed sides a / b (mm), derived | 181.265 / 128.003 | 186.662 / 129.629 |
+| Side c from x = 0 to 53.5 (mm) | 162.210 → 108.710 | 153.626 → 100.126 |
+| Rotation over the full stroke | 24.140° | 23.905° |
+| Arc over the full stroke (x = 0–53.5) | 68.80 mm | 64.37 mm |
+| Arc mm per screw mm | 1.313 at x = 0; minimum 1.276 at x ≈ 33.9; 1.294 at x = 53.5 | 1.202 at x = 0; minimum 1.190 at x ≈ 19.3; 1.251 at x = 53.5 |
+| Screw 3.8 / 49.7 shown as | 4.9 / 63.8 | 4.5 / 59.6 |
+| Travel shown at full range | 58.9 mm | 55.0 mm |
+| G-Force max movement 15 shown as | 19.4 | 17.9 |
+
+Generation 1 reproduces exactly every arc → screw conversion Pit House logged
+against moza-simulator on 2026-11-27 (6 distinct values; the sim reports
+`RS21-P01-HW PM-CU-V12` with firmware 1.2.8.0). The generation 2 constants
+come from the code only. They have not been checked against a V20 unit.
+
+#### Display and snapping
+
+- `displayTick(a) = floor((a + 0.000001) × 10)`. Values are shown rounded
+  down to 0.1 mm, so arc 63.896 shows as 63.8.
+- The travel figure is `displayTick(arc(end) − arc(start)) / 10`. For
+  example, 63.896 − 4.975 = 58.921, shown as 58.9 mm. It is not calculated
+  from the two shown limits, so it can differ from their difference by 0.1.
+- `screwMmForEdit(g, a, current, lo, hi)` converts a typed or dragged arc `a`
+  into the screw value to send:
+  1. If `current` is inside [lo, hi] and shows as the same 0.1 mm tick as
+     `a`, it returns `current` unchanged.
+  2. If `a` is at or below the shown value of `lo`, or in the same tick, it
+     returns `lo`. The same rule applies at `hi`.
+  3. Otherwise it returns the exact inverse, clamped to [lo, hi].
+
+  So each slider end sends the exact bound. A typed 4.9 sends 3.8 (arc
+  4.975), and a typed 63.8 sends 49.7 (arc 63.896), although the inverse of
+  63.8 is 49.625. The log's `adoption:` field gives the branch:
+  `lower-bound`, `upper-bound` or `interior`.
+
+#### Pit House's travel bounds (screw mm)
+
+These come from `travelBounds()` in the Pedals QML and do not depend on the
+generation. The start thumb is limited to
+[max(lower, end − maxGap), min(upper, end − minGap)]. The end thumb is
+limited to [max(lower, start + minGap), min(upper, start + maxGap)].
+
+| | App firmware ≥ 1.2.8.0 (`_v128`) | Below 1.2.8.0, brake | Below 1.2.8.0, throttle / clutch |
+|---|---|---|---|
+| lower | 3.8 | 3.8 | 3.8 |
+| upper | 49.7 | 49.7 | 49.7 |
+| min gap | 4.3 | 4.3 (53.5 × 0.08) | 10.7 (53.5 × 0.2) |
+| max gap | 45.9 | 32.1 (53.5 × 0.6) | 53.5 (no limit) |
+
+Below 1.2.8.0 the upper bound is `clutch_throttle_machinelimit_max_end`,
+round(53.5 × 0.93, 1) − 0.1 = 49.7, for every role. The gaps are rounded to
+0.1 mm.
+
+The G-Force max pedal movement (`<p>_gforce_max_pedal_movement`) uses the
+same conversion, with edit bounds of 0–15 screw mm (`defaultPedalTravelMm`).
+Pit House logs those edits as `Pedals - G movement`.
+
+#### AZOM's arc display
+
+AZOM's Start / End of Travel slider shows arc mm with the generation 1
+formula (`MBoosterTravelArc`, through `MBoosterTravelArcScale` on the
+`MozaRangeSlider`). It does not read the hardware string, and it has no
+generation 2 constants, because no V20 unit is known in the field.
+
+- The thumbs, the end labels (4.9 / 63.8) and **Usable travel (mm)**
+  (`displayTick(arc(end) − arc(start)) / 10`) use Pit House's floor to 0.1.
+  The epsilon is 0.001, not 0.000001. Values stored as float, or read back
+  from the wire (±0.0005 arc mm), otherwise show 0.1 low for about 13% of
+  ticks.
+- The track is linear in arc mm. A drag steps 0.1 arc mm and commits
+  through `screwMmForEdit`, so each end commits the exact bound.
+- `TravelStartMm`/`TravelEndMm`, the wire, diagnostics and the 3.8 mm minimum
+  gap (`TravelMinGapMm`) stay in screw mm. The slider seeds from the stored
+  value without rounding it to 0.1 screw mm.
+- The Pit House import preview shows the travel pair in arc mm.
+- G-Force max pedal movement still shows screw mm.
 
 ### Deadzone / Max Force — REVISED: real hardware calibration, not host-side (bug bundle 5VR5AQ8Y)
 
@@ -2679,12 +3003,25 @@ contains that pixel X, then inverts that segment's X(t) via bisection
 read off the exact point ON the spline. The two editors get different
 values so each shows what it actually receives:
 
-- **Input Curve**: `LastAxisRawPercentPreThreshold` — the HID reading
-  before the host-side Max Threshold rescale (on a routed lane, the base's
-  reading mirrored in by role).
+- **Input Curve**: `AxisPedalPosition` — the HID reading as the unit
+  reports it (on a routed lane, the base's reading mirrored in by role).
 - **Output Curve**: hidden since the curve moved onto the device (see
   [Sim Input Mapping](#sim-input-mapping)) — AZOM has no reading of its
   input to place.
+
+The Pedal Feel curve also carries a yellow **Max Threshold** dot
+(`MozaCurveEditor.ThresholdY`, set by
+`SettingsControl.UpdateMBoosterThresholdMarker` straight from the two
+sliders) where the drawn curve first reaches Max Threshold's kg — the
+leftmost peak when several do, since that's where the sim hits 100%, or the
+curve's start if it already begins above. Shown while Threshold is below Max
+Force and the curve actually reaches it; editing the curve moves it.
+
+The same graph's weight follows three more sliders
+(`SettingsControl.UpdateMBoosterFeelCurveWeight`): the first and last points'
+outlines scale with Front / End Limit stiffness (1 = 2 px, 10 = 3×), the
+curve line with Natural Friction as the pedal gets it (0 = 2.5 px, 100 = 3×;
+switched off counts as 0).
 
 A separate card (Pit House calls this class of setting "input
 mapping") holds the Pit House-parity controls, all still under
@@ -2902,7 +3239,7 @@ rows reach the device through `MozaPlugin.ApplyMBoosterToHardware`.
 | `<p>_softlimit_hardness_press` / `_release`      | `EndstopFrontStiffness` / `EndstopEndStiffness`         | **inferred**, see below                                                                |
 | `brake_press_combine`                            | `SensorOutputRatioPct`                                  | **inferred**; brake role only (`mbooster-brake-angle-ratio` is written only for Brake) |
 | `<p>_forcelimit_min` / `_max` (`_v128` first)    | `DeadzoneKg` / `MaxForceKg`                             | kg; see "Pedal Feel keys" below                                                        |
-| `<p>_forces_curve[0..5]` (or `_forces_curve_cache_v128`) | `InputCurveY` (% of Deadzone→Max Force)         | 7 kg values; `[6]` is the Max Force point                                              |
+| `<p>_forces_curve[0..6]` (or `_forces_curve_cache_v128`) | `InputCurveY` + `InputCurveEndY` (% of Deadzone→Max Force) | 7 kg values; `[6]` is the last point                                                   |
 | `<p>_stroke_curve[0..5]` (or `_stroke_curve_cache_v128`) | `InputCurveX` (% of travel)                     | mm inside `machinelimit_min..max`                                                      |
 | `<p>_damping_press` / `_release` (+ `_switch`)   | `DampingPressPct` / `DampingReleasePct`                 | **inferred**; switched off → 0%                                                        |
 | `<p>_damping_[release_]segment{1,2}_position`    | `SegmentedDamping.Divider{1,2}{Pressed,Released}`       | **inferred**; un-prefixed-direction pair = Pressed                                     |
@@ -2923,9 +3260,11 @@ The sample Brake preset holds `brake_forcelimit_min: 11`,
 `[36.40 … 43.57]`, exactly `k/7` of its `machinelimit` range
 (34.97–45.0 mm) for k = 1..6. The same k/7 is the Pedal Feel wire default
 on both axes (see [Pedal Feel default curve shape](#pedal-feel-default-curve-shape-and-node-x-domain--revised-mbooster-deadzone-slider-does-nothing-report)),
-so these are Deadzone, Max Force and the 6 node Y (kg) / X (mm) positions.
-The Y nodes are converted to % of the preset's own Deadzone→Max Force span,
-X to % of its own travel range — the fractions the wire carries.
+so these are Deadzone, Max Force and the 6 node Y (kg) / X (mm) positions,
+with `forces_curve[6]` the last point (equal to `forcelimit_max` here, i.e.
+100%). The Y values are converted to % of the preset's own Deadzone→Max
+Force span (`[6]` into `InputCurveEndY`), X to % of its own travel range —
+the fractions the wire carries.
 
 Values are clamped to the plugin's own slider bounds (`MBoosterUiConstants`)
 on import, and the travel pair additionally honours `TravelMinGapMm` so an
@@ -2965,7 +3304,11 @@ as superseded; older presets without it fall back to the plain keys.
 
 Travel values are **mm**: Pit House's `LocalParameters/MBoost/<uid>.json`
 stores the pedal's `0x84`/`0x85` read-back under `brake_machinelimit_*`, e.g.
-19.81994382022472 = raw `0x5ed7` × 53.5 / 65536 exactly. The curve caches fit
+19.81994382022472 next to raw `0x5ed7` (24279). That is close to raw `0x5ed7`
+under either divisor but matches neither: × 53.5 / 65536 = 19.82005 and
+× 53.5 / 65535 = 19.82035. How Pit House got the stored value is not known.
+Pit House uses the `_v128` key family when the pedal's app firmware is
+1.2.8.0 or later (`isV128RangeSupported` in the Pedals QML). The curve caches fit
 their own `_v128` ranges at k/7 (stroke 7.3…24.8 in 3.8–28.3; forces
 11.57…45.0 in 6–45).
 
@@ -3073,6 +3416,7 @@ equivalent of `ImportPlan.TouchedMBoosters`.
 - 50 Hz effect worker — [`Devices/MBooster/MBoosterEffectWorker.cs`](../../../Devices/MBooster/MBoosterEffectWorker.cs)
 - Multi-device registry — [`Devices/MBooster/MozaMBoosterRegistry.cs`](../../../Devices/MBooster/MozaMBoosterRegistry.cs)
 - Calibration routines — [`Devices/MBooster/MBoosterCalibrationRunner.cs`](../../../Devices/MBooster/MBoosterCalibrationRunner.cs), UI in [`UI/SettingsControl.MBoosterCal.cs`](../../../UI/SettingsControl.MBoosterCal.cs)
+- Automatic bite point — [`MozaPlugin.MBoosterAutoBiteFeel.cs`](../../../MozaPlugin.MBoosterAutoBiteFeel.cs), template and settings in [`Devices/MBooster/MBoosterAutoBiteFeel.cs`](../../../Devices/MBooster/MBoosterAutoBiteFeel.cs), map in [`Devices/MBooster/MBoosterBitePointPedalMap.cs`](../../../Devices/MBooster/MBoosterBitePointPedalMap.cs), UI in [`UI/SettingsControl.MBoosterAutoBite.cs`](../../../UI/SettingsControl.MBoosterAutoBite.cs)
 - Byte-exact frame expectations — [`tools/cmd-frame-mbooster-cal.txt`](../../../tools/cmd-frame-mbooster-cal.txt), checked with [`tools/cmd-frame`](../../../tools/cmd-frame) (`tools/cmd-frame --check tools/cmd-frame-mbooster-cal.txt`)
 - HID extension — [`Protocol/MozaHidReader.cs`](../../../Protocol/MozaHidReader.cs) (`MozaHidClass.MBooster` path)
 - Profile storage — [`Settings/MozaProfile.cs`](../../../Settings/MozaProfile.cs) (`MBoosterSettings` dict)

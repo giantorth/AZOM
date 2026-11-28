@@ -3,9 +3,9 @@ name: Build
 # Single entry point for every build:
 #
 #   push to main/dev            compile only
-#   pull_request, same-repo     compile + publish the PR pre-release
+#   pull_request, same-repo     compile + sign + publish the PR pre-release
 #   pull_request, fork/draft    compile only (read-only token, no secrets)
-#   workflow_dispatch + PR num  compile + release that PR, forks included
+#   workflow_dispatch + PR num  compile + sign + release that PR, forks included
 #   workflow_dispatch, no num   compile the selected branch
 #   /build comment on a PR      pr-command.yml dispatches the case above
 #
@@ -17,7 +17,10 @@ on:
   # `paths:` scopes a push to the commits actually pushed, but scopes a
   # pull_request to the PR's whole diff — the `changed` job below narrows that
   # back to the pushed range. Keep both lists in sync with the `case` in the
-  # `changed` job below.
+  # `changed` job below. The pull_request side alone skips libs/SimHub/**:
+  # simhub-update.yml tests SimHub bumps itself, so neither the bot's chore PR
+  # nor merging it into dev may publish or announce a PR pre-release. A push to
+  # dev still compiles the merged tree.
   push:
     branches: [main, dev]
     paths:
@@ -40,6 +43,7 @@ on:
       - "**.xaml"
       - "**.resx"
       - "libs/**"
+      - "!libs/SimHub/**"
       - "DeviceTemplates/**"
       - "Resources/**"
       - "Data/**"
@@ -124,10 +128,12 @@ jobs:
           printf '%s\n' "${files:-  (none)}" | sed 's/^/  /'
 
           # Mirrors the two `paths:` filters above — all three lists must
-          # stay in sync.
+          # stay in sync. libs/SimHub/ is the pull_request filter's exclusion:
+          # merging a SimHub bump into dev must not re-release the dev→main PR.
           while IFS= read -r f; do
             [ -n "$f" ] || continue
             case "$f" in
+              libs/SimHub/*) ;;
               *.cs|*.csproj|*.sln|*.xaml|*.resx|libs/*|DeviceTemplates/*|Resources/*|Data/*|Themes/*)
                 build "source changed: ${f}" ;;
             esac
@@ -161,6 +167,7 @@ jobs:
       zip_name: ${{ steps.vars.outputs.zip_name }}
       commit_count: ${{ steps.vars.outputs.commit_count }}
       build_timestamp: ${{ steps.vars.outputs.build_timestamp }}
+      unsigned_artifact_id: ${{ steps.upload-unsigned.outputs.artifact-id }}
 
     steps:
       - name: Resolve build mode
@@ -375,18 +382,17 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Stage and zip release files
+      # SignPath signs MozaPlugin.dll inside the zip this step makes — see
+      # .github/actions/sign-plugin/artifact-configuration.xml.
+      - name: Upload unsigned DLL
+        id: upload-unsigned
         if: steps.mode.outputs.release == 'true'
-        shell: pwsh
-        env:
-          ZIP_NAME: ${{ steps.vars.outputs.zip_name }}
-        run: |
-          $staging = "staging"
-          New-Item -ItemType Directory -Path $staging -Force | Out-Null
-          Copy-Item ./bin/x86/Release/MozaPlugin.dll $staging/
-          # Localized resources are embedded in MozaPlugin.dll — single-file
-          # deployment, no satellite-folder bundling needed. See release.yml.
-          Compress-Archive -Path ./staging/* -DestinationPath ./$env:ZIP_NAME
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-pr-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
+          path: ./bin/x86/Release/MozaPlugin.dll
+          retention-days: 1
+          if-no-files-found: error
 
       # Was softprops/action-gh-release@v3. GitHub has intermittently 403'd
       # POST /releases here with `Contents: write` on the token (same workflow
@@ -429,6 +435,9 @@ jobs:
             cat commit-list.md
             printf '\n**Diff:** https://github.com/%s/compare/%s...%s\n' \
               "$GITHUB_REPOSITORY" "$BASE_SHA" "$HEAD_SHA"
+            # SignPath Foundation requires this on every download page.
+            printf '\n[Code signing policy](https://github.com/%s#code-signing-policy)\n' \
+              "$GITHUB_REPOSITORY"
           } > release-notes.md
 
       - name: Upload release payload
@@ -437,26 +446,64 @@ jobs:
         with:
           name: pr-release-${{ steps.mode.outputs.pr_number }}-${{ steps.vars.outputs.short_sha }}
           path: |
-            ${{ steps.vars.outputs.zip_name }}
             release-notes.md
             commit-list.md
           retention-days: 1
           if-no-files-found: error
 
-  # Holds the write token, so it must never check out or execute PR code — it
-  # only downloads the artifact `compile` produced. Needs `contents: write`
-  # alone: the tag lands on the merge commit, whose .github/workflows tree
-  # matches the base, so no `workflows` scope is involved.
-  publish:
-    runs-on: ubuntu-latest
+  # Holds the SignPath token, so it never runs the build — only the signing
+  # action, checked out from the same tree as this workflow file. The zip it
+  # signs is the one `compile` uploaded. Waits on the manual SignPath approval;
+  # a newer push to the PR cancels it through `concurrency`.
+  sign:
+    runs-on: windows-latest
     needs: compile
-    # `changed` is skipped on every event except a PR push, and GitHub
-    # propagates that skip down the chain — so this needs the same always()
-    # anchor `compile` uses, plus an explicit success check.
     if: >-
       always() &&
       needs.compile.result == 'success' &&
       needs.compile.outputs.release == 'true'
+    timeout-minutes: 330
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout signing action
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/sign-plugin
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Sign and zip
+        uses: ./.github/actions/sign-plugin
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          unsigned-artifact-id: ${{ needs.compile.outputs.unsigned_artifact_id }}
+          version: ${{ needs.compile.outputs.pr_version }}
+          zip-name: ${{ needs.compile.outputs.zip_name }}
+
+      - name: Upload signed ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-signed-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+          path: ${{ needs.compile.outputs.zip_name }}
+          retention-days: 1
+          if-no-files-found: error
+
+  # Holds the write token, so it must never check out or execute PR code — it
+  # only downloads the artifacts `compile` and `sign` produced. Needs
+  # `contents: write` alone: the tag lands on the merge commit, whose
+  # .github/workflows tree matches the base, so no `workflows` scope is involved.
+  publish:
+    runs-on: ubuntu-latest
+    needs: [compile, sign]
+    # `changed` is skipped on every event except a PR push, and GitHub
+    # propagates that skip down the chain — so this needs the same always()
+    # anchor `compile` uses, plus an explicit success check. `sign` only runs
+    # for a release build, so its success implies compile's.
+    if: always() && needs.sign.result == 'success'
     permissions:
       contents: write
     steps:
@@ -464,6 +511,11 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: pr-release-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
+
+      - name: Download signed ZIP
+        uses: actions/download-artifact@v8
+        with:
+          name: pr-signed-${{ needs.compile.outputs.pr_number }}-${{ needs.compile.outputs.short_sha }}
 
       - name: Publish PR pre-release
         shell: bash
