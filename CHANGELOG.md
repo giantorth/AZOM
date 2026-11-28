@@ -4,33 +4,51 @@ All notable changes to the AZOM plugin are documented here.
 
 ## [1.7.6]
 
+## Highlights
+
+- **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point for the current game and car, with adjustable width and force before, after and at the end of travel.
+- **Clutch bite point always calibrates automatically;** the Calibrate button, Auto-calibrate toggle and `AZOM.ClutchBitePointCalibrate` action give way to a status showing the car or game calibration count, readiness to measure and each launch's result.
+- **Clutch Bite Point overlays;** a full one with calibration state, sample count, live clutch against the bite point, standing-start checks and the last launch, and a Mini one that appears only while a standing start can be measured.
+- **Clutch Engine Vibration has a Min/Max frequency range and Roughness;** replacing Cylinders, Lope and Smoothness, Roughness swings frequency and intensity at a set rate, with White noise for randomness.
+
 ## Added
 
-- **mBooster Automatic bite point;** a clutch's Pedal Feel curve peaks at the calibrated bite point, following the game and car.
+### mBooster pedals
+
 - **mBooster Automatic deadzone;** the Sim Input Mapping curve starts where the Pedal Feel deadzone ends, for any Sensor Output Ratio blend.
 - **mBooster Pedal Feel graph shows End Stop and Natural Friction;** the end points' outlines thicken with Front / End Limit stiffness and the curve with Natural Friction.
 - **mBooster Max Threshold point on the Pedal Feel graph;** a yellow dot marks where the curve reaches Max Threshold's force when it's below Max Force.
 - **mBooster Sim Input Mapping graph shows its deadzones;** the travel before the start and past the end is shaded with its %, in place of the line from 0,0.
-- **MOZA Clutch Bite Point overlays;** a full one with calibration state, sample count, live clutch against the bite point, standing-start checks and the last launch, and a Mini one that appears only while a standing start can be measured.
+
+### Plugin
+
+- **Signed plugin DLL;** stable releases and PR pre-releases are code-signed with the SignPath Foundation certificate.
 
 ## Changed
 
-- **Help tab guides grouped by category;** Setup, Wheelbase, Pedals, Shifters & Stalks, LEDs, Dashboard, Controls and Plugin, matching the website.
-- **mBooster Clutch Bite Point card reads the mBooster clutch;** it no longer offers a clutch source.
-- **Clutch bite point always calibrates automatically;** the Calibrate button, Auto-calibrate toggle and `AZOM.ClutchBitePointCalibrate` action give way to a status showing car or game calibration count, readiness to measure, and each launch's result.
-- **Clutch Engine Vibration has a Min/Max frequency range and Roughness;** replacing Cylinders, Lope and Smoothness, Roughness swings frequency and intensity at a set rate, with White noise for randomness.
 - **mBooster Start / End of Travel shows pedal-face mm;** the same numbers as Pit House, with the usable travel beside it.
+- **mBooster Clutch Bite Point card reads the mBooster clutch;** it no longer offers a clutch source.
+- **Help tab guides grouped by category;** Setup, Wheelbase, Pedals, Shifters & Stalks, LEDs, Dashboard, Controls and Plugin, matching the website.
 
 ## Fixed
 
-- **MOZA dashboard updates are offered, not skipped;** a copy saved in Dash Studio gets an Install update / Dismiss banner, and the dashboards now come with thumbnails.
-- **Truck-sim stalk keys reach ETS2/ATS on Linux;** for a game in another Wine prefix or native, with an LSU Wine that forwards SendInput.
+### mBooster pedals
+
+- **mBooster role changes work with a passive pedal connected;** a swap no longer leaves two pedals on one role or mislabels them, and the passive pedal's column on the Pedals tab has its own Role picker.
+- **mBooster Max Threshold no longer applied twice;** AZOM's own pedal readings and effects now match what the pedal reports.
 - **mBooster Pedal Feel curve allows "A"-shaped curves;** any point, the last included, can sit below the one before it, and dragging the last point no longer changes Max Force or rescales the graph.
 - **mBooster Pedal Feel graph no longer jumps while moving Max Force;** its top now follows Max Force smoothly.
 - **Shift-dragging an mBooster Pedal Feel point lands on 5 kg steps;** it gave 136/144 instead of 135/145.
-- **mBooster Max Threshold no longer applied twice;** AZOM's own pedal readings and effects now match what the pedal reports.
-- **mBooster role changes work with a passive pedal connected;** the passive pedal's role is now written to the mBooster when a role change swaps with it, and roles follow the hardware as on chains, so a swap no longer leaves two pedals on one role or mislabels them. A passive pedal's column on the Pedals tab has its own Role picker.
+
+### Dashboards
+
+- **MOZA dashboard updates are offered, not skipped;** a copy saved in Dash Studio gets an Install update / Dismiss banner, and the dashboards now come with thumbnails.
+- **Assetto Corsa track map shows other cars and multi-layout tracks;** car positions and the layout's map.ini are now read from AC's own data.
+
+### Motion and stalks
+
 - **HMA150 port self-test passes with a correct corner assignment;** each corner was sent to the controller mirrored left↔right, so both axis checks failed.
+- **Truck-sim stalk keys reach ETS2/ATS on Linux;** for a game in another Wine prefix or native, with an LSU Wine that forwards SendInput.
 
 ## [1.7.5]
 
