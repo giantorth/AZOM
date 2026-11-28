@@ -901,10 +901,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Under bitepunktet</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Helt sluppet</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Alltid</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Sylindere</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Maks frekvens (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Styrke på tomgang (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsering (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Styrke over bakketopper</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blokkerer tilgang til MOZA-enheter</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Linux-brukeren din kan ikke åpne {0}, så programtillegget kan ikke koble til.</value></data>
@@ -996,4 +994,10 @@ Id: {2}</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Bil ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Spill ×{0}</value></data>
   <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatisk dødsone</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Min frekvens (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Ruhet</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Takt (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frekvens (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensitet (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Hvit støy (%)</value></data>
 </root>

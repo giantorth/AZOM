@@ -896,10 +896,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Ниже точки схватывания</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Полностью отпущено</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Всегда</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Цилиндры</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Макс. частота (Гц)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Сила на холостых (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Пульсация (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Сила на гребнях</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux блокирует доступ к устройствам MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ваш пользователь Linux не может открыть {0}, поэтому плагин не может к нему подключиться.</value></data>
@@ -991,4 +989,10 @@ Id: {2}</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Автомобиль ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Игра ×{0}</value></data>
   <data name="Label_AutoDeadzone" xml:space="preserve"><value>Автоматическая мёртвая зона</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Мин. частота (Гц)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Неровность</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Темп (Гц)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Частота (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Интенсивность (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Белый шум (%)</value></data>
 </root>

@@ -961,10 +961,8 @@ namespace MozaPlugin.Resources
         public static string Option_ClutchClosedBelowBite => Get("Option_ClutchClosedBelowBite");
         public static string Option_ClutchClosedReleased => Get("Option_ClutchClosedReleased");
         public static string Option_ClutchClosedAlways => Get("Option_ClutchClosedAlways");
-        public static string SliderLabel_Cylinders => Get("SliderLabel_Cylinders");
         public static string SliderLabel_MaxFrequencyHz => Get("SliderLabel_MaxFrequencyHz");
         public static string SliderLabel_IdleStrength => Get("SliderLabel_IdleStrength");
-        public static string SliderLabel_Lope => Get("SliderLabel_Lope");
         public static string Motion_Panel_CrestBoost => Get("Motion_Panel_CrestBoost");
         public static string Banner_LinuxAccess_Title => Get("Banner_LinuxAccess_Title");
         public static string Banner_LinuxAccess_TtyFmt => Get("Banner_LinuxAccess_TtyFmt");
@@ -1056,5 +1054,11 @@ namespace MozaPlugin.Resources
         public static string BiteCal_CarCount => Get("BiteCal_CarCount");
         public static string BiteCal_GameCount => Get("BiteCal_GameCount");
         public static string Label_AutoDeadzone => Get("Label_AutoDeadzone");
+        public static string SliderLabel_MinFrequencyHz => Get("SliderLabel_MinFrequencyHz");
+        public static string Section_ShakeItRoughness => Get("Section_ShakeItRoughness");
+        public static string SliderLabel_RoughnessRateHz => Get("SliderLabel_RoughnessRateHz");
+        public static string SliderLabel_FrequencyRoughness => Get("SliderLabel_FrequencyRoughness");
+        public static string SliderLabel_IntensityRoughness => Get("SliderLabel_IntensityRoughness");
+        public static string SliderLabel_WhiteNoise => Get("SliderLabel_WhiteNoise");
     }
 }

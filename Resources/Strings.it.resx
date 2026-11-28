@@ -899,10 +899,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Sotto il punto di stacco</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Completamente rilasciata</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Sempre</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cilindri</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Frequenza max (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensità al minimo (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsazione (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Forza sui dossi</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux sta bloccando l'accesso ai dispositivi MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Il tuo utente Linux non può aprire {0}, quindi il plugin non può connettersi.</value></data>
@@ -994,4 +992,10 @@ Id: {2}</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Auto ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Gioco ×{0}</value></data>
   <data name="Label_AutoDeadzone" xml:space="preserve"><value>Zona morta automatica</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Frequenza min (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Ruvidità</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Ritmo (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frequenza (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensità (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Rumore bianco (%)</value></data>
 </root>

@@ -896,10 +896,8 @@ Id: {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Unter dem Schleifpunkt</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Ganz losgelassen</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Immer</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Zylinder</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Max. Frequenz (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Stärke im Leerlauf (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsieren (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Stärke über Kuppen</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux blockiert den Zugriff auf MOZA-Geräte</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Ihr Linux-Benutzer kann {0} nicht öffnen, daher kann das Plugin keine Verbindung herstellen.</value></data>
@@ -991,4 +989,10 @@ Id: {2}</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Fahrzeug ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Spiel ×{0}</value></data>
   <data name="Label_AutoDeadzone" xml:space="preserve"><value>Automatische Totzone</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Min. Frequenz (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Laufunruhe</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Takt (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Frequenz (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensität (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Weißes Rauschen (%)</value></data>
 </root>

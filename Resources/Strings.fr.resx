@@ -896,10 +896,8 @@ Id : {2}</value></data>
   <data name="Option_ClutchClosedBelowBite" xml:space="preserve"><value>Sous le point de patinage</value></data>
   <data name="Option_ClutchClosedReleased" xml:space="preserve"><value>Entièrement relâché</value></data>
   <data name="Option_ClutchClosedAlways" xml:space="preserve"><value>Toujours</value></data>
-  <data name="SliderLabel_Cylinders" xml:space="preserve"><value>Cylindres</value></data>
   <data name="SliderLabel_MaxFrequencyHz" xml:space="preserve"><value>Fréquence max. (Hz)</value></data>
   <data name="SliderLabel_IdleStrength" xml:space="preserve"><value>Intensité au ralenti (%)</value></data>
-  <data name="SliderLabel_Lope" xml:space="preserve"><value>Pulsation (%)</value></data>
   <data name="Motion_Panel_CrestBoost" xml:space="preserve"><value>Force sur les bosses</value></data>
   <data name="Banner_LinuxAccess_Title" xml:space="preserve"><value>Linux bloque l'accès aux périphériques MOZA</value></data>
   <data name="Banner_LinuxAccess_TtyFmt" xml:space="preserve"><value>Votre utilisateur Linux ne peut pas ouvrir {0}, le plugin ne peut donc pas s'y connecter.</value></data>
@@ -991,4 +989,10 @@ Id : {2}</value></data>
   <data name="BiteCal_CarCount" xml:space="preserve"><value>Voiture ×{0}</value></data>
   <data name="BiteCal_GameCount" xml:space="preserve"><value>Jeu ×{0}</value></data>
   <data name="Label_AutoDeadzone" xml:space="preserve"><value>Zone morte automatique</value></data>
+  <data name="SliderLabel_MinFrequencyHz" xml:space="preserve"><value>Fréquence min. (Hz)</value></data>
+  <data name="Section_ShakeItRoughness" xml:space="preserve"><value>Rugosité</value></data>
+  <data name="SliderLabel_RoughnessRateHz" xml:space="preserve"><value>Cadence (Hz)</value></data>
+  <data name="SliderLabel_FrequencyRoughness" xml:space="preserve"><value>Fréquence (%)</value></data>
+  <data name="SliderLabel_IntensityRoughness" xml:space="preserve"><value>Intensité (%)</value></data>
+  <data name="SliderLabel_WhiteNoise" xml:space="preserve"><value>Bruit blanc (%)</value></data>
 </root>

@@ -18,6 +18,7 @@ All notable changes to the AZOM plugin are documented here.
 - **Help tab guides grouped by category;** Setup, Wheelbase, Pedals, Shifters & Stalks, LEDs, Dashboard, Controls and Plugin, matching the website.
 - **mBooster Clutch Bite Point card reads the mBooster clutch;** it no longer offers a clutch source.
 - **Clutch bite point always calibrates automatically;** the Calibrate button, Auto-calibrate toggle and `AZOM.ClutchBitePointCalibrate` action give way to a status showing car or game calibration count, readiness to measure, and each launch's result.
+- **Clutch Engine Vibration has a Min/Max frequency range and Roughness;** replacing Cylinders, Lope and Smoothness, Roughness swings frequency and intensity at a set rate, with White noise for randomness.
 
 ## Fixed
 
