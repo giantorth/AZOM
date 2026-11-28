@@ -1912,7 +1912,9 @@ sees, and AZOM uses it as reported.
   read back exactly their Exponential shape (6/14/28/54/100).
 
   So "no output until 20% pedal" is `<role>-min` = 20 — a device setting,
-  not a curve shape.
+  not a curve shape. AZOM's graph shades those two deadzones — left of the
+  start, right of the end — each labelled with its width in %, and draws no
+  line from 0,0 to the start (`MozaCurveEditor.UpdateRangeDeadzones`).
 
   **Automatic deadzone** (`AutoDeadzone`, AZOM-only, load-cell owners):
   while on, the UI sets the start to where the output leaves 0 as the pedal

@@ -126,7 +126,8 @@ namespace MozaControls
         // last is the range end, X and Y. The nodes between are Y-only and sit
         // evenly spaced between the two, so X2..X(n-1) are derived and never
         // written. Used by MBoosterCurveEditor; X1/X(n) bind to the pedal's
-        // Min/Max.
+        // Min/Max. The plot outside the two endpoints is shaded and labelled
+        // with its width in % rather than drawn as curve.
         public static readonly DependencyProperty EndpointRangeModeProperty =
             DependencyProperty.Register(nameof(EndpointRangeMode), typeof(bool), typeof(MozaCurveEditor),
                 new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsRender,
@@ -184,7 +185,8 @@ namespace MozaControls
 
         // When true (default — output-curve behaviour), the spline is anchored
         // at the plot's lower-left corner so the visual line implies a
-        // (0,0) → first-node segment. When false (EQ behaviour), the spline
+        // (0,0) → first-node segment (not drawn in EndpointRangeMode). When
+        // false (EQ behaviour), the spline
         // starts AT the first node and ends AT the last node with both
         // endpoints free-floating.
         public static readonly DependencyProperty AnchorAtOriginProperty =
@@ -441,6 +443,51 @@ namespace MozaControls
         public static readonly DependencyProperty ThresholdMarkerTopProperty = ThresholdMarkerTopKey.DependencyProperty;
         public double ThresholdMarkerTop => (double)GetValue(ThresholdMarkerTopProperty);
 
+        // EndpointRangeMode's two deadzones: the shaded bands, and each one's
+        // width in % with its TextBlock's top-left corner (parked off-canvas
+        // with no text when that end has none).
+        private static readonly DependencyPropertyKey RangeDeadzoneGeometryKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeDeadzoneGeometry), typeof(Geometry),
+                typeof(MozaCurveEditor), new PropertyMetadata(null));
+        public static readonly DependencyProperty RangeDeadzoneGeometryProperty = RangeDeadzoneGeometryKey.DependencyProperty;
+        public Geometry? RangeDeadzoneGeometry => (Geometry?)GetValue(RangeDeadzoneGeometryProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneTextKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneText), typeof(string),
+                typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty RangeStartDeadzoneTextProperty = RangeStartDeadzoneTextKey.DependencyProperty;
+        public string RangeStartDeadzoneText => (string)GetValue(RangeStartDeadzoneTextProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneLeftKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneLeft), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeStartDeadzoneLeftProperty = RangeStartDeadzoneLeftKey.DependencyProperty;
+        public double RangeStartDeadzoneLeft => (double)GetValue(RangeStartDeadzoneLeftProperty);
+
+        private static readonly DependencyPropertyKey RangeStartDeadzoneTopKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeStartDeadzoneTop), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeStartDeadzoneTopProperty = RangeStartDeadzoneTopKey.DependencyProperty;
+        public double RangeStartDeadzoneTop => (double)GetValue(RangeStartDeadzoneTopProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneTextKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneText), typeof(string),
+                typeof(MozaCurveEditor), new PropertyMetadata(string.Empty));
+        public static readonly DependencyProperty RangeEndDeadzoneTextProperty = RangeEndDeadzoneTextKey.DependencyProperty;
+        public string RangeEndDeadzoneText => (string)GetValue(RangeEndDeadzoneTextProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneLeftKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneLeft), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeEndDeadzoneLeftProperty = RangeEndDeadzoneLeftKey.DependencyProperty;
+        public double RangeEndDeadzoneLeft => (double)GetValue(RangeEndDeadzoneLeftProperty);
+
+        private static readonly DependencyPropertyKey RangeEndDeadzoneTopKey =
+            DependencyProperty.RegisterReadOnly(nameof(RangeEndDeadzoneTop), typeof(double),
+                typeof(MozaCurveEditor), new PropertyMetadata(-10000.0));
+        public static readonly DependencyProperty RangeEndDeadzoneTopProperty = RangeEndDeadzoneTopKey.DependencyProperty;
+        public double RangeEndDeadzoneTop => (double)GetValue(RangeEndDeadzoneTopProperty);
+
         // The two fixed anchor points (see ShowAnchorPoints) — Border
         // top-left corner, same convention as NodeXKeys, with the anchor's
         // own Y value (YMin / YMax) as the in-circle text.
@@ -663,6 +710,11 @@ namespace MozaControls
         // sync with the Ellipse Width/Height in MozaCurveEditorTemplate.
         private const double MarkerSize = 10;
         private const double MarkerHalf = MarkerSize / 2.0;
+
+        // Deadzone % label box. Keep in sync with its TextBlock Width in
+        // MozaCurveEditorTemplate.
+        private const double DeadzoneLabelWidth = 36;
+        private const double DeadzoneLabelHalfHeight = 8;
 
         // The visual X axis is uniformly compressed by 0.98 so the 28-px node
         // circle (plus its glow) on the last node clears the outer Border's
@@ -1133,9 +1185,14 @@ namespace MozaControls
             for (int i = 0; i < realCount; i++) allPts[i + 1] = real[i];
             allPts[realCount + 1] = real[realCount - 1];
 
+            // EndpointRangeMode doesn't draw the origin → start lead-in (its
+            // start deadzone band stands for it), but keeps the origin as the
+            // tangent helper and in `segments`, so the curve's shape and the
+            // markers are unchanged.
+            int firstDrawn = EndpointRangeMode && anchorStart ? 1 : 0;
             var fig = new PathFigure
             {
-                StartPoint = real[0],
+                StartPoint = real[firstDrawn],
                 IsClosed = false,
                 IsFilled = false,
             };
@@ -1153,13 +1210,15 @@ namespace MozaControls
                 Point p3 = allPts[i + 3];
                 Point c1 = new Point(p1.X + (p2.X - p0.X) / 6.0, p1.Y + (p2.Y - p0.Y) / 6.0);
                 Point c2 = new Point(p2.X - (p3.X - p1.X) / 6.0, p2.Y - (p3.Y - p1.Y) / 6.0);
-                fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
+                if (i >= firstDrawn) fig.Segments.Add(new BezierSegment(c1, c2, p2, true));
                 segments[i] = (p1, c1, c2, p2);
             }
             var geom = new PathGeometry();
             geom.Figures.Add(fig);
             geom.Freeze();
             SetValue(CurveGeometryKey, geom);
+
+            UpdateRangeDeadzones(pts, nodeCount, plotW, plotH);
 
             _markerSegments = segments;
             _markerNodePts = pts;
@@ -1411,6 +1470,49 @@ namespace MozaControls
                 SetValue(LiveMarkerTopKey, -10000.0);
                 SetValue(LiveGuideLineGeometryKey, null);
             }
+        }
+
+        // EndpointRangeMode: output holds at 0 left of the start and at the
+        // end's Y right of the end — shade both full-height, each labelled
+        // with its width in %. The label sits in the plot half away from its
+        // own point.
+        private void UpdateRangeDeadzones(Point[] nodePts, int nodeCount, double plotW, double plotH)
+        {
+            int last = nodeCount - 1;
+            int startPct = EndpointRangeMode ? (int)Math.Round(NodeDataX(0, nodeCount)) : 0;
+            int endPct = EndpointRangeMode ? (int)Math.Round(100.0 - NodeDataX(last, nodeCount)) : 0;
+            double left = PadLeft, right = PadLeft + plotW;
+            double top = PadTop, bottom = PadTop + plotH;
+
+            var bands = new GeometryGroup();
+            if (startPct > 0)
+                bands.Children.Add(new RectangleGeometry(new Rect(new Point(left, top), new Point(nodePts[0].X, bottom))));
+            if (endPct > 0)
+                bands.Children.Add(new RectangleGeometry(new Rect(new Point(nodePts[last].X, top), new Point(right, bottom))));
+            if (bands.Children.Count > 0) bands.Freeze();
+            SetValue(RangeDeadzoneGeometryKey, bands.Children.Count > 0 ? bands : null);
+
+            void SetLabel(int pct, double bandLeft, double bandRight, Point node,
+                DependencyPropertyKey textKey, DependencyPropertyKey leftKey, DependencyPropertyKey topKey)
+            {
+                if (pct <= 0)
+                {
+                    SetValue(textKey, string.Empty);
+                    SetValue(leftKey, -10000.0);
+                    SetValue(topKey, -10000.0);
+                    return;
+                }
+                double x = (bandLeft + bandRight) / 2.0 - DeadzoneLabelWidth / 2.0;
+                x = Math.Max(left, Math.Min(right - DeadzoneLabelWidth, x));
+                double y = node.Y > top + plotH / 2.0 ? top + plotH / 4.0 : top + plotH * 3.0 / 4.0;
+                SetValue(textKey, pct.ToString(CultureInfo.InvariantCulture) + "%");
+                SetValue(leftKey, x);
+                SetValue(topKey, y - DeadzoneLabelHalfHeight);
+            }
+            SetLabel(startPct, left, nodePts[0].X, nodePts[0],
+                RangeStartDeadzoneTextKey, RangeStartDeadzoneLeftKey, RangeStartDeadzoneTopKey);
+            SetLabel(endPct, nodePts[last].X, right, nodePts[last],
+                RangeEndDeadzoneTextKey, RangeEndDeadzoneLeftKey, RangeEndDeadzoneTopKey);
         }
 
         // Threshold dot (see ThresholdY): where the drawn curve first reaches

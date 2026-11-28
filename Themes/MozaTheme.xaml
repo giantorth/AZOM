@@ -902,6 +902,9 @@
                 Padding="0"
                 SnapsToDevicePixels="True">
             <Canvas x:Name="PART_Canvas" Background="Transparent" ClipToBounds="True">
+                <!-- Deadzone bands outside the range (see MozaCurveEditor.EndpointRangeMode) -->
+                <Path Fill="{TemplateBinding AccentBrush}" Opacity="0.12"
+                      Data="{Binding RangeDeadzoneGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <!-- Grid lines -->
                 <Path Stroke="{StaticResource BorderBrush}" StrokeThickness="1"
                       StrokeDashArray="2 3" Opacity="0.6"
@@ -921,6 +924,20 @@
                       Fill="{x:Null}"
                       Effect="{StaticResource CyanGlowSoftEffect}"
                       Data="{Binding CurveGeometry, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <!-- Deadzone widths in %, centred in their bands. Width must stay
+                     in sync with MozaCurveEditor.DeadzoneLabelWidth. -->
+                <TextBlock Text="{Binding RangeStartDeadzoneText, RelativeSource={RelativeSource TemplatedParent}}"
+                           Width="36" TextAlignment="Center"
+                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                           Foreground="{TemplateBinding AccentBrush}" IsHitTestVisible="False"
+                           Canvas.Left="{Binding RangeStartDeadzoneLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding RangeStartDeadzoneTop, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <TextBlock Text="{Binding RangeEndDeadzoneText, RelativeSource={RelativeSource TemplatedParent}}"
+                           Width="36" TextAlignment="Center"
+                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                           Foreground="{TemplateBinding AccentBrush}" IsHitTestVisible="False"
+                           Canvas.Left="{Binding RangeEndDeadzoneLeft, RelativeSource={RelativeSource TemplatedParent}}"
+                           Canvas.Top="{Binding RangeEndDeadzoneTop, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <!-- The curve's two END points (see MozaCurveEditor.ShowAnchorPoints):
                      for Pedal Feel, (0,0) = Deadzone and (100,100) = Max Force.
                      Both are drawn before the draggable nodes so a node dragged up

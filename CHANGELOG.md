@@ -10,6 +10,7 @@ All notable changes to the AZOM plugin are documented here.
 - **mBooster Automatic deadzone;** the Sim Input Mapping curve starts where the Pedal Feel deadzone ends, for any Sensor Output Ratio blend.
 - **mBooster Pedal Feel graph shows End Stop and Natural Friction;** the end points' outlines thicken with Front / End Limit stiffness and the curve with Natural Friction.
 - **mBooster Max Threshold point on the Pedal Feel graph;** a yellow dot marks where the curve reaches Max Threshold's force when it's below Max Force.
+- **mBooster Sim Input Mapping graph shows its deadzones;** the travel before the start and past the end is shaded with its %, in place of the line from 0,0.
 - **MOZA Clutch Bite Point overlays;** a full one with calibration state, sample count, live clutch against the bite point, standing-start checks and the last launch, and a Mini one that appears only while a standing start can be measured.
 
 ## Changed
